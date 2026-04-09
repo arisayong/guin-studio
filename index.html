@@ -1238,6 +1238,18 @@ function ls(k,v){
   window.dispatchEvent(new CustomEvent('guindatachange',{detail:{key:k}}));
 }
 let voucherSeq=parseInt(ls('voucher_seq')||'0');
+async function nextVoucherNoAsync(){
+  if(_fbDatabase){
+    try{
+      const ref=_fbDatabase.ref('docs/voucherSeq');
+      const snap=await ref.get();
+      const n=(snap.exists()?snap.val():0)+1;
+      await ref.set(n);ls('voucher_seq',n);
+      return 'GS-'+new Date().getFullYear()+'-'+String(n).padStart(4,'0');
+    }catch(e){}
+  }
+  return nextVoucherNo();
+}
 function nextVoucherNo(){voucherSeq++;ls('voucher_seq',String(voucherSeq));const y=new Date().getFullYear()+543;return`GS-${y}-${String(voucherSeq).padStart(4,'0')}`}
 
 // ══════════════════════════════════════════════
@@ -1272,7 +1284,72 @@ function getStaffData(){
     ],
   };
 }
-function saveStaffData(d){ls('staff_v3',d)}
+
+// ══════════════════════════════════════════════
+// FIREBASE DATA LAYER — All critical data synced
+// ══════════════════════════════════════════════
+
+// Firebase path mapping for each data type
+const FB_PATHS = {
+  'staff_v3':       'staff',
+  'trk_cards':      'trkCards', 
+  'quotations':     'docs/quotations',
+  'voucher_seq':    'docs/voucherSeq',
+  'docs_history':   'docs/history',
+};
+
+// Save to Firebase + localStorage
+async function fbSave(key, data) {
+  ls(key, data); // always cache locally
+  const path = FB_PATHS[key];
+  if (path && _fbDatabase) {
+    try { await _fbDatabase.ref(path).set(data); } 
+    catch(e) { console.warn('fbSave', key, e.message); }
+  }
+}
+
+// Load from Firebase (fallback to localStorage)
+async function fbLoad(key) {
+  const path = FB_PATHS[key];
+  if (path && _fbDatabase) {
+    try {
+      const snap = await _fbDatabase.ref(path).get();
+      if (snap.exists()) {
+        const val = snap.val();
+        ls(key, val); // update local cache
+        return val;
+      }
+    } catch(e) { console.warn('fbLoad', key, e.message); }
+  }
+  return ls(key); // fallback to localStorage
+}
+
+// Universal get with Firebase prefix keys (client_paid_*, billing_slip_*)
+async function fbSaveKeyed(fbKey, data) {
+  ls(fbKey, data);
+  if (_fbDatabase) {
+    const safePath = 'misc/' + fbKey.replace(/[^a-zA-Z0-9_-]/g,'_');
+    try { await _fbDatabase.ref(safePath).set(data); } 
+    catch(e) {}
+  }
+}
+async function fbLoadKeyed(fbKey) {
+  if (_fbDatabase) {
+    const safePath = 'misc/' + fbKey.replace(/[^a-zA-Z0-9_-]/g,'_');
+    try {
+      const snap = await _fbDatabase.ref(safePath).get();
+      if (snap.exists()) { ls(fbKey, snap.val()); return snap.val(); }
+    } catch(e) {}
+  }
+  return ls(fbKey);
+}
+
+function saveStaffData(d){
+  ls('staff_v3',d); // local cache
+  if(_fbDatabase){
+    _fbDatabase.ref('staff').set(d).catch(e=>console.warn('Staff save error:',e));
+  }
+}
 function getAllStaff(){const d=getStaffData();let a=[];Object.entries(d).forEach(([cat,arr])=>arr.forEach(s=>a.push({...s,category:cat})));return a}
 function getStaffById(id){return getAllStaff().find(s=>s.id===id)}
 
@@ -1431,6 +1508,26 @@ async function enterApp(){
   try {
   showLoader(true);
   try { await loadProjects(); } catch(e) { console.warn('loadProjects skipped:', e.message); }
+  // Load tracking cards from Firebase
+  try {
+    if(_fbDatabase){
+      const snapT = await _fbDatabase.ref('trkCards').get();
+      if(snapT.exists()) ls('trk_cards_v3', snapT.val());
+      const snapD = await _fbDatabase.ref('docs').get();
+      if(snapD.exists()){
+        const d=snapD.val();
+        if(d.quotations)ls('docs_quotations',d.quotations);
+        if(d.voucherSeq)ls('voucher_seq',d.voucherSeq);
+      }
+    }
+  } catch(e) {}
+  // Load staff from Firebase
+  try {
+    if(_fbDatabase){
+      const snap = await _fbDatabase.ref('staff').get();
+      if(snap.exists()) ls('staff_v3', snap.val());
+    }
+  } catch(e) { console.warn('Staff load skipped:', e.message); }
   // Never seed demo in production — only load existing data
   showLoader(false);
   document.getElementById('screen-login').classList.add('hidden');
@@ -1443,6 +1540,8 @@ async function enterApp(){
   const undoBar=document.getElementById('undo-bar');if(undoBar)undoBar.style.display=currentUser.role==='admin'?'flex':'none';
   if(currentUser.role==='admin')nav('dashboard');else nav('my-dashboard');
   updateQueueBadge();
+  // Real-time Firebase sync
+  startFirebaseSync();
   } catch(e) {
     console.error('enterApp failed:', e);
     toast('เกิดข้อผิดพลาดในการโหลดระบบ: ' + e.message, 'error');
@@ -1581,7 +1680,7 @@ function renderDash(){
 // TRACK WORK
 // ══════════════════════════════════════════════
 function getTrkCards(){return ls('trk_cards_v3')||[]}
-function saveTrkCards(arr){ls('trk_cards_v3',arr)}
+function saveTrkCards(arr){ls('trk_cards_v3',arr);if(_fbDatabase)_fbDatabase.ref('trkCards').set(arr).catch(()=>{}); }
 function renderTrack(){renderTrkCalendar();renderTrkBoard()}
 function renderTrkCalendar() {
   const el = document.getElementById('trk-calendar'); if (!el) return;
@@ -3296,7 +3395,7 @@ function issueAndSendVouchers() {
    SHARED HELPERS
    ══════════════════════ */
 function getDocsStore(key) { return ls('docs_'+key)||[]; }
-function saveDocsStore(key, val) { ls('docs_'+key, val); }
+function saveDocsStore(type,data){ls('docs_'+type,data);if(_fbDatabase)_fbDatabase.ref('docs/'+type).set(data).catch(()=>{}); }
 
 function downloadDocHTML(bodyHtml, filename) {
   const fullHtml = `<!DOCTYPE html><html lang="th"><head>
@@ -4229,6 +4328,76 @@ async function adminResetStaffPassword(email, nickname) {
               : 'เกิดข้อผิดพลาด: ' + (e.code || e.message);
     toast(msg, 'error');
   }
+}
+
+// ══════════════════════════════════════════════
+// FIREBASE REAL-TIME SYNC
+// ══════════════════════════════════════════════
+function startFirebaseSync() {
+  if (!_fbDatabase) return;
+
+  // Sync tracking cards
+  _fbDatabase.ref('trkCards').on('value', snap => {
+    if(snap.exists()){
+      ls('trk_cards_v3', snap.val());
+      if(!document.getElementById('page-track')?.classList.contains('hidden')) renderTrkBoard();
+    }
+  });
+  // Sync documents
+  _fbDatabase.ref('docs').on('value', snap => {
+    if(snap.exists()){
+      const d=snap.val();
+      if(d.quotations)ls('docs_quotations',d.quotations);
+      if(d.history)ls('docs_history',d.history);
+      if(d.voucherSeq)ls('voucher_seq',d.voucherSeq);
+    }
+  });
+  // Sync misc (client paid, slips)
+  _fbDatabase.ref('misc').on('value', snap => {
+    if(snap.exists()){
+      const d=snap.val();
+      Object.entries(d).forEach(([k,v])=>{
+        const key=k.replace(/_/g,'.').replace('cpaid.','client_paid_');
+        ls(key,v);
+      });
+    }
+  });
+  // Sync staff data in real-time
+  _fbDatabase.ref('staff').on('value', snap => {
+    if (snap.exists()) {
+      const data = snap.val();
+      ls('staff_v3', data); // update local cache
+      // Re-render if on staff page
+      if (document.getElementById('page-staff') && !document.getElementById('page-staff').classList.contains('hidden')) {
+        renderStaff();
+      }
+    }
+  });
+
+  // Sync projects in real-time
+  _fbDatabase.ref('projects').on('value', snap => {
+    if (snap.exists()) {
+      const val = snap.val();
+      projectsCache = Object.values(val || {}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+      ls('projects_cache', projectsCache);
+      // Re-render if on relevant page
+      const activePage = document.querySelector('.page:not(.hidden)');
+      if (activePage) {
+        const id = activePage.id;
+        if (id === 'page-projects') renderProjList();
+        if (id === 'page-dashboard') renderDash();
+        if (id === 'page-queue') renderQueue();
+        if (id === 'page-proj-cal') renderProjCal();
+      }
+    }
+  });
+
+  // Sync users/staff profiles
+  _fbDatabase.ref('users').on('value', snap => {
+    // profiles update silently
+  });
+
+  console.log('🔄 Firebase real-time sync started');
 }
 // ══════════════════════════════════════════════
 // INIT
