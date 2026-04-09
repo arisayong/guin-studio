@@ -1117,6 +1117,8 @@ let chartCat = null;
 let billingStaffFilter = 'all';
 let currentProjId = null;
 let formDirty = false;
+let selectedQYear = 'all';
+let selectedMonth = 'all';
 
 const CATS = {
   dubbing:    {label:'🎤 Dubbing',     color:'var(--orange)'},
@@ -1126,6 +1128,21 @@ const CATS = {
   subVideo:   {label:'🎬 Sub & Video', color:'var(--red)'},
   manager:    {label:'🗂️ Manager',    color:'var(--accent2)'},
 };
+const PHASES = [
+  {key:'adaptation', label:'✍️ Adaptation', emoji:'✍️', color:'var(--cyan)'},
+  {key:'dubbing',    label:'🎤 Dubbing',     emoji:'🎤', color:'var(--orange)'},
+  {key:'mix',        label:'🎧 Mix',          emoji:'🎧', color:'var(--green)'},
+  {key:'qc',         label:'✅ QC',           emoji:'✅', color:'var(--purple)'},
+];
+
+const TRK_STATUSES = [
+  {key:'none',     label:'⬜ ยังไม่บรีฟ', bg:'rgba(120,120,140,.12)', color:'#888',        border:'rgba(120,120,140,.2)'},
+  {key:'briefed',  label:'📋 บรีฟแล้ว',   bg:'rgba(0,180,255,.12)',  color:'#00B4FF',     border:'rgba(0,180,255,.25)'},
+  {key:'doing',    label:'⚙️ กำลังทำ',   bg:'rgba(255,158,0,.12)',  color:'var(--orange)',border:'rgba(255,158,0,.25)'},
+  {key:'done',     label:'✅ ส่งแล้ว',    bg:'rgba(0,223,160,.12)', color:'var(--green)', border:'rgba(0,223,160,.25)'},
+];
+
+
 
 let _fbApp = null, _fbAuth = null, _fbDatabase = null;
 
@@ -1258,31 +1275,8 @@ function nextVoucherNo(){voucherSeq++;ls('voucher_seq',String(voucherSeq));const
 function getStaffData(){
   const s=ls('staff_v3');
   if(s&&Object.keys(s).length)return s;
-  return{
-    dubbing:[
-      {id:'D001',name:'กวิน พิชญ์ภัทร',nickname:'กวิน',gender:'ชาย',bank:'กสิกรไทย',account:'012-3-45678-9',promptpay:'0812345001',email:'kwin@demo.com'},
-      {id:'D002',name:'มินตรา สุขสวัสดิ์',nickname:'มิ้น',gender:'หญิง',bank:'ไทยพาณิชย์',account:'123-456789-0',promptpay:'',email:''},
-      {id:'D003',name:'ธนวัฒน์ รุ่งโรจน์',nickname:'อาร์ม',gender:'ชาย',bank:'กรุงเทพ',account:'234-5-67890-1',promptpay:'',email:''},
-      {id:'D004',name:'พิมพ์ลภัส ทองดี',nickname:'พิม',gender:'หญิง',bank:'กรุงไทย',account:'345-6-78901-2',promptpay:'',email:''},
-    ],
-    adaptation:[
-      {id:'A001',name:'นภัทร จิตรอารี',nickname:'นิ้ง',gender:'หญิง',bank:'กสิกรไทย',account:'567-8-90123-4',promptpay:'',email:''},
-      {id:'A002',name:'ปัญจพล สวัสดี',nickname:'เจมส์',gender:'ชาย',bank:'ไทยพาณิชย์',account:'678-9-01234-5',promptpay:'',email:''},
-    ],
-    mix:[
-      {id:'M001',name:'วิชัย เมืองงาม',nickname:'ไอซ์',gender:'ชาย',bank:'กรุงเทพ',account:'789-0-12345-6',promptpay:'',email:''},
-      {id:'M002',name:'ธัญพิสิษฐ์ แสนสุข',nickname:'บิ๊ก',gender:'ชาย',bank:'กสิกรไทย',account:'890-1-23456-7',promptpay:'',email:''},
-    ],
-    qc:[
-      {id:'Q001',name:'สุนิสา รัตนา',nickname:'ซัน',gender:'หญิง',bank:'กรุงไทย',account:'901-2-34567-8',promptpay:'',email:''},
-    ],
-    subVideo:[
-      {id:'S001',name:'อังสุมาลิน โพธิ์ทอง',nickname:'แอน',gender:'หญิง',bank:'ไทยพาณิชย์',account:'123-4-56789-1',promptpay:'',email:''},
-    ],
-    manager:[
-      {id:'G001',name:'Guin Home Studio',nickname:'กิน',gender:'อื่นๆ',bank:'กสิกรไทย',account:'999-9-99999-9',promptpay:'',email:'admin@demo.com'},
-    ],
-  };
+  // Return empty structure (Firebase will populate via listener)
+  return {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
 }
 
 // ══════════════════════════════════════════════
@@ -1462,17 +1456,7 @@ auth.onAuthStateChanged(async(fbUser)=>{
     showLoader(false);
     toast('เกิดข้อผิดพลาด: ' + e.message, 'error');
   }
-});;
-function quickLogin(role){
-  if(role==='admin'){
-    document.getElementById('login-email').value='admin@demo.com';
-    document.getElementById('login-pass').value='demo1234';
-  } else {
-    document.getElementById('login-email').value='kwin@demo.com';
-    document.getElementById('login-pass').value='demo1234';
-  }
-  doLogin();
-}
+});
 async function doLogin(){
   const email=document.getElementById('login-email').value.trim();
   const pass=document.getElementById('login-pass').value;
@@ -1521,13 +1505,31 @@ async function enterApp(){
       }
     }
   } catch(e) {}
-  // Load staff from Firebase
-  try {
-    if(_fbDatabase){
-      const snap = await _fbDatabase.ref('staff').get();
-      if(snap.exists()) ls('staff_v3', snap.val());
-    }
-  } catch(e) { console.warn('Staff load skipped:', e.message); }
+  // Load ALL data from Firebase before rendering
+  if(_fbDatabase){
+    try {
+      const [snapS, snapT, snapD, snapM] = await Promise.all([
+        _fbDatabase.ref('staff').get(),
+        _fbDatabase.ref('trkCards').get(),
+        _fbDatabase.ref('docs').get(),
+        _fbDatabase.ref('misc').get(),
+      ]);
+      if(snapS.exists()) ls('staff_v3', snapS.val());
+      if(snapT.exists()) ls('trk_cards_v3', snapT.val());
+      if(snapD.exists()){
+        const d=snapD.val();
+        if(d.quotations) ls('docs_quotations', d.quotations);
+        if(d.voucherSeq) ls('voucher_seq', d.voucherSeq);
+      }
+      if(snapM.exists()){
+        // Restore client_paid and slip data
+        Object.entries(snapM.val()||{}).forEach(([k,v])=>{
+          if(k.startsWith('cpaid_')) ls('client_paid_'+k.slice(6), v);
+          if(k.startsWith('slip_')) ls(k.replace(/_/g,'.').replace('slip.','billing_slip_'), v);
+        });
+      }
+    } catch(e) { console.warn('Firebase load:', e.message); }
+  }
   // Never seed demo in production — only load existing data
   showLoader(false);
   document.getElementById('screen-login').classList.add('hidden');
@@ -2677,6 +2679,7 @@ function toggleClientPaid(projId) {
     // Toggle on — record date
     const today = new Date().toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'});
     ls('client_paid_'+projId, true);
+  if(_fbDatabase){const _cpv=ls('client_paid_'+projId);_fbDatabase.ref('misc/cpaid_'+projId).set(_cpv!==null?_cpv:null).catch(()=>{}); }
     ls('client_paid_date_'+projId, today);
     toast('✅ บันทึก: รับเงินจากลูกค้าแล้ว · '+today, 'success');
     renderQueue();
@@ -2930,7 +2933,10 @@ function saveStaff(){
 }
 function deleteStaff(id,cat){
   if(!confirm('ลบสมาชิกนี้?'))return;
-  const data=getStaffData();data[cat]=(data[cat]||[]).filter(s=>s.id!==id);saveStaffData(data);renderStaff();toast('ลบแล้ว','info');
+  const data=getStaffData();
+  // Remove from ALL categories (multi-position staff)
+  Object.keys(data).forEach(k=>{data[k]=(data[k]||[]).filter(s=>s.id!==id)});
+  saveStaffData(data);renderStaff();toast('ลบแล้ว','info');
 }
 
 // ══════════════════════════════════════════════
