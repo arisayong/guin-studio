@@ -1113,6 +1113,16 @@ let chartCat = null;
 let billingStaffFilter = 'all';
 let currentProjId = null;
 let formDirty = false;
+
+const CATS = {
+  dubbing:    {label:'🎤 Dubbing',     color:'var(--orange)'},
+  adaptation: {label:'✍️ Adaptation', color:'var(--cyan)'},
+  mix:        {label:'🎧 Mix',         color:'var(--green)'},
+  qc:         {label:'✅ QC',          color:'var(--purple)'},
+  subVideo:   {label:'🎬 Sub & Video', color:'var(--red)'},
+  manager:    {label:'🗂️ Manager',    color:'var(--accent2)'},
+};
+
 let _fbApp = null, _fbAuth = null, _fbDatabase = null;
 
 // Initialize Firebase with real config
