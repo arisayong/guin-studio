@@ -2649,27 +2649,60 @@ function renderProfit(){
 // STAFF
 // ══════════════════════════════════════════════
 function renderStaff(){
-  const data=getStaffData();
-  const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
-  const total=Object.values(data).reduce((a,arr)=>a+arr.length,0);
-  // Summary chips
-  const sumEl=document.getElementById('team-summary-row');
-  if(sumEl){
-    sumEl.innerHTML=Object.entries(CATS).map(([key,cat])=>{const count=(data[key]||[]).length;if(!count)return'';return`<div class="team-sum-chip" style="background:${catColors[key]}18;border:1px solid ${catColors[key]}33;color:${catColors[key]}">${cat.label.split(' ')[0]} <strong>${count}</strong></div>`}).join('')+`<div class="team-sum-chip" style="background:var(--dim);border:1px solid var(--border2);color:var(--text2)">👥 รวม <strong>${total}</strong> คน</div>`;
+  try{
+    const data=getStaffData();
+    const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
+    const total=Object.values(data).reduce((a,arr)=>a+(Array.isArray(arr)?arr.length:0),0);
+    // Summary row
+    const sumEl=document.getElementById('team-summary-row');
+    if(sumEl){
+      let chips='';
+      Object.entries(CATS).forEach(([key,cat])=>{
+        const count=(data[key]||[]).length;
+        if(!count)return;
+        chips+='<div class="team-sum-chip" style="background:'+catColors[key]+'18;border:1px solid '+catColors[key]+'33;color:'+catColors[key]+'">'+cat.label.split(' ')[0]+' <strong>'+count+'</strong></div>';
+      });
+      chips+='<div class="team-sum-chip" style="background:var(--dim);border:1px solid var(--border2);color:var(--text2)">👥 รวม <strong>'+total+'</strong> คน</div>';
+      sumEl.innerHTML=chips;
+    }
+    // Tabs
+    const tabsEl=document.getElementById('staff-cat-tabs');
+    if(tabsEl){
+      const wrap=document.createElement('div');
+      wrap.style.cssText='display:flex;gap:6px;flex-wrap:wrap;align-items:center';
+      const allTab=document.createElement('div');
+      allTab.className='tab'+(activeStaffCat==='all'?' active':'');
+      allTab.textContent='ทั้งหมด '+total;
+      allTab.onclick=()=>{activeStaffCat='all';renderStaff();};
+      wrap.appendChild(allTab);
+      Object.entries(CATS).forEach(([key,cat])=>{
+        const count=(data[key]||[]).length;
+        if(!count)return;
+        const tab=document.createElement('div');
+        tab.className='tab'+(activeStaffCat===key?' active':'');
+        tab.style.color=activeStaffCat===key?'var(--text)':catColors[key];
+        tab.textContent=cat.label+' '+count;
+        tab.onclick=()=>{activeStaffCat=key;renderStaff();};
+        wrap.appendChild(tab);
+      });
+      const modeWrap=document.createElement('div');
+      modeWrap.style.cssText='margin-left:auto;display:flex;gap:4px';
+      ['compact','full'].forEach(mode=>{
+        const btn=document.createElement('div');
+        btn.className='tab'+(staffViewMode===mode?' active':'');
+        btn.textContent=mode==='compact'?'👀 ย่อ':'📋 เต็ม';
+        btn.onclick=()=>{staffViewMode=mode;renderStaff();};
+        modeWrap.appendChild(btn);
+      });
+      wrap.appendChild(modeWrap);
+      tabsEl.innerHTML='';
+      tabsEl.appendChild(wrap);
+    }
+    renderStaffGrid();
+  }catch(e){
+    console.error('renderStaff error:',e);
+    toast('renderStaff error: '+e.message,'error');
   }
-  // Category tabs
-  const tabsEl=document.getElementById('staff-cat-tabs');
-  if(tabsEl){
-    tabsEl.innerHTML=`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-      <div class="tab ${activeStaffCat==='all'?'active':''}" onclick="activeStaffCat='all';renderStaff()">ทั้งหมด ${total}</div>
-      ${Object.entries(CATS).map(([key,cat])=>{const count=(data[key]||[]).length;if(!count)return'';return`<div class="tab ${activeStaffCat===key?'active':''}" style="color:${activeStaffCat===key?'var(--text)':catColors[key]}" onclick="activeStaffCat='${key}';renderStaff()">${cat.label} ${count}</div>`}).join('')}
-      <div style="margin-left:auto;display:flex;gap:4px">
-       <div class="tab ${staffViewMode==='compact'?'active':''}" onclick="staffViewMode='compact';renderStaff()">👀 ย่อ</div>
-       <div class="tab ${staffViewMode==='full'?'active':''}" onclick="staffViewMode='full';renderStaff()">📋 เต็ม</div>
-      </div>
-    </div>`;
-  }
-  renderStaffGrid();
 }
 function renderStaffGrid(){
   const data=getStaffData();
