@@ -2757,8 +2757,10 @@ function toggleStaffBody(id){
 function openAddStaff(){
   editingStaffId=null;editingStaffCat=null;document.getElementById('addstaff-title').textContent='➕ เพิ่มสมาชิกใหม่';
   ['st-name','st-nick','st-bank','st-account','st-promptpay','st-email'].forEach(id=>document.getElementById(id).value='');
-  setStaffCatsChecked([]);
+  document.getElementById('st-gender').selectedIndex=0;
+  setStaffCatsChecked(['dubbing']); // default = Dubbing
   openModal('modal-addstaff');
+  setTimeout(()=>document.getElementById('st-name')?.focus(),200);
 }
 function openEditStaff(id,cat){
   editingStaffId=id;editingStaffCat=cat;const data=getStaffData();const s=(data[cat]||[]).find(x=>x.id===id);if(!s)return;
