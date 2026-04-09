@@ -2666,7 +2666,8 @@ function renderStaff(){
   try{
     const data=getStaffData();
     const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
-    const total=Object.values(data).reduce((a,arr)=>a+(Array.isArray(arr)?arr.length:0),0);
+    const allIds = new Set(Object.values(data).flat().map(s=>s.id));
+  const total = allIds.size;
     // Summary row
     const sumEl=document.getElementById('team-summary-row');
     if(sumEl){
