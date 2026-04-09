@@ -2666,8 +2666,9 @@ function renderStaff(){
   try{
     const data=getStaffData();
     const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
-    const allIds = new Set(Object.values(data).flat().map(s=>s.id));
-  const total = allIds.size;
+    // Deduplicate by name to avoid counting multi-category staff multiple times
+    const allNames = new Set(Object.values(data).flat().map(s=>s.name+'|'+(s.nickname||'')));
+    const total = allNames.size;
     // Summary row
     const sumEl=document.getElementById('team-summary-row');
     if(sumEl){
@@ -2812,8 +2813,15 @@ function saveStaff(){
     bank:document.getElementById('st-bank').value.trim(),account:document.getElementById('st-account').value.trim(),
     promptpay:document.getElementById('st-promptpay').value.trim(),email:document.getElementById('st-email').value.trim(),
     categories:cats};
-  // Remove from all categories first
-  if(editingStaffId)Object.keys(data).forEach(k=>{data[k]=(data[k]||[]).filter(s=>s.id!==editingStaffId)});
+  // Remove from all categories (editing OR same name to prevent duplicates)
+  const dupCheck = name+'|'+nick;
+  Object.keys(data).forEach(k=>{
+    data[k]=(data[k]||[]).filter(s=>{
+      if(editingStaffId && s.id===editingStaffId) return false;
+      if(!editingStaffId && (s.name+'|'+(s.nickname||''))===dupCheck) return false;
+      return true;
+    });
+  });
   // Add to each selected category
   cats.forEach(cat=>{
     if(!data[cat])data[cat]=[];
