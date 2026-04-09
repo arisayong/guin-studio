@@ -1508,18 +1508,43 @@ async function enterApp(){
   // Load ALL data from Firebase before rendering
   if(_fbDatabase){
     try {
+      // MIGRATION: push localStorage data to Firebase if Firebase is empty
       const [snapS, snapT, snapD, snapM] = await Promise.all([
         _fbDatabase.ref('staff').get(),
         _fbDatabase.ref('trkCards').get(),
         _fbDatabase.ref('docs').get(),
         _fbDatabase.ref('misc').get(),
       ]);
-      if(snapS.exists()) ls('staff_v3', snapS.val());
-      if(snapT.exists()) ls('trk_cards_v3', snapT.val());
+      // If Firebase has staff → use it. If not but localStorage has → migrate up
+      if(snapS.exists()){
+        ls('staff_v3', snapS.val());
+      } else {
+        const localStaff = ls('staff_v3');
+        if(localStaff && Object.keys(localStaff).length){
+          await _fbDatabase.ref('staff').set(localStaff);
+          console.log('📤 Migrated staff from localStorage to Firebase');
+        }
+      }
+      // Same for trkCards
+      if(snapT.exists()){
+        ls('trk_cards_v3', snapT.val());
+      } else {
+        const localTrk = ls('trk_cards_v3');
+        if(localTrk && localTrk.length){
+          await _fbDatabase.ref('trkCards').set(localTrk);
+          console.log('📤 Migrated trkCards from localStorage to Firebase');
+        }
+      }
       if(snapD.exists()){
         const d=snapD.val();
         if(d.quotations) ls('docs_quotations', d.quotations);
         if(d.voucherSeq) ls('voucher_seq', d.voucherSeq);
+      } else {
+        // Migrate docs
+        const localQt = ls('docs_quotations');
+        if(localQt && localQt.length) await _fbDatabase.ref('docs/quotations').set(localQt).catch(()=>{});
+        const localVSeq = ls('voucher_seq');
+        if(localVSeq) await _fbDatabase.ref('docs/voucherSeq').set(localVSeq).catch(()=>{});
       }
       if(snapM.exists()){
         // Restore client_paid and slip data
