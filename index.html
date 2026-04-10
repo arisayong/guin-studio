@@ -1462,10 +1462,14 @@ async function loadProjects(){
 function getProjects(){return projectsCache}
 async function saveProjectDB(p){
   const withDate={...p,updatedAt:new Date().toISOString()};
-  try{await fbSet('projects/'+p.id, withDate);}catch(e){console.warn('DB save:',e.message);}
-  const i=projectsCache.findIndex(x=>x.id===p.id);
-  if(i>=0)projectsCache[i]=withDate;else projectsCache.unshift(withDate);
+  // Update local cache immediately
+  const idx=projectsCache.findIndex(x=>x.id===p.id);
+  if(idx>=0) projectsCache[idx]=withDate;
+  else projectsCache.unshift(withDate);
   ls('projects_cache',projectsCache);
+  // Save to Firebase - listener will confirm and sync to all admins
+  try{ await fbSet('projects/'+p.id, withDate); }
+  catch(e){ console.warn('DB save:',e.message); }
 }
 function saveProjects(arr){projectsCache=arr;ls('projects_cache',arr)}
 async function deleteProjectDB(id){
@@ -1769,13 +1773,9 @@ async function copyProject(id){
       workers:(p.workers||[]).map(w=>({...w,status:'pending',voucherNo:undefined})),
       snapshot:null, evidenceLogs:[], createdAt:new Date().toISOString()
     };
-    // Add to cache immediately and render BEFORE Firebase (faster UX)
-    projectsCache.unshift(copy);
-    ls('projects_cache',projectsCache);
-    renderProjects();
-    toast('📋 คัดลอกโปรเจกต์แล้ว','success');
-    // Then save to Firebase in background (listener will confirm)
+    // Save to Firebase only - let RT listener update cache and render for ALL admins
     await saveProjectDB(copy);
+    toast('📋 คัดลอกโปรเจกต์แล้ว','success');
   } catch(e) {
     console.error('copyProject error:', e);
     toast('Error: '+e.message,'error');
@@ -4569,10 +4569,14 @@ function startFirebaseSync() {
   _fbDatabase.ref('projects').on('value', snap => {
     try {
       const val = snap.exists() ? snap.val() : {};
-      projectsCache = Object.values(val||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
-      ls('projects_cache', projectsCache);
+      // Merge: take Firebase data but keep any local items not yet confirmed
+      const fbCache = Object.values(val||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+      // Only update cache if Firebase has MORE or DIFFERENT data
+      if(fbCache.length >= projectsCache.length) {
+        projectsCache = fbCache;
+        ls('projects_cache', projectsCache);
+      }
       try { updateQueueBadge(); } catch(e) {}
-      // Re-render whichever admin page is currently active
       const active = document.querySelector('.page:not(.hidden)');
       if(!active) return;
       const pid = active.id;
