@@ -4382,39 +4382,40 @@ function viewSavedSlip(key) {
   w.document.write(`<html><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${slip.base64}" style="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px"></body></html>`);
 }
 
-function doSendVoucherEmail(staffId, withSlip) {
+async function doSendVoucherEmail(staffId, withSlip) {
   const modal = document.getElementById('slip-upload-modal');
+
+  // บันทึกไฟล์ที่อัปโหลด
   if (withSlip) {
-    // บันทึกสลิป
     if (window._slipDataPending) {
       const slipKey = 'billing_slip_'+staffId+'_'+billingYearSelected+'_'+billingMonthSelected+'_'+billingCycleSelected;
       ls(slipKey, window._slipDataPending);
       uploadToDrive('slip', window._slipDataPending.name, window._slipDataPending.base64);
       window._slipDataPending = null;
     }
-    // บันทึกเอกสาร
     if (window._docDataPending) {
       const docKey = 'billing_doc_'+staffId+'_'+billingYearSelected+'_'+billingMonthSelected+'_'+billingCycleSelected;
       ls(docKey, window._docDataPending);
-      uploadToDrive('voucher', window._docDataPending.name, window._docDataPending.base64);
       window._docDataPending = null;
     }
-    toast('💾 บันทึกไฟล์แล้ว','success');
   }
+
   if (modal) modal.remove();
-  const s = getStaffById(staffId); if (!s?.email) return;
-  const html = buildBillingVoucherHTML(staffId); if (!html) return;
-  const vNoMatch = html.match(/data-vno="([^"]+)"/);
-  const vNo = vNoMatch ? vNoMatch[1] : 'เอกสาร';
+
+  const s = getStaffById(staffId);
+  if (!s?.email) { toast('ไม่มี email','error'); return; }
+
   const TM = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-  const period = billingCycleSelected===1?`1-15 ${TM[billingMonthSelected]} ${billingYearSelected+543}`:`16-สิ้นเดือน ${TM[billingMonthSelected]} ${billingYearSelected+543}`;
-  const subject = encodeURIComponent(`ใบสำคัญจ่ายเงิน ${vNo} รอบ ${period} — Guin Home Studio`);
-  const body = encodeURIComponent(`เรียน คุณ${s.name}\n\nขออนุญาตส่งใบสำคัญจ่ายเงินค่าตอบแทนรอบ ${period}\nเลขที่: ${vNo}\n\nกรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio`);
-  window.open(`https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm&to=${s.email}&su=${subject}&body=${body}`, '_blank');
-  toast(`📧 เปิด Email ให้ ${s.name} แล้ว — แนบไฟล์ PDF ก่อนส่งด้วยครับ`, 'success');
-  // Auto-backup voucher to Drive
-  const veHtml = buildBillingVoucherHTML(staffId);
-  if (veHtml) uploadToDrive('voucher', `voucher_${s.nickname}_${vNo}.html`, buildDriveHTML(veHtml, vNo));
+  const period = billingCycleSelected===1
+    ? '1-15 '+TM[billingMonthSelected]+' '+(billingYearSelected+543)
+    : '16-สิ้นเดือน '+TM[billingMonthSelected]+' '+(billingYearSelected+543);
+
+  const subject = 'ใบสำคัญจ่ายเงิน รอบ '+period+' — Guin Home Studio';
+  const message = 'เรียน คุณ'+s.name+'\n\nขออนุญาตส่งใบสำคัญจ่ายเงินค่าตอบแทนรอบ '+period+'\n\nกรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio';
+
+  toast('📤 กำลังส่งอีเมล...','info');
+  const ok = await sendEmailJS(s.email, subject, message);
+  if (ok) toast('✅ ส่งอีเมลถึง '+s.name+' ('+s.email+') สำเร็จแล้วค่ะ','success');
 }
 
 
