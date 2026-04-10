@@ -3697,29 +3697,21 @@ function downloadVouchers() {
   renderDocsHistory();
 }
 function issueAndSendVouchers() {
-  var selected = getSelectedVcWorkers();
+  const selected = getSelectedVcWorkers();
   if (!selected.length){toast('กรุณาเลือกทีมงาน','error');return;}
-  var date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
-  var note = document.getElementById('vc-note')?.value.trim()||'';
-  var sent=0, noEmail=0;
+  const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
+  const note = document.getElementById('vc-note')?.value.trim()||'';
+  let noEmail=0;
   selected.forEach(function(item){
-    var workerId=item.workerId, slot=item.slot, w=item.w, s=item.s, p=item.p;
-    var vNo = nextVoucherNo();
-    var saved = getDocsStore('vouchers')||[];
-    saved.push({type:'voucher',docNo:vNo,staffId:workerId,projId:p.id,projName:p.name,staffName:s.name,amount:w.amount||0,date:date,createdAt:new Date().toISOString()});
+    const {workerId,slot,w,s,p} = item;
+    const vNo = nextVoucherNo();
+    const saved = getDocsStore('vouchers')||[];
+    saved.push({type:'voucher',docNo:vNo,staffId:workerId,projId:p.id,projName:p.name,staffName:s.name,amount:w.amount||0,date,createdAt:new Date().toISOString()});
     saveDocsStore('vouchers', saved);
-    if (s.email) {
-      var subject = encodeURIComponent('ใบสำคัญจ่าย '+vNo+' — Guin Home Studio');
-      var nl = '%0A';
-      var bodyParts = ['เรียน คุณ'+s.name, '', 'แนบใบสำคัญจ่ายเงิน '+vNo+' มาพร้อม Email นี้ค่ะ', 'กรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ', '', 'ขอบคุณค่ะ', 'Guin Home Studio'];
-      var body = bodyParts.map(function(l){return encodeURIComponent(l);}).join(nl);
-      var url = 'https://mail.google.com/mail/u/penguinstudiovoice@gmail.com/?view=cm&to='+encodeURIComponent(s.email)+'&su='+subject+'&body='+body;
-      setTimeout(function(){window.open(url,'_blank');}, sent*400);
-      sent++;
-    } else noEmail++;
+    if(!s.email) noEmail++;
   });
-  if (sent) toast('📧 เปิด Gmail '+sent+' หน้า ใช้เมล penguinstudiovoice ค่ะ','success');
-  if (noEmail) toast('⚠️ '+noEmail+' คนไม่มี email','warn');
+  if(noEmail) toast('⚠️ '+noEmail+' คนไม่มี email','warn');
+  toast('✅ บันทึกรายการแล้ว — กดปุ่ม 📧 ที่แต่ละคนเพื่อส่งอีเมล','success');
   renderDocsHistory();
 }
 
@@ -4321,7 +4313,7 @@ function downloadBillingVoucher(staffId) {
 function sendBillingVoucherEmail(staffId) {
   const s = getStaffById(staffId); if (!s) return;
   if (!s.email) { toast('ไม่มี email ของ '+s.nickname+' — กรุณาเพิ่มในหน้าจัดการทีม','error'); return; }
-  showSlipUploadModal(staffId);
+  showSlipUploadModal(staffId); // เปิด popup อัปโหลดสลิป+เอกสาร แล้วค่อยส่ง
 }
 
 function showSlipUploadModal(staffId) {
