@@ -4716,10 +4716,21 @@ function toggleWorkerDropdown(selId){
 function renderWorkerDropdownList(selId, q){
   const sel=document.getElementById(selId);
   const listEl=document.getElementById(selId+'-list');
-  if(!sel||!listEl)return;
-  const staff=(sel._allStaff||[]).filter(s=>!q||(s.nickname||'').toLowerCase().includes(q.toLowerCase())||(s.name||'').toLowerCase().includes(q.toLowerCase()));
-  if(!staff.length){listEl.innerHTML='<div class="worker-dropdown-empty">ไม่พบสมาชิก</div>';return;}
-  listEl.innerHTML=staff.map(s=>('<div class="worker-dropdown-item" onclick="pickWorkerFromDropdown(\'' + selId + '\',\'' + s.id + '\')">' + (s.nickname||'') + (s.nickname?' · ':'') + s.name + '</div>')).join('');
+  if(!listEl)return;
+  // Fallback: ถ้า _allStaff ว่าง ให้ดึง staff จาก category ที่ตรงกับ selId
+  let staff = (sel&&sel._allStaff&&sel._allStaff.length) ? sel._allStaff : [];
+  if(!staff.length){
+    // หา category จาก selId prefix: dub-main, dub-sub, adp, mix, qc, sub, mgr
+    const data=getStaffData();
+    const prefix=selId.split('-')[0];
+    const catKey=CAT_MAP[prefix]||'dubbing';
+    staff=data[catKey]||[];
+    // save back for next time
+    if(sel) sel._allStaff=staff;
+  }
+  const filtered=staff.filter(s=>!q||(s.nickname||'').toLowerCase().includes(q.toLowerCase())||(s.name||'').toLowerCase().includes(q.toLowerCase()));
+  if(!filtered.length){listEl.innerHTML='<div class="worker-dropdown-empty">ไม่พบสมาชิก</div>';return;}
+  listEl.innerHTML=filtered.map(s=>('<div class="worker-dropdown-item" onclick="pickWorkerFromDropdown(\'' + selId + '\',\'' + s.id + '\')">' + (s.nickname||'') + (s.nickname?' · ':'') + s.name + '</div>')).join('');
 }
 function filterWorkerDropdown(selId, q){renderWorkerDropdownList(selId,q);}
 function pickWorkerFromDropdown(selId, staffId){
