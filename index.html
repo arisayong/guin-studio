@@ -4393,7 +4393,7 @@ function doSendVoucherEmail(staffId, withSlip) {
   const TM = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
   const period = billingCycleSelected===1?`1-15 ${TM[billingMonthSelected]} ${billingYearSelected+543}`:`16-สิ้นเดือน ${TM[billingMonthSelected]} ${billingYearSelected+543}`;
   const subject = encodeURIComponent(`ใบสำคัญจ่ายเงิน ${vNo} รอบ ${period} — Guin Home Studio`);
-  const body = encodeURIComponent('กรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio');
+  const body = encodeURIComponent(`เรียน คุณ${s.name}\n\nขออนุญาตส่งใบสำคัญจ่ายเงินค่าตอบแทนรอบ ${period}\nเลขที่: ${vNo}\n\nกรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio`);
   window.open(`https://mail.google.com/mail/?view=cm&to=${s.email}&su=${subject}&body=${body}`, '_blank');
   toast(`📧 เปิด Email ให้ ${s.name} แล้ว — แนบไฟล์ PDF ก่อนส่งด้วยครับ`, 'success');
   // Auto-backup voucher to Drive
