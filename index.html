@@ -2425,7 +2425,7 @@ async function saveProject(){
     Object.entries(slots).forEach(([slot,arr])=>{
       arr.forEach(w=>{
         const amt=w.unit==='นาที'&&dur>0?(w.amount||0)*dur:(w.amount||0);
-        workers.push({id:w.staffId,slot:`${cat}-${slot}`,amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'เหมา',status:'pending',note:''});
+        workers.push({id:w.staffId,slot:cat+'-'+slot,amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'เหมา',status:'pending',note:''});
       });
     });
   });
