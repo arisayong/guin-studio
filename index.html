@@ -1735,7 +1735,20 @@ function nav(page){
   document.querySelectorAll('.nav-item,.nav-sub-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
-  const renders={dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue,docs:renderDocs,'proj-cal':renderProjCal,'my-dashboard':renderMyDash,'my-history':renderMyHistory};
+  const renders={dashboard:renderDash,track:renderTrack,projects: async ()=>{
+    // ดึงข้อมูล fresh จาก Firebase ทุกครั้งที่ navigate
+    if(_fbDatabase){
+      try{
+        const snap=await _fbDatabase.ref('projects').get();
+        if(snap.exists()){
+          projectsCache=Object.values(snap.val()).filter(p=>p&&p.id)
+            .sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+          ls('projects_cache',projectsCache);
+        } else { projectsCache=[]; }
+      }catch(e){}
+    }
+    renderProjects();
+  },profit:renderProfit,staff:renderStaff,queue:renderQueue,docs:renderDocs,'proj-cal':renderProjCal,'my-dashboard':renderMyDash,'my-history':renderMyHistory};
   if(renders[page])renders[page]();
   window._currentPage=page;
 }
@@ -1775,9 +1788,12 @@ function exportPaymentCSV(){
 // ══════════════════════════════════════════════
 // COPY PROJECT
 // ══════════════════════════════════════════════
+let _copyingNow = false;
 async function copyProject(id){
+  if(_copyingNow){toast('กำลังคัดลอก...','info');return;}
+  _copyingNow = true;
   const p=getProjects().find(x=>x.id===id);
-  if(!p){toast('ไม่พบโปรเจกต์','error');return;}
+  if(!p){toast('ไม่พบโปรเจกต์','error');_copyingNow=false;return;}
   const ts = Date.now();
   const copy={
     ...JSON.parse(JSON.stringify(p, (k,v)=>v===undefined?null:v)),
@@ -1787,16 +1803,15 @@ async function copyProject(id){
     workers:(p.workers||[]).map(w=>({...w,status:'pending',voucherNo:null})),
     snapshot:null,evidenceLogs:[],createdAt:new Date(ts).toISOString()
   };
-  toast('📋 คัดลอกโปรเจกต์แล้ว','success');
-  // Save to Firebase - listener จะ render ให้ทุก admin
   if(_fbDatabase){
     try{
       await _fbDatabase.ref('projects/'+copy.id).set(copy);
-      // listener จะ fire และ render อัตโนมัติ
+      toast('📋 คัดลอกโปรเจกต์แล้ว','success');
     }catch(e){
       toast('⚠️ บันทึกไม่สำเร็จ: '+e.message,'error');
     }
   }
+  _copyingNow = false;
 }
 
 // ══════════════════════════════════════════════
@@ -4591,6 +4606,7 @@ function startFirebaseSync() {
 
   // Sync projects in real-time
   // Projects real-time sync
+  _fbDatabase.ref('projects').off(); // ป้องกัน duplicate listener
   _fbDatabase.ref('projects').on('value', snap => {
     try {
       const val = snap.exists() ? snap.val() : {};
