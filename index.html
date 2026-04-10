@@ -2447,7 +2447,7 @@ async function saveProject(){
   };
   if(editingProjId){
     const existing=getProjects().find(p=>p.id===editingProjId);
-    if(existing)proj.workers=proj.workers.map(w=>{const ex=existing.workers.find(x=>x.id===w.id&&x.slot===w.slot);return ex?{...w,status:ex.status,voucherNo:ex.voucherNo}:w});
+    if(existing)proj.workers=proj.workers.map(w=>{const ex=(existing.workers||[]).find(x=>x.id===w.id&&x.slot===w.slot);return ex?{...w,status:ex.status,voucherNo:ex.voucherNo}:w});
     proj.evidenceLogs=existing?.evidenceLogs||[];proj.snapshot=existing?.snapshot||null;
   }
   await saveProjectDB(proj);closeModal('modal-project');renderProjects();renderDash();
