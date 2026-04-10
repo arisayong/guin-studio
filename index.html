@@ -2418,6 +2418,7 @@ function calcProjSummary(){
   });
 }
 async function saveProject(){
+  try {
   const name=document.getElementById('pj-name').value.trim();if(!name){toast('กรุณากรอกชื่อโปรเจกต์','error');return}
   const dur=parseFloat(document.getElementById('pj-duration')?.value)||0;
   const workers=[];
@@ -2451,6 +2452,11 @@ async function saveProject(){
   }
   await saveProjectDB(proj);closeModal('modal-project');renderProjects();renderDash();
   toast(editingProjId?'อัพเดทแล้ว ✅':'สร้างโปรเจกต์แล้ว ✅','success');updateQueueBadge();
+
+  } catch(e) {
+    console.error('saveProject error:', e);
+    toast('บันทึกไม่สำเร็จ: ' + e.message, 'error');
+  }
 }
 async function deleteProjConfirm(id){
   const p=getProjects().find(x=>x.id===id);if(!p)return;
