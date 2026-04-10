@@ -4569,52 +4569,27 @@ function startFirebaseSync() {
   });
 
   // Sync projects in real-time
-  // Projects real-time sync - granular listeners
-  function _renderCurrentPage(){
-    try{updateQueueBadge();}catch(e){}
-    ls('projects_cache',projectsCache);
-    const pid=(document.querySelector('.page:not(.hidden)')||{}).id||'';
-    try{
-      if(pid==='page-projects')renderProjects();
-      else if(pid==='page-dashboard')renderDash();
-      else if(pid==='page-queue')renderQueue();
-      else if(pid==='page-proj-cal')renderProjCal();
-    }catch(e){console.warn('RT render:',e);}
-  }
-  
-  // New project added (fires for all existing + new ones)
-  _fbDatabase.ref('projects').on('child_added', snap => {
+  // Projects real-time sync
+  _fbDatabase.ref('projects').on('value', snap => {
     try {
-      const p = snap.val();
-      if(!p||!p.id) return;
-      const idx = projectsCache.findIndex(x=>x.id===p.id);
-      if(idx < 0) {
-        projectsCache.unshift(p);
-        projectsCache.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
-        _renderCurrentPage();
+      const val = snap.exists() ? snap.val() : {};
+      projectsCache = Object.values(val).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+      ls('projects_cache', projectsCache);
+      try{updateQueueBadge();}catch(e){}
+      // Re-render page-projects ทันทีถ้า Admin 2 อยู่หน้านั้น
+      const pg = document.getElementById('page-projects');
+      if(pg && !pg.classList.contains('hidden')){
+        try{renderProjects();}catch(e){console.warn('RT renderProjects:',e);}
       }
-    } catch(e){}
-  });
-  
-  // Project updated
-  _fbDatabase.ref('projects').on('child_changed', snap => {
-    try {
-      const p = snap.val();
-      if(!p||!p.id) return;
-      const idx = projectsCache.findIndex(x=>x.id===p.id);
-      if(idx>=0) projectsCache[idx]=p;
-      else projectsCache.unshift(p);
-      _renderCurrentPage();
-    } catch(e){}
-  });
-  
-  // Project deleted
-  _fbDatabase.ref('projects').on('child_removed', snap => {
-    try {
-      const id = snap.key;
-      projectsCache = projectsCache.filter(p=>p.id!==id);
-      _renderCurrentPage();
-    } catch(e){}
+      const pgD = document.getElementById('page-dashboard');
+      if(pgD && !pgD.classList.contains('hidden')){
+        try{renderDash();}catch(e){}
+      }
+      const pgQ = document.getElementById('page-queue');
+      if(pgQ && !pgQ.classList.contains('hidden')){
+        try{renderQueue();}catch(e){}
+      }
+    } catch(e){ console.error('Projects RT error:', e); }
   });
 
   // Sync users/staff profiles
