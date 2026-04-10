@@ -2286,15 +2286,17 @@ function toggleCat(key){
 }
 function populateWorkerSelects(){
   const data=getStaffData();
-  const catSelMap={dub:['dub-main-select','dub-sub-select'],adp:['adp-select'],mix:['mix-select'],qc:['qc-select'],sub:['sub-select'],mgr:['mgr-select']};
-  Object.entries(catSelMap).forEach(([key,selIds])=>{
-    const catKey=CAT_MAP[key];const staff=data[catKey]||[];
-    selIds.forEach(selId=>{
-      const sel=document.getElementById(selId);if(!sel)return;
-      // Store staff data for dropdown search
-      sel._allStaff=staff;
-      sel.innerHTML='<option value="">+ เพิ่มสมาชิก</option>'+staff.map(s=>'<option value="'+s.id+'">'+(s.nickname||'')+' '+s.name+'</option>').join('');
-    });
+  // รวม staff ทุกหมวดเป็น list เดียว (dedup by id)
+  const allStaffMap={};
+  Object.values(data).forEach(arr=>(arr||[]).forEach(s=>{ if(s&&s.id) allStaffMap[s.id]=s; }));
+  const allStaff=Object.values(allStaffMap).sort((a,b)=>(a.nickname||a.name||'').localeCompare(b.nickname||b.name||''));
+
+  // ทุก dropdown ใช้ staff ทั้งหมด
+  const selIds=['dub-main-select','dub-sub-select','adp-select','mix-select','qc-select','sub-select','mgr-select'];
+  selIds.forEach(selId=>{
+    const sel=document.getElementById(selId);if(!sel)return;
+    sel._allStaff=allStaff;
+    sel.innerHTML='<option value="">+ เพิ่มสมาชิก</option>'+allStaff.map(s=>'<option value="'+s.id+'">'+(s.nickname||'')+' '+s.name+'</option>').join('');
   });
 }
 function addWorkerToSlot(cat,slot){
@@ -4704,10 +4706,11 @@ function startFirebaseSync() {
 function toggleWorkerDropdown(selId){
   const popup=document.getElementById(selId+'-popup');
   if(!popup)return;
-  // Close all others first
   document.querySelectorAll('.worker-dropdown-popup.open').forEach(p=>{if(p!==popup)p.classList.remove('open')});
   const isOpen=popup.classList.toggle('open');
   if(isOpen){
+    // Refresh staff data ทุกครั้งที่เปิด dropdown
+    populateWorkerSelects();
     const inp=popup.querySelector('.worker-dropdown-search');
     if(inp){inp.value='';inp.focus();}
     renderWorkerDropdownList(selId,'');
@@ -4717,20 +4720,17 @@ function renderWorkerDropdownList(selId, q){
   const sel=document.getElementById(selId);
   const listEl=document.getElementById(selId+'-list');
   if(!listEl)return;
-  // Fallback: ถ้า _allStaff ว่าง ให้ดึง staff จาก category ที่ตรงกับ selId
-  let staff = (sel&&sel._allStaff&&sel._allStaff.length) ? sel._allStaff : [];
-  if(!staff.length){
-    // หา category จาก selId prefix: dub-main, dub-sub, adp, mix, qc, sub, mgr
-    const data=getStaffData();
-    const prefix=selId.split('-')[0];
-    const catKey=CAT_MAP[prefix]||'dubbing';
-    staff=data[catKey]||[];
-    // save back for next time
-    if(sel) sel._allStaff=staff;
-  }
-  const filtered=staff.filter(s=>!q||(s.nickname||'').toLowerCase().includes(q.toLowerCase())||(s.name||'').toLowerCase().includes(q.toLowerCase()));
+  if(!sel||!sel._allStaff||!sel._allStaff.length) populateWorkerSelects();
+  const all=(sel&&sel._allStaff)||[];
+  const filtered=!q?all:all.filter(s=>
+    (s.nickname||'').toLowerCase().includes(q.toLowerCase())||
+    (s.name||'').toLowerCase().includes(q.toLowerCase())
+  );
   if(!filtered.length){listEl.innerHTML='<div class="worker-dropdown-empty">ไม่พบสมาชิก</div>';return;}
-  listEl.innerHTML=filtered.map(s=>('<div class="worker-dropdown-item" onclick="pickWorkerFromDropdown(\'' + selId + '\',\'' + s.id + '\')">' + (s.nickname||'') + (s.nickname?' · ':'') + s.name + '</div>')).join('');
+  listEl.innerHTML=filtered.map(function(s){
+    var label=(s.nickname||'')+(s.nickname?' \u00b7 ':'')+s.name;
+    return '<div class="worker-dropdown-item" onclick="pickWorkerFromDropdown(\''+selId+'\',\''+s.id+'\')">'+label+'</div>';
+  }).join('');
 }
 function filterWorkerDropdown(selId, q){renderWorkerDropdownList(selId,q);}
 function pickWorkerFromDropdown(selId, staffId){
