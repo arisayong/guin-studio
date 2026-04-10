@@ -1983,7 +1983,6 @@ function renderTrkCalendar() {
   let html = `<div class="trk-calendar-card">
     <div class="trk-cal-nav">
       <button class="trk-cal-nav-btn" onclick="trkCalPrev()">‹ ก่อน</button>
-      <button onclick="trkCalMonth=new Date().getMonth();trkCalYear=new Date().getFullYear();renderTrkCalendar()" style="padding:5px 12px;border-radius:7px;background:var(--accent2);border:none;color:#fff;font-family:Kanit;font-size:12px;font-weight:700;cursor:pointer">วันนี้</button>
       <div class="trk-cal-title" style="display:flex;align-items:center;gap:6px">📅
         <select class="trk-cal-year-sel" onchange="trkCalMonth=parseInt(this.value);renderTrkCalendar()">
           ${TM.map((m,idx)=>('<option value="'+idx+'"'+(idx===trkCalMonth?' selected':'')+'>'+m+'</option>')).join('')}
@@ -1991,6 +1990,7 @@ function renderTrkCalendar() {
         <select class="trk-cal-year-sel" onchange="trkCalYear=parseInt(this.value);renderTrkCalendar()">
           ${years.map(y => `<option value="${y}"${y === trkCalYear ? ' selected' : ''}>${y + 543}</option>`).join('')}
         </select>
+        <button onclick="trkCalMonth=new Date().getMonth();trkCalYear=new Date().getFullYear();renderTrkCalendar()" style="padding:5px 12px;border-radius:7px;background:var(--accent2);border:none;color:#fff;font-family:Kanit;font-size:12px;font-weight:700;cursor:pointer">วันนี้</button>
       </div>
       <button class="trk-cal-nav-btn" onclick="trkCalNext()">หน้า ›</button>
     </div>
@@ -3977,7 +3977,7 @@ function renderProjCal() {
         <div style="display:flex;align-items:center;gap:8px">
           <select class="form-input form-select" style="padding:5px 24px 5px 8px;font-size:11px;width:120px" onchange="projCalSort=this.value;renderProjCal()">${projCalSort==='newest'?'<option value=\"newest\" selected>\uD83D\uDD3D \u0e43\u0e2b\u0e21\u0e48\u0e2a\u0e38\u0e14</option><option value=\"oldest\">\uD83D\uDD3C \u0e40\u0e01\u0e48\u0e32\u0e2a\u0e38\u0e14</option>':'<option value=\"newest\">\uD83D\uDD3D \u0e43\u0e2b\u0e21\u0e48\u0e2a\u0e38\u0e14</option><option value=\"oldest\" selected>\uD83D\uDD3C \u0e40\u0e01\u0e48\u0e32\u0e2a\u0e38\u0e14</option>'}</select>
           ${overdueCnt?`<span style="font-size:11px;padding:3px 10px;border-radius:8px;background:rgba(255,64,64,.12);color:var(--red);font-weight:700">🔴 เกิน deadline: ${overdueCnt}</span>`:''}
-          ${urgentCnt?`<span style="font-size:11px;padding:3px 10px;border-radius:8px;background:rgba(255,158,0,.12);color:var(--orange);font-weight:700">⚠️ ใน 3 วัน: ${urgentCnt}</span>`:''}
+          ${urgentCnt?`<span style="font-size:11px;padding:3px 10px;border-radius:8px;background:rgba(255,158,0,.12);color:var(--orange);font-weight:700">⚠️ ใกล้ deadline: ${urgentCnt}</span>`:''}
         </div>
       </div>
       <table><thead><tr>
