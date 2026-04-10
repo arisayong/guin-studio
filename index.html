@@ -1721,7 +1721,7 @@ function nav(page){
   document.querySelectorAll('.nav-item,.nav-sub-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
-  const renders={dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:()=>{ requestAnimationFrame(()=>requestAnimationFrame(()=>{try{renderQueue();}catch(e){}})); },docs:renderDocs,'proj-cal':renderProjCal,'my-dashboard':renderMyDash,'my-history':renderMyHistory};
+  const renders={dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:()=>{ setTimeout(()=>{try{renderQueue();}catch(e){console.error('queue nav error:',e);}},100); },docs:renderDocs,'proj-cal':renderProjCal,'my-dashboard':renderMyDash,'my-history':renderMyHistory};
   if(renders[page])renders[page]();
   window._currentPage=page;
 }
@@ -2584,6 +2584,7 @@ ${el.outerHTML}
 }
 
 /* ── Fix 4: Queue month/cycle filter ── */
+let queueFilter = 'all';
 let queueCycleFilter='all';
 
 function setQueueCycle(cycle, el){
@@ -2593,7 +2594,7 @@ function setQueueCycle(cycle, el){
   renderQueue();
 }
 
-function initQueueMonthFilter(){
+function initQueueMonthFilter(){ try {
   const monthSel=document.getElementById('q-month-sel');
   const yearSel=document.getElementById('q-year-sel');
   const TM=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
@@ -2627,6 +2628,8 @@ function initQueueMonthFilter(){
       yearSel.appendChild(opt);
     });
   }
+
+  } catch(e){ console.warn('initQueueMonthFilter error:',e); }
 }
 
 
@@ -2657,6 +2660,7 @@ function setQueueFilter(f, el) {
 }
 
 function renderQueue() {
+  try {
   initQueueMonthFilter();
   const el = document.getElementById('queue-list'); if (!el) return;
   const projs = getProjects();
@@ -2850,6 +2854,8 @@ function renderQueue() {
   }).join('');
 
   el.innerHTML = summaryBar + groupCards;
+
+  } catch(e){console.error('renderQueue failed:',e); toast('queue error: '+e.message,'error');}
 }
 
 function toggleQueueGroup(id) {
