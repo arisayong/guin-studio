@@ -2165,11 +2165,11 @@ function renderProjList(){
           +'</select>';
         const pid=String(p.id);
         // Actions column FIRST - always visible
-        const actionBtns='<td style="padding:6px;white-space:nowrap">'
+        const actionBtns='<td style="padding:6px;white-space:nowrap" onclick="event.stopPropagation()">'
           +'<div style="display:flex;gap:3px">'
-          +'<button class="btn btn-xs btn-outline" onclick="openEditProject(\''+pid+'\')" title="แก้ไข">✏️</button>'
-          +'<button class="btn btn-xs btn-outline" onclick="copyProject(\''+pid+'\')" title="คัดลอก">📋</button>'
-          +'<button class="btn btn-xs btn-red" onclick="deleteProjConfirm(\''+pid+'\')" title="ลบ">🗑️</button>'
+          +'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();openEditProject(\''+pid+'\')" title="แก้ไข">✏️</button>'
+          +'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();copyProject(\''+pid+'\')" title="คัดลอก">📋</button>'
+          +'<button class="btn btn-xs btn-red" onclick="event.stopPropagation();deleteProjConfirm(\''+pid+'\')" title="ลบ">🗑️</button>'
           +'</div></td>';
         return '<tr style="font-size:12px">'
           +actionBtns
@@ -4620,6 +4620,18 @@ function startFirebaseSync() {
       const pgD = document.getElementById('page-dashboard');
       if(pgD&&!pgD.classList.contains('hidden')) try{renderDash();}catch(e){}
     } catch(e){ console.error('Projects RT error:', e); }
+  });
+  
+  // child_removed - ลบโปรเจกต์ sync ทันที
+  _fbDatabase.ref('projects').on('child_removed', snap => {
+    try {
+      const id = snap.key;
+      projectsCache = projectsCache.filter(p=>p.id!==id);
+      ls('projects_cache', projectsCache);
+      try{updateQueueBadge();}catch(e){}
+      const pg=document.getElementById('page-projects');
+      if(pg&&!pg.classList.contains('hidden')) try{renderProjects();}catch(e){}
+    } catch(e){}
   });
 
   // Sync users/staff profiles
