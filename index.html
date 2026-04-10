@@ -1124,6 +1124,8 @@ let payAmtTarget = null;
 let noEmail = false;
 let paidAt = null;
 let isLast = false;
+let undoStack = [];
+let redoStack = [];
 
 const CAT_MAP = {
   dub: 'dubbing', adp: 'adaptation', mix: 'mix',
