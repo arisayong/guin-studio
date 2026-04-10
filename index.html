@@ -1208,6 +1208,7 @@ let noEmail = false;
 let paidAt = null;
 let isLast = false;
 let _savingProject = false; // prevent RT listener race
+let _workerListCache = []; // global cache for worker dropdown
 let undoStack = [];
 let redoStack = [];
 
@@ -2288,26 +2289,26 @@ function toggleCat(key){
   if(activeCats.has(key)){activeCats.delete(key);btn.classList.remove('on');block.classList.add('hidden')}
   else{activeCats.add(key);btn.classList.add('on');block.classList.remove('hidden')}
 }
-function populateWorkerSelects(){
-  const data=getStaffData();
-  // Firebase อาจ return object แทน array - ต้อง normalize
-  const toArr = v => {
-    if(!v) return [];
-    if(Array.isArray(v)) return v.filter(Boolean);
-    return Object.values(v).filter(Boolean);
-  };
-  // รวม staff ทุกหมวดเป็น list เดียว (dedup by id)
-  const allStaffMap={};
-  Object.values(data).forEach(cat=>{
-    toArr(cat).forEach(s=>{ if(s&&s.id) allStaffMap[s.id]=s; });
+
+function buildWorkerList(){
+  // ดึง staff data และ normalize ทุก format ที่ Firebase อาจส่งมา
+  const raw = ls('staff_v3');
+  if(!raw) return [];
+  const toArr = v => !v ? [] : Array.isArray(v) ? v : Object.values(v);
+  const map = {};
+  Object.values(raw).forEach(cat => {
+    toArr(cat).filter(Boolean).forEach(s => {
+      if(s && s.id && s.name) map[s.id] = s;
+    });
   });
-  const allStaff=Object.values(allStaffMap).sort((a,b)=>(a.nickname||a.name||'').localeCompare(b.nickname||b.name||'','th'));
-  // ทุก dropdown ใช้ staff ทั้งหมด
-  const selIds=['dub-main-select','dub-sub-select','adp-select','mix-select','qc-select','sub-select','mgr-select'];
-  selIds.forEach(selId=>{
-    const sel=document.getElementById(selId);if(!sel)return;
-    sel._allStaff=allStaff;
-    sel.innerHTML='<option value="">+ เพิ่มสมาชิก</option>'+allStaff.map(s=>'<option value="'+s.id+'">'+(s.nickname||'')+' '+s.name+'</option>').join('');
+  return Object.values(map).sort((a,b) => (a.nickname||a.name||'').localeCompare(b.nickname||b.name||'','th'));
+}
+function populateWorkerSelects(){
+  _workerListCache = buildWorkerList();
+  const opts = '<option value="">+ เพิ่มสมาชิก</option>' + 
+    _workerListCache.map(s => '<option value="'+s.id+'">'+(s.nickname||'')+' '+s.name+'</option>').join('');
+  ['dub-main-select','dub-sub-select','adp-select','mix-select','qc-select','sub-select','mgr-select'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.innerHTML = opts;
   });
 }
 function addWorkerToSlot(cat,slot){
@@ -4715,32 +4716,39 @@ function startFirebaseSync() {
 
 // ── Worker Search Dropdown ──
 function toggleWorkerDropdown(selId){
-  const popup=document.getElementById(selId+'-popup');
-  if(!popup)return;
-  document.querySelectorAll('.worker-dropdown-popup.open').forEach(p=>{if(p!==popup)p.classList.remove('open')});
-  const isOpen=popup.classList.toggle('open');
+  const popup = document.getElementById(selId+'-popup');
+  if(!popup) return;
+  document.querySelectorAll('.worker-dropdown-popup.open').forEach(p => { if(p!==popup) p.classList.remove('open'); });
+  const isOpen = popup.classList.toggle('open');
   if(isOpen){
-    // Refresh staff data ทุกครั้งที่เปิด dropdown
-    populateWorkerSelects();
-    const inp=popup.querySelector('.worker-dropdown-search');
-    if(inp){inp.value='';inp.focus();}
-    renderWorkerDropdownList(selId,'');
+    // Rebuild worker list fresh every open
+    _workerListCache = buildWorkerList();
+    const inp = popup.querySelector('.worker-dropdown-search');
+    if(inp){ inp.value = ''; inp.focus(); }
+    renderWorkerDropdownList(selId, '');
   }
 }
 function renderWorkerDropdownList(selId, q){
-  const sel=document.getElementById(selId);
-  const listEl=document.getElementById(selId+'-list');
-  if(!listEl)return;
-  if(!sel||!sel._allStaff||!sel._allStaff.length) populateWorkerSelects();
-  const all=(sel&&sel._allStaff)||[];
-  const filtered=!q?all:all.filter(s=>
-    (s.nickname||'').toLowerCase().includes(q.toLowerCase())||
-    (s.name||'').toLowerCase().includes(q.toLowerCase())
-  );
-  if(!filtered.length){listEl.innerHTML='<div class="worker-dropdown-empty">ไม่พบสมาชิก</div>';return;}
-  listEl.innerHTML=filtered.map(function(s){
-    var label=(s.nickname||'')+(s.nickname?' \u00b7 ':'')+s.name;
-    return '<div class="worker-dropdown-item" onclick="pickWorkerFromDropdown(\''+selId+'\',\''+s.id+'\')">'+label+'</div>';
+  const listEl = document.getElementById(selId+'-list');
+  if(!listEl) return;
+  if(!_workerListCache.length) _workerListCache = buildWorkerList();
+  const all = _workerListCache;
+  if(!all.length){
+    listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--text2);font-size:12px">ยังไม่มีสมาชิก — เพิ่มในหน้าจัดการทีมก่อน</div>';
+    return;
+  }
+  const q2 = (q||'').toLowerCase();
+  const filtered = q2 ? all.filter(s =>
+    (s.nickname||'').toLowerCase().includes(q2)||(s.name||'').toLowerCase().includes(q2)
+  ) : all;
+  if(!filtered.length){
+    listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--text2);font-size:12px">ไม่พบ "'+q+'"</div>';
+    return;
+  }
+  listEl.innerHTML = filtered.map(function(s){
+    var label=(s.nickname?s.nickname+' \u00b7 ':'')+s.name;
+    var onclick='pickWorkerFromDropdown(\''+selId+'\',\''+s.id+'\')';
+    return '<div class="worker-dropdown-item" onclick="'+onclick+'" onmouseover="this.style.background=\'var(--bg2)\'" onmouseout="this.style.background=\'\'">'+label+'</div>';
   }).join('');
 }
 function filterWorkerDropdown(selId, q){renderWorkerDropdownList(selId,q);}
