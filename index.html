@@ -4099,8 +4099,9 @@ function renderBillingCycleSection() {
           ${years.map(y=>`<option value="${y}" ${y===billingYearSelected?'selected':''}>${y+543}</option>`).join('')}
         </select>
         <div class="tabs" style="margin:0">
-          <div class="tab ${billingCycleSelected===1?'active':''}" onclick="billingCycleSelected=1;renderBillingCycleSection()" style="font-size:13px">🔵 1–15 (ต้นเดือน)</div>
-          <div class="tab ${billingCycleSelected===2?'active':''}" onclick="billingCycleSelected=2;renderBillingCycleSection()" style="font-size:13px">🟠 16–31 (ปลายเดือน)</div>
+          <div class="tab ${billingCycleSelected===0?'active':''}" onclick="billingCycleSelected=0;renderBillingCycleSection()" style="font-size:13px">📅 ทั้งเดือน</div>
+          <div class="tab ${billingCycleSelected===1?'active':''}" onclick="billingCycleSelected=1;renderBillingCycleSection()" style="font-size:13px">🔵 1–15</div>
+          <div class="tab ${billingCycleSelected===2?'active':''}" onclick="billingCycleSelected=2;renderBillingCycleSection()" style="font-size:13px">🟠 16–31</div>
         </div>
       </div>
     </div>
@@ -4121,7 +4122,7 @@ function renderBillingStaffCards() {
     if (!p.deadline) return;
     const dl = new Date(p.deadline);
     if (dl.getFullYear() !== billingYearSelected) return;
-    if (dl.getMonth() !== billingMonthSelected) return;
+    if (billingMonthSelected !== -1 && dl.getMonth() !== billingMonthSelected) return;
     if (billingCycleSelected === 1 && dl.getDate() > 15) return;
     if (billingCycleSelected === 2 && dl.getDate() <= 15) return;
 
@@ -4142,9 +4143,8 @@ function renderBillingStaffCards() {
     (s.nickname||'').toLowerCase().includes(bsq) ||
     items.some(({proj:p}) => (p.name||'').toLowerCase().includes(bsq))
   );
-  const periodStr = billingCycleSelected === 1
-    ? `1–15 ${TM[billingMonthSelected]} ${billingYearSelected+543}`
-    : `16–สิ้นเดือน ${TM[billingMonthSelected]} ${billingYearSelected+543}`;
+  const monthName = billingMonthSelected===-1?'ทุกเดือน':TM[billingMonthSelected];
+  const periodStr = billingCycleSelected===0?`ทั้งเดือน ${monthName} ${billingYearSelected+543}`:billingCycleSelected===1?`1–15 ${monthName} ${billingYearSelected+543}`:`16–สิ้นเดือน ${monthName} ${billingYearSelected+543}`;
 
   if (!entries.length) {
     el.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text2)">ไม่มีรายการที่รอจ่ายในรอบ ${periodStr}</div>`;
@@ -4207,7 +4207,7 @@ function buildBillingVoucherHTML(staffId) {
     if (!p.deadline) return;
     const dl = new Date(p.deadline);
     if (dl.getFullYear() !== billingYearSelected) return;
-    if (dl.getMonth() !== billingMonthSelected) return;
+    if (billingMonthSelected !== -1 && dl.getMonth() !== billingMonthSelected) return;
     if (billingCycleSelected === 1 && dl.getDate() > 15) return;
     if (billingCycleSelected === 2 && dl.getDate() <= 15) return;
     const w = (p.workers||[]).find(x => x.id === staffId && x.status !== 'paid');
@@ -4873,7 +4873,7 @@ function _notifyProjectChange(){
 // ══════════════════════════════════════════════
 const EMAILJS_CONFIG = {
   serviceId: 'service_83hryy5',
-  templateId: 'template_fbmh65i',
+  templateId: 'template_f904hlq',
   publicKey: 'H0Xg1aeoJhlcm9bqW',
 };
 
