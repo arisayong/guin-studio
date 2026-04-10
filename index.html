@@ -3462,23 +3462,84 @@ function saveAndSendQuotation() {
   if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
   if(!data.items.length){toast('กรุณาเพิ่มรายการ','error');return;}
   if(!data.email){toast('กรุณากรอก Email ลูกค้า','error');return;}
+
+  // บันทึกลง history
   const total = calcQtTotal();
-  const saved = { ...data, total, createdAt: new Date().toISOString() };
+  const saved = {...data, total, createdAt: new Date().toISOString()};
   const all = getDocsStore('quotations')||[];
   all.push(saved); saveDocsStore('quotations', all);
-  const subject = encodeURIComponent(`ใบเสนอราคา ${data.docNo} — Guin Home Studio`);
-  const body = encodeURIComponent(`เรียน คุณ${data.client}\n\nกรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio`);
-  window.open(`https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm&to=${data.email}&su=${subject}&body=${body}`, '_blank');
-  toast(`📧 เปิด Email ให้ ${data.client} แล้ว — อย่าลืมแนบ PDF`, 'success');
-  // Auto-backup to Google Drive
-  const qtHtml = buildQuotationHTML(data);
-  uploadToDrive('quotation', `${data.docNo}_${data.client}.html`, buildDriveHTML(qtHtml, data.docNo));
+
+  // เก็บ email data
+  window._pendingEmail = {
+    to: data.email,
+    name: data.client,
+    subject: 'ใบเสนอราคา '+data.docNo+' — Guin Home Studio',
+    message: 'เรียน คุณ'+data.client+'\n\nขออนุญาตส่งใบเสนอราคา '+data.docNo+' มาเพื่อพิจารณาค่ะ\nยอดรวม: ฿'+total.toLocaleString()+'\n\nกรุณาตรวจสอบเอกสารในไฟล์แนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio'
+  };
+  window._slipDataPending = null;
+  window._docDataPending  = null;
+
+  // เปิด popup อัปโหลด PDF
+  const old = document.getElementById('slip-upload-modal');
+  if(old) old.remove();
+  const div = document.createElement('div');
+  div.id = 'slip-upload-modal';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
+  div.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:480px;max-width:98vw">'+
+    '<div style="font-size:17px;font-weight:800;margin-bottom:4px">📎 แนบใบเสนอราคา PDF</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:18px">ถึง <strong>'+data.client+'</strong> ('+data.email+')</div>'+
+    '<label style="cursor:pointer;display:block;margin-bottom:16px">'+
+    '<input type="file" accept="image/*,.pdf" style="display:none" id="qt-doc-input">'+
+    '<div id="qt-doc-zone" style="border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;transition:all .2s" onmouseover="this.style.borderColor=\'var(--accent2)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
+    '<div style="font-size:32px;margin-bottom:6px">📄</div>'+
+    '<div style="font-size:13px;color:var(--text2)">คลิกเพื่อเลือกใบเสนอราคา PDF ที่พิมพ์มาแล้ว</div>'+
+    '<div id="qt-doc-label" style="margin-top:8px;color:var(--accent2);font-size:12px;font-weight:700"></div>'+
+    '</div></label>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn btn-outline btn-sm" style="flex:1" onclick="document.getElementById(\'slip-upload-modal\').remove()">ยกเลิก</button>'+
+    '<button class="btn btn-outline btn-sm" style="flex:1" id="qt-send-noattach">📧 ส่งโดยไม่แนบ PDF</button>'+
+    '<button class="btn btn-blue btn-sm" style="flex:1" id="qt-send-attach">💾 แนบ & ดูตัวอย่าง</button>'+
+    '</div></div>';
+  document.body.appendChild(div);
+
+  div.querySelector('#qt-doc-input').addEventListener('change', function(){
+    const file = this.files[0]; if(!file) return;
+    if(file.size > 10*1024*1024){toast('ไฟล์ใหญ่เกิน 10MB','error');return;}
+    const reader = new FileReader();
+    reader.onload = function(e2){
+      window._docDataPending = {base64:e2.target.result, name:file.name, savedAt:new Date().toISOString()};
+      document.getElementById('qt-doc-label').textContent = '📄 '+file.name;
+      document.getElementById('qt-doc-zone').style.borderColor = 'var(--green)';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('qt-send-noattach').onclick = function(){
+    div.remove(); showEmailPreview();
+  };
+  document.getElementById('qt-send-attach').onclick = function(){
+    if(window._docDataPending) uploadToDrive('quotation', window._docDataPending.name, window._docDataPending.base64);
+    div.remove(); showEmailPreview();
+  };
+
   renderDocsHistory();
 }
 function downloadQuotation() {
   const data = getQuotationData();
   if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
-  previewQuotation();
+  const html = buildQuotationHTML(data);
+  const fname = (data.docNo||'quotation')+'_'+data.client;
+  const fullHtml = '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>'+fname+'</title>'+
+    '<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">'+
+    '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Kanit,sans-serif;background:#f5f7fa;padding:32px}'+
+    '@media print{body{background:#fff;padding:0}.no-print{display:none}@page{margin:12mm;size:A4}}</style>'+
+    '</head><body>'+html+
+    '<div class="no-print" style="text-align:center;margin:24px 0">'+
+    '<p style="font-size:13px;color:#666;margin-bottom:8px">ชื่อไฟล์: <strong>'+fname+'.pdf</strong></p>'+
+    '<button onclick="window.print()" style="padding:12px 32px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF</button>'+
+    '</div></body></html>';
+  const w = window.open('','_blank');
+  if(w){w.document.write(fullHtml);w.document.close();w.onload=function(){setTimeout(()=>w.print(),800);};}
 }
 
 /* ══════════════════════
@@ -4251,8 +4312,26 @@ function previewBillingVoucher(staffId) {
 }
 
 function downloadBillingVoucher(staffId) {
-  // เปิด preview ให้ user พิมพ์เป็น PDF เอง
-  previewBillingVoucher(staffId);
+  const html = buildBillingVoucherHTML(staffId);
+  if (!html) { toast('ไม่พบรายการ', 'warn'); return; }
+  const s = getStaffById(staffId);
+  const TM = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+              'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  const period = billingCycleSelected===1
+    ? '1-15_'+TM[billingMonthSelected]
+    : '16-31_'+TM[billingMonthSelected];
+  const fname = 'voucher_'+(s?.nickname||staffId)+'_'+period+'_'+(billingYearSelected+543);
+  const fullHtml = '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>'+fname+'</title>'+
+    '<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">'+
+    '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Kanit,sans-serif;background:#f5f7fa;padding:32px}'+
+    '@media print{body{background:#fff;padding:0}.no-print{display:none}@page{margin:12mm;size:A4}}</style>'+
+    '</head><body><div>'+html+'</div>'+
+    '<div class="no-print" style="text-align:center;margin:24px 0">'+
+    '<p style="font-size:13px;color:#666;margin-bottom:8px">ชื่อไฟล์: <strong>'+fname+'.pdf</strong></p>'+
+    '<button onclick="window.print()" style="padding:12px 32px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF ('+fname+')</button>'+
+    '</div></body></html>';
+  const w = window.open('','_blank');
+  if(w){ w.document.write(fullHtml); w.document.close(); w.onload=function(){setTimeout(()=>w.print(),800);}; }
 }
 
 function sendBillingVoucherEmail(staffId) {
@@ -4893,18 +4972,34 @@ function showEmailPreview(){
   if(!e){ toast('ไม่มีข้อมูลอีเมล','error'); return; }
   var old = document.getElementById('email-preview-modal');
   if(old) old.remove();
+
+  // ตรวจไฟล์ที่แนบ
+  var slipInfo = window._slipDataPending ? '📎 '+window._slipDataPending.name : '';
+  var docInfo  = window._docDataPending  ? '📄 '+window._docDataPending.name  : '';
+  var attachHtml = '';
+  if(slipInfo||docInfo){
+    attachHtml = '<div style="background:rgba(0,223,160,.08);border:1px solid rgba(0,223,160,.2);border-radius:10px;padding:12px;font-size:12px;margin-bottom:14px">'+
+      '<div style="font-weight:700;color:var(--green);margin-bottom:6px">📎 ไฟล์ที่จะแนบ:</div>'+
+      (slipInfo?'<div style="color:var(--text2)">'+slipInfo+'</div>':'')+
+      (docInfo ?'<div style="color:var(--text2)">'+docInfo+'</div>' :'')+
+      '</div>';
+  } else {
+    attachHtml = '<div style="background:rgba(255,158,0,.08);border:1px solid rgba(255,158,0,.2);border-radius:10px;padding:10px;font-size:12px;color:var(--orange);margin-bottom:14px">⚠️ ไม่มีไฟล์แนบ — อย่าลืมแนบใบสำคัญจ่ายใน Gmail หลังส่ง</div>';
+  }
+
   var div = document.createElement('div');
   div.id = 'email-preview-modal';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
   var msgEsc = e.message.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
   div.innerHTML = [
-    '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:520px;max-width:98vw">',
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:540px;max-width:98vw;max-height:90vh;overflow-y:auto">',
     '<div style="font-size:17px;font-weight:800;margin-bottom:16px">📧 ตัวอย่างอีเมลก่อนส่ง</div>',
-    '<div style="background:var(--bg2);border-radius:10px;padding:16px;font-size:13px;line-height:2.2;margin-bottom:14px">',
+    '<div style="background:var(--bg2);border-radius:10px;padding:14px;font-size:13px;line-height:2.2;margin-bottom:14px">',
     '<div><span style="color:var(--text2);min-width:70px;display:inline-block">จาก:</span><strong style="color:var(--green)">penguinstudiovoice@gmail.com</strong></div>',
     '<div><span style="color:var(--text2);min-width:70px;display:inline-block">ถึง:</span><strong>'+e.to+'</strong> ('+e.name+')</div>',
     '<div><span style="color:var(--text2);min-width:70px;display:inline-block">หัวข้อ:</span>'+e.subject+'</div>',
     '</div>',
+    attachHtml,
     '<div style="background:var(--bg2);border-radius:10px;padding:14px;font-size:13px;line-height:1.8;margin-bottom:16px;border-left:3px solid var(--accent2)">'+msgEsc+'</div>',
     '<div style="display:flex;gap:10px">',
     '<button class="btn btn-outline" style="flex:1" id="ep-cancel">✕ ยกเลิก</button>',
