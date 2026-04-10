@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- Guin Home Studio v3.1 - build: 202604091952 -->
+<!-- Guin Home Studio v3.2 - build: 1775826379 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🎙️ Guin Home Studio</title>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700;800&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
@@ -1531,8 +1531,9 @@ auth.onAuthStateChanged(async(fbUser)=>{
     showLoader(true);
     // Build profile from Firebase Auth user directly — no DB lookup needed for first version
     // Known admin emails - always admin regardless of saved profile
-    const KNOWN_ADMINS = ['penguinstudiovoice@gmail.com','haruyami231@gmail.com'];
-    const isKnownAdmin = KNOWN_ADMINS.some(e => e.toLowerCase() === (fbUser.email||'').toLowerCase());
+    const KNOWN_ADMINS = ['penguinstudiovoice@gmail.com','haruyami231@gmail.com','haruyami231'];
+    const emailLower = (fbUser.email||'').toLowerCase().trim();
+    const isKnownAdmin = KNOWN_ADMINS.some(e => emailLower.includes(e.toLowerCase().replace('@gmail.com','')) || e.toLowerCase() === emailLower);
     const profile = {
       email: fbUser.email,
       name: fbUser.displayName || fbUser.email,
@@ -2116,9 +2117,10 @@ function renderProjList(){
       </td>
       <td>
        <div style="display:flex;gap:4px;flex-wrap:wrap">
+        ${currentUser&&currentUser.role==='admin'?`
         <button class="btn btn-xs btn-outline" onclick="openEditProject('${p.id}')">✏️</button>
         <button class="btn btn-xs btn-outline" onclick="copyProject('${p.id}')" title="Clone">📋</button>
-        <button class="btn btn-xs btn-red" onclick="deleteProjConfirm('${p.id}')">🗑️</button>
+        <button class="btn btn-xs btn-red" onclick="deleteProjConfirm('${p.id}')">🗑️</button>`:''}
        </div>
       </td>
     </tr>`;
