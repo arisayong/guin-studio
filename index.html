@@ -1690,7 +1690,7 @@ function renderDash(){
     <div class="stat-card">
      <span class="stat-icon">💹</span>
      <div class="stat-label">รายได้รวม (Budget)</div>
-     <div class="stat-value" style="color:var(--green)">${fmtB(revenue)}</div>
+     <div class="stat-value" style="color:var(--accent2)">${fmtB(revenue)}</div>
      <div class="stat-delta up">จากลูกค้าทั้งหมด</div>
     </div>
     <div class="stat-card onclick="nav('queue')">
@@ -2021,17 +2021,25 @@ function renderProjList(){
 // ══════════════════════════════════════════════
 function initFormSlots(){formSlots={dub:{main:[],sub:[]},adp:{only:[]},mix:{only:[]},qc:{only:[]},sub:{only:[]},mgr:{only:[]}};activeCats=new Set()}
 function openNewProject(){
+  try {
   editingProjId=null;initFormSlots();
   document.getElementById('proj-modal-title').textContent='➕ สร้างโปรเจกต์ใหม่';
-  ['pj-name','pj-client','pj-budget','pj-duration','pj-note'].forEach(id=>document.getElementById(id).value='');
-  ['pj-type','pj-cycle'].forEach(id=>document.getElementById(id).selectedIndex=0);
+  ['pj-name','pj-client','pj-budget','pj-duration','pj-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['pj-type','pj-cycle'].forEach(id=>{const el=document.getElementById(id);if(el)el.selectedIndex=0;});
   const today=new Date().toISOString().split('T')[0];
-  document.getElementById('pj-start').value=isoToThai(today);document.getElementById('pj-start-pk').value=today;document.getElementById('pj-deadline').value=isoToThai(today);document.getElementById('pj-deadline-pk').value=today;
+  const ps=document.getElementById('pj-start');if(ps)ps.value=isoToThai(today);
+  const pspk=document.getElementById('pj-start-pk');if(pspk)pspk.value=today;
+  const pd=document.getElementById('pj-deadline');if(pd)pd.value=isoToThai(today);
+  const pdpk=document.getElementById('pj-deadline-pk');if(pdpk)pdpk.value=today;
   document.querySelectorAll('.cat-toggle-btn').forEach(b=>b.classList.remove('on'));
-  ['dub','adp','mix','qc','sub','mgr'].forEach(k=>{const c=document.getElementById('catblock-'+k);if(c)c.classList.add('hidden')});
-  ['dub','adp','mix','qc','sub','mgr'].forEach(k=>{const el=document.getElementById(k+'-tax');if(el)el.value=''});
+  ['dub','adp','mix','qc','sub','mgr'].forEach(k=>{const el=document.getElementById('catblock-'+k);if(el)el.classList.add('hidden');});
+  ['dub','adp','mix','qc','sub','mgr'].forEach(k=>{const el=document.getElementById(k+'-tax');if(el)el.value='';});
   populateWorkerSelects();clearAllWorkerLists();calcProjSummary();
   openModal('modal-project');
+  } catch(e) {
+    console.error('openNewProject error:', e);
+    toast('เกิดข้อผิดพลาด: ' + e.message, 'error');
+  }
 }
 function toggleCat(key){
   const btn=document.getElementById('toggle-'+key);const block=document.getElementById('catblock-'+key);if(!btn||!block)return;
