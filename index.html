@@ -515,7 +515,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div class="filter-bar" id="type-filter"></div>
    <div class="table-wrap">
     <table style="width:100%">
-     <thead><tr><th>โปรเจกต์</th><th>ลูกค้า</th><th>ประเภท</th><th>Deadline</th><th>Budget</th><th>รายจ่าย</th><th>กำไร</th><th>สถานะ</th><th>Actions</th></tr></thead>
+     <thead><tr><th style="width:80px">Actions</th><th>โปรเจกต์</th><th>ลูกค้า</th><th>ประเภท</th><th>Deadline</th><th>Budget</th><th>รายจ่าย</th><th>กำไร</th><th>สถานะ</th></tr></thead>
      <tbody id="projects-table"></tbody>
     </table>
    </div>
@@ -2092,7 +2092,7 @@ function renderProjList(){
     const q=(document.getElementById('proj-search')||{}).value?.toLowerCase()||'';
     let projs=getProjects().filter(p=>{
       if(selectedYear!=='all'){
-        const yr = Number(selectedYear);
+        const yr=Number(selectedYear);
         const years=new Set([
           p.date?new Date(p.date).getFullYear():null,
           p.deadline?new Date(p.deadline).getFullYear():null,
@@ -2111,11 +2111,8 @@ function renderProjList(){
       try {
         const exp=getProjExpense(p);
         const profit=(p.budget||0)-exp;
-        // Safe deadline - convert Thai date if needed
-        let deadlineISO = p.deadline||'';
-        if(deadlineISO && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(deadlineISO)){
-          deadlineISO = thaiToIso(deadlineISO)||deadlineISO;
-        }
+        let deadlineISO=p.deadline||'';
+        if(deadlineISO&&/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(deadlineISO))deadlineISO=thaiToIso(deadlineISO)||deadlineISO;
         const dl=deadlineISO?new Date(deadlineISO):null;
         let dlHtml='—';
         if(dl&&!isNaN(dl)){
@@ -2130,13 +2127,16 @@ function renderProjList(){
           +'<option value="done" '+(p.projStatus==='done'?'selected':'')+'>✅ เสร็จแล้ว</option>'
           +'<option value="cancelled" '+(p.projStatus==='cancelled'?'selected':'')+'>❌ ยกเลิก</option>'
           +'</select>';
-        const pid = String(p.id);
-        const actionBtns='<div style="display:flex;gap:3px;white-space:nowrap">'
+        const pid=String(p.id);
+        // Actions column FIRST - always visible
+        const actionBtns='<td style="padding:6px;white-space:nowrap">'
+          +'<div style="display:flex;gap:3px">'
           +'<button class="btn btn-xs btn-outline" onclick="openEditProject(\''+pid+'\')" title="แก้ไข">✏️</button>'
           +'<button class="btn btn-xs btn-outline" onclick="copyProject(\''+pid+'\')" title="คัดลอก">📋</button>'
           +'<button class="btn btn-xs btn-red" onclick="deleteProjConfirm(\''+pid+'\')" title="ลบ">🗑️</button>'
-          +'</div>';
+          +'</div></td>';
         return '<tr style="font-size:12px">'
+          +actionBtns
           +'<td style="cursor:pointer;max-width:160px;padding:8px 6px" onclick="openProjDetail(\''+pid+'\')">'
           +'<div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(p.name||'—')+'</div>'
           +(p.note?'<div style="font-size:10px;color:var(--text2)">📝 '+p.note+'</div>':'')
@@ -2148,11 +2148,10 @@ function renderProjList(){
           +'<td style="padding:8px 6px;color:var(--red)">'+fmtB(exp)+'</td>'
           +'<td style="padding:8px 6px;font-weight:700;color:'+(profit>=0?'var(--green)':'var(--red)')+'">'+fmtB(profit)+'</td>'
           +'<td style="padding:8px 6px">'+statusSel+'</td>'
-          +'<td style="padding:8px 6px">'+actionBtns+'</td>'
           +'</tr>';
-      } catch(rowErr) { console.warn('Row error:', rowErr); return ''; }
+      } catch(rowErr){console.warn('Row render error:',rowErr);return '';}
     }).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:32px">ไม่พบโปรเจกต์</td></tr>';
-  } catch(e) { console.error('renderProjList error:', e); }
+  } catch(e){console.error('renderProjList error:',e);}
 }
 
 // ══════════════════════════════════════════════
