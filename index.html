@@ -5,6 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <meta name="version" content="1775832297">
 <!-- Guin Home Studio v3.5 - build: 1775832297 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -4326,41 +4327,64 @@ function sendBillingVoucherEmail(staffId) {
 function showSlipUploadModal(staffId) {
   const s = getStaffById(staffId); if (!s) return;
   const slipKey = 'billing_slip_'+staffId+'_'+billingYearSelected+'_'+billingMonthSelected+'_'+billingCycleSelected;
-  const existing = ls(slipKey);
+  const docKey  = 'billing_doc_'+staffId+'_'+billingYearSelected+'_'+billingMonthSelected+'_'+billingCycleSelected;
+  const existSlip = ls(slipKey);
+  const existDoc  = ls(docKey);
   const old = document.getElementById('slip-upload-modal');
   if (old) old.remove();
   const div = document.createElement('div');
   div.id = 'slip-upload-modal';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
-  div.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:500px;max-width:98vw;animation:slideUp .3s ease">
-    <div style="font-size:17px;font-weight:800;margin-bottom:4px">📎 แนบสลิปโอนเงิน</div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:18px">สำหรับ <strong>${s.name}</strong> ก่อนส่ง Email</div>
-    ${existing?`<div style="background:rgba(0,223,160,.1);border:1px solid rgba(0,223,160,.25);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--green);margin-bottom:14px;display:flex;align-items:center;gap:8px">
-      <span>✅</span><span>มีสลิปบันทึกไว้แล้ว: <strong>${existing.name}</strong></span>
-      <button onclick="viewSavedSlip('${slipKey}')" style="margin-left:auto;background:none;border:1px solid rgba(0,223,160,.3);border-radius:6px;color:var(--green);font-family:Kanit;font-size:11px;padding:2px 8px;cursor:pointer">ดูสลิป</button>
-    </div>`:''}
-    <label style="cursor:pointer;display:block;margin-bottom:16px">
-      <input type="file" accept="image/*,.pdf" style="display:none" id="slip-upload-input-modal">
-      <div id="slip-drop-zone" style="border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;transition:all .2s"
-        onmouseover="this.style.borderColor='var(--accent2)'" onmouseout="this.style.borderColor='var(--border)'">
-        <div style="font-size:32px;margin-bottom:6px">📁</div>
-        <div style="font-size:13px;color:var(--text2)">คลิกเพื่อเลือกไฟล์สลิป (รูปภาพ / PDF)</div>
-        <div id="slip-fname-label" style="margin-top:8px;color:var(--accent2);font-size:12px;font-weight:700"></div>
-      </div>
-    </label>
-    <div style="background:rgba(0,180,255,.06);border:1px solid rgba(0,180,255,.2);border-radius:8px;padding:10px 14px;font-size:11px;color:var(--text2);margin-bottom:16px;line-height:1.7">
-      💾 สลิปจะถูกบันทึกใน localStorage · สำเนาเก็บไว้ใน Google Drive ด้วยตนเองได้ที่<br>
-      <a href="https://drive.google.com/drive/folders/1lpvnM608S6_Fv6f_dYd8zhnYG9S77X1D" target="_blank" style="color:var(--accent2)">📂 Guin Home Studio — Backup ↗</a>
+  div.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:520px;max-width:98vw;animation:slideUp .3s ease">
+    <div style="font-size:17px;font-weight:800;margin-bottom:4px">📎 แนบไฟล์ก่อนส่ง</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:18px">สำหรับ <strong>${s.name} (${s.nickname})</strong></div>
+
+    <!-- สลิปโอนเงิน -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">💸 สลิปโอนเงิน</div>
+      ${existSlip?`<div style="background:rgba(0,223,160,.1);border:1px solid rgba(0,223,160,.25);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--green);margin-bottom:8px;display:flex;align-items:center;gap:8px">
+        <span>✅ มีสลิปอยู่แล้ว: <strong>${existSlip.name}</strong></span>
+        <button onclick="viewSavedSlip('${slipKey}')" style="margin-left:auto;background:none;border:1px solid rgba(0,223,160,.3);border-radius:6px;color:var(--green);font-family:Kanit;font-size:11px;padding:2px 8px;cursor:pointer">ดูสลิป</button>
+      </div>`:''}
+      <label style="cursor:pointer;display:block">
+        <input type="file" accept="image/*,.pdf" style="display:none" id="slip-file-input">
+        <div id="slip-drop-zone" style="border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;transition:all .2s"
+          onmouseover="this.style.borderColor='var(--accent2)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="font-size:24px;margin-bottom:4px">📁</div>
+          <div style="font-size:12px;color:var(--text2)">คลิกเพื่อเลือกสลิป (รูปภาพ / PDF)</div>
+          <div id="slip-fname-label" style="margin-top:6px;color:var(--accent2);font-size:12px;font-weight:700"></div>
+        </div>
+      </label>
     </div>
+
+    <!-- ใบสำคัญจ่าย -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">📄 ใบสำคัญจ่ายเงิน</div>
+      ${existDoc?`<div style="background:rgba(0,180,255,.1);border:1px solid rgba(0,180,255,.25);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--cyan);margin-bottom:8px">
+        ✅ มีเอกสารอยู่แล้ว: <strong>${existDoc.name}</strong>
+      </div>`:''}
+      <label style="cursor:pointer;display:block">
+        <input type="file" accept="image/*,.pdf" style="display:none" id="doc-file-input">
+        <div id="doc-drop-zone" style="border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;transition:all .2s"
+          onmouseover="this.style.borderColor='var(--accent2)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="font-size:24px;margin-bottom:4px">📋</div>
+          <div style="font-size:12px;color:var(--text2)">คลิกเพื่อเลือกใบสำคัญจ่าย (รูปภาพ / PDF)</div>
+          <div id="doc-fname-label" style="margin-top:6px;color:var(--accent2);font-size:12px;font-weight:700"></div>
+        </div>
+      </label>
+    </div>
+
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-outline btn-sm" style="flex:1" onclick="document.getElementById('slip-upload-modal').remove()">ยกเลิก</button>
-      <button class="btn btn-outline btn-sm" style="flex:1" onclick="doSendVoucherEmail('${staffId}',false)">📧 ส่งโดยไม่แนบสลิป</button>
-      <button class="btn btn-blue btn-sm" style="flex:1" id="btn-save-slip" onclick="doSendVoucherEmail('${staffId}',true)">💾 บันทึกสลิป & ส่ง Email</button>
+      <button class="btn btn-outline btn-sm" style="flex:1" onclick="doSendVoucherEmail('${staffId}',false)">📧 ส่งโดยไม่แนบ</button>
+      <button class="btn btn-blue btn-sm" style="flex:1" onclick="doSendVoucherEmail('${staffId}',true)">💾 บันทึก & ส่ง Email</button>
     </div>
   </div>`;
   document.body.appendChild(div);
   window._slipDataPending = null;
-  div.querySelector('#slip-upload-input-modal').addEventListener('change', function() {
+  window._docDataPending  = null;
+
+  div.querySelector('#slip-file-input').addEventListener('change', function() {
     const file = this.files[0]; if (!file) return;
     if (file.size > 5*1024*1024) { toast('ไฟล์ใหญ่เกิน 5MB','error'); return; }
     const reader = new FileReader();
@@ -4368,6 +4392,18 @@ function showSlipUploadModal(staffId) {
       window._slipDataPending = { base64: e.target.result, name: file.name, staffId, savedAt: new Date().toISOString() };
       document.getElementById('slip-fname-label').textContent = '📎 ' + file.name;
       document.getElementById('slip-drop-zone').style.borderColor = 'var(--green)';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  div.querySelector('#doc-file-input').addEventListener('change', function() {
+    const file = this.files[0]; if (!file) return;
+    if (file.size > 10*1024*1024) { toast('ไฟล์ใหญ่เกิน 10MB','error'); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      window._docDataPending = { base64: e.target.result, name: file.name, staffId, savedAt: new Date().toISOString() };
+      document.getElementById('doc-fname-label').textContent = '📋 ' + file.name;
+      document.getElementById('doc-drop-zone').style.borderColor = 'var(--cyan)';
     };
     reader.readAsDataURL(file);
   });
@@ -4382,13 +4418,21 @@ function viewSavedSlip(key) {
 function doSendVoucherEmail(staffId, withSlip) {
   const modal = document.getElementById('slip-upload-modal');
   if (withSlip) {
-    if (!window._slipDataPending) { toast('กรุณาเลือกไฟล์สลิปก่อน','error'); return; }
-    const key = 'billing_slip_'+staffId+'_'+billingYearSelected+'_'+billingMonthSelected+'_'+billingCycleSelected;
-    ls(key, window._slipDataPending);
-    toast('💾 บันทึกสลิปแล้ว','success');
-    // Upload slip to Drive
-    uploadToDrive('slip', window._slipDataPending.name, window._slipDataPending.base64);
-    window._slipDataPending = null;
+    // บันทึกสลิป
+    if (window._slipDataPending) {
+      const slipKey = 'billing_slip_'+staffId+'_'+billingYearSelected+'_'+billingMonthSelected+'_'+billingCycleSelected;
+      ls(slipKey, window._slipDataPending);
+      uploadToDrive('slip', window._slipDataPending.name, window._slipDataPending.base64);
+      window._slipDataPending = null;
+    }
+    // บันทึกเอกสาร
+    if (window._docDataPending) {
+      const docKey = 'billing_doc_'+staffId+'_'+billingYearSelected+'_'+billingMonthSelected+'_'+billingCycleSelected;
+      ls(docKey, window._docDataPending);
+      uploadToDrive('voucher', window._docDataPending.name, window._docDataPending.base64);
+      window._docDataPending = null;
+    }
+    toast('💾 บันทึกไฟล์แล้ว','success');
   }
   if (modal) modal.remove();
   const s = getStaffById(staffId); if (!s?.email) return;
@@ -4854,6 +4898,34 @@ async function adminCleanDuplicates(){
 
 function _notifyProjectChange(){
   if(_fbDatabase) _fbDatabase.ref('meta/projTS').set(Date.now()).catch(()=>{});
+}
+
+// ══════════════════════════════════════════════
+// EMAILJS — ส่งอีเมลตรงจาก browser
+// ══════════════════════════════════════════════
+const EMAILJS_CONFIG = {
+  serviceId: 'service_83hryy5',
+  templateId: 'w1fzfcq',
+  publicKey: 'H0Xg1aeoJhlcm9bqW',
+};
+
+async function sendEmailJS(to, subject, message) {
+  if(typeof emailjs === 'undefined') {
+    toast('❌ EmailJS ไม่พร้อม — ลองรีเฟรชหน้าเว็บ', 'error');
+    return false;
+  }
+  try {
+    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+      to_email: to,
+      subject: subject,
+      message: message,
+    }, EMAILJS_CONFIG.publicKey);
+    return true;
+  } catch(e) {
+    console.error('EmailJS error:', e);
+    toast('❌ ส่งเมลไม่สำเร็จ: ' + (e.text||e.message||'unknown error'), 'error');
+    return false;
+  }
 }
 // ══════════════════════════════════════════════
 // INIT
