@@ -1462,37 +1462,32 @@ async function loadProjects(){
 }
 function getProjects(){return projectsCache}
 async function saveProjectDB(p){
-  // Sanitize: ลบ undefined ออกเพราะ Firebase reject
   const clean = JSON.parse(JSON.stringify(p, (k,v)=>v===undefined?null:v));
   const withDate={...clean, updatedAt:new Date().toISOString()};
-  // Update cache ก่อน
+  // Update cache (listener จะ overwrite ด้วย Firebase data อีกที)
   const idx=projectsCache.findIndex(x=>x.id===withDate.id);
   if(idx>=0) projectsCache[idx]=withDate;
   else projectsCache.unshift(withDate);
   ls('projects_cache',projectsCache);
-  // Save Firebase - แสดง error ถ้าล้มเหลว
   if(_fbDatabase){
     try{
       await _fbDatabase.ref('projects/'+withDate.id).set(withDate);
-      console.log('✅ Saved to Firebase:', withDate.id);
     }catch(e){
       console.error('❌ Firebase save failed:', e);
       toast('⚠️ บันทึก Firebase ไม่สำเร็จ: '+e.message,'error');
     }
-  } else {
-    toast('⚠️ Firebase ไม่พร้อม','error');
   }
 }
 function saveProjects(arr){projectsCache=arr;ls('projects_cache',arr)}
 async function deleteProjectDB(id){
   projectsCache=projectsCache.filter(p=>p.id!==id);
   ls('projects_cache',projectsCache);
+  try{renderProjects();}catch(e){} // Admin 1 เห็นทันที
   if(_fbDatabase){
     try{
       await _fbDatabase.ref('projects/'+id).remove();
-      console.log('✅ Deleted from Firebase:', id);
+      // Firebase listener จะ fire → Admin 2 เห็น
     }catch(e){
-      console.error('❌ Firebase delete failed:', e);
       toast('⚠️ ลบ Firebase ไม่สำเร็จ: '+e.message,'error');
     }
   }
@@ -1783,18 +1778,25 @@ function exportPaymentCSV(){
 async function copyProject(id){
   const p=getProjects().find(x=>x.id===id);
   if(!p){toast('ไม่พบโปรเจกต์','error');return;}
+  const ts = Date.now();
   const copy={
-    ...JSON.parse(JSON.stringify(p)),
-    id:'P'+Date.now(),
+    ...JSON.parse(JSON.stringify(p, (k,v)=>v===undefined?null:v)),
+    id:'P'+ts,
     name:'[คัดลอก] '+p.name,
     date:new Date().toISOString().split('T')[0],
-    workers:(p.workers||[]).map(w=>({...w,status:'pending',voucherNo:undefined})),
-    snapshot:null,evidenceLogs:[],createdAt:new Date().toISOString()
+    workers:(p.workers||[]).map(w=>({...w,status:'pending',voucherNo:null})),
+    snapshot:null,evidenceLogs:[],createdAt:new Date(ts).toISOString()
   };
-  // saveProjectDB จัดการ cache + Firebase
-  await saveProjectDB(copy);
-  renderProjects();
   toast('📋 คัดลอกโปรเจกต์แล้ว','success');
+  // Save to Firebase - listener จะ render ให้ทุก admin
+  if(_fbDatabase){
+    try{
+      await _fbDatabase.ref('projects/'+copy.id).set(copy);
+      // listener จะ fire และ render อัตโนมัติ
+    }catch(e){
+      toast('⚠️ บันทึกไม่สำเร็จ: '+e.message,'error');
+    }
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -4592,22 +4594,14 @@ function startFirebaseSync() {
   _fbDatabase.ref('projects').on('value', snap => {
     try {
       const val = snap.exists() ? snap.val() : {};
-      projectsCache = Object.values(val).filter(Boolean).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+      projectsCache = Object.values(val).filter(p=>p&&p.id).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
       ls('projects_cache', projectsCache);
       try{updateQueueBadge();}catch(e){}
-      console.log('🔄 Projects synced:', projectsCache.length);
-      // Render ทุก page ที่เกี่ยวข้อง ไม่มี condition
-      ['page-projects','page-dashboard','page-queue','page-proj-cal'].forEach(pgId=>{
-        const pg=document.getElementById(pgId);
-        if(pg&&!pg.classList.contains('hidden')){
-          try{
-            if(pgId==='page-projects') renderProjects();
-            else if(pgId==='page-dashboard') renderDash();
-            else if(pgId==='page-queue') renderQueue();
-            else if(pgId==='page-proj-cal') renderProjCal();
-          }catch(e){console.warn('RT render '+pgId+':',e);}
-        }
-      });
+      // Render page ที่ active
+      const pg = document.getElementById('page-projects');
+      if(pg&&!pg.classList.contains('hidden')) try{renderProjects();}catch(e){}
+      const pgD = document.getElementById('page-dashboard');
+      if(pgD&&!pgD.classList.contains('hidden')) try{renderDash();}catch(e){}
     } catch(e){ console.error('Projects RT error:', e); }
   });
 
