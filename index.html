@@ -1118,6 +1118,17 @@ let billingStaffFilter = 'all';
 let currentProjId = null;
 let formDirty = false;
 let editingProjId = null;
+let activeCats = new Set();
+let evidenceLogs = [];
+let payAmtTarget = null;
+let noEmail = false;
+let paidAt = null;
+let isLast = false;
+
+const CAT_MAP = {
+  dub: 'dubbing', adp: 'adaptation', mix: 'mix',
+  qc: 'qc', sub: 'subVideo', mgr: 'manager'
+};
 let selectedQYear = 'all';
 let selectedMonth = 'all';
 
