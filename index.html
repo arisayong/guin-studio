@@ -1772,13 +1772,10 @@ async function copyProject(id){
     workers:(p.workers||[]).map(w=>({...w,status:'pending',voucherNo:undefined})),
     snapshot:null,evidenceLogs:[],createdAt:new Date().toISOString()
   };
-  // เพิ่ม cache ก่อน แล้ว await save
-  projectsCache.unshift(copy);
-  ls('projects_cache',projectsCache);
+  // saveProjectDB จัดการ cache + Firebase
+  await saveProjectDB(copy);
   renderProjects();
   toast('📋 คัดลอกโปรเจกต์แล้ว','success');
-  // await save - listener จะ fire หลัง Firebase confirm แล้ว
-  await saveProjectDB(copy);
 }
 
 // ══════════════════════════════════════════════
@@ -4597,24 +4594,7 @@ function startFirebaseSync() {
 
   console.log('🔄 Firebase real-time sync started');
   
-  // Backup polling every 15s in case real-time listener misses updates
-  setInterval(async () => {
-    try {
-      if(!_fbDatabase || !currentUser) return;
-      const snap = await _fbDatabase.ref('projects').get();
-      if(!snap.exists()) return;
-      const val = snap.val();
-      const fresh = Object.values(val||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
-      if(fresh.length !== projectsCache.length) {
-        projectsCache = fresh;
-        ls('projects_cache', projectsCache);
-        const pg = document.getElementById('page-projects');
-        if(pg && !pg.classList.contains('hidden')) try{renderProjects();}catch(e){}
-        try{updateQueueBadge();}catch(e){}
-        console.log('🔄 Backup sync: updated projects', fresh.length);
-      }
-    } catch(e) {}
-  }, 8000);
+
 }
 
 // ── Worker Search Dropdown ──
