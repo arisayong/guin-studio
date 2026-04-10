@@ -4526,18 +4526,20 @@ function startFirebaseSync() {
 
   // Sync projects in real-time
   _fbDatabase.ref('projects').on('value', snap => {
-    if (snap.exists()) {
-      const val = snap.val();
-      projectsCache = Object.values(val || {}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
-      ls('projects_cache', projectsCache);
-      // Re-render if on relevant page
-      const activePage = document.querySelector('.page:not(.hidden)');
-      if (activePage) {
-        const id = activePage.id;
-        if (id === 'page-projects') renderProjList();
-        if (id === 'page-dashboard') renderDash();
-        if (id === 'page-queue') renderQueue();
-        if (id === 'page-proj-cal') renderProjCal();
+    const val = snap.exists() ? snap.val() : {};
+    projectsCache = Object.values(val||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+    ls('projects_cache', projectsCache);
+    updateQueueBadge();
+    const activePage = document.querySelector('.page:not(.hidden)');
+    if (activePage) {
+      const id = activePage.id;
+      if (id === 'page-projects') renderProjects();
+      else if (id === 'page-dashboard') renderDash();
+      else if (id === 'page-queue') renderQueue();
+      else if (id === 'page-proj-cal') renderProjCal();
+      else if (id === 'page-project-detail' && currentProjId) {
+        const p = getProjects().find(x=>x.id===currentProjId);
+        if (p) renderProjectDetail(p);
       }
     }
   });
