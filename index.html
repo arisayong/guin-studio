@@ -1310,7 +1310,7 @@ async function fbGetAll(path) {
     const snap = await _fbDatabase.ref(path).get();
     if (!snap.exists()) return [];
     const val = snap.val();
-    return Object.values(val || {});
+    return Object.values(val || {}).filter(p=>p!=null);
   }
   return Object.values(Object.fromEntries(
     Object.entries(_db).filter(([k]) => k.startsWith(path+'/'))
@@ -1768,7 +1768,7 @@ function updateQueueBadge(){
 function exportPaymentCSV(){
   const projs=getProjects();
   const rows=[['ชื่อ','นามสกุล','ตำแหน่ง','โปรเจกต์','ลูกค้า','ยอด','สถานะ','Deadline']];
-  projs.forEach(p=>p.workers.forEach(w=>{const s=getStaffById(w.id);if(!s)return;const[first,...rest]=s.name.split(' ');rows.push([first,rest.join(' ')||'-',CATS[s.category]?.label||'',p.name,p.client||'-',w.amount||0,w.status,p.deadline||''])}));
+  projs.forEach(p=>(p.workers||[]).forEach(w=>{const s=getStaffById(w.id);if(!s)return;const[first,...rest]=s.name.split(' ');rows.push([first,rest.join(' ')||'-',CATS[s.category]?.label||'',p.name,p.client||'-',w.amount||0,w.status,p.deadline||''])}));
   const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;
@@ -1803,7 +1803,7 @@ async function copyProject(id){
 function renderDash(){
   const projs=getProjects();let paid=0,pending=0,revenue=0,pendingWorkers=[];
   const today=new Date();today.setHours(0,0,0,0);
-  projs.forEach(p=>{revenue+=p.budget||0;p.workers.forEach(w=>{if(w.status==='paid')paid+=w.amount||0;else{pending+=w.amount||0;pendingWorkers.push({proj:p,worker:w})}})});
+  projs.forEach(p=>{revenue+=p.budget||0;(p.workers||[]).forEach(w=>{if(w.status==='paid')paid+=w.amount||0;else{pending+=w.amount||0;pendingWorkers.push({proj:p,worker:w})}})});
   const profit=revenue-(paid+pending);
   const urgent=projs.filter(p=>{if(!p.deadline)return false;const dl=new Date(p.deadline);dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));return diff>=0&&diff<=7}).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
   document.getElementById('dash-stats').innerHTML=`
@@ -2071,7 +2071,7 @@ function updateCardProj(cardId,projId){
 function getActivePhasesForProj(p){
   if(!p||!p.workers||!p.workers.length)return PHASES.map(ph=>ph.key);
   const SMAP={dub:'dubbing',adp:'adaptation',mix:'mix',qc:'qc',sub:'subVideo',mgr:'manager'};
-  const keys=new Set();p.workers.forEach(w=>{const pre=(w.slot||'').split('-')[0];if(SMAP[pre])keys.add(SMAP[pre])});
+  const keys=new Set();(p.workers||[]).forEach(w=>{const pre=(w.slot||'').split('-')[0];if(SMAP[pre])keys.add(SMAP[pre])});
   return PHASES.map(ph=>ph.key).filter(k=>keys.has(k));
 }
 
@@ -2945,22 +2945,22 @@ function viewVoucher(vNo) {
 // ══════════════════════════════════════════════
 function renderProfit(){
   const projs=getProjects();let revenue=0,paid=0,pending=0;
-  projs.forEach(p=>{revenue+=p.budget||0;p.workers.forEach(w=>{if(w.status==='paid')paid+=w.amount||0;else pending+=w.amount||0})});
+  projs.forEach(p=>{revenue+=p.budget||0;(p.workers||[]).forEach(w=>{if(w.status==='paid')paid+=w.amount||0;else pending+=w.amount||0})});
   document.getElementById('profit-stats').innerHTML=`
     <div class="stat-card"><span class="stat-icon">💹</span><div class="stat-label">รายได้รวม</div><div class="stat-value" style="color:var(--green)">${fmtB(revenue)}</div></div>
     <div class="stat-card"><span class="stat-icon">💸</span><div class="stat-label">จ่ายออกแล้ว</div><div class="stat-value" style="color:var(--red)">${fmtB(paid)}</div></div>
     <div class="stat-card"><span class="stat-icon">⏳</span><div class="stat-label">ค้างจ่าย</div><div class="stat-value" style="color:var(--orange)">${fmtB(pending)}</div></div>`;
   const months=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.'];
   const mData=new Array(6).fill(0);
-  projs.forEach(p=>{const m=new Date(p.date||p.createdAt).getMonth();if(m<6)p.workers.forEach(w=>{if(w.status==='paid')mData[m]+=w.amount||0})});
+  projs.forEach(p=>{const m=new Date(p.date||p.createdAt).getMonth();if(m<6)(p.workers||[]).forEach(w=>{if(w.status==='paid')mData[m]+=w.amount||0})});
   if(chartMonthly)chartMonthly.destroy();
   chartMonthly=new Chart(document.getElementById('chart-monthly'),{type:'bar',data:{labels:months,datasets:[{label:'฿',data:mData,backgroundColor:'rgba(21,101,255,.7)',borderColor:'var(--accent)',borderWidth:2,borderRadius:8}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6890B8'},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#6890B8'},grid:{color:'rgba(255,255,255,.04)'}}}}});
   const catTotals={dubbing:0,adaptation:0,mix:0,qc:0,subVideo:0,manager:0};
-  projs.forEach(p=>p.workers.forEach(w=>{const s=getStaffById(w.id);if(s&&w.status==='paid')catTotals[s.category]=(catTotals[s.category]||0)+(w.amount||0)}));
+  projs.forEach(p=>(p.workers||[]).forEach(w=>{const s=getStaffById(w.id);if(s&&w.status==='paid')catTotals[s.category]=(catTotals[s.category]||0)+(w.amount||0)}));
   if(chartCat)chartCat.destroy();
   chartCat=new Chart(document.getElementById('chart-cat'),{type:'doughnut',data:{labels:Object.values(CATS).map(c=>c.label),datasets:[{data:Object.values(catTotals),backgroundColor:['rgba(255,158,0,.8)','rgba(0,180,255,.8)','rgba(0,223,160,.8)','rgba(155,111,255,.8)','rgba(255,64,64,.8)','rgba(21,101,255,.8)'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#6890B8',padding:10,font:{size:11}}}}}});
   const unpaid={};
-  projs.forEach(p=>p.workers.forEach(w=>{const s=getStaffById(w.id);if(s&&w.status!=='paid'){if(!unpaid[s.id])unpaid[s.id]={s,total:0,projs:[]};unpaid[s.id].total+=w.amount||0;unpaid[s.id].projs.push(p.name)}}));
+  projs.forEach(p=>(p.workers||[]).forEach(w=>{const s=getStaffById(w.id);if(s&&w.status!=='paid'){if(!unpaid[s.id])unpaid[s.id]={s,total:0,projs:[]};unpaid[s.id].total+=w.amount||0;unpaid[s.id].projs.push(p.name)}}));
   document.getElementById('unpaid-table').innerHTML=Object.values(unpaid).sort((a,b)=>b.total-a.total).map(({s,total,projs})=>`<tr>
     <td><strong>${s.name}</strong> (${s.nickname})</td>
     <td style="color:${CATS[s.category]?.color||'var(--text2)'}">${CATS[s.category]?.label||''}</td>
@@ -4009,7 +4009,7 @@ function renderBillingStaffCards() {
     if (billingCycleSelected === 1 && dl.getDate() > 15) return;
     if (billingCycleSelected === 2 && dl.getDate() <= 15) return;
 
-    p.workers.forEach(w => {
+    (p.workers||[]).forEach(w => {
       if (w.status === 'paid') return; // already paid
       const s = getStaffById(w.id); if (!s) return;
       if (!staffMap[s.id]) staffMap[s.id] = { staff: s, items: [], total: 0 };
@@ -4592,7 +4592,7 @@ function startFirebaseSync() {
   _fbDatabase.ref('projects').on('value', snap => {
     try {
       const val = snap.exists() ? snap.val() : {};
-      projectsCache = Object.values(val).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+      projectsCache = Object.values(val).filter(Boolean).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
       ls('projects_cache', projectsCache);
       try{updateQueueBadge();}catch(e){}
       console.log('🔄 Projects synced:', projectsCache.length);
