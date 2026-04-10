@@ -1473,6 +1473,7 @@ async function saveProjectDB(p){
   if(_fbDatabase){
     try{
       await _fbDatabase.ref('projects/'+withDate.id).set(withDate);
+      _notifyProjectChange();
     }catch(e){
       console.error('❌ Firebase save failed:', e);
       toast('⚠️ บันทึก Firebase ไม่สำเร็จ: '+e.message,'error');
@@ -1487,7 +1488,7 @@ async function deleteProjectDB(id){
   if(_fbDatabase){
     try{
       await _fbDatabase.ref('projects/'+id).remove();
-      // Firebase listener จะ fire → Admin 2 เห็น
+      _notifyProjectChange(); // แจ้งทุก admin
     }catch(e){
       toast('⚠️ ลบ Firebase ไม่สำเร็จ: '+e.message,'error');
     }
@@ -1807,6 +1808,7 @@ async function copyProject(id){
   if(_fbDatabase){
     try{
       await _fbDatabase.ref('projects/'+copy.id).set(copy);
+      _notifyProjectChange();
       toast('📋 คัดลอกโปรเจกต์แล้ว','success');
     }catch(e){
       toast('⚠️ บันทึกไม่สำเร็จ: '+e.message,'error');
@@ -4706,6 +4708,10 @@ async function adminCleanDuplicates(){
     await _fbDatabase.ref('projects/'+id).remove();
   }
   toast('ลบโปรเจกต์ซ้ำ '+toDelete.length+' รายการแล้ว ✅','success');
+}
+
+function _notifyProjectChange(){
+  if(_fbDatabase) _fbDatabase.ref('meta/projTS').set(Date.now()).catch(()=>{});
 }
 // ══════════════════════════════════════════════
 // INIT
