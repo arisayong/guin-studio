@@ -4718,14 +4718,31 @@ function startFirebaseSync() {
 function toggleWorkerDropdown(selId){
   const popup = document.getElementById(selId+'-popup');
   if(!popup) return;
-  document.querySelectorAll('.worker-dropdown-popup.open').forEach(p => { if(p!==popup) p.classList.remove('open'); });
+  document.querySelectorAll('.worker-dropdown-popup.open').forEach(p=>{ if(p!==popup) p.classList.remove('open'); });
   const isOpen = popup.classList.toggle('open');
-  if(isOpen){
-    // Rebuild worker list fresh every open
-    _workerListCache = buildWorkerList();
-    const inp = popup.querySelector('.worker-dropdown-search');
-    if(inp){ inp.value = ''; inp.focus(); }
-    renderWorkerDropdownList(selId, '');
+  if(!isOpen) return;
+
+  const inp = popup.querySelector('.worker-dropdown-search');
+  if(inp){ inp.value=''; }
+
+  // Build list จาก localStorage
+  _workerListCache = buildWorkerList();
+
+  if(_workerListCache.length){
+    if(inp) inp.focus();
+    renderWorkerDropdownList(selId,'');
+  } else if(_fbDatabase){
+    // ถ้ายังว่าง - ดึงจาก Firebase โดยตรง
+    _fbDatabase.ref('staff').get().then(snap=>{
+      if(snap.exists()){
+        ls('staff_v3', snap.val());
+        _workerListCache = buildWorkerList();
+      }
+      if(inp) inp.focus();
+      renderWorkerDropdownList(selId,'');
+    }).catch(()=>renderWorkerDropdownList(selId,''));
+  } else {
+    renderWorkerDropdownList(selId,'');
   }
 }
 function renderWorkerDropdownList(selId, q){
