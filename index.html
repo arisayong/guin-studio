@@ -1430,7 +1430,12 @@ async function fbLoadKeyed(fbKey) {
 function saveStaffData(d){
   ls('staff_v3',d); // local cache
   if(_fbDatabase){
-    _fbDatabase.ref('staff').set(d).catch(e=>console.warn('Staff save error:',e));
+    // Save per-category to avoid overwriting other admins' changes
+    const updates = {};
+    ['dubbing','adaptation','mix','qc','subVideo','manager'].forEach(cat=>{
+      updates['staff/'+cat] = d[cat]||[];
+    });
+    _fbDatabase.ref().update(updates).catch(e=>console.warn('Staff save error:',e));
   }
 }
 function getAllStaff(){const d=getStaffData();let a=[];Object.entries(d).forEach(([cat,arr])=>arr.forEach(s=>a.push({...s,category:cat})));return a}
@@ -1525,16 +1530,23 @@ auth.onAuthStateChanged(async(fbUser)=>{
   try {
     showLoader(true);
     // Build profile from Firebase Auth user directly — no DB lookup needed for first version
+    // Known admin emails - always admin regardless of saved profile
+    const KNOWN_ADMINS = ['penguinstudiovoice@gmail.com','haruyami231@gmail.com'];
+    const isKnownAdmin = KNOWN_ADMINS.some(e => e.toLowerCase() === (fbUser.email||'').toLowerCase());
     const profile = {
       email: fbUser.email,
       name: fbUser.displayName || fbUser.email,
       nickname: (fbUser.displayName || fbUser.email.split('@')[0]),
-      role: 'admin',
+      role: isKnownAdmin ? 'admin' : 'staff',
     };
     // Try to get saved profile from DB (non-blocking)
     try {
       const saved = await fbGetUserProfile(fbUser.uid);
-      if (saved) Object.assign(profile, saved);
+      if (saved) {
+        Object.assign(profile, saved);
+        // Force admin role for known admins even if DB says otherwise
+        if (isKnownAdmin) profile.role = 'admin';
+      }
     } catch(e) { console.warn('Profile load skipped:', e.message); }
 
     currentUser = {uid: fbUser.uid, ...profile};
@@ -4514,14 +4526,12 @@ function startFirebaseSync() {
   });
   // Sync staff data in real-time
   _fbDatabase.ref('staff').on('value', snap => {
-    if (snap.exists()) {
-      const data = snap.val();
-      ls('staff_v3', data); // update local cache
-      // Re-render if on staff page
-      if (document.getElementById('page-staff') && !document.getElementById('page-staff').classList.contains('hidden')) {
-        renderStaff();
-      }
-    }
+    try {
+      const val = snap.exists() ? snap.val() : {};
+      ls('staff_v3', val);
+      const pg=document.getElementById('page-staff');
+      if(pg&&!pg.classList.contains('hidden')) try{renderStaff();}catch(e){}
+    } catch(e) { console.error('Staff RT error:', e); }
   });
 
   // Sync projects in real-time
