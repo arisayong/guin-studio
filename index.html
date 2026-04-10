@@ -145,7 +145,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .btn-xs{padding:4px 9px;font-size:11px}
 
 /* TABLE */
-.table-wrap{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow-x:auto;overflow-y:hidden;margin-bottom:14px}
+.table-wrap{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
 .table-header{padding:15px 20px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between}
 .table-title{font-size:14px;font-weight:700}
 table{width:100%;border-collapse:collapse}
@@ -514,8 +514,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div class="filter-bar" id="year-filter"></div>
    <div class="filter-bar" id="type-filter"></div>
    <div class="table-wrap">
-    <table style="min-width:900px"
-     <thead><tr><th>โปรเจกต์</th><th>ลูกค้า</th><th>ประเภท</th><th>Deadline</th><th>Budget</th><th>รายจ่าย</th><th>กำไร</th><th>สถานะ</th><th style="position:sticky;right:0;background:var(--card);z-index:2">Actions</th></tr></thead>
+    <table style="width:100%">
+     <thead><tr><th>โปรเจกต์</th><th>ลูกค้า</th><th>ประเภท</th><th>Deadline</th><th>Budget</th><th>รายจ่าย</th><th>กำไร</th><th>สถานะ</th><th>Actions</th></tr></thead>
      <tbody id="projects-table"></tbody>
     </table>
    </div>
@@ -1714,7 +1714,11 @@ function nav(page){
   document.querySelectorAll('.nav-item,.nav-sub-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
-  const renders={dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:()=>{initQueueMonthFilter();renderQueue();},docs:renderDocs,'proj-cal':renderProjCal,'my-dashboard':renderMyDash,'my-history':renderMyHistory};
+  const renders={dashboard:renderDash,track:renderTrack,projects:async()=>{
+    // Always fetch fresh data before rendering projects
+    if(_fbDatabase){try{const s=await _fbDatabase.ref('projects').get();if(s.exists()){projectsCache=Object.values(s.val()||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));ls('projects_cache',projectsCache);}}catch(e){}}
+    renderProjects();
+  },profit:renderProfit,staff:renderStaff,queue:()=>{initQueueMonthFilter();renderQueue();},docs:renderDocs,'proj-cal':renderProjCal,'my-dashboard':renderMyDash,'my-history':renderMyHistory};
   if(renders[page])renders[page]();
   window._currentPage=page;
 }
@@ -2095,34 +2099,32 @@ function renderProjList(){
   document.getElementById('projects-table').innerHTML=projs.map(p=>{
     const exp=getProjExpense(p);const profit=(p.budget||0)-exp;const st=getProjStatus(p);
     const dl=p.deadline?new Date(p.deadline):null;let dlHtml='—';
-    if(dl){dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));const color=diff<0?'var(--red)':diff<=3?'var(--orange)':diff<=7?'var(--orange)':'var(--text2)';dlHtml=`<span style="color:${color}">${fmtDate(p.deadline)}</span>`}
-    return`<tr>
-      <td style="cursor:pointer;max-width:200px" onclick="openProjDetail('${p.id}')">
-       <div style="font-weight:700">${p.name}</div>
-       ${p.note?`<div style="font-size:10px;color:var(--text2);margin-top:2px">📝 ${p.note}</div>`:''}
-      </td>
-      <td style="font-size:12px;color:var(--text2)">${p.client||'—'}</td>
-      <td><span style="font-size:11px;background:var(--bg2);padding:2px 8px;border-radius:8px;color:var(--text2)">${p.type||'—'}</span></td>
-      <td>${dlHtml}</td>
-      <td style="font-weight:700;color:var(--accent2)">${p.budget?fmtB(p.budget):'—'}</td>
-      <td style="color:var(--red)">${fmtB(exp)}</td>
-      <td style="font-weight:700;color:${profit>=0?'var(--green)':'var(--red)'}">${fmtB(profit)}</td>
-      <td>
-       <select class="form-select" style="padding:5px 28px 5px 10px;font-size:12px;border-radius:8px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:Kanit;cursor:pointer" onchange="saveProjStatus('${p.id}',this.value)" onclick="event.stopPropagation()">
-        <option value="notstarted" ${(p.projStatus||'notstarted')==='notstarted'?'selected':''}>⬜ ยังไม่เริ่ม</option>
-        <option value="inprogress" ${p.projStatus==='inprogress'?'selected':''}>⚙️ กำลังทำ</option>
-        <option value="done"       ${p.projStatus==='done'?'selected':''}>✅ เสร็จแล้ว</option>
-        <option value="cancelled"  ${p.projStatus==='cancelled'?'selected':''}>❌ ยกเลิก</option>
-       </select>
-      </td>
-      <td style="position:sticky;right:0;background:var(--card)">
-       <div style="display:flex;gap:4px;flex-wrap:wrap">
-        <button class="btn btn-xs btn-outline" onclick="openEditProject('${p.id}')">✏️</button>
-        <button class="btn btn-xs btn-outline" onclick="copyProject('${p.id}')" title="Clone">📋</button>
-        <button class="btn btn-xs btn-red" onclick="deleteProjConfirm('${p.id}')">🗑️</button>
-       </div>
-      </td>
-    </tr>`;
+    if(dl){dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));const color=diff<0?'var(--red)':diff<=3?'var(--orange)':'var(--text2)';dlHtml='<span style="color:'+color+'">'+fmtDate(p.deadline)+'</span>';}
+    const statusSel='<select style="padding:3px 6px;font-size:11px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:Kanit;cursor:pointer;max-width:100px" onchange="saveProjStatus(\''+p.id+'\',this.value)" onclick="event.stopPropagation()">'
+      +'<option value="notstarted" '+((!p.projStatus||p.projStatus==='notstarted')?'selected':'')+'>⬜ ยังไม่เริ่ม</option>'
+      +'<option value="inprogress" '+(p.projStatus==='inprogress'?'selected':'')+'>⚙️ กำลังทำ</option>'
+      +'<option value="done" '+(p.projStatus==='done'?'selected':'')+'>✅ เสร็จแล้ว</option>'
+      +'<option value="cancelled" '+(p.projStatus==='cancelled'?'selected':'')+'>❌ ยกเลิก</option>'
+      +'</select>';
+    const actionBtns='<div style="display:flex;gap:3px">'
+      +'<button class="btn btn-xs btn-outline" onclick="openEditProject(\''+p.id+'\')" title="แก้ไข">✏️</button>'
+      +'<button class="btn btn-xs btn-outline" onclick="copyProject(\''+p.id+'\')" title="คัดลอก">📋</button>'
+      +'<button class="btn btn-xs btn-red" onclick="deleteProjConfirm(\''+p.id+'\')" title="ลบ">🗑️</button>'
+      +'</div>';
+    return '<tr style="font-size:12px">'
+      +'<td style="cursor:pointer;max-width:140px;padding:8px 6px" onclick="openProjDetail(\''+p.id+'\')">'
+      +'<div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</div>'
+      +(p.note?'<div style="font-size:10px;color:var(--text2)">📝 '+p.note+'</div>':'')
+      +'</td>'
+      +'<td style="padding:8px 6px;color:var(--text2);white-space:nowrap">'+( p.client||'—')+'</td>'
+      +'<td style="padding:8px 6px"><span style="font-size:10px;background:var(--bg2);padding:2px 6px;border-radius:6px;color:var(--text2);white-space:nowrap">'+(p.type||'—')+'</span></td>'
+      +'<td style="padding:8px 6px;white-space:nowrap">'+dlHtml+'</td>'
+      +'<td style="padding:8px 6px;font-weight:700;color:var(--accent2);white-space:nowrap">'+(p.budget?fmtB(p.budget):'—')+'</td>'
+      +'<td style="padding:8px 6px;color:var(--red);white-space:nowrap">'+fmtB(exp)+'</td>'
+      +'<td style="padding:8px 6px;font-weight:700;white-space:nowrap;color:'+(profit>=0?'var(--green)':'var(--red)')+'">'+fmtB(profit)+'</td>'
+      +'<td style="padding:8px 6px">'+statusSel+'</td>'
+      +'<td style="padding:8px 6px">'+actionBtns+'</td>'
+      +'</tr>';
   }).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:32px">ไม่พบโปรเจกต์</td></tr>';
 }
 
@@ -4582,7 +4584,7 @@ function startFirebaseSync() {
         console.log('🔄 Backup sync: updated projects', fresh.length);
       }
     } catch(e) {}
-  }, 15000);
+  }, 8000);
 }
 
 // ── Worker Search Dropdown ──
