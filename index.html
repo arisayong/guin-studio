@@ -516,7 +516,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div class="filter-bar" id="year-filter"></div>
    <div class="filter-bar" id="type-filter"></div>
    <div class="table-wrap">
-    <table style="width:100%;table-layout:fixed">
+    <table style="width:100%">
      <thead><tr><th style="width:90px">Actions</th><th>โปรเจกต์</th><th>ลูกค้า</th><th>ประเภท</th><th>Deadline</th><th>Budget</th><th>รายจ่าย</th><th>กำไร</th><th>สถานะ</th></tr></thead>
      <tbody id="projects-table"></tbody>
     </table>
@@ -1201,6 +1201,7 @@ let payAmtTarget = null;
 let noEmail = false;
 let paidAt = null;
 let isLast = false;
+let _savingProject = false; // prevent RT listener race
 let undoStack = [];
 let redoStack = [];
 
@@ -1720,7 +1721,7 @@ function nav(page){
   document.querySelectorAll('.nav-item,.nav-sub-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
-  const renders={dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:()=>{ setTimeout(()=>{try{renderQueue();}catch(e){}},50); },docs:renderDocs,'proj-cal':renderProjCal,'my-dashboard':renderMyDash,'my-history':renderMyHistory};
+  const renders={dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:()=>{ requestAnimationFrame(()=>requestAnimationFrame(()=>{try{renderQueue();}catch(e){}})); },docs:renderDocs,'proj-cal':renderProjCal,'my-dashboard':renderMyDash,'my-history':renderMyHistory};
   if(renders[page])renders[page]();
   window._currentPage=page;
 }
@@ -1773,9 +1774,9 @@ async function copyProject(id){
       workers:(p.workers||[]).map(w=>({...w,status:'pending',voucherNo:undefined})),
       snapshot:null, evidenceLogs:[], createdAt:new Date().toISOString()
     };
-    // Step 1: บันทึก Firebase
+    _savingProject = true; // lock RT listener from overriding
     await saveProjectDB(copy);
-    // Step 2: Fetch ใหม่จาก Firebase เพื่อ confirm data ถูกต้อง
+    // Fetch confirmed data
     if(_fbDatabase){
       try{
         const snap=await _fbDatabase.ref('projects').get();
@@ -1785,10 +1786,11 @@ async function copyProject(id){
         }
       }catch(e){}
     }
-    // Step 3: Render ด้วยข้อมูลที่ confirm แล้ว
     renderProjects();
     toast('📋 คัดลอกโปรเจกต์แล้ว','success');
+    setTimeout(()=>{_savingProject=false;},2000); // unlock after 2s
   } catch(e) {
+    _savingProject=false;
     console.error('copyProject error:', e);
     toast('Error: '+e.message,'error');
   }
@@ -4580,6 +4582,7 @@ function startFirebaseSync() {
   // Sync projects in real-time
   _fbDatabase.ref('projects').on('value', snap => {
     try {
+      if(_savingProject) return; // skip during copy/save to prevent race
       const val = snap.exists() ? snap.val() : {};
       projectsCache = Object.values(val||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
       ls('projects_cache', projectsCache);
