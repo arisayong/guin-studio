@@ -326,6 +326,18 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
   .main-content{margin-left:62px;padding:16px}
   .stats-grid{grid-template-columns:1fr 1fr}
 }
+
+/* ── Worker Search Dropdown ── */
+.worker-dropdown-wrap{position:relative;display:inline-block;max-width:280px;margin-bottom:12px}
+.worker-dropdown-btn{padding:7px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;color:var(--text2);font-family:Kanit;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;min-width:200px}
+.worker-dropdown-btn:hover{border-color:var(--accent2);color:var(--accent2)}
+.worker-dropdown-popup{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:9999;background:var(--card);border:1px solid var(--border2);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.4);min-width:260px;max-width:320px}
+.worker-dropdown-popup.open{display:block}
+.worker-dropdown-search{width:100%;padding:8px 12px;background:var(--bg2);border:none;border-bottom:1px solid var(--border2);border-radius:10px 10px 0 0;color:var(--text);font-family:Kanit;font-size:12px;outline:none}
+.worker-dropdown-list{max-height:220px;overflow-y:auto;padding:4px}
+.worker-dropdown-item{padding:7px 12px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--text)}
+.worker-dropdown-item:hover{background:var(--dim);color:var(--accent2)}
+.worker-dropdown-empty{padding:12px;text-align:center;color:var(--text2);font-size:12px}
 </style>
   <!-- Firebase SDK (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -848,10 +860,28 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
     <div class="cat-block-body">
      <div style="font-size:11px;color:var(--text2);margin-bottom:7px;font-weight:700;letter-spacing:1px">🌟 นักพากย์หลัก</div>
      <div id="dub-main-list"></div>
-     <select class="form-input form-select" id="dub-main-select" style="max-width:220px;padding:7px 10px;font-size:12px;margin-bottom:12px" onchange="addWorkerToSlot('dub','main')"><option value="">+ เพิ่มนักพากย์หลัก</option></select>
+     <div class="worker-dropdown-wrap">
+  <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('dub-main-select')">
+    <span>➕ เพิ่มสมาชิก</span><span>▾</span>
+  </button>
+  <div id="dub-main-select-popup" class="worker-dropdown-popup">
+    <input class="worker-dropdown-search" type="text" placeholder="🔍 ค้นหาชื่อ..." oninput="filterWorkerDropdown('dub-main-select', this.value)" autocomplete="off">
+    <div id="dub-main-select-list" class="worker-dropdown-list"></div>
+  </div>
+  <select id="dub-main-select" style="display:none" onchange="addWorkerToSlot('dub','main')"></select>
+</div>
      <div style="font-size:11px;color:var(--text2);margin-bottom:7px;font-weight:700;letter-spacing:1px">🎭 นักพากย์รอง</div>
      <div id="dub-sub-list"></div>
-     <select class="form-input form-select" id="dub-sub-select" style="max-width:220px;padding:7px 10px;font-size:12px" onchange="addWorkerToSlot('dub','sub')"><option value="">+ เพิ่มนักพากย์รอง</option></select>
+     <div class="worker-dropdown-wrap">
+  <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('dub-sub-select')">
+    <span>➕ เพิ่มสมาชิก</span><span>▾</span>
+  </button>
+  <div id="dub-sub-select-popup" class="worker-dropdown-popup">
+    <input class="worker-dropdown-search" type="text" placeholder="🔍 ค้นหาชื่อ..." oninput="filterWorkerDropdown('dub-sub-select', this.value)" autocomplete="off">
+    <div id="dub-sub-select-list" class="worker-dropdown-list"></div>
+  </div>
+  <select id="dub-sub-select" style="display:none" onchange="addWorkerToSlot('dub','sub')"></select>
+</div>
     </div>
    </div>
 
@@ -863,7 +893,16 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
       <span id="adp-subtotal" style="font-size:13px;font-weight:700;color:var(--cyan)">฿0</span>
      </div>
     </div>
-    <div class="cat-block-body"><div id="adp-list"></div><select class="form-input form-select" id="adp-select" style="max-width:220px;padding:7px 10px;font-size:12px" onchange="addWorkerToSlot('adp','only')"><option value="">+ เพิ่มสมาชิก</option></select></div>
+    <div class="cat-block-body"><div id="adp-list"></div><div class="worker-dropdown-wrap">
+  <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('adp-select')">
+    <span>➕ เพิ่มสมาชิก</span><span>▾</span>
+  </button>
+  <div id="adp-select-popup" class="worker-dropdown-popup">
+    <input class="worker-dropdown-search" type="text" placeholder="🔍 ค้นหาชื่อ..." oninput="filterWorkerDropdown('adp-select', this.value)" autocomplete="off">
+    <div id="adp-select-list" class="worker-dropdown-list"></div>
+  </div>
+  <select id="adp-select" style="display:none" onchange="addWorkerToSlot('adp','only')"></select>
+</div></div>
    </div>
 
    <!-- MIX -->
@@ -874,7 +913,16 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
       <span id="mix-subtotal" style="font-size:13px;font-weight:700;color:var(--green)">฿0</span>
      </div>
     </div>
-    <div class="cat-block-body"><div id="mix-list"></div><select class="form-input form-select" id="mix-select" style="max-width:220px;padding:7px 10px;font-size:12px" onchange="addWorkerToSlot('mix','only')"><option value="">+ เพิ่มสมาชิก</option></select></div>
+    <div class="cat-block-body"><div id="mix-list"></div><div class="worker-dropdown-wrap">
+  <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('mix-select')">
+    <span>➕ เพิ่มสมาชิก</span><span>▾</span>
+  </button>
+  <div id="mix-select-popup" class="worker-dropdown-popup">
+    <input class="worker-dropdown-search" type="text" placeholder="🔍 ค้นหาชื่อ..." oninput="filterWorkerDropdown('mix-select', this.value)" autocomplete="off">
+    <div id="mix-select-list" class="worker-dropdown-list"></div>
+  </div>
+  <select id="mix-select" style="display:none" onchange="addWorkerToSlot('mix','only')"></select>
+</div></div>
    </div>
 
    <!-- QC -->
@@ -885,7 +933,16 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
       <span id="qc-subtotal" style="font-size:13px;font-weight:700;color:var(--purple)">฿0</span>
      </div>
     </div>
-    <div class="cat-block-body"><div id="qc-list"></div><select class="form-input form-select" id="qc-select" style="max-width:220px;padding:7px 10px;font-size:12px" onchange="addWorkerToSlot('qc','only')"><option value="">+ เพิ่มสมาชิก</option></select></div>
+    <div class="cat-block-body"><div id="qc-list"></div><div class="worker-dropdown-wrap">
+  <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('qc-select')">
+    <span>➕ เพิ่มสมาชิก</span><span>▾</span>
+  </button>
+  <div id="qc-select-popup" class="worker-dropdown-popup">
+    <input class="worker-dropdown-search" type="text" placeholder="🔍 ค้นหาชื่อ..." oninput="filterWorkerDropdown('qc-select', this.value)" autocomplete="off">
+    <div id="qc-select-list" class="worker-dropdown-list"></div>
+  </div>
+  <select id="qc-select" style="display:none" onchange="addWorkerToSlot('qc','only')"></select>
+</div></div>
    </div>
 
    <!-- SUB & VIDEO -->
@@ -896,7 +953,16 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
       <span id="sub-subtotal" style="font-size:13px;font-weight:700;color:var(--red)">฿0</span>
      </div>
     </div>
-    <div class="cat-block-body"><div id="sub-list"></div><select class="form-input form-select" id="sub-select" style="max-width:220px;padding:7px 10px;font-size:12px" onchange="addWorkerToSlot('sub','only')"><option value="">+ เพิ่มสมาชิก</option></select></div>
+    <div class="cat-block-body"><div id="sub-list"></div><div class="worker-dropdown-wrap">
+  <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('sub-select')">
+    <span>➕ เพิ่มสมาชิก</span><span>▾</span>
+  </button>
+  <div id="sub-select-popup" class="worker-dropdown-popup">
+    <input class="worker-dropdown-search" type="text" placeholder="🔍 ค้นหาชื่อ..." oninput="filterWorkerDropdown('sub-select', this.value)" autocomplete="off">
+    <div id="sub-select-list" class="worker-dropdown-list"></div>
+  </div>
+  <select id="sub-select" style="display:none" onchange="addWorkerToSlot('sub','only')"></select>
+</div></div>
    </div>
 
    <!-- MANAGER -->
@@ -907,7 +973,16 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
       <span id="mgr-subtotal" style="font-size:13px;font-weight:700;color:var(--accent2)">฿0</span>
      </div>
     </div>
-    <div class="cat-block-body"><div id="mgr-list"></div><select class="form-input form-select" id="mgr-select" style="max-width:220px;padding:7px 10px;font-size:12px" onchange="addWorkerToSlot('mgr','only')"><option value="">+ เพิ่มสมาชิก</option></select></div>
+    <div class="cat-block-body"><div id="mgr-list"></div><div class="worker-dropdown-wrap">
+  <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('mgr-select')">
+    <span>➕ เพิ่มสมาชิก</span><span>▾</span>
+  </button>
+  <div id="mgr-select-popup" class="worker-dropdown-popup">
+    <input class="worker-dropdown-search" type="text" placeholder="🔍 ค้นหาชื่อ..." oninput="filterWorkerDropdown('mgr-select', this.value)" autocomplete="off">
+    <div id="mgr-select-list" class="worker-dropdown-list"></div>
+  </div>
+  <select id="mgr-select" style="display:none" onchange="addWorkerToSlot('mgr','only')"></select>
+</div></div>
    </div>
 
   </div>
@@ -2075,27 +2150,9 @@ function populateWorkerSelects(){
     const catKey=CAT_MAP[key];const staff=data[catKey]||[];
     selIds.forEach(selId=>{
       const sel=document.getElementById(selId);if(!sel)return;
-      // Store all staff for search
-      sel._allStaff = staff;
-      sel.innerHTML='<option value="">+ เพิ่มสมาชิก</option>'+staff.map(s=>`<option value="${s.id}">${s.nickname||''} ${s.name}</option>`).join('');
-      // Add search box if not already added
-      const searchId = selId+'-search';
-      let searchBox = document.getElementById(searchId);
-      if(!searchBox){
-        searchBox = document.createElement('input');
-        searchBox.id = searchId;
-        searchBox.type = 'text';
-        searchBox.placeholder = '🔍 ค้นหาชื่อ...';
-        searchBox.style.cssText = 'width:100%;padding:6px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12px;margin-bottom:4px';
-        searchBox.addEventListener('input', function(){
-          const q = this.value.toLowerCase();
-          const allStaff = sel._allStaff || [];
-          sel.innerHTML='<option value="">+ เพิ่มสมาชิก</option>'+
-            allStaff.filter(s=>(s.nickname||'').toLowerCase().includes(q)||(s.name||'').toLowerCase().includes(q))
-            .map(s=>`<option value="${s.id}">${s.nickname||''} ${s.name}</option>`).join('');
-        });
-        sel.parentNode.insertBefore(searchBox, sel);
-      }
+      // Store staff data for dropdown search
+      sel._allStaff=staff;
+      sel.innerHTML='<option value="">+ เพิ่มสมาชิก</option>'+staff.map(s=>'<option value="'+s.id+'">'+(s.nickname||'')+' '+s.name+'</option>').join('');
     });
   });
 }
@@ -2114,7 +2171,7 @@ function renderAllWorkerLists(){
 }
 function clearAllWorkerLists(){
   const cats=[['dub','main'],['dub','sub'],['adp','only'],['mix','only'],['qc','only'],['sub','only'],['mgr','only']];
-  cats.forEach(([cat,slot])=>{const id=cat==='dub'?`dub-${slot}-list`:`${cat}-list`;const el=document.getElementById(id);if(el)el.innerHTML=''});
+    cats.forEach(([cat,slot])=>{const id=cat==='dub'?`dub-${slot}-list`:`${cat}-list`;const el=document.getElementById(id);if(el)el.innerHTML=''});
 }
 function renderWorkerList(cat,slot){
   const listId=cat==='dub'?`dub-${slot}-list`:`${cat}-list`;
@@ -4492,6 +4549,45 @@ function startFirebaseSync() {
 
   console.log('🔄 Firebase real-time sync started');
 }
+
+// ── Worker Search Dropdown ──
+function toggleWorkerDropdown(selId){
+  const popup=document.getElementById(selId+'-popup');
+  if(!popup)return;
+  // Close all others first
+  document.querySelectorAll('.worker-dropdown-popup.open').forEach(p=>{if(p!==popup)p.classList.remove('open')});
+  const isOpen=popup.classList.toggle('open');
+  if(isOpen){
+    const inp=popup.querySelector('.worker-dropdown-search');
+    if(inp){inp.value='';inp.focus();}
+    renderWorkerDropdownList(selId,'');
+  }
+}
+function renderWorkerDropdownList(selId, q){
+  const sel=document.getElementById(selId);
+  const listEl=document.getElementById(selId+'-list');
+  if(!sel||!listEl)return;
+  const staff=(sel._allStaff||[]).filter(s=>!q||(s.nickname||'').toLowerCase().includes(q.toLowerCase())||(s.name||'').toLowerCase().includes(q.toLowerCase()));
+  if(!staff.length){listEl.innerHTML='<div class="worker-dropdown-empty">ไม่พบสมาชิก</div>';return;}
+  listEl.innerHTML=staff.map(s=>('<div class="worker-dropdown-item" onclick="pickWorkerFromDropdown(\'' + selId + '\',\'' + s.id + '\')">' + (s.nickname||'') + (s.nickname?' · ':'') + s.name + '</div>')).join('');
+}
+function filterWorkerDropdown(selId, q){renderWorkerDropdownList(selId,q);}
+function pickWorkerFromDropdown(selId, staffId){
+  const sel=document.getElementById(selId);
+  if(!sel)return;
+  sel.value=staffId;
+  sel.dispatchEvent(new Event('change'));
+  // Close popup
+  const popup=document.getElementById(selId+'-popup');
+  if(popup)popup.classList.remove('open');
+}
+// Close dropdown when clicking outside
+document.addEventListener('click',function(e){
+  if(!e.target.closest('.worker-dropdown-wrap')){
+    document.querySelectorAll('.worker-dropdown-popup.open').forEach(p=>p.classList.remove('open'));
+  }
+});
+
 // ══════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════
