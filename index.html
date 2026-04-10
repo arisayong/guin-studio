@@ -1773,8 +1773,9 @@ async function copyProject(id){
       workers:(p.workers||[]).map(w=>({...w,status:'pending',voucherNo:undefined})),
       snapshot:null, evidenceLogs:[], createdAt:new Date().toISOString()
     };
-    // Save to Firebase only - let RT listener update cache and render for ALL admins
     await saveProjectDB(copy);
+    // Force render after save - don't rely on listener timing
+    try{ renderProjects(); }catch(e){}
     toast('📋 คัดลอกโปรเจกต์แล้ว','success');
   } catch(e) {
     console.error('copyProject error:', e);
@@ -4569,13 +4570,8 @@ function startFirebaseSync() {
   _fbDatabase.ref('projects').on('value', snap => {
     try {
       const val = snap.exists() ? snap.val() : {};
-      // Merge: take Firebase data but keep any local items not yet confirmed
-      const fbCache = Object.values(val||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
-      // Only update cache if Firebase has MORE or DIFFERENT data
-      if(fbCache.length >= projectsCache.length) {
-        projectsCache = fbCache;
-        ls('projects_cache', projectsCache);
-      }
+      projectsCache = Object.values(val||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+      ls('projects_cache', projectsCache);
       try { updateQueueBadge(); } catch(e) {}
       const active = document.querySelector('.page:not(.hidden)');
       if(!active) return;
