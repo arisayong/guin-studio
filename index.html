@@ -4526,22 +4526,25 @@ function startFirebaseSync() {
 
   // Sync projects in real-time
   _fbDatabase.ref('projects').on('value', snap => {
-    const val = snap.exists() ? snap.val() : {};
-    projectsCache = Object.values(val||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
-    ls('projects_cache', projectsCache);
-    updateQueueBadge();
-    const activePage = document.querySelector('.page:not(.hidden)');
-    if (activePage) {
-      const id = activePage.id;
-      if (id === 'page-projects') renderProjects();
-      else if (id === 'page-dashboard') renderDash();
-      else if (id === 'page-queue') renderQueue();
-      else if (id === 'page-proj-cal') renderProjCal();
-      else if (id === 'page-project-detail' && currentProjId) {
-        const p = getProjects().find(x=>x.id===currentProjId);
-        if (p) renderProjectDetail(p);
-      }
-    }
+    try {
+      const val = snap.exists() ? snap.val() : {};
+      const newCache = Object.values(val||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+      // Only re-render if data actually changed
+      const oldLen = projectsCache.length;
+      const newLen = newCache.length;
+      projectsCache = newCache;
+      ls('projects_cache', projectsCache);
+      try { updateQueueBadge(); } catch(e) {}
+      // Re-render current page
+      const pg = document.getElementById('page-projects');
+      const pgDash = document.getElementById('page-dashboard');
+      const pgQ = document.getElementById('page-queue');
+      const pgCal = document.getElementById('page-proj-cal');
+      if(pg && !pg.classList.contains('hidden')) { try{renderProjects();}catch(e){console.warn('RT renderProjects:',e);} }
+      else if(pgDash && !pgDash.classList.contains('hidden')) { try{renderDash();}catch(e){} }
+      else if(pgQ && !pgQ.classList.contains('hidden')) { try{renderQueue();}catch(e){} }
+      else if(pgCal && !pgCal.classList.contains('hidden')) { try{renderProjCal();}catch(e){} }
+    } catch(e) { console.error('Projects RT listener error:', e); }
   });
 
   // Sync users/staff profiles
@@ -4550,6 +4553,25 @@ function startFirebaseSync() {
   });
 
   console.log('🔄 Firebase real-time sync started');
+  
+  // Backup polling every 15s in case real-time listener misses updates
+  setInterval(async () => {
+    try {
+      if(!_fbDatabase || !currentUser) return;
+      const snap = await _fbDatabase.ref('projects').get();
+      if(!snap.exists()) return;
+      const val = snap.val();
+      const fresh = Object.values(val||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+      if(fresh.length !== projectsCache.length) {
+        projectsCache = fresh;
+        ls('projects_cache', projectsCache);
+        const pg = document.getElementById('page-projects');
+        if(pg && !pg.classList.contains('hidden')) try{renderProjects();}catch(e){}
+        try{updateQueueBadge();}catch(e){}
+        console.log('🔄 Backup sync: updated projects', fresh.length);
+      }
+    } catch(e) {}
+  }, 15000);
 }
 
 // ── Worker Search Dropdown ──
