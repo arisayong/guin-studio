@@ -3509,9 +3509,7 @@ function saveAndSendQuotation() {
 function downloadQuotation() {
   const data = getQuotationData();
   if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
-  const html = buildQuotationHTML(data);
-  downloadDocHTML(html, data.docNo);
-  uploadToDrive('quotation', data.docNo+'.html', buildDriveHTML(html, data.docNo));
+  previewQuotation();
 }
 
 /* ══════════════════════
@@ -3680,21 +3678,8 @@ function previewVouchers() {
 function downloadVouchers() {
   const selected = getSelectedVcWorkers();
   if (!selected.length){toast('กรุณาเลือกทีมงานอย่างน้อย 1 คน','error');return;}
-  const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
-  const note = document.getElementById('vc-note')?.value.trim()||'';
-  let allHtml = '';
-  const savedDocs = [];
-  selected.forEach(({workerId,slot,w,s,p}) => {
-    const vNo = nextVoucherNo();
-    allHtml += buildVoucherHTML(p.id, workerId, slot, vNo, date, note);
-    savedDocs.push({ type:'voucher', docNo:vNo, staffId:workerId, projId:p.id, projName:p.name, staffName:s.name, amount:w.amount||0, date, createdAt:new Date().toISOString() });
-  });
-  const all = getDocsStore('vouchers')||[];
-  savedDocs.forEach(d=>all.push(d));
-  saveDocsStore('vouchers',all);
-  downloadDocHTML(`<div>${allHtml}</div>`, `vouchers_${new Date().toISOString().slice(0,10)}`);
-  toast(`⬇️ ดาวน์โหลด ${selected.length} ใบ สำเร็จ`, 'success');
-  renderDocsHistory();
+  // เปิด preview แรกอย่างเดียว ให้ user print เป็น PDF เอง
+  previewVouchers();
 }
 function issueAndSendVouchers() {
   const selected = getSelectedVcWorkers();
@@ -4296,18 +4281,8 @@ function previewBillingVoucher(staffId) {
 }
 
 function downloadBillingVoucher(staffId) {
-  const html = buildBillingVoucherHTML(staffId);
-  if (!html) { toast('ไม่พบรายการ', 'warn'); return; }
-  const s = getStaffById(staffId);
-  const TM = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
-              'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-  const period = billingCycleSelected===1?`1-15_${TM[billingMonthSelected]}`:`16-31_${TM[billingMonthSelected]}`;
-  const vFilename = `voucher_${s?.nickname||staffId}_${period}_${billingYearSelected+543}`;
-  downloadDocHTML(html, vFilename);
-  toast(`⬇️ ดาวน์โหลดใบสำคัญจ่าย ${s?.nickname} แล้ว`, 'success');
-  // Auto-backup to Google Drive
-  const vHtmlFull = buildDriveHTML(html, vFilename);
-  uploadToDrive('voucher', vFilename+'.html', vHtmlFull);
+  // เปิด preview ให้ user พิมพ์เป็น PDF เอง
+  previewBillingVoucher(staffId);
 }
 
 function sendBillingVoucherEmail(staffId) {
