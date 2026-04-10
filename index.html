@@ -2053,7 +2053,27 @@ function populateWorkerSelects(){
     const catKey=CAT_MAP[key];const staff=data[catKey]||[];
     selIds.forEach(selId=>{
       const sel=document.getElementById(selId);if(!sel)return;
-      sel.innerHTML=`<option value="">+ เพิ่มสมาชิก</option>`+staff.map(s=>`<option value="${s.id}">${s.nickname} (${s.name})</option>`).join('');
+      // Store all staff for search
+      sel._allStaff = staff;
+      sel.innerHTML='<option value="">+ เพิ่มสมาชิก</option>'+staff.map(s=>`<option value="${s.id}">${s.nickname||''} ${s.name}</option>`).join('');
+      // Add search box if not already added
+      const searchId = selId+'-search';
+      let searchBox = document.getElementById(searchId);
+      if(!searchBox){
+        searchBox = document.createElement('input');
+        searchBox.id = searchId;
+        searchBox.type = 'text';
+        searchBox.placeholder = '🔍 ค้นหาชื่อ...';
+        searchBox.style.cssText = 'width:100%;padding:6px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12px;margin-bottom:4px';
+        searchBox.addEventListener('input', function(){
+          const q = this.value.toLowerCase();
+          const allStaff = sel._allStaff || [];
+          sel.innerHTML='<option value="">+ เพิ่มสมาชิก</option>'+
+            allStaff.filter(s=>(s.nickname||'').toLowerCase().includes(q)||(s.name||'').toLowerCase().includes(q))
+            .map(s=>`<option value="${s.id}">${s.nickname||''} ${s.name}</option>`).join('');
+        });
+        sel.parentNode.insertBefore(searchBox, sel);
+      }
     });
   });
 }
