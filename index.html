@@ -1371,10 +1371,14 @@ function nextVoucherNo(){voucherSeq++;ls('voucher_seq',String(voucherSeq));const
 // STAFF DATA
 // ══════════════════════════════════════════════
 function getStaffData(){
-  const s=ls('staff_v3');
-  if(s&&Object.keys(s).length)return s;
-  // Return empty structure (Firebase will populate via listener)
-  return {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
+  const raw=ls('staff_v3');
+  if(!raw||!Object.keys(raw).length) return {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
+  // Normalize: Firebase อาจ return {0:{...},1:{...}} แทน array
+  const norm={};
+  Object.entries(raw).forEach(([cat,val])=>{
+    norm[cat]=Array.isArray(val)?val.filter(Boolean):Object.values(val||{}).filter(Boolean);
+  });
+  return norm;
 }
 
 // ══════════════════════════════════════════════
@@ -2286,11 +2290,18 @@ function toggleCat(key){
 }
 function populateWorkerSelects(){
   const data=getStaffData();
+  // Firebase อาจ return object แทน array - ต้อง normalize
+  const toArr = v => {
+    if(!v) return [];
+    if(Array.isArray(v)) return v.filter(Boolean);
+    return Object.values(v).filter(Boolean);
+  };
   // รวม staff ทุกหมวดเป็น list เดียว (dedup by id)
   const allStaffMap={};
-  Object.values(data).forEach(arr=>(arr||[]).forEach(s=>{ if(s&&s.id) allStaffMap[s.id]=s; }));
-  const allStaff=Object.values(allStaffMap).sort((a,b)=>(a.nickname||a.name||'').localeCompare(b.nickname||b.name||''));
-
+  Object.values(data).forEach(cat=>{
+    toArr(cat).forEach(s=>{ if(s&&s.id) allStaffMap[s.id]=s; });
+  });
+  const allStaff=Object.values(allStaffMap).sort((a,b)=>(a.nickname||a.name||'').localeCompare(b.nickname||b.name||'','th'));
   // ทุก dropdown ใช้ staff ทั้งหมด
   const selIds=['dub-main-select','dub-sub-select','adp-select','mix-select','qc-select','sub-select','mgr-select'];
   selIds.forEach(selId=>{
