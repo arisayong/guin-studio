@@ -1764,7 +1764,7 @@ function renderTrkCalendar() {
       <button class="trk-cal-nav-btn" onclick="trkCalPrev()">‹ ก่อน</button>
       <div class="trk-cal-title" style="display:flex;align-items:center;gap:6px">📅
         <select class="trk-cal-year-sel" onchange="trkCalMonth=parseInt(this.value);renderTrkCalendar()">
-          ${TM.map((m,idx)=>`<option value="${idx}"${idx===trkCalMonth?' selected':''}>${m}</option>`).join('')}
+          ${TM.map((m,idx)=>('<option value="'+idx+'"'+(idx===trkCalMonth?' selected':'')+'>'+m+'</option>')).join('')}
         </select>
         <select class="trk-cal-year-sel" onchange="trkCalYear=parseInt(this.value);renderTrkCalendar()">
           ${years.map(y => `<option value="${y}"${y === trkCalYear ? ' selected' : ''}>${y + 543}</option>`).join('')}
