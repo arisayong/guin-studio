@@ -3500,7 +3500,7 @@ function saveAndSendQuotation() {
   all.push(saved); saveDocsStore('quotations', all);
   const subject = encodeURIComponent(`ใบเสนอราคา ${data.docNo} — Guin Home Studio`);
   const body = encodeURIComponent(`เรียน คุณ${data.client}\n\nกรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio`);
-  window.open(`https://mail.google.com/mail/?view=cm&to=${data.email}&su=${subject}&body=${body}`, '_blank');
+  window.open(`https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm&to=${data.email}&su=${subject}&body=${body}`, '_blank');
   toast(`📧 เปิด Email ให้ ${data.client} แล้ว — อย่าลืมแนบ PDF`, 'success');
   // Auto-backup to Google Drive
   const qtHtml = buildQuotationHTML(data);
@@ -3734,19 +3734,28 @@ function downloadDocHTML(bodyHtml, filename) {
   const fullHtml = `<!DOCTYPE html><html lang="th"><head>
 <meta charset="UTF-8"><title>${filename}</title>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">
-<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Kanit',sans-serif;background:#f5f7fa;padding:32px;min-height:100vh}
-@media print{body{background:#fff;padding:0}.no-print{display:none}}</style>
-<script>window.onload=function(){window.print();}<\/script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Kanit',sans-serif;background:#fff;padding:20px}
+@media print{
+  body{padding:0}
+  .no-print{display:none!important}
+  @page{margin:12mm;size:A4}
+}
+</style>
 </head><body>${bodyHtml}
 <div class="no-print" style="text-align:center;margin:24px 0">
-  <button onclick="window.print()" style="padding:12px 32px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ พิมพ์ / บันทึกเป็น PDF</button>
+  <button onclick="window.print()" style="padding:12px 32px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF</button>
+  <p style="margin-top:8px;font-size:12px;color:#666">กด Ctrl+P หรือกดปุ่มด้านบน → เลือก "Save as PDF"</p>
 </div>
 </body></html>`;
-  const blob = new Blob([fullHtml], {type:'text/html;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download=filename+'.html';
-  document.body.appendChild(a); a.click();
-  setTimeout(()=>{URL.revokeObjectURL(url);a.remove()},1000);
+  const w = window.open('','_blank');
+  if(w){
+    w.document.write(fullHtml);
+    w.document.close();
+    // เปิด print dialog อัตโนมัติหลัง font โหลด
+    w.onload = function(){ setTimeout(()=>w.print(), 800); };
+  }
 }
 
 /* ══════════════════════
@@ -4394,7 +4403,7 @@ function doSendVoucherEmail(staffId, withSlip) {
   const period = billingCycleSelected===1?`1-15 ${TM[billingMonthSelected]} ${billingYearSelected+543}`:`16-สิ้นเดือน ${TM[billingMonthSelected]} ${billingYearSelected+543}`;
   const subject = encodeURIComponent(`ใบสำคัญจ่ายเงิน ${vNo} รอบ ${period} — Guin Home Studio`);
   const body = encodeURIComponent(`เรียน คุณ${s.name}\n\nขออนุญาตส่งใบสำคัญจ่ายเงินค่าตอบแทนรอบ ${period}\nเลขที่: ${vNo}\n\nกรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio`);
-  window.open(`https://mail.google.com/mail/?view=cm&to=${s.email}&su=${subject}&body=${body}`, '_blank');
+  window.open(`https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm&to=${s.email}&su=${subject}&body=${body}`, '_blank');
   toast(`📧 เปิด Email ให้ ${s.name} แล้ว — แนบไฟล์ PDF ก่อนส่งด้วยครับ`, 'success');
   // Auto-backup voucher to Drive
   const veHtml = buildBillingVoucherHTML(staffId);
