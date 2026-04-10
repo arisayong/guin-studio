@@ -1983,6 +1983,7 @@ function renderTrkCalendar() {
   let html = `<div class="trk-calendar-card">
     <div class="trk-cal-nav">
       <button class="trk-cal-nav-btn" onclick="trkCalPrev()">‹ ก่อน</button>
+      <button onclick="trkCalMonth=new Date().getMonth();trkCalYear=new Date().getFullYear();renderTrkCalendar()" style="padding:5px 12px;border-radius:7px;background:var(--accent2);border:none;color:#fff;font-family:Kanit;font-size:12px;font-weight:700;cursor:pointer">วันนี้</button>
       <div class="trk-cal-title" style="display:flex;align-items:center;gap:6px">📅
         <select class="trk-cal-year-sel" onchange="trkCalMonth=parseInt(this.value);renderTrkCalendar()">
           ${TM.map((m,idx)=>('<option value="'+idx+'"'+(idx===trkCalMonth?' selected':'')+'>'+m+'</option>')).join('')}
@@ -3851,9 +3852,6 @@ function renderProjCal() {
   const monthStart = new Date(projCalYear, projCalMonth, 1);
   const monthEnd   = new Date(projCalYear, projCalMonth+1, 0); monthEnd.setHours(23,59,59);
 
-  // Sort allEvents ตาม projCalSort
-  allEvents.sort((a,b) => projCalSort==='oldest' ? a.end-b.end : b.end-a.end);
-
   // Events that overlap this month (bar shown in calendar)
   const visibleEvents = allEvents.filter(ev => ev.start <= monthEnd && ev.end >= monthStart);
 
@@ -3968,7 +3966,7 @@ function renderProjCal() {
   calHtml += '</div>';
 
   // ── Deadline table (all events sorted)
-  const sorted = [...allEvents].sort((a,b)=>a.end-b.end);
+  const sorted = [...allEvents].sort((a,b) => projCalSort==='oldest' ? a.end-b.end : b.end-a.end);
   const overdueCnt = sorted.filter(e=>e.isOverdue&&e.p.projStatus!=='done'&&e.p.projStatus!=='cancelled').length;
   const urgentCnt  = sorted.filter(e=>e.isUrgent&&e.p.projStatus!=='done'&&e.p.projStatus!=='cancelled').length;
 
