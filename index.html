@@ -1518,8 +1518,8 @@ function statusBadge(s){return`<span class="badge badge-${s||'pending'}">${{pend
 function getProjExpense(p){return(p.workers||[]).reduce((a,w)=>a+(w.amount||0),0)}
 function getProjStatus(p){
   if(!p.workers||!p.workers.length)return'pending';
-  if(p.workers.every(w=>w.status==='paid'))return'paid';
-  if(p.workers.some(w=>w.status==='approved'))return'approved';
+  if((p.workers||[]).every(w=>w.status==='paid'))return'paid';
+  if((p.workers||[]).some(w=>w.status==='approved'))return'approved';
   return'pending';
 }
 
@@ -1755,7 +1755,7 @@ function updateUndoUI(){const u=document.getElementById('undo-btn'),r=document.g
 function refreshCurrentPage(){const renders={dashboard:renderDash,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue};const p=window._currentPage;if(p&&renders[p])renders[p]()}
 
 function updateQueueBadge(){
-  const n=getProjects().reduce((a,p)=>a+p.workers.filter(w=>w.status==='pending'||w.status==='approved').length,0);
+  const n=getProjects().reduce((a,p)=>a+(p.workers||[]).filter(w=>w.status==='pending'||w.status==='approved').length,0);
   const el=document.getElementById('queue-badge');if(el){el.textContent=n;el.classList.toggle('hidden',!n)}
   const today=new Date();today.setHours(0,0,0,0);
   const urgent=getProjects().filter(p=>{if(!p.deadline)return false;const dl=new Date(p.deadline);dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));return diff>=0&&diff<=3}).length;
@@ -2454,7 +2454,7 @@ function openPayAmt(projId,workerId,slot){
 }
 async function savePayAmt(){
   if(!payAmtTarget)return;const p=getProjects().find(x=>x.id===payAmtTarget.projId);if(!p)return;
-  const w=p.workers.find(x=>x.id===payAmtTarget.workerId&&x.slot===payAmtTarget.slot);
+  const w=(p.workers||[]).find(x=>x.id===payAmtTarget.workerId&&x.slot===payAmtTarget.slot);
   if(w){w.amount=parseFloat(document.getElementById('payamt-val').value)||0;w.note=document.getElementById('payamt-note').value}
   await saveProjectDB(p);closeModal('modal-payamt');renderProjDetail();toast('บันทึกยอดแล้ว ✅','success');
 }
@@ -2475,7 +2475,7 @@ function autoFillSlip(){}
 async function confirmPayment(){
   if(!slipTarget)return;
   const p=getProjects().find(x=>x.id===slipTarget.projId);if(!p)return;
-  const w=p.workers.find(x=>x.id===slipTarget.workerId&&x.slot===slipTarget.slot);if(!w)return;
+  const w=(p.workers||[]).find(x=>x.id===slipTarget.workerId&&x.slot===slipTarget.slot);if(!w)return;
   const s=getStaffById(slipTarget.workerId);
   const amount=parseFloat(document.getElementById('slip-amount').value)||w.amount||0;
   const vNo=nextVoucherNo();
@@ -2637,7 +2637,7 @@ function initQueueMonthFilter(){ try {
 
 function openEvModal(){
   evType='';const p=getProjects().find(x=>x.id===currentProjId);if(!p)return;
-  document.getElementById('ev-worker').innerHTML=p.workers.map(w=>{const s=getStaffById(w.id);return s?`<option value="${w.id}">${s.name} (${s.nickname})</option>`:''}).join('');
+  document.getElementById('ev-worker').innerHTML=(p.workers||[]).map(w=>{const s=getStaffById(w.id);return s?`<option value="${w.id}">${s.name} (${s.nickname})</option>`:''}).join('');
   document.getElementById('ev-amount').value='';document.getElementById('ev-date').value=new Date().toISOString().split('T')[0];document.getElementById('ev-note').value='';
   openModal('modal-ev');
 }
@@ -2688,7 +2688,7 @@ function renderQueue() {
       if (queueCycleFilter === '1' && day > 15) return;
       if (queueCycleFilter === '2' && day <= 15) return;
     }
-    const workers = p.workers.filter(w => {
+    const workers = (p.workers||[]).filter(w => {
       const s = getStaffById(w.id);
       return s && (queueFilter === 'all' || w.status === queueFilter);
     });
@@ -2907,7 +2907,7 @@ function confirmClientUnpaid(projId, toastEl) {
 /* อนุมัติ — pending → approved แล้ว re-render ทันที */
 async function qApprove(projId, workerId, slot) {
   const p = getProjects().find(x => x.id === projId); if (!p) return;
-  const w = p.workers.find(x => x.id === workerId && x.slot === slot); if (!w) return;
+  const w = (p.workers||[]).find(x => x.id === workerId && x.slot === slot); if (!w) return;
   w.status = 'approved';
   await saveProjectDB(p);
   updateQueueBadge();
@@ -3155,7 +3155,7 @@ function renderMyDash(){
   if(!currentUser?.staffId)return;const s=getStaffById(currentUser.staffId);if(!s)return;
   document.getElementById('my-welcome').textContent=`สวัสดี ${s.nickname} 👋`;
   const projs=getProjects();let paid=0,pending=0;const rows=[];
-  projs.forEach(p=>{const w=p.workers.find(x=>x.id===s.id);if(!w)return;
+  projs.forEach(p=>{const w=(p.workers||[]).find(x=>x.id===s.id);if(!w)return;
     if(w.status==='paid')paid+=w.amount||0;else pending+=w.amount||0;
     rows.push(`<tr><td><strong>${p.name}</strong></td><td>${fmtDate(p.date)}</td><td>${CATS[s.category]?.label||''}</td><td style="color:var(--accent2);font-weight:700">${w.amount?fmtB(w.amount):'TBD'}</td><td>${statusBadge(w.status)}</td></tr>`);
   });
@@ -3165,7 +3165,7 @@ function renderMyDash(){
 function renderMyHistory(){
   if(!currentUser?.staffId)return;const s=getStaffById(currentUser.staffId);if(!s)return;
   const projs=getProjects();const rows=[];
-  projs.forEach(p=>{const w=p.workers.find(x=>x.id===s.id);if(!w)return;
+  projs.forEach(p=>{const w=(p.workers||[]).find(x=>x.id===s.id);if(!w)return;
     rows.push(`<tr><td><strong>${p.name}</strong></td><td>${fmtDate(p.date)}</td><td>${CATS[s.category]?.label||''}</td><td style="color:var(--accent2);font-weight:700">${w.amount?fmtB(w.amount):'TBD'}</td><td style="font-size:12px;color:var(--text2)">${s.bank} ${s.account}</td><td>${statusBadge(w.status)}</td></tr>`);
   });
   document.getElementById('my-hist-table').innerHTML=rows.join('')||'<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:20px">ยังไม่มีประวัติ</td></tr>';
@@ -3418,7 +3418,7 @@ function onVcProjChange() {
     return;
   }
   const catColors = {dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
-  listEl.innerHTML = p.workers.map(w => {
+  listEl.innerHTML = (p.workers||[]).map(w => {
     const s = getStaffById(w.id); if (!s) return '';
     const key = `${w.id}|${w.slot}`;
     const color = catColors[s.category]||'var(--text2)';
@@ -3484,7 +3484,7 @@ function updateVcSummary() {
 
 function buildVoucherHTML(projId, workerId, slot, vNo, issueDate, note) {
   const p = getProjects().find(x=>x.id===projId); if(!p) return '';
-  const w = p.workers.find(x=>x.id===workerId&&x.slot===slot); if(!w) return '';
+  const w = (p.workers||[]).find(x=>x.id===workerId&&x.slot===slot); if(!w) return '';
   const s = getStaffById(workerId); if(!s) return '';
   const thaiDate = d => d ? new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}) : '—';
   return `<div style="background:#fff;color:#111;font-family:'Kanit',sans-serif;max-width:520px;margin:0 auto 32px;padding:32px;border-radius:12px;border:1px solid #e0e8f8;page-break-after:always">
@@ -3543,7 +3543,7 @@ function getSelectedVcWorkers() {
   if (!p) return [];
   return [...vcSelectedWorkers].map(key => {
     const [wid, slot] = key.split('|');
-    return { workerId: wid, slot, w: p.workers.find(x=>x.id===wid&&x.slot===slot), s: getStaffById(wid), p };
+    return { workerId: wid, slot, w: (p.workers||[]).find(x=>x.id===wid&&x.slot===slot), s: getStaffById(wid), p };
   }).filter(x=>x.w&&x.s);
 }
 function previewVouchers() {
@@ -4087,7 +4087,7 @@ function buildBillingVoucherHTML(staffId) {
     if (dl.getMonth() !== billingMonthSelected) return;
     if (billingCycleSelected === 1 && dl.getDate() > 15) return;
     if (billingCycleSelected === 2 && dl.getDate() <= 15) return;
-    const w = p.workers.find(x => x.id === staffId && x.status !== 'paid');
+    const w = (p.workers||[]).find(x => x.id === staffId && x.status !== 'paid');
     if (w) items.push({ proj: p, worker: w });
   });
   if (!items.length) return null;
