@@ -3969,14 +3969,15 @@ function renderProjCal() {
 
   // ── Deadline table (all events sorted)
   const sorted = [...allEvents].sort((a,b)=>a.end-b.end);
-  const overdueCnt = sorted.filter(e=>e.isOverdue).length;
-  const urgentCnt  = sorted.filter(e=>e.isUrgent).length;
+  const overdueCnt = sorted.filter(e=>e.isOverdue&&e.p.projStatus!=='done'&&e.p.projStatus!=='cancelled').length;
+  const urgentCnt  = sorted.filter(e=>e.isUrgent&&e.p.projStatus!=='done'&&e.p.projStatus!=='cancelled').length;
 
   const tableHtml = sorted.length ? `
     <div class="table-wrap">
       <div class="table-header">
         <div class="table-title">📌 Deadline ทั้งหมด</div>
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <select class="form-input form-select" style="padding:5px 24px 5px 8px;font-size:11px;width:120px" onchange="projCalSort=this.value;renderProjCal()">${projCalSort==='newest'?'<option value=\"newest\" selected>\uD83D\uDD3D \u0e43\u0e2b\u0e21\u0e48\u0e2a\u0e38\u0e14</option><option value=\"oldest\">\uD83D\uDD3C \u0e40\u0e01\u0e48\u0e32\u0e2a\u0e38\u0e14</option>':'<option value=\"newest\">\uD83D\uDD3D \u0e43\u0e2b\u0e21\u0e48\u0e2a\u0e38\u0e14</option><option value=\"oldest\" selected>\uD83D\uDD3C \u0e40\u0e01\u0e48\u0e32\u0e2a\u0e38\u0e14</option>'}</select>
           ${overdueCnt?`<span style="font-size:11px;padding:3px 10px;border-radius:8px;background:rgba(255,64,64,.12);color:var(--red);font-weight:700">🔴 เกิน deadline: ${overdueCnt}</span>`:''}
           ${urgentCnt?`<span style="font-size:11px;padding:3px 10px;border-radius:8px;background:rgba(255,158,0,.12);color:var(--orange);font-weight:700">⚠️ ใน 3 วัน: ${urgentCnt}</span>`:''}
         </div>
