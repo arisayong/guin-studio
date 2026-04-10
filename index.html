@@ -2614,7 +2614,7 @@ function buildSimpleReceipt({vNo,name,nickname,projName,amount,bank,date}){
   const thaiDate=date?new Date(date).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}):fmtDate(new Date());
   return`<div id="printable-receipt" data-vno="${vNo}" style="background:#fff;color:#111;border-radius:12px;padding:28px;font-family:'Kanit',sans-serif;max-width:460px;margin:0 auto">
     <div style="text-align:center;border-bottom:2px solid #1565FF;padding-bottom:14px;margin-bottom:16px">
-     <div style="font-size:20px;font-weight:800;color:#1565FF;letter-spacing:2px">🎙️ GUIN HOME STUDIO</div>
+     <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:44px;object-fit:contain;display:block;margin:0 auto">
      <div style="font-size:14px;font-weight:700;margin-top:6px">แจ้งการโอนเงิน</div>
      <div style="font-size:11px;color:#888;margin-top:4px">เลขที่: ${vNo}</div>
     </div>
@@ -2659,7 +2659,7 @@ function emailReceipt(){
     `กรุณาดาวน์โหลด PDF และเก็บไว้เป็นหลักฐานครับ\n\n`+
     `ขอบคุณครับ\nGuin Home Studio`
   );
-  window.open(`https://mail.google.com/mail/?view=cm&to=${email}&su=${subject}&body=${body}`,'_blank');
+  window.open('https://mail.google.com/mail/u/penguinstudiovoice@gmail.com/?view=cm&to='+email+'&su='+subject+'&body='+body,'_blank');
   toast(`📧 เปิด Email ไปยัง ${email} แล้วครับ`,'success');
 }
 
@@ -3499,7 +3499,7 @@ function saveAndSendQuotation() {
   const all = getDocsStore('quotations')||[];
   all.push(saved); saveDocsStore('quotations', all);
   const subject = encodeURIComponent(`ใบเสนอราคา ${data.docNo} — Guin Home Studio`);
-  const body = encodeURIComponent(`เรียน คุณ${data.client}\n\nขอส่งใบเสนอราคา ${data.docNo} มาเพื่อพิจารณาครับ\nยอดรวม: ฿${total.toLocaleString()}\n\nกรุณาตอบกลับเพื่อยืนยันการรับงาน\n\nขอบคุณครับ\nGuin Home Studio`);
+  const body = encodeURIComponent(`เรียน คุณ${data.client}\n\nขอส่งใบเสนอราคา ${data.docNo} มาเพื่อพิจารณาครับ\nยอดรวม: ฿${total.toLocaleString()}\n\nกรุณาตอบกลับเพื่อยืนยันการรับงานค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio`);
   window.open(`https://mail.google.com/mail/?view=cm&to=${data.email}&su=${subject}&body=${body}`, '_blank');
   toast(`📧 เปิด Email ให้ ${data.client} แล้ว — อย่าลืมแนบ PDF`, 'success');
   // Auto-backup to Google Drive
@@ -3605,8 +3605,8 @@ function buildVoucherHTML(projId, workerId, slot, vNo, issueDate, note) {
   return `<div style="background:#fff;color:#111;font-family:'Kanit',sans-serif;max-width:520px;margin:0 auto 32px;padding:32px;border-radius:12px;border:1px solid #e0e8f8;page-break-after:always">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1565FF;padding-bottom:14px;margin-bottom:18px">
       <div>
-        <div style="font-size:20px;font-weight:800;color:#1565FF;letter-spacing:2px">🎙️ GUIN HOME STUDIO</div>
-        <div style="font-size:11px;color:#666;margin-top:3px">ใบสำคัญจ่าย / Payment Voucher</div>
+        <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:48px;object-fit:contain;display:block">
+        <div style="font-size:11px;color:#666;margin-top:4px">ใบสำคัญจ่าย / Payment Voucher</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:12px;color:#888">เลขที่: <strong style="color:#1565FF">${vNo}</strong></div>
@@ -3698,34 +3698,29 @@ function downloadVouchers() {
   renderDocsHistory();
 }
 function issueAndSendVouchers() {
-  const selected = getSelectedVcWorkers();
+  var selected = getSelectedVcWorkers();
   if (!selected.length){toast('กรุณาเลือกทีมงาน','error');return;}
-  const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
-  const note = document.getElementById('vc-note')?.value.trim()||'';
-  let sent=0, noEmail=0;
-  let allHtml = '';
-  selected.forEach(function({workerId,slot,w,s,p}) {
-    const vNo = nextVoucherNo();
-    const html = buildVoucherHTML(p.id, workerId, slot, vNo, date, note);
-    allHtml += html;
-    const saved = getDocsStore('vouchers')||[];
-    saved.push({ type:'voucher', docNo:vNo, staffId:workerId, projId:p.id, projName:p.name, staffName:s.name, amount:w.amount||0, date, createdAt:new Date().toISOString() });
+  var date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
+  var note = document.getElementById('vc-note')?.value.trim()||'';
+  var sent=0, noEmail=0;
+  selected.forEach(function(item){
+    var workerId=item.workerId, slot=item.slot, w=item.w, s=item.s, p=item.p;
+    var vNo = nextVoucherNo();
+    var saved = getDocsStore('vouchers')||[];
+    saved.push({type:'voucher',docNo:vNo,staffId:workerId,projId:p.id,projName:p.name,staffName:s.name,amount:w.amount||0,date:date,createdAt:new Date().toISOString()});
     saveDocsStore('vouchers', saved);
-    if (s.email) sent++; else noEmail++;
+    if (s.email) {
+      var subject = encodeURIComponent('ใบสำคัญจ่าย '+vNo+' — Guin Home Studio');
+      var nl = '%0A';
+      var bodyParts = ['เรียน คุณ'+s.name, '', 'แนบใบสำคัญจ่ายเงิน '+vNo+' มาพร้อม Email นี้ค่ะ', 'กรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ', '', 'ขอบคุณค่ะ', 'Guin Home Studio'];
+      var body = bodyParts.map(function(l){return encodeURIComponent(l);}).join(nl);
+      var url = 'https://mail.google.com/mail/u/penguinstudiovoice@gmail.com/?view=cm&to='+encodeURIComponent(s.email)+'&su='+subject+'&body='+body;
+      setTimeout(function(){window.open(url,'_blank');}, sent*400);
+      sent++;
+    } else noEmail++;
   });
-  // ดาวน์โหลดใบก่อน
-  downloadDocHTML('<div>'+allHtml+'</div>', 'vouchers_'+new Date().toISOString().slice(0,10));
-  // เปิด Gmail หลัง 1 วินาที
-  if (sent > 0) {
-    const emails = selected.filter(function(x){return x.s.email;}).map(function(x){return x.s.email;}).join(',');
-    const subject = encodeURIComponent('ใบสำคัญจ่าย — Guin Home Studio');
-    const bodyTxt = 'เรียน ทีมงานทุกท่าน\n\nแนบใบสำคัญจ่ายเงินมาด้วย\nกรุณาตรวจสอบยอดเงินในไฟล์ที่แนบ\n\nขอบคุณครับ\nGuin Home Studio';
-    setTimeout(function() {
-      window.open('https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(emails)+'&su='+subject+'&body='+encodeURIComponent(bodyTxt), '_blank');
-      toast('📎 ไฟล์ถูกดาวน์โหลดแล้ว — กรุณาแนบไฟล์ใน Gmail ที่เปิดขึ้น', 'info');
-    }, 1000);
-  }
-  if (noEmail) toast('⚠️ '+noEmail+' คนไม่มี email', 'warn');
+  if (sent) toast('📧 เปิด Gmail '+sent+' หน้า ใช้เมล penguinstudiovoice ค่ะ','success');
+  if (noEmail) toast('⚠️ '+noEmail+' คนไม่มี email','warn');
   renderDocsHistory();
 }
 
@@ -3741,6 +3736,7 @@ function downloadDocHTML(bodyHtml, filename) {
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Kanit',sans-serif;background:#f5f7fa;padding:32px;min-height:100vh}
 @media print{body{background:#fff;padding:0}.no-print{display:none}}</style>
+<script>window.onload=function(){window.print();}<\/script>
 </head><body>${bodyHtml}
 <div class="no-print" style="text-align:center;margin:24px 0">
   <button onclick="window.print()" style="padding:12px 32px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ พิมพ์ / บันทึกเป็น PDF</button>
@@ -4244,8 +4240,8 @@ function buildBillingVoucherHTML(staffId) {
   return `<div id="printable-receipt" data-vno="${vNo}" style="background:#fff;color:#111;font-family:'Kanit',sans-serif;max-width:580px;margin:0 auto;padding:36px;border-radius:12px">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1565FF;padding-bottom:14px;margin-bottom:18px">
       <div>
-        <div style="font-size:20px;font-weight:800;color:#1565FF;letter-spacing:2px">🎙️ GUIN HOME STUDIO</div>
-        <div style="font-size:11px;color:#666;margin-top:3px">ใบสำคัญจ่ายเงิน / Payment Voucher</div>
+        <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:48px;object-fit:contain;display:block">
+        <div style="font-size:11px;color:#666;margin-top:4px">ใบสำคัญจ่ายเงิน / Payment Voucher</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:12px;color:#888">เลขที่: <strong style="color:#1565FF">${vNo}</strong></div>
