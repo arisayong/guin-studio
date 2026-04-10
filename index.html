@@ -1452,7 +1452,15 @@ function saveStaffData(d){
     _fbDatabase.ref().update(updates).catch(e=>console.warn('Staff save error:',e));
   }
 }
-function getAllStaff(){const d=getStaffData();let a=[];Object.entries(d).forEach(([cat,arr])=>arr.forEach(s=>a.push({...s,category:cat})));return a}
+function getAllStaff(){
+  const d=getStaffData();
+  let a=[];
+  Object.entries(d).forEach(([cat,val])=>{
+    const arr=Array.isArray(val)?val:Object.values(val||{});
+    arr.filter(Boolean).forEach(s=>a.push({...s,category:cat}));
+  });
+  return a;
+}
 function getStaffById(id){return getAllStaff().find(s=>s.id===id)}
 
 // ══════════════════════════════════════════════
@@ -2317,7 +2325,7 @@ function addWorkerToSlot(cat,slot){
   const staffId=sel.value;
   if(!formSlots[cat])formSlots[cat]={};if(!formSlots[cat][slot])formSlots[cat][slot]=[];
   if(formSlots[cat][slot].find(w=>w.staffId===staffId)){toast('เพิ่มคนนี้แล้ว','warn');sel.value='';return}
-  formSlots[cat][slot].push({staffId,amount:0,unit:'เหมา'});sel.value='';
+  formSlots[cat][slot].push({staffId,amount:0,unit:'นาที'});sel.value='';
   renderWorkerList(cat,slot);calcProjSummary();
 }
 function renderAllWorkerLists(){
@@ -2353,7 +2361,7 @@ function renderWorkerList(cat,slot){
         oninput="updateSlotAmount('${cat}','${slot}',${i},this.value)">
       <span style="color:var(--text2);font-size:12px">/</span>
       <select style="padding:5px 8px;background:rgba(0,0,0,.35);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:12px" onchange="updateSlotUnit('${cat}','${slot}',${i},this.value)">
-       <option value="นาที"${w.unit==='นาที'?' selected':''}>นาที</option>
+       <option value="นาที"${(w.unit==='นาที'||!w.unit)?' selected':''}>นาที</option>
        <option value="เหมา"${w.unit==='เหมา'?' selected':''}>เหมา</option>
       </select>
       ${calcHtml}
