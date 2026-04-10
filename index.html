@@ -4048,7 +4048,8 @@ function parseLocalDate(str) {
 // BILLING CYCLE — ออกใบสำคัญจ่ายรายบุคคล
 // ══════════════════════════════════════════════
 let billingViewOpen = false;
-let billingCycleSelected = 1; // 1 = 1-15, 2 = 16-31
+let billingCycleSelected = 1; // 1 = 1-15, 2 = 16-31, 0 = ทั้งเดือน
+let billingMonthAll = false; // true = ทุกเดือน
 let billingMonthSelected = new Date().getMonth();
 let billingYearSelected  = new Date().getFullYear();
 
@@ -4385,7 +4386,7 @@ function viewSavedSlip(key) {
 async function doSendVoucherEmail(staffId, withSlip) {
   const modal = document.getElementById('slip-upload-modal');
 
-  // บันทึกไฟล์ที่อัปโหลด
+  // บันทึกไฟล์
   if (withSlip) {
     if (window._slipDataPending) {
       const slipKey = 'billing_slip_'+staffId+'_'+billingYearSelected+'_'+billingMonthSelected+'_'+billingCycleSelected;
@@ -4399,23 +4400,64 @@ async function doSendVoucherEmail(staffId, withSlip) {
       window._docDataPending = null;
     }
   }
-
   if (modal) modal.remove();
 
   const s = getStaffById(staffId);
-  if (!s?.email) { toast('ไม่มี email','error'); return; }
+  if (!s || !s.email) { toast('ไม่มี email ในระบบ','error'); return; }
 
   const TM = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
   const period = billingCycleSelected===1
     ? '1-15 '+TM[billingMonthSelected]+' '+(billingYearSelected+543)
     : '16-สิ้นเดือน '+TM[billingMonthSelected]+' '+(billingYearSelected+543);
 
-  const subject = 'ใบสำคัญจ่ายเงิน รอบ '+period+' — Guin Home Studio';
-  const message = 'เรียน คุณ'+s.name+'\n\nขออนุญาตส่งใบสำคัญจ่ายเงินค่าตอบแทนรอบ '+period+'\n\nกรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio';
+  // เก็บ email data ไว้ใน global ก่อนแสดง preview
+  window._pendingEmail = {
+    to: s.email,
+    name: s.name || s.nickname || '',
+    subject: 'ใบสำคัญจ่ายเงิน รอบ '+period+' — Guin Home Studio',
+    message: 'เรียน คุณ'+(s.name||s.nickname||'')+'\n\nขออนุญาตส่งใบสำคัญจ่ายเงินค่าตอบแทนรอบ '+period+'\n\nกรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio'
+  };
 
+  // แสดง preview
+  const old = document.getElementById('email-preview-modal');
+  if (old) old.remove();
+  const prev = document.createElement('div');
+  prev.id = 'email-preview-modal';
+  prev.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
+  const e = window._pendingEmail;
+  prev.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:520px;max-width:98vw">'+
+    '<div style="font-size:17px;font-weight:800;margin-bottom:16px">📧 ตัวอย่างอีเมลก่อนส่ง</div>'+
+    '<div style="background:var(--bg2);border-radius:10px;padding:16px;font-size:13px;line-height:2;margin-bottom:14px">'+
+    '<div><span style="color:var(--text2);width:60px;display:inline-block">จาก:</span> <strong style="color:var(--green)">penguinstudiovoice@gmail.com</strong></div>'+
+    '<div><span style="color:var(--text2);width:60px;display:inline-block">ถึง:</span> <strong>'+e.to+'</strong> ('+e.name+')</div>'+
+    '<div><span style="color:var(--text2);width:60px;display:inline-block">หัวข้อ:</span> '+e.subject+'</div>'+
+    '</div>'+
+    '<div style="background:var(--bg2);border-radius:10px;padding:14px;font-size:13px;white-space:pre-line;line-height:1.8;margin-bottom:16px;border-left:3px solid var(--accent2)">'+e.message+'</div>'+
+    '<div style="display:flex;gap:10px">'+
+    '<button class="btn btn-outline" style="flex:1" onclick="document.getElementById(\'email-preview-modal\').remove()">✕ ยกเลิก</button>'+
+    '<button class="btn btn-blue" style="flex:1" onclick="confirmSendEmailJS()">✅ ยืนยันส่ง</button>'+
+    '</div></div>';
+  document.body.appendChild(prev);
+}
+
+async function confirmSendEmailJS() {
+  document.getElementById('email-preview-modal')?.remove();
+  const e = window._pendingEmail;
+  if (!e) { toast('ไม่มีข้อมูลอีเมล','error'); return; }
   toast('📤 กำลังส่งอีเมล...','info');
-  const ok = await sendEmailJS(s.email, subject, message);
-  if (ok) toast('✅ ส่งอีเมลถึง '+s.name+' ('+s.email+') สำเร็จแล้วค่ะ','success');
+  const ok = await sendEmailJS(e.to, e.subject, e.message);
+  if (ok) {
+    toast('✅ ส่งอีเมลถึง '+e.name+' ('+e.to+') สำเร็จแล้วค่ะ','success');
+    window._pendingEmail = null;
+  }
+}
+
+async function confirmSendEmailJS(staffId, toEmail, subject, message) {
+  document.getElementById('email-preview-modal')?.remove();
+  toast('📤 กำลังส่งอีเมล...','info');
+  const ok = await sendEmailJS(toEmail, subject, message);
+  if (ok) toast('✅ ส่งอีเมลสำเร็จแล้วค่ะ','success');
 }
 
 
