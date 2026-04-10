@@ -510,6 +510,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
     <div class="page-actions">
      <div class="search-bar" style="margin:0;flex:1;max-width:280px"><span class="icon">🔍</span><input placeholder="ค้นหา..." id="proj-search" oninput="renderProjList()"></div>
      <button class="btn btn-blue" onclick="openNewProject()">➕ สร้างโปรเจกต์ใหม่</button>
+     <button class="btn btn-xs btn-outline" style="background:rgba(255,80,80,.1);border-color:rgba(255,80,80,.4);color:var(--red)" onclick="adminCleanDuplicates()" title="ล้างโปรเจกต์ซ้ำ">🧹 ล้างซ้ำ</button>
      <button class="btn btn-outline btn-sm" onclick="exportPaymentCSV()">⬇️ CSV</button>
     </div>
    </div>
@@ -4669,6 +4670,31 @@ document.addEventListener('click',function(e){
   }
 });
 
+
+// ════════════════════════
+// ADMIN: ล้างข้อมูลซ้ำ
+// ════════════════════════
+async function adminCleanDuplicates(){
+  if(!_fbDatabase){toast('Firebase ไม่พร้อม','error');return;}
+  if(!confirm('ล้างโปรเจกต์ที่ชื่อซ้ำกัน? (เก็บเฉพาะอันแรกของแต่ละชื่อ)'))return;
+  const snap = await _fbDatabase.ref('projects').get();
+  if(!snap.exists()){toast('ไม่มีข้อมูล','info');return;}
+  const all = Object.values(snap.val()).filter(p=>p&&p.id);
+  const seen = new Set();
+  const toDelete = [];
+  // sort เก่าสุดก่อน
+  all.sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));
+  all.forEach(p=>{
+    const key = p.name||p.id;
+    if(seen.has(key)) toDelete.push(p.id);
+    else seen.add(key);
+  });
+  if(!toDelete.length){toast('ไม่พบข้อมูลซ้ำ ✅','success');return;}
+  for(const id of toDelete){
+    await _fbDatabase.ref('projects/'+id).remove();
+  }
+  toast('ลบโปรเจกต์ซ้ำ '+toDelete.length+' รายการแล้ว ✅','success');
+}
 // ══════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════
