@@ -145,7 +145,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .btn-xs{padding:4px 9px;font-size:11px}
 
 /* TABLE */
-.table-wrap{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.table-wrap{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow-x:auto;overflow-y:hidden;margin-bottom:14px}
 .table-header{padding:15px 20px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between}
 .table-title{font-size:14px;font-weight:700}
 table{width:100%;border-collapse:collapse}
@@ -514,7 +514,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div class="filter-bar" id="year-filter"></div>
    <div class="filter-bar" id="type-filter"></div>
    <div class="table-wrap">
-    <table>
+    <table style="min-width:900px"
      <thead><tr><th>โปรเจกต์</th><th>ลูกค้า</th><th>ประเภท</th><th>Deadline</th><th>Budget</th><th>รายจ่าย</th><th>กำไร</th><th>สถานะ</th><th>Actions</th></tr></thead>
      <tbody id="projects-table"></tbody>
     </table>
