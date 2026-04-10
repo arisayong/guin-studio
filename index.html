@@ -1721,7 +1721,7 @@ function nav(page){
   document.querySelectorAll('.nav-item,.nav-sub-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
-  const renders={dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:()=>{ setTimeout(()=>{try{renderQueue();}catch(e){console.error('queue nav error:',e);}},100); },docs:renderDocs,'proj-cal':renderProjCal,'my-dashboard':renderMyDash,'my-history':renderMyHistory};
+  const renders={dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue,docs:renderDocs,'proj-cal':renderProjCal,'my-dashboard':renderMyDash,'my-history':renderMyHistory};
   if(renders[page])renders[page]();
   window._currentPage=page;
 }
@@ -1762,38 +1762,23 @@ function exportPaymentCSV(){
 // COPY PROJECT
 // ══════════════════════════════════════════════
 async function copyProject(id){
-  try {
-    const p=getProjects().find(x=>x.id===id);
-    if(!p){toast('ไม่พบโปรเจกต์','error');return;}
-    pushUndo();
-    const copy={
-      ...JSON.parse(JSON.stringify(p)),
-      id:'P'+Date.now(),
-      name:'[คัดลอก] '+p.name,
-      date:new Date().toISOString().split('T')[0],
-      workers:(p.workers||[]).map(w=>({...w,status:'pending',voucherNo:undefined})),
-      snapshot:null, evidenceLogs:[], createdAt:new Date().toISOString()
-    };
-    _savingProject = true; // lock RT listener from overriding
-    await saveProjectDB(copy);
-    // Fetch confirmed data
-    if(_fbDatabase){
-      try{
-        const snap=await _fbDatabase.ref('projects').get();
-        if(snap.exists()){
-          projectsCache=Object.values(snap.val()||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
-          ls('projects_cache',projectsCache);
-        }
-      }catch(e){}
-    }
-    renderProjects();
-    toast('📋 คัดลอกโปรเจกต์แล้ว','success');
-    setTimeout(()=>{_savingProject=false;},2000); // unlock after 2s
-  } catch(e) {
-    _savingProject=false;
-    console.error('copyProject error:', e);
-    toast('Error: '+e.message,'error');
-  }
+  const p=getProjects().find(x=>x.id===id);
+  if(!p){toast('ไม่พบโปรเจกต์','error');return;}
+  const copy={
+    ...JSON.parse(JSON.stringify(p)),
+    id:'P'+Date.now(),
+    name:'[คัดลอก] '+p.name,
+    date:new Date().toISOString().split('T')[0],
+    workers:(p.workers||[]).map(w=>({...w,status:'pending',voucherNo:undefined})),
+    snapshot:null,evidenceLogs:[],createdAt:new Date().toISOString()
+  };
+  // เพิ่ม cache ทันที
+  projectsCache.unshift(copy);
+  ls('projects_cache',projectsCache);
+  renderProjects();
+  toast('📋 คัดลอกโปรเจกต์แล้ว','success');
+  // บันทึก Firebase ใน background (ไม่ await ป้องกัน delay)
+  saveProjectDB(copy).catch(e=>console.warn('copy save error:',e));
 }
 
 // ══════════════════════════════════════════════
@@ -2053,11 +2038,18 @@ function toggleTrkCheck(cardId){
   renderTrkBoard();renderTrkCalendar();
 }
 function removeTrkCard(cardId){
+  if(!confirm('ลบการ์ดนี้?'))return;
   const updated=getTrkCards().filter(c=>c.id!==cardId);
   ls('trk_cards_v3',updated);
   trkCheckedCards.delete(cardId);
-  renderTrkBoard();renderTrkCalendar();
-  if(_fbDatabase)_fbDatabase.ref('trkCards').set(updated).catch(()=>{});
+  // Save Firebase ก่อน render
+  if(_fbDatabase){
+    _fbDatabase.ref('trkCards').set(updated)
+      .then(()=>console.log('trkCards saved'))
+      .catch(e=>console.warn('trkCards save error:',e));
+  }
+  renderTrkBoard();
+  renderTrkCalendar();
 }
 function updateCardProj(cardId,projId){
   const cards=getTrkCards();const card=cards.find(c=>c.id===cardId);if(!card)return;
@@ -4588,7 +4580,6 @@ function startFirebaseSync() {
   // Sync projects in real-time
   _fbDatabase.ref('projects').on('value', snap => {
     try {
-      if(_savingProject) return; // skip during copy/save to prevent race
       const val = snap.exists() ? snap.val() : {};
       projectsCache = Object.values(val||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
       ls('projects_cache', projectsCache);
