@@ -1667,10 +1667,27 @@ function exportPaymentCSV(){
 // COPY PROJECT
 // ══════════════════════════════════════════════
 async function copyProject(id){
-  const p=getProjects().find(x=>x.id===id);if(!p)return;pushUndo();
-  const copy={...JSON.parse(JSON.stringify(p)),id:'P'+Date.now(),name:'[คัดลอก] '+p.name,
-    date:new Date().toISOString().split('T')[0],workers:p.workers.map(w=>({...w,status:'pending',voucherNo:undefined})),snapshot:null,evidenceLogs:[],createdAt:new Date()};
-  await saveProjectDB(copy);renderProjects();toast('📋 คัดลอกโปรเจกต์แล้ว','success');
+  try {
+    const p=getProjects().find(x=>x.id===id);
+    if(!p){toast('ไม่พบโปรเจกต์','error');return;}
+    pushUndo();
+    const copy={
+      ...JSON.parse(JSON.stringify(p)),
+      id:'P'+Date.now(),
+      name:'[คัดลอก] '+p.name,
+      date:new Date().toISOString().split('T')[0],
+      workers:(p.workers||[]).map(w=>({...w,status:'pending',voucherNo:undefined})),
+      snapshot:null,
+      evidenceLogs:[],
+      createdAt:new Date().toISOString()
+    };
+    await saveProjectDB(copy);
+    renderProjects();
+    toast('📋 คัดลอกโปรเจกต์แล้ว','success');
+  } catch(e) {
+    console.error('copyProject error:', e);
+    toast('Error: '+e.message,'error');
+  }
 }
 
 // ══════════════════════════════════════════════
