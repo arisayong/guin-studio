@@ -2659,7 +2659,7 @@ function emailReceipt(){
     `กรุณาดาวน์โหลด PDF และเก็บไว้เป็นหลักฐานครับ\n\n`+
     `ขอบคุณครับ\nGuin Home Studio`
   );
-  window.open(`mailto:${email}?subject=${subject}&body=${body}`,'_blank');
+  window.open(`https://mail.google.com/mail/?view=cm&to=${email}&su=${subject}&body=${body}`,'_blank');
   toast(`📧 เปิด Email ไปยัง ${email} แล้วครับ`,'success');
 }
 
@@ -3500,7 +3500,7 @@ function saveAndSendQuotation() {
   all.push(saved); saveDocsStore('quotations', all);
   const subject = encodeURIComponent(`ใบเสนอราคา ${data.docNo} — Guin Home Studio`);
   const body = encodeURIComponent(`เรียน คุณ${data.client}\n\nขอส่งใบเสนอราคา ${data.docNo} มาเพื่อพิจารณาครับ\nยอดรวม: ฿${total.toLocaleString()}\n\nกรุณาตอบกลับเพื่อยืนยันการรับงาน\n\nขอบคุณครับ\nGuin Home Studio`);
-  window.open(`mailto:${data.email}?subject=${subject}&body=${body}`, '_blank');
+  window.open(`https://mail.google.com/mail/?view=cm&to=${data.email}&su=${subject}&body=${body}`, '_blank');
   toast(`📧 เปิด Email ให้ ${data.client} แล้ว — อย่าลืมแนบ PDF`, 'success');
   // Auto-backup to Google Drive
   const qtHtml = buildQuotationHTML(data);
@@ -3712,7 +3712,7 @@ function issueAndSendVouchers() {
     if (s.email) {
       const subject = encodeURIComponent(`ใบสำคัญจ่าย ${vNo} — Guin Home Studio`);
       const body = encodeURIComponent(`เรียน คุณ${s.name}\n\nแนบใบสำคัญจ่าย ${vNo} มาพร้อม Email นี้\nยอด: ${w.amount?fmtB(w.amount):'TBD'}\n\nกรุณาเซ็นและส่งกลับครับ\nGuin Home Studio`);
-      setTimeout(()=>window.open(`mailto:${s.email}?subject=${subject}&body=${body}`,'_blank'), sent*400);
+      setTimeout(()=>window.open(`https://mail.google.com/mail/?view=cm&to=${s.email}&su=${subject}&body=${body}`,'_blank'), sent*400);
       sent++;
     } else { noEmail++; }
   });
@@ -4390,7 +4390,7 @@ function doSendVoucherEmail(staffId, withSlip) {
   const period = billingCycleSelected===1?`1-15 ${TM[billingMonthSelected]} ${billingYearSelected+543}`:`16-สิ้นเดือน ${TM[billingMonthSelected]} ${billingYearSelected+543}`;
   const subject = encodeURIComponent(`ใบสำคัญจ่ายเงิน ${vNo} รอบ ${period} — Guin Home Studio`);
   const body = encodeURIComponent(`เรียน คุณ${s.name}\n\nขอส่งใบสำคัญจ่ายเงินค่าตอบแทนรอบ ${period}\nเลขที่: ${vNo}\n\nกรุณาตรวจสอบยอดเงินในเอกสารแนบครับ\n\nขอบคุณครับ\nGuin Home Studio`);
-  window.open(`mailto:${s.email}?subject=${subject}&body=${body}`, '_blank');
+  window.open(`https://mail.google.com/mail/?view=cm&to=${s.email}&su=${subject}&body=${body}`, '_blank');
   toast(`📧 เปิด Email ให้ ${s.name} แล้ว — แนบไฟล์ PDF ก่อนส่งด้วยครับ`, 'success');
   // Auto-backup voucher to Drive
   const veHtml = buildBillingVoucherHTML(staffId);
