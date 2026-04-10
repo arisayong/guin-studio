@@ -2635,67 +2635,36 @@ function printReceipt(){downloadReceiptHTML()} // compat alias
 
 /* ── Fix 2: Email receipt via mailto ── */
 function emailReceipt(){
-  // Try to get staff email from slipTarget or from receipt content
-  let email='', name='', vNo='';
-  const receiptEl=document.getElementById('printable-receipt');
-  if(receiptEl){
-    vNo=receiptEl.querySelector?.('.receipt-no')?.textContent?.replace('เลขที่: ','').trim()||'';
-  }
-  // Get from slipTarget if still set, or from _lastReceiptCtx
-  const ctx=window._lastReceiptCtx||{};
-  if(ctx.staffId){
-    const s=getStaffById(ctx.staffId);
-    email=s?.email||''; name=s?.name||'';
-  }
-  if(!email){
-    email=prompt('กรอก Email ของ Staff:','');
-    if(!email)return;
-  }
-  const subject=encodeURIComponent(`ใบสำคัญรับเงิน ${vNo||'Guin Home Studio'}`);
-  const body=encodeURIComponent(
-    `เรียน คุณ${name}\n\n`+
-    `แนบใบสำคัญรับเงิน${vNo?' เลขที่ '+vNo:''} มาพร้อม Email นี้\n`+
-    `กรุณาดาวน์โหลด PDF และเก็บไว้เป็นหลักฐานครับ\n\n`+
-    `ขอบคุณครับ\nGuin Home Studio`
-  );
-  window.open('https://mail.google.com/mail/u/penguinstudiovoice@gmail.com/?view=cm&to='+email+'&su='+subject+'&body='+body,'_blank');
-  toast(`📧 เปิด Email ไปยัง ${email} แล้วครับ`,'success');
+  const ctx = window._lastReceiptCtx||{};
+  const s = ctx.staffId ? getStaffById(ctx.staffId) : null;
+  const email = s?.email || prompt('กรอก Email:','');
+  if(!email) return;
+  var nm = s?.name||email;
+  window._pendingEmail = {
+    to: email, name: nm,
+    subject: 'ใบสำคัญรับเงิน — Guin Home Studio',
+    message: 'เรียน คุณ'+nm+'\n\nขออนุญาตส่งใบสำคัญรับเงิน\n\nกรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio'
+  };
+  showEmailPreview();
 }
 
 /* ── Fix 3: Download receipt as printable HTML file ── */
 function downloadReceiptHTML(){
   const el=document.getElementById('printable-receipt');
-  if(!el){toast('ไม่มีข้อมูลใบเสร็จ','warn');return}
-  const ctx=window._lastReceiptCtx||{};
-  const vNo=el.dataset?.vno
-    ||el.textContent?.match(/GS-\d{4}-\d{4}/)?.[0]
-    ||'receipt';
-  const html=`<!DOCTYPE html>
-<html lang="th"><head>
-<meta charset="UTF-8">
-<title>ใบสำคัญรับเงิน ${vNo}</title>
-<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Kanit',sans-serif;background:#f5f7fa;display:flex;justify-content:center;padding:32px;min-height:100vh}
-  .wrap{background:#fff;border-radius:12px;padding:36px;max-width:520px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.12)}
-  @media print{body{background:#fff;padding:0} .wrap{box-shadow:none;border-radius:0} .no-print{display:none}}
-</style>
-</head><body>
-<div class="wrap">
-${el.outerHTML}
-<div class="no-print" style="margin-top:24px;text-align:center">
-  <button onclick="window.print()" style="padding:10px 28px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:14px;font-weight:700;cursor:pointer">🖨️ พิมพ์ / บันทึก PDF</button>
-</div>
-</div>
-</body></html>`;
-  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download=`${vNo}.html`;
-  document.body.appendChild(a); a.click();
-  setTimeout(()=>{URL.revokeObjectURL(url);a.remove()},1000);
-  toast('⬇️ ดาวน์โหลดแล้ว — เปิดไฟล์แล้วกด "พิมพ์" หรือ Ctrl+P → บันทึกเป็น PDF','success');
+  if(!el){toast('ไม่มีข้อมูลใบเสร็จ','warn');return;}
+  const vNo=el.dataset?.vno||'receipt';
+  const html='<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>'+vNo+'</title>'+
+    '<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">'+
+    '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Kanit,sans-serif;background:#f5f7fa;display:flex;justify-content:center;padding:32px}'+
+    '.wrap{background:#fff;border-radius:12px;padding:36px;max-width:520px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.12)}'+
+    '@media print{body{background:#fff;padding:0}.wrap{box-shadow:none}.no-print{display:none}}</style>'+
+    '</head><body><div class="wrap">'+el.outerHTML+
+    '<div class="no-print" style="margin-top:24px;text-align:center">'+
+    '<button onclick="window.print()" style="padding:10px 28px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:14px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF</button>'+
+    '</div></div></body></html>';
+  const w=window.open('','_blank');
+  if(w){w.document.write(html);w.document.close();w.onload=function(){setTimeout(()=>w.print(),800);};}
+  toast('เปิดหน้าใหม่แล้ว — กด "Save as PDF" ครับ','info');
 }
 
 /* ── Fix 4: Queue month/cycle filter ── */
@@ -4919,6 +4888,34 @@ const EMAILJS_CONFIG = {
   publicKey: 'H0Xg1aeoJhlcm9bqW',
 };
 
+function showEmailPreview(){
+  var e = window._pendingEmail;
+  if(!e){ toast('ไม่มีข้อมูลอีเมล','error'); return; }
+  var old = document.getElementById('email-preview-modal');
+  if(old) old.remove();
+  var div = document.createElement('div');
+  div.id = 'email-preview-modal';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
+  var msgEsc = e.message.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  div.innerHTML = [
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:520px;max-width:98vw">',
+    '<div style="font-size:17px;font-weight:800;margin-bottom:16px">📧 ตัวอย่างอีเมลก่อนส่ง</div>',
+    '<div style="background:var(--bg2);border-radius:10px;padding:16px;font-size:13px;line-height:2.2;margin-bottom:14px">',
+    '<div><span style="color:var(--text2);min-width:70px;display:inline-block">จาก:</span><strong style="color:var(--green)">penguinstudiovoice@gmail.com</strong></div>',
+    '<div><span style="color:var(--text2);min-width:70px;display:inline-block">ถึง:</span><strong>'+e.to+'</strong> ('+e.name+')</div>',
+    '<div><span style="color:var(--text2);min-width:70px;display:inline-block">หัวข้อ:</span>'+e.subject+'</div>',
+    '</div>',
+    '<div style="background:var(--bg2);border-radius:10px;padding:14px;font-size:13px;line-height:1.8;margin-bottom:16px;border-left:3px solid var(--accent2)">'+msgEsc+'</div>',
+    '<div style="display:flex;gap:10px">',
+    '<button class="btn btn-outline" style="flex:1" id="ep-cancel">✕ ยกเลิก</button>',
+    '<button class="btn btn-blue" style="flex:1" id="ep-confirm">✅ ยืนยันส่ง</button>',
+    '</div></div>'
+  ].join('');
+  document.body.appendChild(div);
+  document.getElementById('ep-cancel').onclick = function(){ div.remove(); };
+  document.getElementById('ep-confirm').onclick = confirmSendEmailJS;
+}
+
 async function sendEmailJS(to, subject, message) {
   if(typeof emailjs === 'undefined') {
     toast('❌ EmailJS ไม่พร้อม — ลองรีเฟรชหน้าเว็บ', 'error');
@@ -4927,6 +4924,9 @@ async function sendEmailJS(to, subject, message) {
   try {
     await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
       to_email: to,
+      to_name: to,
+      from_name: 'Guin Home Studio',
+      reply_to: 'penguinstudiovoice@gmail.com',
       subject: subject,
       message: message,
     }, EMAILJS_CONFIG.publicKey);
