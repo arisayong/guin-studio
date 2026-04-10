@@ -1714,11 +1714,7 @@ function nav(page){
   document.querySelectorAll('.nav-item,.nav-sub-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
-  const renders={dashboard:renderDash,track:renderTrack,projects:async()=>{
-    // Always fetch fresh data before rendering projects
-    if(_fbDatabase){try{const s=await _fbDatabase.ref('projects').get();if(s.exists()){projectsCache=Object.values(s.val()||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));ls('projects_cache',projectsCache);}}catch(e){}}
-    renderProjects();
-  },profit:renderProfit,staff:renderStaff,queue:()=>{initQueueMonthFilter();renderQueue();},docs:renderDocs,'proj-cal':renderProjCal,'my-dashboard':renderMyDash,'my-history':renderMyHistory};
+  const renders={dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue,docs:renderDocs,'proj-cal':renderProjCal,'my-dashboard':renderMyDash,'my-history':renderMyHistory};
   if(renders[page])renders[page]();
   window._currentPage=page;
 }
@@ -1769,13 +1765,15 @@ async function copyProject(id){
       name:'[คัดลอก] '+p.name,
       date:new Date().toISOString().split('T')[0],
       workers:(p.workers||[]).map(w=>({...w,status:'pending',voucherNo:undefined})),
-      snapshot:null,
-      evidenceLogs:[],
-      createdAt:new Date().toISOString()
+      snapshot:null, evidenceLogs:[], createdAt:new Date().toISOString()
     };
-    await saveProjectDB(copy);
+    // Add to cache immediately and render BEFORE Firebase (faster UX)
+    projectsCache.unshift(copy);
+    ls('projects_cache',projectsCache);
     renderProjects();
     toast('📋 คัดลอกโปรเจกต์แล้ว','success');
+    // Then save to Firebase in background (listener will confirm)
+    await saveProjectDB(copy);
   } catch(e) {
     console.error('copyProject error:', e);
     toast('Error: '+e.message,'error');
@@ -2038,7 +2036,13 @@ function toggleTrkCheck(cardId){
   else trkCheckedCards.add(cardId);
   renderTrkBoard();renderTrkCalendar();
 }
-function removeTrkCard(cardId){saveTrkCards(getTrkCards().filter(c=>c.id!==cardId));trkCheckedCards.delete(cardId);renderTrkBoard();renderTrkCalendar()}
+function removeTrkCard(cardId){
+  const updated=getTrkCards().filter(c=>c.id!==cardId);
+  ls('trk_cards_v3',updated);
+  trkCheckedCards.delete(cardId);
+  renderTrkBoard();renderTrkCalendar();
+  if(_fbDatabase)_fbDatabase.ref('trkCards').set(updated).catch(()=>{});
+}
 function updateCardProj(cardId,projId){
   const cards=getTrkCards();const card=cards.find(c=>c.id===cardId);if(!card)return;
   card.projId=projId;const p=projId?getProjects().find(x=>x.id===projId):null;
@@ -4541,23 +4545,20 @@ function startFirebaseSync() {
   _fbDatabase.ref('projects').on('value', snap => {
     try {
       const val = snap.exists() ? snap.val() : {};
-      const newCache = Object.values(val||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
-      // Only re-render if data actually changed
-      const oldLen = projectsCache.length;
-      const newLen = newCache.length;
-      projectsCache = newCache;
+      projectsCache = Object.values(val||{}).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
       ls('projects_cache', projectsCache);
       try { updateQueueBadge(); } catch(e) {}
-      // Re-render current page
-      const pg = document.getElementById('page-projects');
-      const pgDash = document.getElementById('page-dashboard');
-      const pgQ = document.getElementById('page-queue');
-      const pgCal = document.getElementById('page-proj-cal');
-      if(pg && !pg.classList.contains('hidden')) { try{renderProjects();}catch(e){console.warn('RT renderProjects:',e);} }
-      else if(pgDash && !pgDash.classList.contains('hidden')) { try{renderDash();}catch(e){} }
-      else if(pgQ && !pgQ.classList.contains('hidden')) { try{renderQueue();}catch(e){} }
-      else if(pgCal && !pgCal.classList.contains('hidden')) { try{renderProjCal();}catch(e){} }
-    } catch(e) { console.error('Projects RT listener error:', e); }
+      // Re-render whichever admin page is currently active
+      const active = document.querySelector('.page:not(.hidden)');
+      if(!active) return;
+      const pid = active.id;
+      try {
+        if(pid==='page-projects') renderProjects();
+        else if(pid==='page-dashboard') renderDash();
+        else if(pid==='page-queue') renderQueue();
+        else if(pid==='page-proj-cal') renderProjCal();
+      } catch(e) { console.warn('RT render error:', pid, e.message); }
+    } catch(e) { console.error('Projects RT error:', e); }
   });
 
   // Sync users/staff profiles
