@@ -146,6 +146,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .btn-xs{padding:4px 9px;font-size:11px}
 
 /* TABLE */
+.reg-role-active{opacity:1!important;filter:brightness(1.2);box-shadow:0 0 0 2px currentColor!important}
+#reg-role-checks label input[type=checkbox]:checked + span{opacity:1}
 .table-wrap{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
 #projects-table td, #page-projects thead th{padding:6px 4px;font-size:11px;word-break:break-word}
 .table-header{padding:15px 20px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between}
@@ -384,9 +386,12 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
   <div id="register-form" class="hidden">
    <div class="form-group">
     <label class="form-label">ระบุชื่อในระบบ (เชื่อมบัญชีของคุณ) *</label>
-    <select class="form-input form-select" id="reg-staff-id" onchange="autoFillRegRole()">
-     <option value="">-- เลือกชื่อของคุณ --</option>
-    </select>
+    <div style="position:relative">
+    <input class="form-input" id="reg-staff-search" type="text" placeholder="🔍 พิมพ์ชื่อเพื่อค้นหา..." oninput="filterRegStaff()" autocomplete="off">
+    <div id="reg-staff-dropdown" style="display:none;position:absolute;z-index:999;background:var(--card);border:1px solid var(--border2);border-radius:8px;max-height:200px;overflow-y:auto;width:100%;margin-top:2px;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
+    </div>
+    <input type="hidden" id="reg-staff-id">
+    <div id="reg-staff-selected" style="font-size:12px;color:var(--accent2);margin-top:4px"></div>
    </div>
    <div class="form-group">
     <label class="form-label">ชื่อเล่น *</label>
@@ -394,15 +399,15 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    </div>
    <div class="form-row">
     <div class="form-group">
-     <label class="form-label">ตำแหน่ง</label>
-     <select class="form-input form-select" id="reg-role">
-      <option value="dubbing">🎤 Dubbing</option>
-      <option value="adaptation">✍️ Adaptation</option>
-      <option value="mix">🎧 Mix</option>
-      <option value="qc">✅ QC</option>
-      <option value="subVideo">🎬 Sub & Video</option>
-      <option value="manager">🗂️ Manager</option>
-     </select>
+     <label class="form-label">ตำแหน่ง (เลือกได้หลายตำแหน่ง)</label>
+     <div id="reg-role-checks" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+      <label onclick="toggleRegRole(this)" style="display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(255,158,0,.3);background:rgba(255,158,0,.06);cursor:pointer;transition:all .15s;user-select:none;font-size:12px;font-weight:600;color:#FF9E00"><input type="checkbox" value="dubbing" name="reg-role" style="display:none">🎤 Dubbing</label>
+      <label onclick="toggleRegRole(this)" style="display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(0,180,255,.3);background:rgba(0,180,255,.06);cursor:pointer;transition:all .15s;user-select:none;font-size:12px;font-weight:600;color:#00B4FF"><input type="checkbox" value="adaptation" name="reg-role" style="display:none">✍️ Adaptation</label>
+      <label onclick="toggleRegRole(this)" style="display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(0,223,160,.3);background:rgba(0,223,160,.06);cursor:pointer;transition:all .15s;user-select:none;font-size:12px;font-weight:600;color:#00DFA0"><input type="checkbox" value="mix" name="reg-role" style="display:none">🎧 Mix</label>
+      <label onclick="toggleRegRole(this)" style="display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(155,111,255,.3);background:rgba(155,111,255,.06);cursor:pointer;transition:all .15s;user-select:none;font-size:12px;font-weight:600;color:#9B6FFF"><input type="checkbox" value="qc" name="reg-role" style="display:none">✅ QC</label>
+      <label onclick="toggleRegRole(this)" style="display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(255,64,64,.3);background:rgba(255,64,64,.06);cursor:pointer;transition:all .15s;user-select:none;font-size:12px;font-weight:600;color:#FF4040"><input type="checkbox" value="subVideo" name="reg-role" style="display:none">🎬 Sub & Video</label>
+      <label onclick="toggleRegRole(this)" style="display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(21,101,255,.3);background:rgba(21,101,255,.06);cursor:pointer;transition:all .15s;user-select:none;font-size:12px;font-weight:600;color:#1565FF"><input type="checkbox" value="manager" name="reg-role" style="display:none">🗂️ Manager</label>
+     </div>div>
     </div>
     <div class="form-group">
      <label class="form-label">เพศ</label>
@@ -1535,11 +1540,58 @@ function populateRegStaff(){
   sel.innerHTML='<option value="">-- เลือกชื่อของคุณ --</option>';
   getAllStaff().forEach(s=>sel.innerHTML+=`<option value="${s.id}">${s.name} (${s.nickname}) — ${CATS[s.category]?.label}</option>`);
 }
-function autoFillRegRole(){
-  const id=document.getElementById('reg-staff-id').value;const s=getStaffById(id);if(!s)return;
-  document.getElementById('reg-role').value=s.category;
-  document.getElementById('reg-nickname').value=s.nickname;
+function filterRegStaff(){
+  const q=(document.getElementById('reg-staff-search').value||'').toLowerCase();
+  const dd=document.getElementById('reg-staff-dropdown');
+  if(!q){dd.style.display='none';return;}
+  const allStaff=getAllStaff();
+  const matches=allStaff.filter(s=>
+    (s.nickname||'').toLowerCase().includes(q)||
+    (s.name||'').toLowerCase().includes(q)
+  ).slice(0,8);
+  if(!matches.length){dd.style.display='none';return;}
+  dd.style.display='block';
+  dd.innerHTML=matches.map(s=>`
+    <div onclick="selectRegStaff('${s.id}','${(s.nickname||s.name||'').replace(/'/g,'')}')" 
+         style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border2)"
+         onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
+      <span style="font-weight:700">${s.nickname||s.name}</span>
+      <span style="color:var(--text2);font-size:11px;margin-left:6px">${s.name||''} · ${s.category||''}</span>
+    </div>`).join('');
 }
+function selectRegStaff(id, name){
+  document.getElementById('reg-staff-id').value=id;
+  document.getElementById('reg-staff-search').value=name;
+  document.getElementById('reg-staff-dropdown').style.display='none';
+  document.getElementById('reg-staff-selected').textContent='✅ เลือก: '+name;
+  const s=getStaffById(id);
+  if(s){
+    document.getElementById('reg-nickname').value=s.nickname||s.name||'';
+    // Auto-check ทุกตำแหน่งของ staff (รองรับหลายตำแหน่ง)
+    const cats = s.categories||[s.category]||[];
+    document.querySelectorAll('input[name="reg-role"]').forEach(cb=>{
+      cb.checked = cats.includes(cb.value);
+      // sync visual state
+      const lbl = cb.closest('label');
+      if(lbl) lbl.classList.toggle('reg-role-active', cb.checked);
+    });
+  }
+}
+function autoFillRegRole(){} // legacy - unused
+function toggleRegRole(el){
+  const cb = el.querySelector('input[type=checkbox]');
+  if(!cb) return;
+  cb.checked = !cb.checked;
+  el.classList.toggle('reg-role-active', cb.checked);
+}
+
+// ปิด reg staff dropdown เมื่อคลิกข้างนอก
+document.addEventListener('click', function(e){
+  if(!e.target.closest('#reg-staff-search') && !e.target.closest('#reg-staff-dropdown')){
+    const dd=document.getElementById('reg-staff-dropdown');
+    if(dd) dd.style.display='none';
+  }
+});
 // Trigger initial null so login screen shows properly
 setTimeout(()=>{if(window._authCb&&!window._mockUser)window._authCb(null)},50);
 auth.onAuthStateChanged(async(fbUser)=>{
@@ -1606,11 +1658,33 @@ async function doLogin(){
   showLoader(false);
 }
 async function doRegister(){
-  const nick=document.getElementById('reg-nickname').value.trim();
-  const staffId=document.getElementById('reg-staff-id').value;
-  if(!nick||!staffId){toast('กรุณากรอกข้อมูลให้ครบ','error');return}
-  toast(`ยินดีต้อนรับ ${nick}! (Demo mode — ผูกกับ Firebase จริงได้ทันที)`,'success');
-  switchLoginTab('login');
+  const nick = document.getElementById('reg-nickname').value.trim();
+  const email = document.getElementById('reg-email')?.value.trim()||'';
+  const pass = document.getElementById('reg-pass')?.value||'';
+  const gender = document.getElementById('reg-gender')?.value||'';
+  const staffId = document.getElementById('reg-staff-id').value;
+  const roles = [...document.querySelectorAll('input[name="reg-role"]:checked')].map(x=>x.value);
+  if(!nick){toast('กรุณากรอกชื่อเล่น','error');return;}
+  if(!email){toast('กรุณากรอกอีเมล','error');return;}
+  if(!pass||pass.length<6){toast('รหัสผ่านอย่างน้อย 6 ตัว','error');return;}
+  if(!staffId){toast('กรุณาเลือกชื่อในระบบ','error');return;}
+  if(!roles.length){toast('กรุณาเลือกตำแหน่งอย่างน้อย 1 ตำแหน่ง','error');return;}
+  try{
+    showLoader(true);
+    const cred = await firebase.auth().createUserWithEmailAndPassword(email,pass);
+    await cred.user.updateProfile({displayName:nick});
+    if(_fbDatabase){
+      await _fbDatabase.ref('users/'+cred.user.uid).set({
+        email, nickname:nick, gender,
+        staffId, roles, role:'staff',
+        createdAt:new Date().toISOString()
+      });
+    }
+    toast(`✅ สมัครสมาชิกเสร็จสิ้น ยินดีต้อนรับ ${nick}!`,'success');
+    switchLoginTab('login');
+  }catch(e){
+    toast('❌ สมัครไม่สำเร็จ: '+e.message,'error');
+  }finally{showLoader(false);}
 }
 function doLogout(){auth.signOut();currentUser=null;projectsCache=[]}
 async function enterApp(){
