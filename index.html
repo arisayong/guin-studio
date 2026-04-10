@@ -2117,10 +2117,9 @@ function renderProjList(){
       </td>
       <td>
        <div style="display:flex;gap:4px;flex-wrap:wrap">
-        ${currentUser&&currentUser.role==='admin'?`
         <button class="btn btn-xs btn-outline" onclick="openEditProject('${p.id}')">✏️</button>
         <button class="btn btn-xs btn-outline" onclick="copyProject('${p.id}')" title="Clone">📋</button>
-        <button class="btn btn-xs btn-red" onclick="deleteProjConfirm('${p.id}')">🗑️</button>`:''}
+        <button class="btn btn-xs btn-red" onclick="deleteProjConfirm('${p.id}')">🗑️</button>
        </div>
       </td>
     </tr>`;
