@@ -1787,7 +1787,7 @@ async function copyProject(id){
   const copy={
     ...JSON.parse(JSON.stringify(p, (k,v)=>v===undefined?null:v)),
     id:'P'+ts,
-    name:'[คัดลอก] '+p.name,
+    name:'[คัดลอก] '+(p.name||'').replace(/^(\[คัดลอก\]\s*)+/,''),
     date:new Date().toISOString().split('T')[0],
     workers:(p.workers||[]).map(w=>({...w,status:'pending',voucherNo:null})),
     snapshot:null,evidenceLogs:[],createdAt:new Date(ts).toISOString()
@@ -2372,9 +2372,10 @@ async function deleteProjConfirm(id){
   wrap.appendChild(el);setTimeout(()=>{if(el.parentNode)el.remove()},8000);
 }
 async function confirmDeleteProj(id,toastEl){
-  toastEl?.remove();pushUndo();
-  projectsCache=projectsCache.filter(p=>p.id!==id);saveProjects(projectsCache);
-  renderProjects();toast('ลบแล้ว','info');updateQueueBadge();
+  toastEl?.remove();
+  pushUndo();
+  await deleteProjectDB(id);  // ลบจาก Firebase + notify ทุก admin
+  toast('🗑️ ลบแล้ว','info');
 }
 function openEditProject(id){
   const p=getProjects().find(x=>x.id===id);if(!p)return;
@@ -4669,18 +4670,18 @@ document.addEventListener('click',function(e){
 // ════════════════════════
 async function adminCleanDuplicates(){
   if(!_fbDatabase){toast('Firebase ไม่พร้อม','error');return;}
-  const snap = await _fbDatabase.ref('projects').get();
+  const snap=await _fbDatabase.ref('projects').get();
   if(!snap.exists()){toast('ไม่มีข้อมูล','info');return;}
-  const all = Object.values(snap.val()).filter(p=>p&&p.id);
-  // แสดง list projects ทั้งหมดใน Firebase
-  const names = all.map(p=>`${p.name} (${p.id})`).join('\n');
-  const copies = all.filter(p=>(p.name||'').includes('[คัดลอก]'));
-  if(!confirm(`Firebase มีโปรเจกต์ทั้งหมด ${all.length} รายการ:\n${names}\n\nลบ [คัดลอก] ${copies.length} รายการ?`)) return;
+  const all=Object.values(snap.val()).filter(p=>p&&p.id);
+  const names=all.map((p,i)=>`${i+1}. ${p.name}`).join('\n');
+  // ลบทุกอัน [คัดลอก] ไม่ว่ากี่ชั้น
+  const copies=all.filter(p=>(p.name||'').includes('[คัดลอก]'));
+  if(!confirm(`Firebase มี ${all.length} โปรเจกต์:\n${names}\n\nจะลบ [คัดลอก] ${copies.length} รายการ`)) return;
   for(const p of copies){
     await _fbDatabase.ref('projects/'+p.id).remove();
   }
   _notifyProjectChange();
-  toast(`ลบ [คัดลอก] ${copies.length} รายการแล้ว ✅`,'success');
+  toast(`🧹 ลบ [คัดลอก] ${copies.length} รายการแล้ว`,'success');
 }
 
 function _notifyProjectChange(){
