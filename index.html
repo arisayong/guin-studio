@@ -335,7 +335,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
 .worker-dropdown-wrap{position:relative;display:inline-block;max-width:280px;margin-bottom:12px}
 .worker-dropdown-btn{padding:7px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;color:var(--text2);font-family:Kanit;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;min-width:200px}
 .worker-dropdown-btn:hover{border-color:var(--accent2);color:var(--accent2)}
-.worker-dropdown-popup{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:9999;background:var(--card);border:1px solid var(--border2);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.4);min-width:260px;max-width:320px}
+.worker-dropdown-popup{display:none;position:fixed;z-index:99999;background:var(--card);border:1px solid var(--border2);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.4);min-width:260px;max-width:320px}
 .worker-dropdown-popup.open{display:block}
 .worker-dropdown-search{width:100%;padding:8px 12px;background:var(--bg2);border:none;border-bottom:1px solid var(--border2);border-radius:10px 10px 0 0;color:var(--text);font-family:Kanit;font-size:12px;outline:none}
 .worker-dropdown-list{max-height:220px;overflow-y:auto;padding:4px}
@@ -4722,28 +4722,29 @@ function toggleWorkerDropdown(selId){
   const isOpen = popup.classList.toggle('open');
   if(!isOpen) return;
 
-  const inp = popup.querySelector('.worker-dropdown-search');
-  if(inp){ inp.value=''; }
+  // หา button ที่เรียก function นี้ - ใช้ closest จาก event หรือ wrap
+  const wrap = popup.closest('.worker-dropdown-wrap') || popup.parentElement;
+  if(wrap){
+    const btn = wrap.querySelector('.worker-dropdown-btn');
+    if(btn){
+      const rect = btn.getBoundingClientRect();
+      popup.style.top = (rect.bottom + 4) + 'px';
+      popup.style.left = rect.left + 'px';
+      popup.style.width = Math.max(260, rect.width) + 'px';
+    }
+  }
 
-  // Build list จาก localStorage
   _workerListCache = buildWorkerList();
-
-  if(_workerListCache.length){
-    if(inp) inp.focus();
-    renderWorkerDropdownList(selId,'');
-  } else if(_fbDatabase){
-    // ถ้ายังว่าง - ดึงจาก Firebase โดยตรง
-    _fbDatabase.ref('staff').get().then(snap=>{
-      if(snap.exists()){
-        ls('staff_v3', snap.val());
-        _workerListCache = buildWorkerList();
-      }
-      if(inp) inp.focus();
+  if(!_workerListCache.length && _fbDatabase){
+    _fbDatabase.ref('staff').get().then(function(snap){
+      if(snap.exists()){ ls('staff_v3', snap.val()); _workerListCache = buildWorkerList(); }
       renderWorkerDropdownList(selId,'');
-    }).catch(()=>renderWorkerDropdownList(selId,''));
+    }).catch(function(){ renderWorkerDropdownList(selId,''); });
   } else {
     renderWorkerDropdownList(selId,'');
   }
+  var inp = popup.querySelector('.worker-dropdown-search');
+  if(inp){ inp.value=''; inp.focus(); }
 }
 function renderWorkerDropdownList(selId, q){
   const listEl = document.getElementById(selId+'-list');
