@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- Guin Home Studio v3.2 - build: 1775826379 -->
+<!-- Guin Home Studio v3.3 - build: 1775827013 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🎙️ Guin Home Studio</title>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700;800&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
@@ -515,7 +515,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div class="filter-bar" id="type-filter"></div>
    <div class="table-wrap">
     <table style="min-width:900px"
-     <thead><tr><th>โปรเจกต์</th><th>ลูกค้า</th><th>ประเภท</th><th>Deadline</th><th>Budget</th><th>รายจ่าย</th><th>กำไร</th><th>สถานะ</th><th>Actions</th></tr></thead>
+     <thead><tr><th>โปรเจกต์</th><th>ลูกค้า</th><th>ประเภท</th><th>Deadline</th><th>Budget</th><th>รายจ่าย</th><th>กำไร</th><th>สถานะ</th><th style="position:sticky;right:0;background:var(--card);z-index:2">Actions</th></tr></thead>
      <tbody id="projects-table"></tbody>
     </table>
    </div>
@@ -2115,7 +2115,7 @@ function renderProjList(){
         <option value="cancelled"  ${p.projStatus==='cancelled'?'selected':''}>❌ ยกเลิก</option>
        </select>
       </td>
-      <td>
+      <td style="position:sticky;right:0;background:var(--card)">
        <div style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="btn btn-xs btn-outline" onclick="openEditProject('${p.id}')">✏️</button>
         <button class="btn btn-xs btn-outline" onclick="copyProject('${p.id}')" title="Clone">📋</button>
