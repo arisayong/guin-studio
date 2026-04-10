@@ -145,7 +145,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .btn-xs{padding:4px 9px;font-size:11px}
 
 /* TABLE */
-.table-wrap{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.table-wrap{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow-x:auto;overflow-y:visible;margin-bottom:14px}
 .table-header{padding:15px 20px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between}
 .table-title{font-size:14px;font-weight:700}
 table{width:100%;border-collapse:collapse}
@@ -2061,6 +2061,7 @@ function getActivePhasesForProj(p){
 // PROJECTS LIST
 // ══════════════════════════════════════════════
 function renderProjects(){
+  try {
   const projs=getProjects();
   // Build year filter
   const yearSet=new Set();
@@ -2083,53 +2084,75 @@ function renderProjects(){
   const tf=document.getElementById('type-filter');
   if(tf)tf.innerHTML=['all',...types].map(t=>`<div class="filter-chip${selectedType===t?' active':''}" onclick="selectedType='${t}';renderProjects()">${t==='all'?'ทุกประเภท':t}</div>`).join('');
   renderProjList();
+
+  } catch(e){ console.error('renderProjects error:', e); }
 }
 function renderProjList(){
-  const q=(document.getElementById('proj-search')||{}).value?.toLowerCase()||'';
-  let projs=getProjects().filter(p=>{
-    if(selectedYear!=='all'){
-      const years=new Set([
-        p.date?new Date(p.date).getFullYear():null,
-        p.deadline?new Date(p.deadline).getFullYear():null,
-        p.startDate?new Date(p.startDate).getFullYear():null,
-      ].filter(Boolean));
-      if(!years.has(selectedYear))return false;
-    }
-    if(selectedType!=='all'&&p.type!==selectedType)return false;
-    if(q&&!p.name.toLowerCase().includes(q)&&!(p.client||'').toLowerCase().includes(q))return false;
-    return true;
-  });
-  const today=new Date();today.setHours(0,0,0,0);
-  document.getElementById('projects-table').innerHTML=projs.map(p=>{
-    const exp=getProjExpense(p);const profit=(p.budget||0)-exp;const st=getProjStatus(p);
-    const dl=p.deadline?new Date(p.deadline):null;let dlHtml='—';
-    if(dl){dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));const color=diff<0?'var(--red)':diff<=3?'var(--orange)':'var(--text2)';dlHtml='<span style="color:'+color+'">'+fmtDate(p.deadline)+'</span>';}
-    const statusSel='<select style="padding:3px 6px;font-size:11px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:Kanit;cursor:pointer;max-width:100px" onchange="saveProjStatus(\''+p.id+'\',this.value)" onclick="event.stopPropagation()">'
-      +'<option value="notstarted" '+((!p.projStatus||p.projStatus==='notstarted')?'selected':'')+'>⬜ ยังไม่เริ่ม</option>'
-      +'<option value="inprogress" '+(p.projStatus==='inprogress'?'selected':'')+'>⚙️ กำลังทำ</option>'
-      +'<option value="done" '+(p.projStatus==='done'?'selected':'')+'>✅ เสร็จแล้ว</option>'
-      +'<option value="cancelled" '+(p.projStatus==='cancelled'?'selected':'')+'>❌ ยกเลิก</option>'
-      +'</select>';
-    const actionBtns='<div style="display:flex;gap:3px">'
-      +'<button class="btn btn-xs btn-outline" onclick="openEditProject(\''+p.id+'\')" title="แก้ไข">✏️</button>'
-      +'<button class="btn btn-xs btn-outline" onclick="copyProject(\''+p.id+'\')" title="คัดลอก">📋</button>'
-      +'<button class="btn btn-xs btn-red" onclick="deleteProjConfirm(\''+p.id+'\')" title="ลบ">🗑️</button>'
-      +'</div>';
-    return '<tr style="font-size:12px">'
-      +'<td style="cursor:pointer;max-width:140px;padding:8px 6px" onclick="openProjDetail(\''+p.id+'\')">'
-      +'<div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</div>'
-      +(p.note?'<div style="font-size:10px;color:var(--text2)">📝 '+p.note+'</div>':'')
-      +'</td>'
-      +'<td style="padding:8px 6px;color:var(--text2);white-space:nowrap">'+( p.client||'—')+'</td>'
-      +'<td style="padding:8px 6px"><span style="font-size:10px;background:var(--bg2);padding:2px 6px;border-radius:6px;color:var(--text2);white-space:nowrap">'+(p.type||'—')+'</span></td>'
-      +'<td style="padding:8px 6px;white-space:nowrap">'+dlHtml+'</td>'
-      +'<td style="padding:8px 6px;font-weight:700;color:var(--accent2);white-space:nowrap">'+(p.budget?fmtB(p.budget):'—')+'</td>'
-      +'<td style="padding:8px 6px;color:var(--red);white-space:nowrap">'+fmtB(exp)+'</td>'
-      +'<td style="padding:8px 6px;font-weight:700;white-space:nowrap;color:'+(profit>=0?'var(--green)':'var(--red)')+'">'+fmtB(profit)+'</td>'
-      +'<td style="padding:8px 6px">'+statusSel+'</td>'
-      +'<td style="padding:8px 6px">'+actionBtns+'</td>'
-      +'</tr>';
-  }).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:32px">ไม่พบโปรเจกต์</td></tr>';
+  try {
+    const q=(document.getElementById('proj-search')||{}).value?.toLowerCase()||'';
+    let projs=getProjects().filter(p=>{
+      if(selectedYear!=='all'){
+        const yr = Number(selectedYear);
+        const years=new Set([
+          p.date?new Date(p.date).getFullYear():null,
+          p.deadline?new Date(p.deadline).getFullYear():null,
+          p.startDate?new Date(p.startDate).getFullYear():null,
+        ].filter(Boolean));
+        if(!years.has(yr))return false;
+      }
+      if(selectedType!=='all'&&p.type!==selectedType)return false;
+      if(q&&!(p.name||'').toLowerCase().includes(q)&&!(p.client||'').toLowerCase().includes(q))return false;
+      return true;
+    });
+    const today=new Date();today.setHours(0,0,0,0);
+    const tbody=document.getElementById('projects-table');
+    if(!tbody)return;
+    tbody.innerHTML=projs.map(p=>{
+      try {
+        const exp=getProjExpense(p);
+        const profit=(p.budget||0)-exp;
+        // Safe deadline - convert Thai date if needed
+        let deadlineISO = p.deadline||'';
+        if(deadlineISO && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(deadlineISO)){
+          deadlineISO = thaiToIso(deadlineISO)||deadlineISO;
+        }
+        const dl=deadlineISO?new Date(deadlineISO):null;
+        let dlHtml='—';
+        if(dl&&!isNaN(dl)){
+          dl.setHours(0,0,0,0);
+          const diff=Math.ceil((dl-today)/(864e5));
+          const color=diff<0?'var(--red)':diff<=3?'var(--orange)':'var(--text2)';
+          dlHtml='<span style="color:'+color+'">'+fmtDate(p.deadline)+'</span>';
+        }
+        const statusSel='<select style="padding:3px 6px;font-size:11px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:Kanit;cursor:pointer;max-width:110px" onchange="saveProjStatus(\''+p.id+'\',this.value)" onclick="event.stopPropagation()">'
+          +'<option value="notstarted" '+((!p.projStatus||p.projStatus==='notstarted')?'selected':'')+'>⬜ ยังไม่เริ่ม</option>'
+          +'<option value="inprogress" '+(p.projStatus==='inprogress'?'selected':'')+'>⚙️ กำลังทำ</option>'
+          +'<option value="done" '+(p.projStatus==='done'?'selected':'')+'>✅ เสร็จแล้ว</option>'
+          +'<option value="cancelled" '+(p.projStatus==='cancelled'?'selected':'')+'>❌ ยกเลิก</option>'
+          +'</select>';
+        const pid = String(p.id);
+        const actionBtns='<div style="display:flex;gap:3px;white-space:nowrap">'
+          +'<button class="btn btn-xs btn-outline" onclick="openEditProject(\''+pid+'\')" title="แก้ไข">✏️</button>'
+          +'<button class="btn btn-xs btn-outline" onclick="copyProject(\''+pid+'\')" title="คัดลอก">📋</button>'
+          +'<button class="btn btn-xs btn-red" onclick="deleteProjConfirm(\''+pid+'\')" title="ลบ">🗑️</button>'
+          +'</div>';
+        return '<tr style="font-size:12px">'
+          +'<td style="cursor:pointer;max-width:160px;padding:8px 6px" onclick="openProjDetail(\''+pid+'\')">'
+          +'<div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(p.name||'—')+'</div>'
+          +(p.note?'<div style="font-size:10px;color:var(--text2)">📝 '+p.note+'</div>':'')
+          +'</td>'
+          +'<td style="padding:8px 6px;color:var(--text2)">'+(p.client||'—')+'</td>'
+          +'<td style="padding:8px 6px"><span style="font-size:10px;background:var(--bg2);padding:2px 6px;border-radius:6px;color:var(--text2)">'+(p.type||'—')+'</span></td>'
+          +'<td style="padding:8px 6px;white-space:nowrap">'+dlHtml+'</td>'
+          +'<td style="padding:8px 6px;font-weight:700;color:var(--accent2)">'+(p.budget?fmtB(p.budget):'—')+'</td>'
+          +'<td style="padding:8px 6px;color:var(--red)">'+fmtB(exp)+'</td>'
+          +'<td style="padding:8px 6px;font-weight:700;color:'+(profit>=0?'var(--green)':'var(--red)')+'">'+fmtB(profit)+'</td>'
+          +'<td style="padding:8px 6px">'+statusSel+'</td>'
+          +'<td style="padding:8px 6px">'+actionBtns+'</td>'
+          +'</tr>';
+      } catch(rowErr) { console.warn('Row error:', rowErr); return ''; }
+    }).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:32px">ไม่พบโปรเจกต์</td></tr>';
+  } catch(e) { console.error('renderProjList error:', e); }
 }
 
 // ══════════════════════════════════════════════
