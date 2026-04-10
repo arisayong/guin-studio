@@ -3703,21 +3703,29 @@ function issueAndSendVouchers() {
   const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
   const note = document.getElementById('vc-note')?.value.trim()||'';
   let sent=0, noEmail=0;
-  selected.forEach(({workerId,slot,w,s,p}) => {
+  let allHtml = '';
+  selected.forEach(function({workerId,slot,w,s,p}) {
     const vNo = nextVoucherNo();
     const html = buildVoucherHTML(p.id, workerId, slot, vNo, date, note);
+    allHtml += html;
     const saved = getDocsStore('vouchers')||[];
     saved.push({ type:'voucher', docNo:vNo, staffId:workerId, projId:p.id, projName:p.name, staffName:s.name, amount:w.amount||0, date, createdAt:new Date().toISOString() });
     saveDocsStore('vouchers', saved);
-    if (s.email) {
-      const subject = encodeURIComponent(`ใบสำคัญจ่าย ${vNo} — Guin Home Studio`);
-      const body = encodeURIComponent(`เรียน คุณ${s.name}\n\nแนบใบสำคัญจ่าย ${vNo} มาพร้อม Email นี้\nยอด: ${w.amount?fmtB(w.amount):'TBD'}\n\nกรุณาเซ็นและส่งกลับครับ\nGuin Home Studio`);
-      setTimeout(()=>window.open(`https://mail.google.com/mail/?view=cm&to=${s.email}&su=${subject}&body=${body}`,'_blank'), sent*400);
-      sent++;
-    } else { noEmail++; }
+    if (s.email) sent++; else noEmail++;
   });
-  if (sent) toast(`📧 เปิด Email ${sent} ฉบับแล้ว`, 'success');
-  if (noEmail) toast(`⚠️ ${noEmail} คนไม่มี email ในระบบ`, 'warn');
+  // ดาวน์โหลดใบก่อน
+  downloadDocHTML('<div>'+allHtml+'</div>', 'vouchers_'+new Date().toISOString().slice(0,10));
+  // เปิด Gmail หลัง 1 วินาที
+  if (sent > 0) {
+    const emails = selected.filter(function(x){return x.s.email;}).map(function(x){return x.s.email;}).join(',');
+    const subject = encodeURIComponent('ใบสำคัญจ่าย — Guin Home Studio');
+    const bodyTxt = 'เรียน ทีมงานทุกท่าน\n\nแนบใบสำคัญจ่ายเงินมาด้วย\nกรุณาตรวจสอบยอดเงินในไฟล์ที่แนบ\n\nขอบคุณครับ\nGuin Home Studio';
+    setTimeout(function() {
+      window.open('https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(emails)+'&su='+subject+'&body='+encodeURIComponent(bodyTxt), '_blank');
+      toast('📎 ไฟล์ถูกดาวน์โหลดแล้ว — กรุณาแนบไฟล์ใน Gmail ที่เปิดขึ้น', 'info');
+    }, 1000);
+  }
+  if (noEmail) toast('⚠️ '+noEmail+' คนไม่มี email', 'warn');
   renderDocsHistory();
 }
 
