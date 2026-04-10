@@ -2231,8 +2231,10 @@ function renderProjList(){
         if(dl&&!isNaN(dl)){
           dl.setHours(0,0,0,0);
           const diff=Math.ceil((dl-today)/(864e5));
-          const color=diff<0?'var(--red)':diff<=3?'var(--orange)':'var(--text2)';
-          dlHtml='<span style="color:'+color+'">'+fmtDate(p.deadline)+'</span>';
+          const isDone=p.projStatus==='done'||p.projStatus==='cancelled';
+          const color=isDone?'var(--green)':diff<0?'var(--red)':diff<=3?'var(--orange)':'var(--text2)';
+          const prefix=isDone?'✅ ':diff<0?'⚠️ ':'';
+          dlHtml='<span style="color:'+color+'">'+prefix+fmtDate(p.deadline)+'</span>';
         }
         const statusSel='<select style="padding:3px 6px;font-size:11px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:Kanit;cursor:pointer;max-width:110px" onchange="saveProjStatus(\''+p.id+'\',this.value)" onclick="event.stopPropagation()">'
           +'<option value="notstarted" '+((!p.projStatus||p.projStatus==='notstarted')?'selected':'')+'>⬜ ยังไม่เริ่ม</option>'
@@ -2800,6 +2802,7 @@ function renderQueue() {
       if (queueCycleFilter === '2' && day <= 15) return;
     }
     const workers = (p.workers||[]).filter(w => {
+      // แสดงทุก worker แม้จะหา staff profile ไม่เจอ
       const s = getStaffById(w.id);
       return s && (queueFilter === 'all' || w.status === queueFilter);
     });
@@ -3809,6 +3812,7 @@ let projCalMonth = new Date().getMonth();
 let projCalYear  = new Date().getFullYear();
 let projCalFilter = 'all';
 let projCalSearchQ = ''; // 'all' | projId
+let projCalSort = 'newest'; // 'newest' | 'oldest'
 
 function renderProjCal() {
   const el = document.getElementById('proj-cal-content'); if (!el) return;
@@ -3846,6 +3850,9 @@ function renderProjCal() {
   // Filter to just this month's visible range (but deadline dot always shown)
   const monthStart = new Date(projCalYear, projCalMonth, 1);
   const monthEnd   = new Date(projCalYear, projCalMonth+1, 0); monthEnd.setHours(23,59,59);
+
+  // Sort allEvents ตาม projCalSort
+  allEvents.sort((a,b) => projCalSort==='oldest' ? a.end-b.end : b.end-a.end);
 
   // Events that overlap this month (bar shown in calendar)
   const visibleEvents = allEvents.filter(ev => ev.start <= monthEnd && ev.end >= monthStart);
@@ -4017,6 +4024,10 @@ function renderProjCal() {
       <option value="all" ${projCalFilter==='all'?'selected':''}>📋 ทุกโปรเจกต์ (${projs.length})</option>
       ${filterOpts}
     </select>
+    <select class="form-input form-select" style="padding:8px 32px 8px 12px;font-size:13px;width:140px" onchange="projCalSort=this.value;renderProjCal()">
+      <option value="newest" ${projCalSort==='newest'?'selected':''}>🔽 ใหม่สุด</option>
+      <option value="oldest" ${projCalSort==='oldest'?'selected':''}>🔼 เก่าสุด</option>
+    </select>
     <div class="search-bar" style="margin:0;flex:1;max-width:280px">
       <span class="icon">🔍</span>
       <input placeholder="พิมค้นหาโปรเจกต์..." id="projcal-search"
@@ -4083,7 +4094,13 @@ function renderBillingCycleSection() {
   // Header controls
   sec.innerHTML = `<div style="background:var(--card);border:1px solid rgba(21,101,255,.3);border-radius:var(--r);overflow:hidden">
     <div style="background:rgba(21,101,255,.08);padding:14px 18px;border-bottom:1px solid rgba(21,101,255,.15)">
-      <div style="font-size:14px;font-weight:800;color:var(--accent2);margin-bottom:12px">📄 ออกใบสำคัญจ่ายรายบุคคล — เลือกรอบการจ่าย</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:800;color:var(--accent2)">📄 ออกใบสำคัญจ่ายรายบุคคล — เลือกรอบการจ่าย</div>
+        <div class="search-bar" style="margin:0;width:220px">
+          <span class="icon">🔍</span>
+          <input id="billing-search" placeholder="เสิร์ชชื่อ / โปรเจกต์..." oninput="renderBillingStaffCards()" style="font-size:12px">
+        </div>
+      </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <select class="form-input form-select" style="padding:8px 32px 8px 12px;font-size:13px;width:150px"
           onchange="billingMonthSelected=parseInt(this.value);renderBillingCycleSection()">
@@ -4129,7 +4146,14 @@ function renderBillingStaffCards() {
     });
   });
 
-  const entries = Object.values(staffMap);
+  let entries = Object.values(staffMap);
+  // Filter ด้วย search
+  const bsq = (document.getElementById('billing-search')?.value||'').toLowerCase();
+  if(bsq) entries = entries.filter(({staff:s, items}) =>
+    (s.name||'').toLowerCase().includes(bsq) ||
+    (s.nickname||'').toLowerCase().includes(bsq) ||
+    items.some(({proj:p}) => (p.name||'').toLowerCase().includes(bsq))
+  );
   const periodStr = billingCycleSelected === 1
     ? `1–15 ${TM[billingMonthSelected]} ${billingYearSelected+543}`
     : `16–สิ้นเดือน ${TM[billingMonthSelected]} ${billingYearSelected+543}`;
