@@ -1233,6 +1233,15 @@ function mkDatePicker(id, isoVal, onchangeCode) {
     measurementId:     "G-D76E1TKYKM"
   };
 
+function fmtWarnDate(d){
+  if(!d)return'';
+  // already DD/MM/YYYY format
+  if(d.includes('/'))return d;
+  // ISO format YYYY-MM-DD → DD/MM/YYYY(BE)
+  const p=d.split('-');
+  if(p.length===3)return p[2]+'/'+p[1]+'/'+(parseInt(p[0])+543);
+  return d;
+}
 function isoToThai(iso){if(!iso)return'';const p=iso.split('-');if(p.length!==3||p[0].length!==4)return iso;return p[2]+'/'+p[1]+'/'+p[0];}
 function thaiToIso(thai){if(!thai)return'';const p=thai.replace(/-/g,'/').split('/');if(p.length===3&&p[2].length===4)return p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');return '';}
 function validateDateThai(el,onSave){let v=el.value.trim();if(!v){el.style.borderColor='var(--border2)';onSave('');return;}const iso=thaiToIso(v);if(iso){el.value=isoToThai(iso);el.style.borderColor='rgba(0,223,160,.4)';el.style.color='var(--text)';onSave(iso);}else{el.style.borderColor='rgba(255,64,64,.5)';el.style.color='var(--red)';toast('รูปแบบ วว/ดด/ปปปป เช่น 09/04/2026','warn');}}
@@ -1970,7 +1979,7 @@ function openMyWarnDetail() {
           <div style="width:18px;height:18px;border-radius:50%;background:rgba(255,40,40,.2);color:#FF4040;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
           <div style="font-size:13px;font-weight:700;color:#FF7070">${w.type}</div>
         </div>
-        ${w.projName?`<div style="font-size:11px;color:var(--text2)">โปรเจกต์: ${w.projName} · ${w.date||''}</div>`:`<div style="font-size:11px;color:var(--text2)">${w.date||''}</div>`}
+        ${w.projName?`<div style="font-size:11px;color:var(--text2)">โปรเจกต์: ${w.projName} · ${fmtWarnDate(w.date)}</div>`:`<div style="font-size:11px;color:var(--text2)">${fmtWarnDate(w.date)}</div>`}
         ${w.note?`<div style="font-size:12px;color:var(--text2);margin-top:5px;font-style:italic">${w.note}</div>`:''}
       </div>`).join('')}
     <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:6px">ใบเตือนแก้ไขหรือลบไม่ได้ — ติดต่อแอดมินหากมีข้อสงสัย</div>`;
@@ -3630,7 +3639,7 @@ function openEditStaff(id,cat){
       <div style="display:flex;align-items:center;gap:7px;padding:6px 10px;background:rgba(0,0,0,.3);border-radius:7px;margin-bottom:5px">
         <div style="width:18px;height:18px;border-radius:50%;background:rgba(255,40,40,.2);color:#FF4040;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
         <div style="flex:1;font-size:11px;color:#FF8080">${w.type}${w.projName?' · '+w.projName:''}</div>
-        <div style="font-size:10px;color:var(--text2)">${w.date||''}</div>
+        <div style="font-size:10px;color:var(--text2)">${fmtWarnDate(w.date)}</div>
         <button onclick="deleteWarning('${id}','${w.id}').then(()=>openEditStaff('${id}','${cat}'))" style="padding:2px 8px;background:none;border:1px solid rgba(255,255,255,.1);border-radius:5px;color:var(--text2);font-size:10px;cursor:pointer;font-family:Kanit" onmouseover="this.style.borderColor='rgba(255,64,64,.4)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='rgba(255,255,255,.1)';this.style.color='var(--text2)'">ลบ</button>
       </div>`).join('') : '<div style="font-size:11px;color:var(--text2);text-align:center;padding:8px">ยังไม่มีใบเตือน</div>';
   }
