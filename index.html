@@ -4317,7 +4317,8 @@ function sendBillingVoucherEmail(staffId) {
   div.innerHTML =
     '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:500px;max-width:98vw">'+
     '<div style="font-size:17px;font-weight:800;margin-bottom:4px">☁️ แบล็คอัพก่อนส่ง</div>'+
-    '<div style="font-size:12px;color:var(--text2);margin-bottom:18px">สำหรับ <strong>'+s.name+' ('+s.nickname+')</strong></div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">ถึง: <strong>'+s.name+' ('+s.email+')</strong></div>'+
+    '<div style="font-size:12px;background:rgba(0,223,160,.1);border:1px solid rgba(0,223,160,.25);border-radius:8px;padding:7px 12px;margin-bottom:14px;color:var(--green)">📤 จาก: <strong>penguinstudiovoice@gmail.com</strong></div>'+
 
     '<div style="margin-bottom:14px">'+
     '<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">💸 สลิปโอนเงิน</div>'+
@@ -4477,14 +4478,34 @@ async function doSendVoucherEmail(staffId, withSlip) {
     'ขอบคุณค่ะ\nGuin Home Studio'
   );
 
-  window.open(
-    'https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm'+
-    '&to='+encodeURIComponent(s.email)+
-    '&su='+subject+
-    '&body='+body,
-    '_blank'
-  );
-  toast('📧 เปิด Gmail แล้ว — กรุณาแนบ PDF ก่อนกดส่งครับ','info');
+  // แสดง popup แจ้ง From/To ก่อนเปิด Gmail
+  const infoDiv = document.createElement('div');
+  infoDiv.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
+  infoDiv.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;width:420px;max-width:98vw">'+
+    '<div style="font-size:16px;font-weight:800;margin-bottom:14px">📧 ยืนยันการส่งอีเมล</div>'+
+    '<div style="background:var(--bg2);border-radius:10px;padding:14px;font-size:13px;line-height:2.2;margin-bottom:16px">'+
+    '<div><span style="color:var(--text2);min-width:50px;display:inline-block">จาก:</span> <strong style="color:var(--green)">penguinstudiovoice@gmail.com</strong></div>'+
+    '<div><span style="color:var(--text2);min-width:50px;display:inline-block">ถึง:</span> <strong style="color:var(--accent2)">'+s.email+'</strong></div>'+
+    '<div><span style="color:var(--text2);min-width:50px;display:inline-block">ชื่อ:</span> '+s.name+'</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn btn-outline" style="flex:1" id="cancel-send">✕ ยกเลิก</button>'+
+    '<button class="btn btn-blue" style="flex:1" id="confirm-send">✅ เปิด Gmail</button>'+
+    '</div></div>';
+  document.body.appendChild(infoDiv);
+  document.getElementById('cancel-send').onclick = function(){ infoDiv.remove(); };
+  document.getElementById('confirm-send').onclick = function(){
+    infoDiv.remove();
+    window.open(
+      'https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm'+
+      '&to='+encodeURIComponent(s.email)+
+      '&su='+subject+
+      '&body='+body,
+      '_blank'
+    );
+    toast('📧 เปิด Gmail แล้ว — กรุณาแนบ PDF ก่อนกดส่งครับ','info');
+  };
 }
 
 async function confirmSendEmailJS() {
