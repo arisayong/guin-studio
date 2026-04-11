@@ -1544,7 +1544,13 @@ function toast(msg,type='info'){
   el.innerHTML=`<span>${ic[type]||'ℹ️'}</span><span>${msg}</span>`;wrap.appendChild(el);
   setTimeout(()=>{el.style.opacity='0';el.style.transform='translateX(20px)';setTimeout(()=>el.remove(),300)},3500);
 }
-document.querySelectorAll('.modal-overlay').forEach(ov=>ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.add('hidden')}));
+document.querySelectorAll('.modal-overlay').forEach(ov=>{
+  ov.addEventListener('click',e=>{
+    if(e.target===ov) ov.classList.add('hidden');
+  });
+  const modal = ov.querySelector('.modal');
+  if(modal) modal.addEventListener('click',e=>e.stopPropagation());
+});
 function statusBadge(s){return`<span class="badge badge-${s||'pending'}">${{pending:'⏳ รอจ่าย',approved:'🔵 อนุมัติ',paid:'✅ จ่ายแล้ว'}[s]||s}</span>`}
 function getProjExpense(p){return(p.workers||[]).reduce((a,w)=>a+(w.amount||0),0)}
 function getProjStatus(p){
