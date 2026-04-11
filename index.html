@@ -1868,7 +1868,7 @@ function updateQueueBadge(){
 function exportPaymentCSV(){
   const projs=getProjects();
   const rows=[['ชื่อ','นามสกุล','ตำแหน่ง','โปรเจกต์','ลูกค้า','ยอด','สถานะ','Deadline']];
-  projs.forEach(p=>(p.workers||[]).forEach(w=>{const s=getStaffById(w.id);if(!s)return;const[first,...rest]=s.name.split(' ');rows.push([first,rest.join(' ')||'-',CATS[s.category]?.label||'',p.name,p.client||'-',w.amount||0,w.status,p.deadline||''])}));
+  projs.forEach(p=>(p.workers||[]).forEach(w=>{const s=getStaffById(w.id);if(!s)return;const[first,...rest]=s.name.split(' ');rows.push([first,rest.join(' ')||'-',(()=>{const _p=(w.slot||'').split('-')[0];const _s=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';const _l={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return (_l[_p]||CATS[s.category]?.label||'')+_s;})()||'',p.name,p.client||'-',w.amount||0,w.status,p.deadline||''])}));
   const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;
@@ -3265,7 +3265,7 @@ function renderMyDash(){
   const projs=getProjects();let paid=0,pending=0;const rows=[];
   projs.forEach(p=>{const w=(p.workers||[]).find(x=>x.id===s.id);if(!w)return;
     if(w.status==='paid')paid+=w.amount||0;else pending+=w.amount||0;
-    rows.push(`<tr><td><strong>${p.name}</strong></td><td>${fmtDate(p.date)}</td><td>${CATS[s.category]?.label||''}</td><td style="color:var(--accent2);font-weight:700">${w.amount?fmtB(w.amount):'TBD'}</td><td>${statusBadge(w.status)}</td></tr>`);
+    rows.push(`<tr><td><strong>${p.name}</strong></td><td>${fmtDate(p.date)}</td><td>${(()=>{const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return (_lbl[_pre]||CATS[s.category]?.label||'')+_suf;})()}</td><td style="color:var(--accent2);font-weight:700">${w.amount?fmtB(w.amount):'TBD'}</td><td>${statusBadge(w.status)}</td></tr>`);
   });
   document.getElementById('my-paid').textContent=fmtB(paid);document.getElementById('my-pending').textContent=fmtB(pending);
   document.getElementById('my-proj-table').innerHTML=rows.join('')||'<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:20px">ยังไม่มีงาน</td></tr>';
@@ -3277,7 +3277,7 @@ function renderMyHistory(){
   projs.forEach(p=>{
     if(q&&!(p.name||'').toLowerCase().includes(q))return;
     const w=(p.workers||[]).find(x=>x.id===s.id);if(!w)return;
-    rows.push(`<tr><td><strong>${p.name}</strong></td><td>${fmtDate(p.date)}</td><td>${CATS[s.category]?.label||''}</td><td style="color:var(--accent2);font-weight:700">${w.amount?fmtB(w.amount):'TBD'}</td><td style="font-size:12px;color:var(--text2)">${s.bank} ${s.account}</td><td>${statusBadge(w.status)}</td></tr>`);
+    rows.push(`<tr><td><strong>${p.name}</strong></td><td>${fmtDate(p.date)}</td><td>${(()=>{const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return (_lbl[_pre]||CATS[s.category]?.label||'')+_suf;})()}</td><td style="color:var(--accent2);font-weight:700">${w.amount?fmtB(w.amount):'TBD'}</td><td style="font-size:12px;color:var(--text2)">${s.bank} ${s.account}</td><td>${statusBadge(w.status)}</td></tr>`);
   });
   document.getElementById('my-hist-table').innerHTML=rows.join('')||'<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:20px">ยังไม่มีประวัติ</td></tr>';
 }
@@ -4276,7 +4276,7 @@ function renderBillingStaffCards() {
         <div style="width:38px;height:38px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0">${s.nickname[0]}</div>
         <div style="flex:1">
           <div style="font-weight:700;font-size:14px">${s.name} <span style="color:var(--text2);font-size:12px">(${s.nickname})</span></div>
-          <div style="font-size:11px;color:${color};margin-top:1px">${CATS[s.category]?.label||''} · ${items.length} โปรเจกต์</div>
+          <div style="font-size:11px;color:${color};margin-top:1px">${slotRoleLabel} · ${items.length} โปรเจกต์</div>
           <div style="font-size:11px;color:var(--text2);margin-top:1px">🏦 ${s.bank} ${s.account}${s.promptpay?' · 📱 '+s.promptpay:''}</div>
         </div>
         <div style="text-align:right">
