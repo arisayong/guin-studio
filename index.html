@@ -3370,77 +3370,88 @@ function buildQuotationHTML(data) {
   const vatAmt = Math.round(subtotal * vat / 100);
   const total = subtotal + vatAmt;
   const thaiDate = d => d ? new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}) : '—';
+  const rows = items.map((x,i) => '<tr style="border-bottom:1px solid #f3f4f6;background:'+(i%2?'#fafafa':'#fff')+'">'+
+    '<td style="padding:12px 14px"><div style="font-weight:600;color:#111827">'+( x.desc||'—')+'</div>'+(x.detail?'<div style="font-size:11px;color:#9ca3af;margin-top:2px">'+x.detail+'</div>':'')+'</td>'+
+    '<td style="padding:12px 8px;text-align:center;color:#374151">'+(x.qty||1)+'</td>'+
+    '<td style="padding:12px 8px;text-align:center;color:#6b7280">'+(x.unit||'งาน')+'</td>'+
+    '<td style="padding:12px 8px;text-align:right;color:#374151">฿'+(x.price||0).toLocaleString()+'</td>'+
+    '<td style="padding:12px 14px;text-align:right;font-weight:600;color:#111827">฿'+((x.qty||1)*(x.price||0)).toLocaleString()+'</td>'+
+    '</tr>').join('');
   const adminSig = ls('admin_signature');
-  return `<div id="printable-quotation" data-vno="${docNo}" style="background:#fff;color:#111;font-family:'Kanit',sans-serif;max-width:640px;margin:0 auto;padding:36px;border-radius:12px">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1565FF;padding-bottom:16px;margin-bottom:20px">
-      <div>
-        <div style="font-size:22px;font-weight:800;color:#1565FF;letter-spacing:2px">🎙️ GUIN HOME STUDIO</div>
-        <div style="font-size:12px;color:#666;margin-top:4px">ระบบจัดการค่าตอบแทน · penguinstudiovoice@gmail.com</div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:18px;font-weight:800;color:#111">ใบเสนอราคา</div>
-        <div style="font-size:13px;color:#888;margin-top:3px">เลขที่: <strong style="color:#1565FF">${docNo}</strong></div>
-        <div style="font-size:12px;color:#888;margin-top:2px">วันที่: ${thaiDate(date)}</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;font-size:13px">
-      <div style="background:#f8faff;border-radius:8px;padding:14px">
-        <div style="font-size:10px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">เสนอให้</div>
-        <div style="font-weight:800;font-size:16px">${client||'—'}</div>
-        ${email ? `<div style="color:#666;margin-top:3px">✉ ${email}</div>` : ''}
-      </div>
-      ${p ? `<div style="background:#f8faff;border-radius:8px;padding:14px">
-        <div style="font-size:10px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">โปรเจกต์</div>
-        <div style="font-weight:700">${p.name}</div>
-        ${p.type ? `<div style="color:#666;font-size:12px">${p.type}</div>` : ''}
-      </div>` : '<div></div>'}
-    </div>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
-      <thead>
-        <tr style="background:#f0f4ff;border-bottom:2px solid #1565FF">
-          <th style="text-align:left;padding:10px 12px;font-size:12px">รายการ</th>
-          <th style="text-align:right;padding:10px 12px;font-size:12px;width:120px">ราคา/หน่วย</th>
-          <th style="text-align:center;padding:10px 8px;font-size:12px;width:60px">จำนวน</th>
-          <th style="text-align:center;padding:10px 8px;font-size:12px;width:70px">หน่วย</th>
-          <th style="text-align:right;padding:10px 12px;font-size:12px;width:110px">รวม</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${items.map((x,i) => `<tr style="border-bottom:1px solid #f0f0f0;background:${i%2?'#fafcff':'#fff'}">
-          <td style="padding:10px 12px">
-            <div style="font-size:13px;font-weight:600">${x.desc||'—'}</div>
-            ${x.detail?`<div style="font-size:11px;color:#888;margin-top:2px">${x.detail}</div>`:''}
-          </td>
-          <td style="padding:10px 12px;text-align:right;font-size:13px">฿${(x.price||0).toLocaleString()}</td>
-          <td style="padding:10px 8px;text-align:center;font-size:13px">${x.qty||1}</td>
-          <td style="padding:10px 8px;text-align:center;font-size:13px;color:#666">${x.unit||'งาน'}</td>
-          <td style="padding:10px 12px;text-align:right;font-size:13px;font-weight:700">฿${((x.qty||1)*(x.price||0)).toLocaleString()}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>
-    <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
-      <div style="background:#f0f4ff;border-radius:10px;padding:16px 24px;min-width:240px">
-        <div style="display:flex;justify-content:space-between;gap:40px;font-size:13px;margin-bottom:6px;color:#666">
-          <span>ราคารวม</span><span>฿${subtotal.toLocaleString()}</span>
+  return `<div id="printable-quotation" data-vno="${docNo}" style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:620px;margin:0 auto;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb">
+    <div style="background:#0d0d2b;padding:26px 30px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:56px;object-fit:contain;display:block">
+          <div style="color:#8b8fa8;font-size:11px;margin-top:7px">penguinstudiovoice@gmail.com</div>
         </div>
-        ${vat>0?`<div style="display:flex;justify-content:space-between;gap:40px;font-size:13px;margin-bottom:8px;color:#666">
-          <span>VAT ${vat}%</span><span>฿${vatAmt.toLocaleString()}</span>
-        </div>`:''}
-        <div style="display:flex;justify-content:space-between;gap:40px;font-size:18px;font-weight:800;color:#1565FF;border-top:2px dashed #c8d8f5;padding-top:8px">
-          <span>รวมทั้งสิ้น</span><span>฿${total.toLocaleString()}</span>
+        <div style="text-align:right">
+          <div style="color:#fff;font-size:20px;font-weight:700;letter-spacing:1px">ใบเสนอราคา</div>
+          <div style="color:#8b8fa8;font-size:10px;margin-top:2px;letter-spacing:0.5px">QUOTATION</div>
+          <div style="margin-top:10px;background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 12px">
+            <div style="color:#8b8fa8;font-size:10px;letter-spacing:1px">เลขที่</div>
+            <div style="color:#fff;font-size:15px;font-weight:600">${docNo}</div>
+            <div style="color:#8b8fa8;font-size:11px;margin-top:3px">${thaiDate(date)}</div>
+          </div>
         </div>
       </div>
     </div>
-    ${note ? `<div style="background:#fffbf0;border-left:4px solid #1565FF;border-radius:4px;padding:12px 16px;font-size:12px;color:#444;margin-bottom:20px"><strong>หมายเหตุ:</strong> ${note}</div>` : ''}
-    <div style="margin-top:24px;display:flex;justify-content:flex-end;padding-top:20px;border-top:1px solid #eee">
-      <div style="text-align:center;min-width:220px">
-        <div style="font-size:11px;color:#888;margin-bottom:8px">ผู้เสนอราคา / Guin Home Studio</div>
-        ${adminSig ? `<img src="${adminSig}" style="height:60px;object-fit:contain;display:block;margin:0 auto 6px">` : '<div style="height:60px"></div>'}
-        <div style="border-bottom:1px solid #ccc;width:200px;margin:0 auto"></div>
-        <div style="font-size:11px;color:#aaa;margin-top:6px">วันที่ ${thaiDate(date)}</div>
+    <div style="height:5px;background:linear-gradient(90deg,#1565FF,#00B4FF,#00DFA0)"></div>
+    <div style="padding:22px 30px 0">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+        <div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">เสนอให้</div>
+          <div style="font-size:16px;font-weight:700;color:#111827">${client||'—'}</div>
+          ${email?'<div style="font-size:12px;color:#6b7280;margin-top:3px">'+email+'</div>':''}
+        </div>
+        ${p?'<div><div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">โปรเจกต์</div><div style="font-size:14px;font-weight:600;color:#111827">'+p.name+'</div>'+(p.type?'<div style="font-size:12px;color:#6b7280;margin-top:3px">'+p.type+'</div>':'')+'</div>':'<div></div>'}
       </div>
     </div>
-  </div>`;
+    <div style="height:1px;background:#f3f4f6;margin:18px 30px"></div>
+    <div style="padding:0 30px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:#0d0d2b">
+            <th style="text-align:left;padding:10px 14px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase">รายการ</th>
+            <th style="text-align:center;padding:10px 8px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">จำนวน</th>
+            <th style="text-align:center;padding:10px 8px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">หน่วย</th>
+            <th style="text-align:right;padding:10px 8px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:95px">ราคา/หน่วย</th>
+            <th style="text-align:right;padding:10px 14px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:105px">รวม</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:flex-end;padding:18px 30px">
+      <div style="min-width:240px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6">
+          <span style="font-size:13px;color:#6b7280">ราคารวม</span>
+          <span style="font-size:13px;color:#374151">฿${subtotal.toLocaleString()}</span>
+        </div>
+        ${vat>0?'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6"><span style="font-size:13px;color:#6b7280">VAT '+vat+'%</span><span style="font-size:13px;color:#374151">฿'+vatAmt.toLocaleString()+'</span></div>':''}
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:3px solid #0d0d2b">
+          <span style="font-size:14px;font-weight:700;color:#111827">ยอดรวมทั้งสิ้น</span>
+          <span style="font-size:20px;font-weight:700;color:#1565FF">฿${total.toLocaleString()}</span>
+        </div>
+      </div>
+    </div>
+    <div style="padding:0 30px 26px">
+      <div style="width:220px;margin-left:auto;text-align:center">
+        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png'}" style="height:44px;object-fit:contain;opacity:0.6;display:block;margin:0 auto 6px">
+        <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
+        <div style="font-size:12px;font-weight:600;color:#374151">ผู้เสนอราคา / Guin Home Studio</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(date)}</div>
+      </div>
+    </div>
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:9px 30px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:10px;color:#9ca3af">GUIN HOME STUDIO · Payment System</div>
+      <div style="display:flex;gap:5px">
+        <div style="width:6px;height:6px;border-radius:50%;background:#1565FF"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#00B4FF"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#00DFA0"></div>
+      </div>
+    </div>
+  </div>`; 
 }
 
 
@@ -3597,54 +3608,89 @@ function buildVoucherHTML(projId, workerId, slot, vNo, issueDate, note) {
   const w = (p.workers||[]).find(x=>x.id===workerId&&x.slot===slot); if(!w) return '';
   const s = getStaffById(workerId); if(!s) return '';
   const thaiDate = d => d ? new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}) : '—';
-  return `<div style="background:#fff;color:#111;font-family:'Kanit',sans-serif;max-width:520px;margin:0 auto 32px;padding:32px;border-radius:12px;border:1px solid #e0e8f8;page-break-after:always">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1565FF;padding-bottom:14px;margin-bottom:18px">
+  const catLabel = CATS[s.category]?.label||s.category||'';
+  const slotLabel = slot.includes('main')?'หลัก':slot.includes('-sub')?'รอง':'';
+  return `<div style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:620px;margin:0 auto 32px;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb;page-break-after:always">
+    <div style="background:#0d0d2b;padding:26px 30px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:56px;object-fit:contain;display:block">
+          <div style="color:#8b8fa8;font-size:11px;margin-top:7px">penguinstudiovoice@gmail.com</div>
+        </div>
+        <div style="text-align:right">
+          <div style="color:#fff;font-size:20px;font-weight:700;letter-spacing:1px">ใบสำคัญจ่าย</div>
+          <div style="color:#8b8fa8;font-size:10px;margin-top:2px;letter-spacing:0.5px">PAYMENT VOUCHER</div>
+          <div style="margin-top:10px;background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 12px">
+            <div style="color:#8b8fa8;font-size:10px;letter-spacing:1px">เลขที่</div>
+            <div style="color:#fff;font-size:15px;font-weight:600">${vNo}</div>
+            <div style="color:#8b8fa8;font-size:11px;margin-top:3px">${thaiDate(issueDate)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="height:5px;background:linear-gradient(90deg,#1565FF,#00B4FF,#00DFA0)"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;padding:22px 30px 0;gap:18px">
       <div>
-        <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:48px;object-fit:contain;display:block">
-        <div style="font-size:11px;color:#666;margin-top:4px">ใบสำคัญจ่าย / Payment Voucher</div>
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">จ่ายให้</div>
+        <div style="font-size:16px;font-weight:700;color:#111827">${s.name}</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px">${s.nickname||''}</div>
+        <div style="display:inline-block;margin-top:6px;background:#E3F2FF;color:#1565FF;font-size:10px;font-weight:600;padding:2px 10px;border-radius:20px">${catLabel}${slotLabel?' · '+slotLabel:''}</div>
       </div>
-      <div style="text-align:right">
-        <div style="font-size:12px;color:#888">เลขที่: <strong style="color:#1565FF">${vNo}</strong></div>
-        <div style="font-size:12px;color:#888;margin-top:2px">วันที่: ${thaiDate(issueDate)}</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;font-size:13px">
-      <div style="background:#f8faff;border-radius:8px;padding:12px">
-        <div style="font-size:10px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">ผู้รับเงิน</div>
-        <div style="font-weight:800;font-size:15px">${s.name}</div>
-        <div style="color:#666;margin-top:2px">${CATS[s.category]?.label||''}</div>
-      </div>
-      <div style="background:#f8faff;border-radius:8px;padding:12px">
-        <div style="font-size:10px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">ช่องทางรับเงิน</div>
-        <div style="font-weight:700">${s.bank}</div>
-        <div style="color:#666;font-size:12px">${s.account}</div>
-        ${s.promptpay?`<div style="color:#666;font-size:12px">📱 PromptPay: ${s.promptpay}</div>`:''}
+      <div>
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ช่องทางรับเงิน</div>
+        <div style="font-size:14px;font-weight:700;color:#111827">${s.bank}</div>
+        <div style="font-size:13px;color:#374151;margin-top:2px">${s.account}</div>
+        ${s.promptpay?'<div style="font-size:12px;color:#6b7280;margin-top:2px">PromptPay: '+s.promptpay+'</div>':''}
       </div>
     </div>
-    <div style="background:#f8faff;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px">
-      <div style="font-size:10px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">โปรเจกต์</div>
-      <div style="font-weight:700">${p.name}</div>
-      ${p.client?`<div style="color:#666;font-size:12px">ลูกค้า: ${p.client}</div>`:''}
+    <div style="height:1px;background:#f3f4f6;margin:18px 30px"></div>
+    <div style="padding:0 30px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:#0d0d2b">
+            <th style="text-align:left;padding:10px 14px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase">รายการ</th>
+            <th style="text-align:center;padding:10px 8px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:80px">หน่วย</th>
+            <th style="text-align:right;padding:10px 14px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:120px">จำนวน</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #f3f4f6">
+            <td style="padding:14px 14px">
+              <div style="font-weight:600;color:#111827">${p.name}</div>
+              ${p.client?'<div style="font-size:11px;color:#9ca3af;margin-top:2px">ลูกค้า: '+p.client+'</div>':''}
+              ${note?'<div style="font-size:11px;color:#9ca3af;margin-top:2px">'+note+'</div>':''}
+            </td>
+            <td style="padding:14px 8px;text-align:center;color:#6b7280">${w.unit||'เหมา'}</td>
+            <td style="padding:14px 14px;text-align:right;font-weight:700;color:#111827">${w.amount?'฿'+w.amount.toLocaleString()+'.00':'TBD'}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-    ${note?`<div style="background:#fffbf0;border-left:4px solid #1565FF;padding:10px 14px;border-radius:4px;font-size:12px;color:#555;margin-bottom:16px"><strong>หมายเหตุ:</strong> ${note}</div>`:''}
-    <div style="display:flex;justify-content:space-between;font-size:22px;font-weight:800;color:#1565FF;border:2px dashed #c8d8f5;border-radius:10px;padding:14px 18px;margin-bottom:20px">
-      <span>ยอดชำระ</span>
-      <span>${w.amount?fmtB(w.amount):'TBD'}</span>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px">
-      <div style="text-align:center">
-        <div style="height:64px;border-bottom:1px solid #ccc;margin-bottom:8px"></div>
-        <div style="font-size:11px;color:#888">ลายเซ็นผู้รับเงิน</div>
-        <div style="font-size:12px;font-weight:700;color:#333;margin-top:3px">${s.name}</div>
-        <div style="font-size:11px;color:#aaa">วันที่ ……………………</div>
+    <div style="display:flex;justify-content:flex-end;padding:18px 30px">
+      <div style="min-width:220px">
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid #e5e7eb;border-bottom:3px solid #0d0d2b">
+          <span style="font-size:14px;font-weight:700;color:#111827">ยอดรวมทั้งสิ้น</span>
+          <span style="font-size:20px;font-weight:700;color:#1565FF">${w.amount?'฿'+w.amount.toLocaleString()+'.00':'TBD'}</span>
+        </div>
       </div>
-      <div style="text-align:center">
-        <div style="height:64px;border-bottom:1px solid #ccc;margin-bottom:8px"></div>
-        <div style="font-size:11px;color:#888">ผู้จ่ายเงิน / Guin Home Studio</div>
-        <div style="font-size:11px;color:#aaa;margin-top:3px">วันที่ ${thaiDate(issueDate)}</div>
+    </div>
+    <div style="padding:0 30px 26px">
+      <div style="width:220px;margin-left:auto;text-align:center">
+        <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:40px;object-fit:contain;opacity:0.55;display:block;margin:0 auto 6px">
+        <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
+        <div style="font-size:12px;font-weight:600;color:#374151">ผู้จ่ายเงิน / Guin Home Studio</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(issueDate)}</div>
       </div>
     </div>
-  </div>`;
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:9px 30px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:10px;color:#9ca3af">GUIN HOME STUDIO · Payment System</div>
+      <div style="display:flex;gap:5px">
+        <div style="width:6px;height:6px;border-radius:50%;background:#1565FF"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#8B5CF6"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#F472B6"></div>
+      </div>
+    </div>
+  </div>`; 
 }
 
 function getSelectedVcWorkers() {
@@ -4199,75 +4245,110 @@ function renderBillingStaffCards() {
 }
 
 function buildBillingVoucherHTML(staffId) {
-  const TM = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
-              'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  const TM = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
   const s = getStaffById(staffId); if (!s) return null;
   const items = [];
   getProjects().forEach(p => {
     if (!p.deadline) return;
     const dl = new Date(p.deadline);
-    if (dl.getFullYear() !== billingYearSelected) return;
-    if (billingMonthSelected !== -1 && dl.getMonth() !== billingMonthSelected) return;
-    if (billingCycleSelected === 1 && dl.getDate() > 15) return;
-    if (billingCycleSelected === 2 && dl.getDate() <= 15) return;
+    if (!billingMonthAll) {
+      if (dl.getFullYear() !== billingYearSelected) return;
+      if (dl.getMonth() !== billingMonthSelected) return;
+      if (billingCycleSelected === 1 && dl.getDate() > 15) return;
+      if (billingCycleSelected === 2 && dl.getDate() <= 15) return;
+    }
     const w = (p.workers||[]).find(x => x.id === staffId && x.status !== 'paid');
     if (w) items.push({ proj: p, worker: w });
   });
   if (!items.length) return null;
-
   const total = items.reduce((a,x) => a+(x.worker.amount||0), 0);
-  const periodStr = billingCycleSelected===1
-    ? `1–15 ${TM[billingMonthSelected]} ${billingYearSelected+543}`
-    : `16–สิ้นเดือน ${TM[billingMonthSelected]} ${billingYearSelected+543}`;
+  const periodStr = billingMonthAll ? 'ทุกเดือน'
+    : billingCycleSelected===0 ? 'ทั้งเดือน '+TM[billingMonthSelected]+' '+(billingYearSelected+543)
+    : billingCycleSelected===1 ? '1–15 '+TM[billingMonthSelected]+' '+(billingYearSelected+543)
+    : '16–สิ้นเดือน '+TM[billingMonthSelected]+' '+(billingYearSelected+543);
   const vNo = nextVoucherNo();
   const issueDate = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
+  const catLabel = CATS[s.category]?.label||s.category||'';
+  const rows = items.map((x,i) => '<tr style="border-bottom:1px solid #f3f4f6;background:'+(i%2?'#fafafa':'#fff')+'">'+
+    '<td style="padding:12px 14px"><div style="font-weight:600;color:#111827">'+x.proj.name+'</div>'+(x.proj.client?'<div style="font-size:11px;color:#9ca3af;margin-top:2px">'+x.proj.client+'</div>':'')+'</td>'+
+    '<td style="padding:12px 8px;text-align:center;color:#6b7280;font-size:12px">'+(x.worker.unit||'เหมา')+'</td>'+
+    '<td style="padding:12px 14px;text-align:right;font-weight:700;color:#111827">฿'+(x.worker.amount||0).toLocaleString()+'.00</td>'+
+    '</tr>').join('');
 
-  return `<div id="printable-receipt" data-vno="${vNo}" style="background:#fff;color:#111;font-family:'Kanit',sans-serif;max-width:580px;margin:0 auto;padding:36px;border-radius:12px">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1565FF;padding-bottom:14px;margin-bottom:18px">
+  return `<div id="printable-receipt" data-vno="${vNo}" style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:620px;margin:0 auto;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb">
+    <div style="background:#0d0d2b;padding:26px 30px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:56px;object-fit:contain;display:block">
+          <div style="color:#8b8fa8;font-size:11px;margin-top:7px">penguinstudiovoice@gmail.com</div>
+        </div>
+        <div style="text-align:right">
+          <div style="color:#fff;font-size:20px;font-weight:700;letter-spacing:1px">ใบสำคัญจ่าย</div>
+          <div style="color:#8b8fa8;font-size:10px;margin-top:2px;letter-spacing:0.5px">PAYMENT VOUCHER</div>
+          <div style="margin-top:10px;background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 12px">
+            <div style="color:#8b8fa8;font-size:10px;letter-spacing:1px">เลขที่</div>
+            <div style="color:#fff;font-size:15px;font-weight:600">${vNo}</div>
+            <div style="color:#8b8fa8;font-size:11px;margin-top:3px">${issueDate}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="height:5px;background:linear-gradient(90deg,#1565FF,#00B4FF,#00DFA0)"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;padding:22px 30px 0;gap:18px">
       <div>
-        <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:48px;object-fit:contain;display:block">
-        <div style="font-size:11px;color:#666;margin-top:4px">ใบสำคัญจ่ายเงิน / Payment Voucher</div>
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">จ่ายให้</div>
+        <div style="font-size:16px;font-weight:700;color:#111827">${s.name}</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px">${s.nickname||''}</div>
+        <div style="display:inline-block;margin-top:6px;background:#E3F2FF;color:#1565FF;font-size:10px;font-weight:600;padding:2px 10px;border-radius:20px">${catLabel}</div>
       </div>
-      <div style="text-align:right">
-        <div style="font-size:12px;color:#888">เลขที่: <strong style="color:#1565FF">${vNo}</strong></div>
-        <div style="font-size:12px;color:#888;margin-top:2px">รอบ: <strong>${periodStr}</strong></div>
-        <div style="font-size:12px;color:#888;margin-top:2px">วันที่: ${issueDate}</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;font-size:13px">
-      <div style="background:#f8faff;border-radius:8px;padding:12px">
-        <div style="font-size:10px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">ผู้รับเงิน</div>
-        <div style="font-weight:800;font-size:15px">${s.name}</div>
-        <div style="color:#666;margin-top:2px">${CATS[s.category]?.label||''}</div>
-      </div>
-      <div style="background:#f8faff;border-radius:8px;padding:12px">
-        <div style="font-size:10px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">ช่องทางรับเงิน</div>
-        <div style="font-weight:700">${s.bank}</div>
-        <div style="color:#666;font-size:12px">${s.account}</div>
-        ${s.promptpay?`<div style="color:#666;font-size:12px">📱 PromptPay: ${s.promptpay}</div>`:''}
+      <div>
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ช่องทางรับเงิน</div>
+        <div style="font-size:14px;font-weight:700;color:#111827">${s.bank}</div>
+        <div style="font-size:13px;color:#374151;margin-top:2px">${s.account}</div>
+        ${s.promptpay?'<div style="font-size:12px;color:#6b7280;margin-top:2px">PromptPay: '+s.promptpay+'</div>':''}
       </div>
     </div>
-    <div style="font-size:10px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">รายการงาน</div>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:14px">
-      <thead><tr style="background:#f0f4ff;border-bottom:2px solid #1565FF">
-        <th style="text-align:left;padding:8px 10px;font-size:11px">โปรเจกต์</th>
-
-        <th style="text-align:right;padding:8px 10px;font-size:11px">ยอด</th>
-      </tr></thead>
-      <tbody>
-        ${items.map((x,i)=>`<tr style="border-bottom:1px solid #f0f0f0;background:${i%2?'#fafcff':'#fff'}">
-          <td style="padding:8px 10px;font-size:13px;font-weight:600">${x.proj.name}</td>
-
-          <td style="padding:8px 10px;font-size:13px;text-align:right;font-weight:700">฿${(x.worker.amount||0).toLocaleString()}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>
-    <div style="display:flex;justify-content:space-between;font-size:20px;font-weight:800;border:2px dashed #c8d8f5;border-radius:10px;padding:14px 18px;color:#1565FF;margin-bottom:16px">
-      <span>ยอดรวมทั้งสิ้น</span>
-      <span>฿${total.toLocaleString()}</span>
+    <div style="background:#E3F2FF;border-radius:6px;margin:16px 30px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:11px;color:#1565FF;font-weight:600">รอบการจ่าย</div>
+      <div style="font-size:13px;color:#0a3d8f;font-weight:700">${periodStr}</div>
     </div>
-
-  </div>`;
+    <div style="padding:0 30px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:#0d0d2b">
+            <th style="text-align:left;padding:10px 14px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase">รายการโปรเจกต์</th>
+            <th style="text-align:center;padding:10px 8px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:80px">หน่วย</th>
+            <th style="text-align:right;padding:10px 14px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:120px">จำนวน</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:flex-end;padding:18px 30px">
+      <div style="min-width:220px">
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid #e5e7eb;border-bottom:3px solid #0d0d2b">
+          <span style="font-size:14px;font-weight:700;color:#111827">ยอดรวมทั้งสิ้น</span>
+          <span style="font-size:20px;font-weight:700;color:#1565FF">฿${total.toLocaleString()}.00</span>
+        </div>
+      </div>
+    </div>
+    <div style="padding:0 30px 26px">
+      <div style="width:240px;margin-left:auto">
+        <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:40px;object-fit:contain;opacity:0.55;display:block;margin:0 auto 6px">
+        <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
+        <div style="font-size:12px;font-weight:600;color:#374151">ผู้จ่ายเงิน / Guin Home Studio</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:3px">${issueDate}</div>
+      </div>
+    </div>
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:9px 30px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:10px;color:#9ca3af">GUIN HOME STUDIO · Payment System</div>
+      <div style="display:flex;gap:5px">
+        <div style="width:6px;height:6px;border-radius:50%;background:#6D28D9"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#8B5CF6"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#F472B6"></div>
+      </div>
+    </div>
+  </div>`; 
 }
 
 function previewBillingVoucher(staffId) {
