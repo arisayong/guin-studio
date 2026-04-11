@@ -1978,7 +1978,7 @@ function renderTrkCalendar() {
       const [sy, sm, sd] = pd.startDate.split('-').map(Number);
       const [ey, em, ed] = pd.deadline.split('-').map(Number);
       events.push({
-        label: ph.label + (projLabel ? ' · ' + projLabel : '') + (pd.submitTime ? ' 🕐'+pd.submitTime : ''),
+        label: ph.label + (projLabel ? ' · ' + projLabel : '') + (pd.submitTime ? ' '+toThaiTime(pd.submitTime) : ''),
         color: ph.color,
         start: new Date(sy, sm - 1, sd),
         end:   new Date(ey, em - 1, ed),
@@ -2105,9 +2105,9 @@ function renderTrkCardHTML(card){
       const thaiT = toThaiTime(pd.submitTime);
       submitDiffLabel = '<span style="font-size:10px;color:var(--text2)">' + thaiT + '</span>';
     }
-    if (false) { // placeholder
-    } else if (pd.submitTime) {
-      submitDiffLabel = '<span style="font-size:10px;color:var(--green)">🕐 '+pd.submitTime+'</span>';
+    if (false) { // placeholder (unused)
+    } else if (false) {
+      submitDiffLabel = '<span style="font-size:10px;color:var(--text2)">'+toThaiTime(pd.submitTime)+'</span>';
     }
     tbody += '<tr style="border-top:1px solid rgba(255,255,255,.04);background:'+rowBg+'">'
       + '<td style="padding:5px 8px;white-space:nowrap"><span style="font-size:12px;font-weight:700;color:'+ph.color+'">'+ph.label+'</span></td>'
@@ -3949,7 +3949,7 @@ function renderProjCal() {
   const legendItems = allEvents.map(ev => {
     const stIcon = getProjStatus(ev.p)==='paid'?'✅':getProjStatus(ev.p)==='approved'?'🔵':'⏳';
     const isDoneLeg = getProjStatus(ev.p)==='paid';
-    const dLabel = isDoneLeg?'เสร็จแล้ว':ev.daysLeft<0?`เกิน${Math.abs(ev.daysLeft)}วัน`:ev.daysLeft===0?'วันนี้!':ev.daysLeft+'วัน';
+    const dLabel = isDoneLeg?'<span style="color:var(--green)">✅ เสร็จแล้ว</span>':ev.daysLeft<0?`เกิน${Math.abs(ev.daysLeft)}วัน`:ev.daysLeft===0?'วันนี้!':ev.daysLeft+'วัน';
     const bg = isDoneLeg?'rgba(0,223,160,.08)':ev.isOverdue?'rgba(255,64,64,.12)':ev.isUrgent?'rgba(255,119,0,.12)':'rgba(255,255,255,.05)';
     const border = isDoneLeg?'rgba(0,223,160,.25)':ev.isOverdue?'rgba(255,64,64,.35)':ev.isUrgent?'rgba(255,119,0,.35)':'var(--border2)';
     return `<div style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;background:${bg};border:1px solid ${border};cursor:pointer;flex-shrink:0"
