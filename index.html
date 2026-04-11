@@ -1594,7 +1594,10 @@ async function preloadRegStaff(){
       if(anonUser){ try{ await _fbAuth.signOut(); }catch(e){} }
     }
   } catch(e){ console.warn('preloadRegStaff error:', e.message); }
-  _regStaffCache = getAllStaff();
+  // Deduplicate by id (staff ที่มีหลายตำแหน่งจะขึ้นแค่ชื่อเดียว)
+  const _allStaff = getAllStaff();
+  const _seen = {};
+  _regStaffCache = _allStaff.filter(s => { if(!s.id||_seen[s.id]) return false; _seen[s.id]=1; return true; });
   if(inp){
     const n = _regStaffCache.length;
     inp.placeholder = n > 0 ? `🔍 พิมพ์ชื่อเพื่อค้นหา... (${n} คน)` : '🔍 พิมพ์ชื่อเพื่อค้นหา...';
