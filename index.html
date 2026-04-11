@@ -861,12 +861,12 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div style="margin-bottom:14px">
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px;letter-spacing:1px;text-transform:uppercase">👥 ทีมงาน — เลือกหมวดที่มีในโปรเจกต์นี้</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px" id="cat-toggles">
-     <button type="button" class="cat-toggle-btn" id="toggle-dub" style="border-color:rgba(255,158,0,.4);color:var(--orange);background:none;font-family:Kanit;font-weight:700;cursor:pointer" onclick="toggleCat('dub')">🎤 Dubbing</button>
-     <button type="button" class="cat-toggle-btn" id="toggle-adp" style="border-color:rgba(0,180,255,.4);color:var(--cyan);background:none;font-family:Kanit;font-weight:700;cursor:pointer" onclick="toggleCat('adp')">✍️ Adaptation</button>
-     <button type="button" class="cat-toggle-btn" id="toggle-mix" style="border-color:rgba(0,223,160,.4);color:var(--green);background:none;font-family:Kanit;font-weight:700;cursor:pointer" onclick="toggleCat('mix')">🎧 Mix</button>
-     <button type="button" class="cat-toggle-btn" id="toggle-qc" style="border-color:rgba(155,111,255,.4);color:var(--purple);background:none;font-family:Kanit;font-weight:700;cursor:pointer" onclick="toggleCat('qc')">✅ QC</button>
-     <button type="button" class="cat-toggle-btn" id="toggle-sub" style="border-color:rgba(255,64,64,.4);color:var(--red);background:none;font-family:Kanit;font-weight:700;cursor:pointer" onclick="toggleCat('sub')">🎬 Sub & Video</button>
-     <button type="button" class="cat-toggle-btn" id="toggle-mgr" style="border-color:rgba(21,101,255,.4);color:var(--accent2);background:none;font-family:Kanit;font-weight:700;cursor:pointer" onclick="toggleCat('mgr')">🗂️ Manager</button>
+     <div class="cat-toggle-btn" id="toggle-dub" onclick="toggleCat('dub')" style="border-color:rgba(255,158,0,.4);color:var(--orange)">🎤 Dubbing</div>
+     <div class="cat-toggle-btn" id="toggle-adp" onclick="toggleCat('adp')" style="border-color:rgba(0,180,255,.4);color:var(--cyan)">✍️ Adaptation</div>
+     <div class="cat-toggle-btn" id="toggle-mix" onclick="toggleCat('mix')" style="border-color:rgba(0,223,160,.4);color:var(--green)">🎧 Mix</div>
+     <div class="cat-toggle-btn" id="toggle-qc" onclick="toggleCat('qc')" style="border-color:rgba(155,111,255,.4);color:var(--purple)">✅ QC</div>
+     <div class="cat-toggle-btn" id="toggle-sub" onclick="toggleCat('sub')" style="border-color:rgba(255,64,64,.4);color:var(--red)">🎬 Sub & Video</div>
+     <div class="cat-toggle-btn" id="toggle-mgr" onclick="toggleCat('mgr')" style="border-color:rgba(21,101,255,.4);color:var(--accent2)">🗂️ Manager</div>
     </div>
    </div>
 
@@ -2303,10 +2303,7 @@ function openNewProject(){
   }
 }
 function toggleCat(key){
-  console.log('toggleCat called:', key);
-  const btn=document.getElementById('toggle-'+key);const block=document.getElementById('catblock-'+key);
-  console.log('btn:', btn?.id, 'block:', block?.id);
-  if(!btn||!block)return;
+  const btn=document.getElementById('toggle-'+key);const block=document.getElementById('catblock-'+key);if(!btn||!block)return;
   if(activeCats.has(key)){activeCats.delete(key);btn.classList.remove('on');block.classList.add('hidden')}
   else{activeCats.add(key);btn.classList.add('on');block.classList.remove('hidden')}
 }
@@ -2334,9 +2331,7 @@ function populateWorkerSelects(){
 }
 function addWorkerToSlot(cat,slot){
   const selId=cat==='dub'?`dub-${slot}-select`:`${cat}-select`;
-  const sel=document.getElementById(selId);
-  console.log('addWorkerToSlot:', cat, slot, 'sel:', sel?.id, 'val:', sel?.value);
-  if(!sel||!sel.value)return;
+  const sel=document.getElementById(selId);if(!sel||!sel.value)return;
   const staffId=sel.value;
   if(!formSlots[cat])formSlots[cat]={};if(!formSlots[cat][slot])formSlots[cat][slot]=[];
   if(formSlots[cat][slot].find(w=>w.staffId===staffId)){toast('เพิ่มคนนี้แล้ว','warn');sel.value='';return}
@@ -5058,20 +5053,13 @@ function startFirebaseSync() {
   const btnSave = document.getElementById('btn-save-project');
   if(btnSave) {
     btnSave.addEventListener('click', function(e){
-      e.preventDefault();
-      e.stopPropagation();
       saveProject();
     });
     console.log('✅ Save button bound');
   } else {
     console.warn('❌ btn-save-project not found');
   }
-  // ผูก cat toggle buttons ด้วย addEventListener สำรอง
-  ['dub','adp','mix','qc','sub','mgr'].forEach(function(key){
-    var btn = document.getElementById('toggle-'+key);
-    if(btn) btn.addEventListener('click', function(e){ e.stopPropagation(); toggleCat(key); });
-  });
-  console.log('✅ Cat buttons bound');
+
   
 
 }
