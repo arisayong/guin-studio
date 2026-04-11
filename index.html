@@ -3503,7 +3503,7 @@ function downloadQuotation() {
     '@media print{body{background:#fff;padding:0}.no-print{display:none}@page{margin:12mm;size:A4}}</style>'+
     '</head><body>'+html+
     '<div class="no-print" style="text-align:center;margin:24px 0">'+
-    '<p style="font-size:13px;color:#666;margin-bottom:8px">ชื่อไฟล์: <strong>'+fname+'.pdf</strong></p>'+
+
     '<button onclick="window.print()" style="padding:12px 32px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF</button>'+
     '</div></body></html>';
   const w = window.open('','_blank');
@@ -4296,7 +4296,7 @@ function downloadBillingVoucher(staffId) {
     '@media print{body{background:#fff;padding:0}.no-print{display:none}@page{margin:12mm;size:A4}}</style>'+
     '</head><body><div>'+html+'</div>'+
     '<div class="no-print" style="text-align:center;margin:24px 0">'+
-    '<p style="font-size:13px;color:#666;margin-bottom:8px">ชื่อไฟล์: <strong>'+fname+'.pdf</strong></p>'+
+
     '<button onclick="window.print()" style="padding:12px 32px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF ('+fname+')</button>'+
     '</div></body></html>';
   const w = window.open('','_blank');
@@ -4307,7 +4307,61 @@ function sendBillingVoucherEmail(staffId) {
   const s = getStaffById(staffId);
   if (!s) return;
   if (!s.email) { toast('ไม่มี email ของ '+s.nickname+' — กรุณาเพิ่มในหน้าจัดการทีม','error'); return; }
-  doSendVoucherEmail(staffId, false);
+
+  // เปิด popup อัปโหลดไฟล์ backup ก่อน
+  const old = document.getElementById('slip-upload-modal');
+  if(old) old.remove();
+  const div = document.createElement('div');
+  div.id = 'slip-upload-modal';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
+  div.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:500px;max-width:98vw">'+
+    '<div style="font-size:17px;font-weight:800;margin-bottom:4px">☁️ แบล็คอัพก่อนส่ง</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:18px">สำหรับ <strong>'+s.name+' ('+s.nickname+')</strong></div>'+
+
+    '<div style="margin-bottom:14px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">💸 สลิปโอนเงิน</div>'+
+    '<label style="cursor:pointer;display:block"><input type="file" accept="image/*,.pdf" style="display:none" id="slip-file-input">'+
+    '<div id="slip-drop-zone" style="border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;transition:all .2s" onmouseover="this.style.borderColor=\'var(--accent2)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'+
+    '<div style="font-size:22px">📁</div><div style="font-size:12px;color:var(--text2)">คลิกเพื่อเลือกสลิป</div>'+
+    '<div id="slip-fname-label" style="margin-top:6px;color:var(--green);font-size:12px;font-weight:700"></div></div></label></div>'+
+
+    '<div style="margin-bottom:18px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">📄 ใบสำคัญจ่ายเงิน (PDF)</div>'+
+    '<label style="cursor:pointer;display:block"><input type="file" accept="image/*,.pdf" style="display:none" id="doc-file-input">'+
+    '<div id="doc-drop-zone" style="border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;transition:all .2s" onmouseover="this.style.borderColor=\'var(--accent2)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'+
+    '<div style="font-size:22px">📋</div><div style="font-size:12px;color:var(--text2)">คลิกเพื่อเลือกใบสำคัญ PDF</div>'+
+    '<div id="doc-fname-label" style="margin-top:6px;color:var(--green);font-size:12px;font-weight:700"></div></div></label></div>'+
+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn btn-outline btn-sm" style="flex:1" onclick="document.getElementById(\'slip-upload-modal\').remove()">ยกเลิก</button>'+
+    '<button class="btn btn-outline btn-sm" style="flex:1" id="btn-skip-upload">ข้าม → เปิด Gmail</button>'+
+    '<button class="btn btn-blue btn-sm" style="flex:1" id="btn-save-upload">💾 แบล็คอัพ & เปิด Gmail</button>'+
+    '</div></div>';
+  document.body.appendChild(div);
+
+  window._slipDataPending = null;
+  window._docDataPending  = null;
+
+  div.querySelector('#slip-file-input').addEventListener('change', function(){
+    const file = this.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e){ window._slipDataPending = {base64:e.target.result, name:file.name}; document.getElementById('slip-fname-label').textContent='📎 '+file.name; document.getElementById('slip-drop-zone').style.borderColor='var(--green)'; };
+    reader.readAsDataURL(file);
+  });
+  div.querySelector('#doc-file-input').addEventListener('change', function(){
+    const file = this.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e){ window._docDataPending = {base64:e.target.result, name:file.name}; document.getElementById('doc-fname-label').textContent='📋 '+file.name; document.getElementById('doc-drop-zone').style.borderColor='var(--cyan)'; };
+    reader.readAsDataURL(file);
+  });
+  div.querySelector('#btn-skip-upload').onclick = function(){ div.remove(); doSendVoucherEmail(staffId, false); };
+  div.querySelector('#btn-save-upload').onclick = async function(){
+    div.remove();
+    if(window._slipDataPending) { await uploadToDrive('slip', window._slipDataPending.name, window._slipDataPending.base64); window._slipDataPending=null; }
+    if(window._docDataPending)  { await uploadToDrive('voucher', window._docDataPending.name, window._docDataPending.base64); window._docDataPending=null; }
+    doSendVoucherEmail(staffId, false);
+  };
 }
 
 function showSlipUploadModal(staffId) {
