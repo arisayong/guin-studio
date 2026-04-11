@@ -1665,7 +1665,12 @@ document.addEventListener('click', function(e){
 // Trigger initial null so login screen shows properly
 setTimeout(()=>{if(window._authCb&&!window._mockUser)window._authCb(null)},50);
 auth.onAuthStateChanged(async(fbUser)=>{
-  console.log('🔐 Auth state:', fbUser ? fbUser.email : 'null');
+  console.log('🔐 Auth state:', fbUser ? (fbUser.email||'anonymous') : 'null');
+  // ข้าม anonymous user ที่ใช้แค่ดึง staff list ตอนสมัครสมาชิก
+  if(fbUser && fbUser.isAnonymous){
+    console.log('⏩ Skipping anonymous user');
+    return;
+  }
   if(!fbUser){
     document.getElementById('app-layout').classList.add('hidden');
     document.getElementById('screen-login').classList.remove('hidden');
