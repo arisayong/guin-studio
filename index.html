@@ -657,8 +657,13 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
   <!-- ── MY DASHBOARD ── -->
   <div id="page-my-dashboard" class="page hidden">
    <div class="page-header">
-    <div class="page-title" id="my-welcome">สวัสดี 👋</div>
-    <div class="page-subtitle">ยอดค่าตอบแทนของคุณ</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+     <div>
+      <div class="page-title" id="my-welcome">สวัสดี 👋</div>
+      <div class="page-subtitle">ยอดค่าตอบแทนของคุณ</div>
+     </div>
+     <div id="my-warn-bell-wrap"></div>
+    </div>
    </div>
    <div class="my-earnings-banner">
     <div style="font-size:12px;color:var(--text2);margin-bottom:5px;letter-spacing:1px">รับไปแล้ว</div>
@@ -1176,6 +1181,14 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    </div>
    <div class="form-group"><label class="form-label">เบอร์ PromptPay <span style="color:var(--text2)">(ถ้ามี)</span></label><input class="form-input" id="st-promptpay" placeholder="0812345678"></div>
    <div class="form-group"><label class="form-label">📧 Email <span style="color:var(--text2)">(สำหรับส่งใบสำคัญ)</span></label><input class="form-input" id="st-email" type="email" placeholder="example@email.com"></div>
+  </div>
+  <!-- Warning section - แสดงเฉพาะตอนแก้ไข -->
+  <div id="st-warn-section" class="hidden" style="margin:0 24px 14px;padding:12px 14px;background:rgba(255,40,40,.06);border:1px solid rgba(255,40,40,.2);border-radius:10px">
+   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div style="font-size:12px;color:#FF6060;font-weight:700;display:flex;align-items:center;gap:6px">✉️ ใบเตือนสะสม (<span id="st-warn-count">0</span> ใบ)</div>
+    <button class="btn btn-sm" style="background:rgba(255,40,40,.15);border:1px solid rgba(255,40,40,.3);color:#FF4040;font-size:11px" onclick="openIssueWarning()">+ ออกใบเตือน</button>
+   </div>
+   <div id="st-warn-history"></div>
   </div>
   <div class="modal-foot"><button class="btn btn-outline" onclick="closeModal('modal-addstaff')">ยกเลิก</button><button class="btn btn-blue" onclick="saveStaff()">💾 บันทึก</button></div>
  </div>
@@ -1715,6 +1728,256 @@ async function saveMyNickname(){
     toast('❌ บันทึกไม่สำเร็จ: '+e.message,'error');
   }
 }
+
+// ══════════════════════════════════════════════
+// WARNING SYSTEM
+// ══════════════════════════════════════════════
+
+const IW_CATS = [
+  {items:['ส่งงานล่าช้าโดยไม่แจ้งล่วงหน้า','ไม่แจ้งขยายเวลาก่อนถึง deadline','ละทิ้งงานกลางคัน']},
+  {items:['ไม่อัพเดทสถานะงานระหว่างดำเนินการ','หายจากการสื่อสารโดยไม่แจ้งเหตุผล']},
+  {items:['ส่งงานไม่ผ่านมาตรฐานซ้ำหลังแก้แล้ว','ไม่ปฏิบัติตามคำแนะนำ QC']},
+  {items:['เผยแพร่ไฟล์งานโดยไม่ได้รับอนุญาต','นำงานทีมไปอ้างอิงสร้างความเสียหาย']},
+  {items:['ใช้ภาษาหยาบคาย/ก้าวร้าวต่อสมาชิก','ไม่ให้ความร่วมมือโดยไม่มีเหตุผล','ไม่แจ้งปัญหาที่กระทบงานทีม']}
+];
+
+let _iwStaffId = '';
+let _iwSelItem = '';
+let _iwSelProj = '';
+
+// ── Data helpers ──
+function getWarnings(staffId) {
+  const raw = ls('warnings_v1') || {};
+  return raw[staffId] || [];
+}
+function getAllWarnings() {
+  return ls('warnings_v1') || {};
+}
+async function saveWarning(staffId, warn) {
+  const all = getAllWarnings();
+  if (!all[staffId]) all[staffId] = [];
+  all[staffId].push(warn);
+  ls('warnings_v1', all);
+  if (_fbDatabase) {
+    try { await _fbDatabase.ref('warnings/' + staffId).set(all[staffId]); } catch(e) {}
+  }
+}
+async function deleteWarning(staffId, warnId) {
+  const all = getAllWarnings();
+  if (all[staffId]) all[staffId] = all[staffId].filter(w => w.id !== warnId);
+  ls('warnings_v1', all);
+  if (_fbDatabase) {
+    try { await _fbDatabase.ref('warnings/' + staffId).set(all[staffId] || []); } catch(e) {}
+  }
+}
+async function loadWarningsFromFirebase() {
+  if (!_fbDatabase) return;
+  try {
+    const snap = await _fbDatabase.ref('warnings').get();
+    if (snap.exists()) ls('warnings_v1', snap.val());
+  } catch(e) {}
+}
+
+// ── Warning badge on staff cards (compact mode) ──
+function getWarnBadgeHtml(staffId) {
+  const warns = getWarnings(staffId);
+  if (!warns.length) return '';
+  const n = warns.length;
+  const full = n >= 3;
+  return `<span style="position:absolute;top:4px;right:4px;display:inline-flex;align-items:center;gap:2px;background:${full?'rgba(255,40,40,.35)':'rgba(255,40,40,.18)'};border:1px solid ${full?'#FF3030':'rgba(255,40,40,.4)'};border-radius:20px;padding:2px 7px 2px 4px;font-size:10px;cursor:pointer" onclick="event.stopPropagation();openIssueWarningById('${staffId}')">
+    <span style="color:#FF4040;font-size:12px">✉</span><span style="color:#FF4040;font-weight:700">${n}</span>
+  </span>`;
+}
+
+// ── Open issue warning from edit modal ──
+function openIssueWarning() {
+  const s = _iwStaffId ? getStaffById(_iwStaffId) : null;
+  if (!s && !_iwStaffId) { toast('กรุณาบันทึกข้อมูลก่อนออกใบเตือน','warn'); return; }
+  document.getElementById('iw-target').textContent = s ? (s.nickname || s.name) : _iwStaffId;
+  _iwSelItem = ''; _iwSelProj = '';
+  document.querySelectorAll('#iw-cat-tabs button').forEach(b => b.style.cssText = '');
+  document.getElementById('iw-sub-list').innerHTML = '';
+  document.getElementById('iw-proj-inp').value = '';
+  document.getElementById('iw-proj-inp').style.display = 'block';
+  document.getElementById('iw-proj-sel').style.display = 'none';
+  document.getElementById('iw-submit-btn').disabled = true;
+  closeModal('modal-addstaff');
+  openModal('modal-issue-warning');
+}
+
+function openIssueWarningById(staffId) {
+  _iwStaffId = staffId;
+  const s = getStaffById(staffId);
+  openEditStaff(staffId, s?.category || s?.categories?.[0] || 'dubbing');
+}
+
+function closeIssueWarning() {
+  closeModal('modal-issue-warning');
+  if (_iwStaffId) {
+    const s = getStaffById(_iwStaffId);
+    if (s) openEditStaff(_iwStaffId, s.category || s.categories?.[0] || 'dubbing');
+  }
+}
+
+// ── Category selection ──
+function iwSelCat(idx, el) {
+  _iwSelItem = '';
+  document.querySelectorAll('#iw-cat-tabs button').forEach(b => b.classList.remove('btn-blue'));
+  el.classList.add('btn-blue');
+  el.classList.remove('btn-outline');
+  document.getElementById('iw-sub-list').innerHTML = IW_CATS[idx].items.map(it =>
+    `<div onclick="iwSelSub(this,'${it.replace(/'/g,"\'")}') "
+      style="padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid rgba(255,255,255,.07);color:var(--text2);background:rgba(0,0,0,.2);display:flex;align-items:center;gap:8px;transition:all .15s"
+      onmouseover="if(!this.classList.contains('iw-sel'))this.style.borderColor='rgba(255,64,64,.3)'"
+      onmouseout="if(!this.classList.contains('iw-sel'))this.style.borderColor='rgba(255,255,255,.07)'">
+      <span style="width:8px;height:8px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);flex-shrink:0;display:inline-block" class="iw-dot"></span>
+      ${it}
+    </div>`
+  ).join('');
+  iwChk();
+}
+
+function iwSelSub(el, val) {
+  _iwSelItem = val;
+  document.querySelectorAll('#iw-sub-list > div').forEach(d => {
+    d.classList.remove('iw-sel');
+    d.style.borderColor = 'rgba(255,255,255,.07)';
+    d.style.color = 'var(--text2)';
+    d.style.background = 'rgba(0,0,0,.2)';
+    const dot = d.querySelector('.iw-dot');
+    if (dot) { dot.style.background=''; dot.style.borderColor='rgba(255,255,255,.2)'; }
+  });
+  el.classList.add('iw-sel');
+  el.style.borderColor = 'rgba(255,64,64,.5)';
+  el.style.color = '#FF6060';
+  el.style.background = 'rgba(255,64,64,.1)';
+  const dot = el.querySelector('.iw-dot');
+  if (dot) { dot.style.background='#FF4040'; dot.style.borderColor='#FF4040'; }
+  iwChk();
+}
+
+function iwChk() {
+  document.getElementById('iw-submit-btn').disabled = !_iwSelItem;
+}
+
+// ── Project search ──
+function iwFilterProj(q) {
+  const projs = getProjects();
+  const drop = document.getElementById('iw-proj-drop');
+  const filtered = q ? projs.filter(p => (p.name||'').toLowerCase().includes(q.toLowerCase())) : projs;
+  drop.innerHTML = filtered.length
+    ? filtered.slice(0,10).map(p => `<div onclick="iwPickProj('${p.id}','${p.name.replace(/'/g,"\'")}')"`
+        + ` style="padding:9px 13px;cursor:pointer;font-size:13px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--text2)"`
+        + ` onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">${p.name}</div>`).join('')
+    : `<div style="padding:10px 13px;font-size:13px;color:var(--text2)">ไม่พบโปรเจกต์</div>`;
+  drop.style.display = 'block';
+}
+
+function iwShowDrop() {
+  if (!_iwSelProj) iwFilterProj(document.getElementById('iw-proj-inp').value);
+}
+function iwHideDrop() { document.getElementById('iw-proj-drop').style.display = 'none'; }
+
+function iwPickProj(id, name) {
+  _iwSelProj = id;
+  document.getElementById('iw-proj-inp').style.display = 'none';
+  document.getElementById('iw-proj-sel-name').textContent = name;
+  document.getElementById('iw-proj-sel').style.display = 'flex';
+  document.getElementById('iw-proj-drop').style.display = 'none';
+}
+
+function iwClearProj() {
+  _iwSelProj = '';
+  document.getElementById('iw-proj-inp').style.display = 'block';
+  document.getElementById('iw-proj-inp').value = '';
+  document.getElementById('iw-proj-sel').style.display = 'none';
+}
+
+// ── Submit warning ──
+async function submitWarning() {
+  if (!_iwSelItem) { toast('กรุณาเลือกประเภทความผิด', 'error'); return; }
+  const p = _iwSelProj ? getProjects().find(x => x.id === _iwSelProj) : null;
+  const warn = {
+    id: 'W' + Date.now(),
+    type: _iwSelItem,
+    projId: _iwSelProj || '',
+    projName: p ? p.name : '',
+    note: document.getElementById('iw-note').value.trim(),
+    date: new Date().toISOString().split('T')[0],
+    issuedAt: new Date().toISOString()
+  };
+  await saveWarning(_iwStaffId, warn);
+  closeModal('modal-issue-warning');
+  toast('✅ ออกใบเตือนแล้ว — ' + (getStaffById(_iwStaffId)?.nickname || _iwStaffId), 'success');
+  renderStaff();
+  // reopen edit modal
+  const s = getStaffById(_iwStaffId);
+  if (s) setTimeout(() => openEditStaff(_iwStaffId, s.category || s.categories?.[0] || 'dubbing'), 300);
+}
+
+// ── Staff view: render bell ──
+function renderMyWarnBell() {
+  const el = document.getElementById('my-warn-bell-wrap');
+  if (!el || !currentUser?.staffId) return;
+  const warns = getWarnings(currentUser.staffId);
+  const n = warns.length;
+  if (!n) { el.innerHTML = ''; return; }
+  const full = n >= 3;
+  el.innerHTML = `<div style="position:relative;display:inline-block">
+    <button onclick="toggleMyWarnPopup()" style="display:flex;align-items:center;gap:5px;padding:6px 14px 6px 10px;background:${full?'rgba(255,40,40,.2)':'rgba(255,40,40,.12)'};border:1px solid ${full?'rgba(255,40,40,.5)':'rgba(255,40,40,.3)'};border-radius:20px;cursor:pointer;font-family:Kanit;transition:all .15s">
+      <span style="font-size:15px;color:#FF4040">✉️</span>
+      <span style="font-size:13px;font-weight:700;color:#FF4040">${n}</span>
+      <span style="font-size:11px;color:#FF7070">ใบเตือน</span>
+    </button>
+    <div id="my-warn-popup" style="display:none;position:absolute;right:0;top:calc(100% + 6px);width:280px;background:var(--card);border:1px solid rgba(255,40,40,.3);border-radius:12px;z-index:999;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.5)">
+      <div style="padding:12px 15px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;font-weight:700;color:#FF6060;flex:1">✉️ ใบเตือนของฉัน</span>
+        <button onclick="toggleMyWarnPopup()" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px">✕</button>
+      </div>
+      <div style="padding:12px 15px;display:flex;gap:7px;align-items:center">
+        ${[1,2,3].map(i=>`<div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;${i<=n?'background:rgba(255,40,40,.2);color:#FF4040;border:1px solid rgba(255,40,40,.4)':'background:rgba(255,255,255,.05);color:var(--text2);border:1px solid rgba(255,255,255,.08)'}">${i}</div>`).join('')}
+        ${full ? '<span style="font-size:11px;color:#FF7070;margin-left:4px">⚠️ ครบ 3 ใบ</span>' : `<span style="font-size:11px;color:var(--text2);margin-left:4px">สะสม ${n} ใบ</span>`}
+      </div>
+      <button onclick="openMyWarnDetail()" style="width:100%;padding:10px;background:rgba(255,40,40,.07);border:none;border-top:1px solid rgba(255,255,255,.05);color:#FF7070;font-size:12px;font-family:Kanit;cursor:pointer">ดูรายละเอียด →</button>
+    </div>
+  </div>`;
+}
+
+let _myWarnPopupOpen = false;
+function toggleMyWarnPopup() {
+  _myWarnPopupOpen = !_myWarnPopupOpen;
+  const p = document.getElementById('my-warn-popup');
+  if (p) p.style.display = _myWarnPopupOpen ? 'block' : 'none';
+}
+
+function openMyWarnDetail() {
+  _myWarnPopupOpen = false;
+  const p = document.getElementById('my-warn-popup');
+  if (p) p.style.display = 'none';
+  const warns = getWarnings(currentUser?.staffId || '');
+  const n = warns.length;
+  const body = document.getElementById('my-warnings-body');
+  if (!body) return;
+  const dots = [1,2,3].map(i=>`<div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;${i<=n?'background:rgba(255,40,40,.2);color:#FF4040;border:1px solid rgba(255,40,40,.4)':'background:rgba(255,255,255,.05);color:var(--text2);border:1px solid rgba(255,255,255,.08)'}">${i}</div>`).join('');
+  body.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+      ${dots}
+      <span style="font-size:12px;color:${n>=3?'#FF7070':'var(--text2)'};margin-left:4px">${n>=3?'⚠️ ครบ 3 ใบ — กรุณาติดต่อแอดมิน':'สะสม '+n+' ใบ'}</span>
+    </div>
+    ${warns.map((w,i)=>`
+      <div style="background:var(--bg2);border:1px solid rgba(255,40,40,.15);border-radius:9px;padding:11px 14px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
+          <div style="width:18px;height:18px;border-radius:50%;background:rgba(255,40,40,.2);color:#FF4040;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
+          <div style="font-size:13px;font-weight:700;color:#FF7070">${w.type}</div>
+        </div>
+        ${w.projName?`<div style="font-size:11px;color:var(--text2)">โปรเจกต์: ${w.projName} · ${w.date||''}</div>`:`<div style="font-size:11px;color:var(--text2)">${w.date||''}</div>`}
+        ${w.note?`<div style="font-size:12px;color:var(--text2);margin-top:5px;font-style:italic">${w.note}</div>`:''}
+      </div>`).join('')}
+    <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:6px">ใบเตือนแก้ไขหรือลบไม่ได้ — ติดต่อแอดมินหากมีข้อสงสัย</div>`;
+  openModal('modal-my-warnings');
+}
+
+
 function toggleRegRole(el){
   const cb = el.querySelector('input[type=checkbox]');
   if(!cb) return;
@@ -1833,6 +2096,7 @@ async function enterApp(){
   try {
   showLoader(true);
   try { await loadProjects(); } catch(e) { console.warn('loadProjects skipped:', e.message); }
+  try { await loadWarningsFromFirebase(); } catch(e) {}
   // Load tracking cards from Firebase
   try {
     if(_fbDatabase){
@@ -3301,7 +3565,8 @@ function renderStaffGrid(){
       staff.forEach(s=>{
         const av=s.nickname?s.nickname[0]:'?';
         const resetBtn=s.email?'<button onclick="adminResetStaffPassword(\''+s.email.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',\''+(s.nickname||s.name).replace(/'/g,"\\'")+'\''+')" style="padding:3px 10px;background:none;border:1px solid rgba(0,180,255,.4);border-radius:6px;color:var(--cyan);font-family:Kanit;font-size:11px;cursor:pointer">🔑 รีเซ็ต</button>':'';
-        html+='<div style="background:var(--bg2);border:1px solid '+color+'33;border-radius:10px;padding:14px;display:flex;gap:12px">';
+        const warnHtml = getWarnBadgeHtml(s.id);
+        html+='<div style="background:var(--bg2);border:1px solid '+color+'33;border-radius:10px;padding:14px;display:flex;gap:12px;position:relative">'+warnHtml;
         html+='<div style="width:40px;height:40px;border-radius:50%;background:'+color+'22;color:'+color+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex-shrink:0">'+av+'</div>';
         html+='<div style="flex:1;min-width:0">';
         html+='<div style="font-weight:700;font-size:14px">'+s.name+'</div>';
@@ -3338,7 +3603,7 @@ function toggleStaffBody(id){
   if(arr)arr.textContent=hidden?'▼':'▶';
 }
 function openAddStaff(){
-  editingStaffId=null;editingStaffCat=null;document.getElementById('addstaff-title').textContent='➕ เพิ่มสมาชิกใหม่';
+  editingStaffId=null;editingStaffCat=null;_iwStaffId='';document.getElementById('addstaff-title').textContent='➕ เพิ่มสมาชิกใหม่';const _ws=document.getElementById('st-warn-section');if(_ws)_ws.classList.add('hidden');
   ['st-name','st-nick','st-bank','st-account','st-promptpay','st-email'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('st-gender').selectedIndex=0;
   setStaffCatsChecked(['dubbing']); // default = Dubbing
@@ -3353,6 +3618,22 @@ function openEditStaff(id,cat){
   document.getElementById('st-promptpay').value=s.promptpay||'';document.getElementById('st-email').value=s.email||'';
   const catSel=document.getElementById('st-cat-wrap');setStaffCatsChecked(s.categories||[cat]);
   const genderSel=document.getElementById('st-gender');[...genderSel.options].forEach((o,i)=>{if(o.text===s.gender)genderSel.selectedIndex=i});
+  // Load warnings
+  _iwStaffId = id;
+  const warnSec = document.getElementById('st-warn-section');
+  if (warnSec) {
+    warnSec.classList.remove('hidden');
+    const warns = getWarnings(id);
+    document.getElementById('st-warn-count').textContent = warns.length;
+    const histEl = document.getElementById('st-warn-history');
+    histEl.innerHTML = warns.length ? warns.map((w,i)=>`
+      <div style="display:flex;align-items:center;gap:7px;padding:6px 10px;background:rgba(0,0,0,.3);border-radius:7px;margin-bottom:5px">
+        <div style="width:18px;height:18px;border-radius:50%;background:rgba(255,40,40,.2);color:#FF4040;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
+        <div style="flex:1;font-size:11px;color:#FF8080">${w.type}${w.projName?' · '+w.projName:''}</div>
+        <div style="font-size:10px;color:var(--text2)">${w.date||''}</div>
+        <button onclick="deleteWarning('${id}','${w.id}').then(()=>openEditStaff('${id}','${cat}'))" style="padding:2px 8px;background:none;border:1px solid rgba(255,255,255,.1);border-radius:5px;color:var(--text2);font-size:10px;cursor:pointer;font-family:Kanit" onmouseover="this.style.borderColor='rgba(255,64,64,.4)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='rgba(255,255,255,.1)';this.style.color='var(--text2)'">ลบ</button>
+      </div>`).join('') : '<div style="font-size:11px;color:var(--text2);text-align:center;padding:8px">ยังไม่มีใบเตือน</div>';
+  }
   openModal('modal-addstaff');
 }
 
@@ -3406,6 +3687,7 @@ function deleteStaff(id,cat){
 function renderMyDash(){
   if(!currentUser?.staffId)return;const s=getStaffById(currentUser.staffId);if(!s)return;
   document.getElementById('my-welcome').textContent=`สวัสดี ${currentUser.nickname||s.nickname} 👋`;
+  renderMyWarnBell();
 
   const projs=getProjects();let paid=0,pending=0;const items=[];
   projs.forEach(p=>{const myWs=(p.workers||[]).filter(x=>x.id===s.id);if(!myWs.length)return;
@@ -5624,6 +5906,64 @@ window.addEventListener('load',()=>{
   document.querySelectorAll('input[type="date"]').forEach(i=>{if(!i.value)i.value=today});
 });
 </script>
+
+<!-- ════ WARNING ISSUE MODAL ════ -->
+<div id="modal-issue-warning" class="modal-overlay hidden">
+ <div class="modal" style="width:500px">
+  <div class="modal-head">
+   <div class="modal-title">✉️ ออกใบเตือน — <span id="iw-target" style="color:#FF4040"></span></div>
+   <button class="btn-close" onclick="closeIssueWarning()">✕</button>
+  </div>
+  <div class="modal-body">
+   <div class="form-group">
+    <label class="form-label">หมวดความผิด *</label>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px" id="iw-cat-tabs">
+     <button class="btn btn-outline btn-sm" onclick="iwSelCat(0,this)">1. ส่งงาน/เวลา</button>
+     <button class="btn btn-outline btn-sm" onclick="iwSelCat(1,this)">2. การสื่อสาร</button>
+     <button class="btn btn-outline btn-sm" onclick="iwSelCat(2,this)">3. คุณภาพงาน</button>
+     <button class="btn btn-outline btn-sm" onclick="iwSelCat(3,this)">4. ความลับ</button>
+     <button class="btn btn-outline btn-sm" onclick="iwSelCat(4,this)">5. พฤติกรรม</button>
+    </div>
+    <div id="iw-sub-list" style="display:flex;flex-direction:column;gap:5px"></div>
+   </div>
+   <div class="form-group">
+    <label class="form-label">โปรเจกต์ที่เกิดเหตุ</label>
+    <div style="position:relative">
+     <input class="form-input" id="iw-proj-inp" placeholder="🔍 พิมพ์ชื่อโปรเจกต์เพื่อค้นหา..." oninput="iwFilterProj(this.value)" onfocus="iwShowDrop()" onblur="setTimeout(iwHideDrop,180)" autocomplete="off">
+     <div id="iw-proj-drop" style="display:none;position:absolute;z-index:999;width:100%;background:var(--card);border:1px solid rgba(21,101,255,.25);border-radius:9px;margin-top:2px;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
+    </div>
+    <div id="iw-proj-sel" style="display:none;margin-top:5px;padding:8px 12px;background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.2);border-radius:8px;font-size:13px;color:var(--accent2);display:flex;align-items:center;justify-content:space-between">
+     <span id="iw-proj-sel-name"></span>
+     <span style="font-size:11px;color:var(--text2);cursor:pointer" onclick="iwClearProj()">✕ เปลี่ยน</span>
+    </div>
+   </div>
+   <div class="form-group">
+    <label class="form-label">หมายเหตุเพิ่มเติม</label>
+    <textarea class="form-input" id="iw-note" style="height:64px;resize:none" placeholder="ระบุรายละเอียด..."></textarea>
+   </div>
+   <div style="padding:9px 12px;background:rgba(255,158,0,.06);border:1px solid rgba(255,158,0,.18);border-radius:8px;font-size:11px;color:rgba(255,158,0,.8)">
+    ใบเตือนนี้มองเห็นได้เฉพาะแอดมิน — สต๊าฟเห็นแค่จำนวนและประเภทของตัวเอง
+   </div>
+  </div>
+  <div class="modal-foot">
+   <button class="btn btn-outline" onclick="closeIssueWarning()">ยกเลิก</button>
+   <button class="btn" id="iw-submit-btn" style="background:rgba(255,40,40,.15);border:1px solid rgba(255,40,40,.35);color:#FF4040" disabled onclick="submitWarning()">ออกใบเตือน</button>
+  </div>
+ </div>
+</div>
+
+<!-- ════ STAFF WARNING DETAIL MODAL ════ -->
+<div id="modal-my-warnings" class="modal-overlay hidden">
+ <div class="modal" style="width:480px">
+  <div class="modal-head">
+   <div class="modal-title">✉️ ใบเตือนของฉัน</div>
+   <button class="btn-close" onclick="closeModal('modal-my-warnings')">✕</button>
+  </div>
+  <div class="modal-body" id="my-warnings-body"></div>
+  <div class="modal-foot"><button class="btn btn-blue" onclick="closeModal('modal-my-warnings')">รับทราบ</button></div>
+ </div>
+</div>
+
 
 <!-- ════ PROFILE MODAL ════ -->
 <div id="modal-profile" class="modal-overlay hidden" onclick="if(event.target===this)closeProfileModal()">
