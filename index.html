@@ -1776,15 +1776,38 @@ async function deleteWarning(staffId, warnId) {
   if (all[staffId]) all[staffId] = all[staffId].filter(w => w.id !== warnId);
   ls('warnings_v1', all);
   if (_fbDatabase) {
-    try { await _fbDatabase.ref('warnings/' + staffId).set(all[staffId] || []); } catch(e) {}
+    try {
+      const remaining = all[staffId] || [];
+      if (remaining.length === 0) {
+        await _fbDatabase.ref('warnings/' + staffId).remove();
+      } else {
+        await _fbDatabase.ref('warnings/' + staffId).set(remaining);
+      }
+    } catch(e) { console.warn('deleteWarning Firebase error:', e); }
   }
 }
 async function loadWarningsFromFirebase() {
   if (!_fbDatabase) return;
   try {
     const snap = await _fbDatabase.ref('warnings').get();
-    if (snap.exists()) ls('warnings_v1', snap.val());
+    if (snap.exists()) {
+      ls('warnings_v1', snap.val());
+    } else {
+      ls('warnings_v1', {});
+    }
   } catch(e) {}
+}
+function startWarningsSync() {
+  if (!_fbDatabase) return;
+  _fbDatabase.ref('warnings').on('value', snap => {
+    if (snap.exists()) {
+      ls('warnings_v1', snap.val());
+    } else {
+      ls('warnings_v1', {});
+    }
+    // ถ้าเป็น staff ให้ re-render bell
+    if (currentUser?.role !== 'admin') renderMyWarnBell();
+  });
 }
 
 // ── Warning badge on staff cards (compact mode) ──
@@ -2183,6 +2206,7 @@ async function enterApp(){
   updateQueueBadge();
   // Real-time Firebase sync
   startFirebaseSync();
+  startWarningsSync();
   } catch(e) {
     console.error('enterApp failed:', e);
     toast('เกิดข้อผิดพลาดในการโหลดระบบ: ' + e.message, 'error');
