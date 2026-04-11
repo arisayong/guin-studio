@@ -4970,8 +4970,10 @@ function startFirebaseSync() {
       ls('trk_cards_v3', snap.val());
       if(!document.getElementById('page-track')?.classList.contains('hidden')) renderTrkBoard();
       if(!document.getElementById('page-my-calendar')?.classList.contains('hidden')) renderMyCalendar();
-      if(!document.getElementById('page-my-dashboard')?.classList.contains('hidden')) renderMyDash();
-      if(!document.getElementById('page-my-history')?.classList.contains('hidden')) renderMyHistory();
+      if(currentUser&&currentUser.role==='staff'){
+        if(!document.getElementById('page-my-dashboard')?.classList.contains('hidden')) try{renderMyDash();}catch(e){}
+        if(!document.getElementById('page-my-history')?.classList.contains('hidden')) try{renderMyHistory();}catch(e){}
+      }
     }
   });
   // Sync documents
@@ -4998,11 +5000,13 @@ function startFirebaseSync() {
     try {
       const val = snap.exists() ? snap.val() : {};
       ls('staff_v3', val);
-      // Staff pages sync on staff data change
-      const pgSD=document.getElementById('page-my-dashboard');
-      if(pgSD&&!pgSD.classList.contains('hidden')) try{renderMyDash();}catch(e){}
-      const pgSH=document.getElementById('page-my-history');
-      if(pgSH&&!pgSH.classList.contains('hidden')) try{renderMyHistory();}catch(e){}
+      // Staff pages sync on staff data change (only for staff users)
+      if(currentUser&&currentUser.role==='staff'){
+        const pgSD=document.getElementById('page-my-dashboard');
+        if(pgSD&&!pgSD.classList.contains('hidden')) try{renderMyDash();}catch(e){}
+        const pgSH=document.getElementById('page-my-history');
+        if(pgSH&&!pgSH.classList.contains('hidden')) try{renderMyHistory();}catch(e){}
+      }
       const pg=document.getElementById('page-staff');
       if(pg&&!pg.classList.contains('hidden')) try{renderStaff();}catch(e){}
     } catch(e) { console.error('Staff RT error:', e); }
@@ -5025,13 +5029,15 @@ function startFirebaseSync() {
       if(pg&&!pg.classList.contains('hidden')) try{renderProjects();}catch(e){}
       const pgD = document.getElementById('page-dashboard');
       if(pgD&&!pgD.classList.contains('hidden')) try{renderDash();}catch(e){}
-      // Staff pages sync
-      const pgMD=document.getElementById('page-my-dashboard');
-      if(pgMD&&!pgMD.classList.contains('hidden')) try{renderMyDash();}catch(e){}
-      const pgMH=document.getElementById('page-my-history');
-      if(pgMH&&!pgMH.classList.contains('hidden')) try{renderMyHistory();}catch(e){}
-      const pgMC=document.getElementById('page-my-calendar');
-      if(pgMC&&!pgMC.classList.contains('hidden')) try{renderMyCalendar();}catch(e){}
+      // Staff pages sync (only for staff users)
+      if(currentUser&&currentUser.role==='staff'){
+        const pgMD=document.getElementById('page-my-dashboard');
+        if(pgMD&&!pgMD.classList.contains('hidden')) try{renderMyDash();}catch(e){}
+        const pgMH=document.getElementById('page-my-history');
+        if(pgMH&&!pgMH.classList.contains('hidden')) try{renderMyHistory();}catch(e){}
+        const pgMC=document.getElementById('page-my-calendar');
+        if(pgMC&&!pgMC.classList.contains('hidden')) try{renderMyCalendar();}catch(e){}
+      }
     } catch(e){ console.warn('Projects sync error:', e); }
   });
 
