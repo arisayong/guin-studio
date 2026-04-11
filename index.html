@@ -3263,9 +3263,14 @@ function renderMyDash(){
   if(!currentUser?.staffId)return;const s=getStaffById(currentUser.staffId);if(!s)return;
   document.getElementById('my-welcome').textContent=`สวัสดี ${s.nickname} 👋`;
   const projs=getProjects();let paid=0,pending=0;const rows=[];
-  projs.forEach(p=>{const w=(p.workers||[]).find(x=>x.id===s.id);if(!w)return;
-    if(w.status==='paid')paid+=w.amount||0;else pending+=w.amount||0;
-    rows.push(`<tr><td><strong>${p.name}</strong></td><td>${fmtDate(p.date)}</td><td>${(()=>{const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return (_lbl[_pre]||CATS[s.category]?.label||'')+_suf;})()}</td><td style="color:var(--accent2);font-weight:700">${w.amount?fmtB(w.amount):'TBD'}</td><td>${statusBadge(w.status)}</td></tr>`);
+  projs.forEach(p=>{const myWs=(p.workers||[]).filter(x=>x.id===s.id);if(!myWs.length)return;
+    myWs.forEach((w,wi)=>{
+      if(w.status==='paid')paid+=w.amount||0;else pending+=w.amount||0;
+      const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';
+      const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+      const roleLabel=(_lbl[_pre]||CATS[s.category]?.label||'')+_suf;
+      rows.push('<tr>'+(wi===0?'<td rowspan="'+myWs.length+'"><strong>'+p.name+'</strong></td><td rowspan="'+myWs.length+'">'+fmtDate(p.date)+'</td>':'')+'<td style="color:var(--cyan);font-weight:700">'+roleLabel+'</td><td style="color:var(--accent2);font-weight:700">'+(w.amount?fmtB(w.amount):'TBD')+'</td><td>'+statusBadge(w.status)+'</td></tr>');
+    });
   });
   document.getElementById('my-paid').textContent=fmtB(paid);document.getElementById('my-pending').textContent=fmtB(pending);
   document.getElementById('my-proj-table').innerHTML=rows.join('')||'<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:20px">ยังไม่มีงาน</td></tr>';
@@ -3276,8 +3281,13 @@ function renderMyHistory(){
   const projs=getProjects();const rows=[];
   projs.forEach(p=>{
     if(q&&!(p.name||'').toLowerCase().includes(q))return;
-    const w=(p.workers||[]).find(x=>x.id===s.id);if(!w)return;
-    rows.push(`<tr><td><strong>${p.name}</strong></td><td>${fmtDate(p.date)}</td><td>${(()=>{const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return (_lbl[_pre]||CATS[s.category]?.label||'')+_suf;})()}</td><td style="color:var(--accent2);font-weight:700">${w.amount?fmtB(w.amount):'TBD'}</td><td style="font-size:12px;color:var(--text2)">${s.bank} ${s.account}</td><td>${statusBadge(w.status)}</td></tr>`);
+    const myWorkers=(p.workers||[]).filter(x=>x.id===s.id);if(!myWorkers.length)return;
+    myWorkers.forEach((w,wi)=>{
+      const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';
+      const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+      const roleLabel=(_lbl[_pre]||CATS[s.category]?.label||'')+_suf;
+      rows.push('<tr>'+(wi===0?'<td rowspan="'+myWorkers.length+'"><strong>'+p.name+'</strong></td><td rowspan="'+myWorkers.length+'">'+fmtDate(p.date)+'</td>':'')+'<td style="color:var(--cyan);font-weight:700">'+roleLabel+'</td><td style="color:var(--accent2);font-weight:700">'+(w.amount?fmtB(w.amount):'TBD')+'</td><td style="font-size:12px;color:var(--text2)">'+s.bank+' '+s.account+'</td><td>'+statusBadge(w.status)+'</td></tr>');
+    });
   });
   document.getElementById('my-hist-table').innerHTML=rows.join('')||'<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:20px">ยังไม่มีประวัติ</td></tr>';
 }
