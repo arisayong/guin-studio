@@ -3638,8 +3638,11 @@ function buildVoucherHTML(projId, workerId, slot, vNo, issueDate, note) {
   const w = (p.workers||[]).find(x=>x.id===workerId&&x.slot===slot); if(!w) return '';
   const s = getStaffById(workerId); if(!s) return '';
   const thaiDate = d => d ? new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}) : '—';
-  const catLabel = CATS[s.category]?.label||s.category||'';
-  const slotLabel = slot.includes('main')?'หลัก':slot.includes('-sub')?'รอง':'';
+  const slotPre = (slot||'').split('-')[0];
+  const slotSuf = slot.includes('main')?'หลัก':slot.includes('-sub')?'รอง':'';
+  const SLOT_LABELS = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+  const catLabel = SLOT_LABELS[slotPre]||CATS[s.category]?.label||'';
+  const slotLabel = slotSuf;
   return `<div style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:620px;margin:0 auto 32px;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb;page-break-after:always">
     <div style="background:#0d0d2b;padding:26px 30px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
