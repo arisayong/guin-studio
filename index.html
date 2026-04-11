@@ -1029,7 +1029,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    </div>
    <div style="display:flex;gap:10px;width:100%;justify-content:flex-end">
     <button class="btn btn-outline" onclick="closeModal('modal-project')">ยกเลิก</button>
-    <button class="btn btn-blue" onclick="saveProject()">💾 บันทึกโปรเจกต์</button>
+    <button class="btn btn-blue" id="btn-save-project">💾 บันทึกโปรเจกต์</button>
    </div>
   </div>
  </div>
@@ -5048,6 +5048,18 @@ function startFirebaseSync() {
   });
 
   console.log('🔄 Firebase real-time sync started');
+  // ผูก save button ด้วย addEventListener แทน onclick
+  const btnSave = document.getElementById('btn-save-project');
+  if(btnSave) {
+    btnSave.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      saveProject();
+    });
+    console.log('✅ Save button bound');
+  } else {
+    console.warn('❌ btn-save-project not found');
+  }
   
 
 }
