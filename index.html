@@ -1568,40 +1568,42 @@ function switchLoginTab(t){
   document.querySelectorAll('.login-tab').forEach((el,i)=>el.classList.toggle('active',i===(t==='login'?0:1)));
   document.getElementById('login-form').classList.toggle('hidden',t!=='login');
   document.getElementById('register-form').classList.toggle('hidden',t==='login');
-  if(t==='register')populateRegStaff();
+  if(t==='register') preloadRegStaff();
 }
-async function populateRegStaff(){
-  // โหลดข้อมูล staff จาก Firebase โดยตรง (ไม่รอ login)
+
+// โหลดข้อมูล staff จาก Firebase ล่วงหน้าครั้งเดียว แล้วค้นหาจาก cache ได้เลย
+let _regStaffCache = null;
+async function preloadRegStaff(){
   const inp = document.getElementById('reg-staff-search');
-  if(inp) { inp.placeholder='⏳ กำลังโหลดรายชื่อ...'; inp.disabled=true; }
+  if(_regStaffCache){ // มี cache อยู่แล้ว พร้อมใช้งานทันที
+    if(inp){ inp.placeholder='🔍 พิมพ์ชื่อเพื่อค้นหา...'; inp.disabled=false; }
+    return;
+  }
+  if(inp){ inp.placeholder='⏳ กำลังโหลดรายชื่อ...'; inp.disabled=true; }
   try {
     if(_fbDatabase){
       const snap = await _fbDatabase.ref('staff').get();
       if(snap.exists()){
-        const val = snap.val();
-        ls('staff_v3', val); // cache ไว้ใน localStorage
+        ls('staff_v3', snap.val());
       }
     }
-  } catch(e){ console.warn('populateRegStaff load error:', e); }
+  } catch(e){ console.warn('preloadRegStaff error:', e); }
+  _regStaffCache = getAllStaff(); // cache ผลลัพธ์ไว้
   if(inp){ inp.placeholder='🔍 พิมพ์ชื่อเพื่อค้นหา...'; inp.disabled=false; inp.focus(); }
 }
+
 function filterRegStaff(){
-  const q=(document.getElementById('reg-staff-search').value||'').toLowerCase();
+  const q=(document.getElementById('reg-staff-search').value||'').toLowerCase().trim();
   const dd=document.getElementById('reg-staff-dropdown');
   if(!q){dd.style.display='none';return;}
-  const allStaff=getAllStaff();
-  if(!allStaff.length){
-    dd.style.display='block';
-    dd.innerHTML='<div style="padding:10px 12px;font-size:13px;color:var(--text2)">⏳ กำลังโหลดข้อมูล กรุณารอสักครู่...</div>';
-    return;
-  }
+  const allStaff = _regStaffCache || getAllStaff();
   const matches=allStaff.filter(s=>
     (s.nickname||'').toLowerCase().includes(q)||
     (s.name||'').toLowerCase().includes(q)
   ).slice(0,10);
   if(!matches.length){
     dd.style.display='block';
-    dd.innerHTML='<div style="padding:10px 12px;font-size:13px;color:var(--text2)">❌ ไม่พบชื่อ "'+q+'" — ติดต่อแอดมิน</div>';
+    dd.innerHTML='<div style="padding:10px 12px;font-size:13px;color:var(--text2)">❌ ไม่พบ "'+q+'" — ติดต่อแอดมิน</div>';
     return;
   }
   dd.style.display='block';
