@@ -4505,7 +4505,11 @@ async function confirmSendEmailJS() {
   document.getElementById('email-preview-modal')?.remove();
   const e = window._pendingEmail;
   if (!e) { toast('ไม่มีข้อมูลอีเมล','error'); return; }
-  toast('📤 กำลังส่งอีเมล...','info');
+  if (!e.to || !e.to.includes('@')) {
+    toast('❌ Email ผู้รับไม่ถูกต้อง: "'+e.to+'" — กรุณาตรวจสอบ email ในระบบ','error');
+    return;
+  }
+  toast('📤 กำลังส่งไปที่ '+e.to+'...','info');
   const ok = await sendEmailJS(e.to, e.subject, e.message);
   if (ok) {
     toast('✅ ส่งอีเมลถึง '+e.name+' ('+e.to+') สำเร็จแล้วค่ะ','success');
@@ -4513,12 +4517,7 @@ async function confirmSendEmailJS() {
   }
 }
 
-async function confirmSendEmailJS(staffId, toEmail, subject, message) {
-  document.getElementById('email-preview-modal')?.remove();
-  toast('📤 กำลังส่งอีเมล...','info');
-  const ok = await sendEmailJS(toEmail, subject, message);
-  if (ok) toast('✅ ส่งอีเมลสำเร็จแล้วค่ะ','success');
-}
+
 
 
 
