@@ -2310,8 +2310,20 @@ function openNewProject(){
 }
 function toggleCat(key){
   const btn=document.getElementById('toggle-'+key);const block=document.getElementById('catblock-'+key);if(!btn||!block)return;
-  if(activeCats.has(key)){activeCats.delete(key);btn.classList.remove('on');block.classList.add('hidden')}
-  else{activeCats.add(key);btn.classList.add('on');block.classList.remove('hidden')}
+  if(activeCats.has(key)){
+    // ปิดหมวด → ลบ workers ออกจาก formSlots ด้วย
+    activeCats.delete(key);
+    btn.classList.remove('on');
+    block.classList.add('hidden');
+    if(formSlots[key]){
+      Object.keys(formSlots[key]).forEach(slot=>{ formSlots[key][slot]=[]; });
+    }
+    calcProjSummary();
+  } else {
+    activeCats.add(key);
+    btn.classList.add('on');
+    block.classList.remove('hidden');
+  }
 }
 
 function buildWorkerList(){
