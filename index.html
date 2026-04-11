@@ -4301,7 +4301,11 @@ function buildBillingVoucherHTML(staffId) {
     : '16–สิ้นเดือน '+TM[billingMonthSelected]+' '+(billingYearSelected+543);
   const vNo = nextVoucherNo();
   const issueDate = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
-  const catLabel = CATS[s.category]?.label||s.category||'';
+  // ดึง catLabel จาก slot ของ worker ใน project (ไม่ใช่ category ใน staff db)
+  const SLOT_LABELS = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+  const firstSlot = (items[0]?.worker?.slot||'').split('-')[0];
+  const firstSuf  = (items[0]?.worker?.slot||'').includes('main')?'หลัก':(items[0]?.worker?.slot||'').includes('-sub')?'รอง':'';
+  const catLabel  = (SLOT_LABELS[firstSlot]||CATS[s.category]?.label||'')+(firstSuf?' · '+firstSuf:'');
   const rows = items.map((x,i) => '<tr style="border-bottom:1px solid #f3f4f6;background:'+(i%2?'#fafafa':'#fff')+'">'+
     '<td style="padding:12px 14px"><div style="font-weight:600;color:#111827">'+x.proj.name+'</div>'+(x.proj.client?'<div style="font-size:11px;color:#9ca3af;margin-top:2px">'+x.proj.client+'</div>':'')+'</td>'+
     '<td style="padding:12px 8px;text-align:center;color:#6b7280;font-size:12px">'+(x.worker.unit||'เหมา')+'</td>'+
