@@ -2186,8 +2186,25 @@ function trkCalPrev(){trkCalMonth--;if(trkCalMonth<0){trkCalMonth=11;trkCalYear-
 function trkCalNext(){trkCalMonth++;if(trkCalMonth>11){trkCalMonth=0;trkCalYear++}renderTrkCalendar()}
 function renderTrkBoard(){
   const el=document.getElementById('trk-board');if(!el)return;
-  const cards=getTrkCards();
+  let cards=getTrkCards();
   if(!cards.length){el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">ยังไม่มีการ์ด — กด ➕ เพิ่มโปรเจกต์ที่ติดตาม</div>';return}
+  // Auto-sync phases ให้ตรงกับ workers ในโปรเจกต์ล่าสุดเสมอ
+  let changed=false;
+  cards=cards.map(card=>{
+    if(!card.projId)return card;
+    const p=getProjects().find(x=>x.id===card.projId);
+    if(!p)return card;
+    const activePhases=getActivePhasesForProj(p);
+    const oldPhases=card.phases||{};
+    const newPhases={};
+    // เพิ่ม phase ที่ขาด, เก็บ phase เดิมที่มีข้อมูลไว้
+    activePhases.forEach(phKey=>{newPhases[phKey]=oldPhases[phKey]||{startDate:'',deadline:'',status:'none'}});
+    const oldKeys=Object.keys(oldPhases).sort().join(',');
+    const newKeys=Object.keys(newPhases).sort().join(',');
+    if(oldKeys!==newKeys){changed=true;return{...card,phases:newPhases};}
+    return card;
+  });
+  if(changed)saveTrkCards(cards);
   el.innerHTML=cards.map(card=>renderTrkCardHTML(card)).join('');
 }
 function renderTrkCardHTML(card){
