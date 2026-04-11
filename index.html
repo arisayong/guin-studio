@@ -5025,13 +5025,17 @@ async function sendEmailJS(to, subject, message) {
     return false;
   }
   try {
+    // แปลง newline เป็น <br> สำหรับ HTML email
+    var htmlMessage = '<div style="font-family:sans-serif;font-size:14px;line-height:1.8;color:#333">'+
+      message.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')+
+      '</div>';
     await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
       to_email: to,
       to_name: to,
       from_name: 'Guin Home Studio',
       reply_to: 'penguinstudiovoice@gmail.com',
       subject: subject,
-      message: message,
+      message: htmlMessage,
     }, EMAILJS_CONFIG.publicKey);
     return true;
   } catch(e) {
