@@ -5031,7 +5031,15 @@ async function sendEmailJS(to, subject, message) {
     return false;
   }
   try {
-    console.log('EmailJS sending:', {to, subject});
+    // แปลงเป็น HTML ที่มี style ป้องกันการตัดคำภาษาไทยผิด
+    var paragraphs = message.split('\n').map(function(line) {
+      if (!line.trim()) return '<p style="margin:6px 0">&nbsp;</p>';
+      return '<p style="margin:6px 0;word-break:normal;overflow-wrap:break-word;white-space:normal">'+
+        line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</p>';
+    }).join('');
+    var htmlMsg = '<div style="font-family:\'Sarabun\',\'Kanit\',sans-serif;font-size:15px;line-height:1.8;color:#222;max-width:600px;word-break:normal">'+paragraphs+'</div>';
+
+    console.log('📧 EmailJS sending to:', to);
     const result = await emailjs.send(
       EMAILJS_CONFIG.serviceId,
       EMAILJS_CONFIG.templateId,
@@ -5039,7 +5047,7 @@ async function sendEmailJS(to, subject, message) {
         to_email: to.trim(),
         from_name: 'Guin Home Studio',
         subject: subject,
-        message: message,
+        message: htmlMsg,
       },
       EMAILJS_CONFIG.publicKey
     );
