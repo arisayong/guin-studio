@@ -4138,9 +4138,10 @@ function renderBillingCycleSection() {
           ${years.map(y=>`<option value="${y}" ${y===billingYearSelected?'selected':''}>${y+543}</option>`).join('')}
         </select>
         <div class="tabs" style="margin:0">
-          <div class="tab ${billingCycleSelected===0?'active':''}" onclick="billingCycleSelected=0;renderBillingCycleSection()" style="font-size:13px">📅 ทั้งเดือน</div>
-          <div class="tab ${billingCycleSelected===1?'active':''}" onclick="billingCycleSelected=1;renderBillingCycleSection()" style="font-size:13px">🔵 1–15</div>
-          <div class="tab ${billingCycleSelected===2?'active':''}" onclick="billingCycleSelected=2;renderBillingCycleSection()" style="font-size:13px">🟠 16–31</div>
+          <div class="tab ${billingMonthAll?'active':''}" onclick="billingMonthAll=true;renderBillingCycleSection()" style="font-size:13px">📆 ทุกเดือน</div>
+          <div class="tab ${!billingMonthAll&&billingCycleSelected===0?'active':''}" onclick="billingMonthAll=false;billingCycleSelected=0;renderBillingCycleSection()" style="font-size:13px">📅 ทั้งเดือน</div>
+          <div class="tab ${!billingMonthAll&&billingCycleSelected===1?'active':''}" onclick="billingMonthAll=false;billingCycleSelected=1;renderBillingCycleSection()" style="font-size:13px">🔵 1–15</div>
+          <div class="tab ${!billingMonthAll&&billingCycleSelected===2?'active':''}" onclick="billingMonthAll=false;billingCycleSelected=2;renderBillingCycleSection()" style="font-size:13px">🟠 16–31</div>
         </div>
       </div>
     </div>
