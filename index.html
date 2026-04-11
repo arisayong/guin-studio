@@ -2436,8 +2436,9 @@ function calcProjSummary(){
   });
 }
 async function saveProject(){
+  console.log('saveProject called');
   try {
-  const name=document.getElementById('pj-name').value.trim();if(!name){toast('กรุณากรอกชื่อโปรเจกต์','error');return}
+  const name=document.getElementById('pj-name')?.value?.trim()||'';if(!name){toast('กรุณากรอกชื่อโปรเจกต์','error');return}if(!name){toast('กรุณากรอกชื่อโปรเจกต์','error');return}
   const dur=parseFloat(document.getElementById('pj-duration')?.value)||0;
   const workers=[];
   Object.entries(formSlots).forEach(([cat,slots])=>{
@@ -2459,8 +2460,8 @@ async function saveProject(){
     duration:dur,
     startDate:thaiToIso(document.getElementById('pj-start').value)||document.getElementById('pj-start').value,
     deadline:thaiToIso(document.getElementById('pj-deadline').value)||document.getElementById('pj-deadline').value,
-    cycle:document.getElementById('pj-cycle').value||'ต้นเดือน (1-15)',
-    note:document.getElementById('pj-note').value,
+    cycle:document.getElementById('pj-cycle')?.value||'ต้นเดือน (1-15)',
+    note:document.getElementById('pj-note')?.value||'',
     workers,tax,evidenceLogs:[],snapshot:null,createdAt:new Date()
   };
   if(editingProjId){
