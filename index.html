@@ -2615,7 +2615,7 @@ function buildSimpleReceipt({vNo,name,nickname,projName,amount,bank,date}){
   const thaiDate=date?new Date(date).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}):fmtDate(new Date());
   return`<div id="printable-receipt" data-vno="${vNo}" style="background:#fff;color:#111;border-radius:12px;padding:28px;font-family:'Kanit',sans-serif;max-width:460px;margin:0 auto">
     <div style="text-align:center;border-bottom:2px solid #1565FF;padding-bottom:14px;margin-bottom:16px">
-     <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:44px;object-fit:contain;display:block;margin:0 auto">
+     <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:44px;object-fit:contain;display:block;margin:0 auto">
      <div style="font-size:14px;font-weight:700;margin-top:6px">แจ้งการโอนเงิน</div>
      <div style="font-size:11px;color:#888;margin-top:4px">เลขที่: ${vNo}</div>
     </div>
@@ -3382,7 +3382,7 @@ function buildQuotationHTML(data) {
     <div style="background:#0d0d2b;padding:26px 30px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
-          <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:56px;object-fit:contain;display:block">
+          <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:72px;object-fit:contain;display:block">
           <div style="color:#8b8fa8;font-size:11px;margin-top:7px">penguinstudiovoice@gmail.com</div>
         </div>
         <div style="text-align:right">
@@ -3437,7 +3437,7 @@ function buildQuotationHTML(data) {
     </div>
     <div style="padding:0 30px 26px">
       <div style="width:220px;margin-left:auto;text-align:center">
-        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png'}" style="height:44px;object-fit:contain;opacity:0.6;display:block;margin:0 auto 6px">
+        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="height:44px;object-fit:contain;opacity:0.75;height:56px;display:block;margin:0 auto 6px">
         <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
         <div style="font-size:12px;font-weight:600;color:#374151">ผู้เสนอราคา / Guin Home Studio</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(date)}</div>
@@ -3485,22 +3485,52 @@ function saveAndSendQuotation() {
   const saved = {...data, total, createdAt: new Date().toISOString()};
   const all = getDocsStore('quotations')||[];
   all.push(saved); saveDocsStore('quotations', all);
-  const subject = encodeURIComponent('ใบเสนอราคา '+data.docNo+' — Guin Home Studio');
-  const body = encodeURIComponent(
-    'เรียน คุณ'+data.client+'\n\n'+
-    'ขออนุญาตส่งใบเสนอราคา '+data.docNo+' มาเพื่อพิจารณาค่ะ\n'+
-    'ยอดรวม: ฿'+total.toLocaleString()+'\n\n'+
-    'กรุณาตรวจสอบเอกสารในไฟล์แนบค่ะ\n\n'+
-    'ขอบคุณค่ะ\nGuin Home Studio'
-  );
-  window.open(
-    'https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm'+
-    '&to='+encodeURIComponent(data.email)+
-    '&su='+subject+
-    '&body='+body,
-    '_blank'
-  );
-  toast('📧 เปิด Gmail แล้ว — กรุณาแนบ PDF ก่อนกดส่งครับ','info');
+
+  // เปิด popup แสดง From/To + อัปโหลดไฟล์
+  const old = document.getElementById('slip-upload-modal');
+  if(old) old.remove();
+  const div = document.createElement('div');
+  div.id = 'slip-upload-modal';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
+  div.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:500px;max-width:98vw">'+
+    '<div style="font-size:17px;font-weight:800;margin-bottom:4px">📤 ส่งใบเสนอราคา</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">ถึง: <strong>'+data.client+'</strong> ('+data.email+')</div>'+
+    '<div style="font-size:12px;background:rgba(0,180,255,.1);border:1px solid rgba(0,180,255,.25);border-radius:8px;padding:7px 12px;margin-bottom:16px;color:var(--cyan)">📤 จาก: <strong>penguinstudiovoice@gmail.com</strong></div>'+
+    '<div style="margin-bottom:16px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">📄 แนบไฟล์ใบเสนอราคา PDF (ถ้ามี)</div>'+
+    '<label style="cursor:pointer;display:block"><input type="file" accept="image/*,.pdf" style="display:none" id="qt-doc-input">'+
+    '<div id="qt-doc-zone" style="border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;transition:all .2s" onmouseover="this.style.borderColor=\'var(--accent2)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'+
+    '<div style="font-size:22px">📋</div><div style="font-size:12px;color:var(--text2)">คลิกเพื่อเลือกไฟล์ PDF</div>'+
+    '<div id="qt-doc-label" style="margin-top:6px;color:var(--green);font-size:12px;font-weight:700"></div></div></label></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn btn-outline btn-sm" style="flex:1" onclick="document.getElementById(\'slip-upload-modal\').remove()">ยกเลิก</button>'+
+    '<button class="btn btn-outline btn-sm" style="flex:1" id="qt-send-noattach">ข้าม → เปิด Gmail</button>'+
+    '<button class="btn btn-blue btn-sm" style="flex:1" id="qt-send-attach">💾 แบล็คอัพ & เปิด Gmail</button>'+
+    '</div></div>';
+  document.body.appendChild(div);
+  window._docDataPending = null;
+
+  div.querySelector('#qt-doc-input').addEventListener('change', function(){
+    const file = this.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e){ window._docDataPending = {base64:e.target.result, name:file.name}; document.getElementById('qt-doc-label').textContent='📋 '+file.name; document.getElementById('qt-doc-zone').style.borderColor='var(--green)'; };
+    reader.readAsDataURL(file);
+  });
+
+  const openGmail = function(){
+    const subject = encodeURIComponent('ใบเสนอราคา '+data.docNo+' — Guin Home Studio');
+    const body = encodeURIComponent('เรียน คุณ'+data.client+'\n\nขออนุญาตส่งใบเสนอราคา '+data.docNo+' มาเพื่อพิจารณาค่ะ\nยอดรวม: ฿'+total.toLocaleString()+'\n\nกรุณาตรวจสอบเอกสารในไฟล์แนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio');
+    window.open('https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm&to='+encodeURIComponent(data.email)+'&su='+subject+'&body='+body,'_blank');
+    toast('📧 เปิด Gmail แล้ว — กรุณาแนบ PDF ก่อนกดส่ง','info');
+  };
+
+  div.querySelector('#qt-send-noattach').onclick = function(){ div.remove(); openGmail(); };
+  div.querySelector('#qt-send-attach').onclick = function(){
+    div.remove();
+    openGmail();
+    if(window._docDataPending){ uploadToDrive('quotation', window._docDataPending.name, window._docDataPending.base64); window._docDataPending=null; }
+  };
   renderDocsHistory();
 }
 function downloadQuotation() {
@@ -3614,7 +3644,7 @@ function buildVoucherHTML(projId, workerId, slot, vNo, issueDate, note) {
     <div style="background:#0d0d2b;padding:26px 30px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
-          <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:56px;object-fit:contain;display:block">
+          <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:72px;object-fit:contain;display:block">
           <div style="color:#8b8fa8;font-size:11px;margin-top:7px">penguinstudiovoice@gmail.com</div>
         </div>
         <div style="text-align:right">
@@ -3676,7 +3706,7 @@ function buildVoucherHTML(projId, workerId, slot, vNo, issueDate, note) {
     </div>
     <div style="padding:0 30px 26px">
       <div style="width:220px;margin-left:auto;text-align:center">
-        <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:40px;object-fit:contain;opacity:0.55;display:block;margin:0 auto 6px">
+        <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:40px;object-fit:contain;opacity:0.75;height:56px;display:block;margin:0 auto 6px">
         <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
         <div style="font-size:12px;font-weight:600;color:#374151">ผู้จ่ายเงิน / Guin Home Studio</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(issueDate)}</div>
@@ -4279,7 +4309,7 @@ function buildBillingVoucherHTML(staffId) {
     <div style="background:#0d0d2b;padding:26px 30px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
-          <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:56px;object-fit:contain;display:block">
+          <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:72px;object-fit:contain;display:block">
           <div style="color:#8b8fa8;font-size:11px;margin-top:7px">penguinstudiovoice@gmail.com</div>
         </div>
         <div style="text-align:right">
@@ -4334,7 +4364,7 @@ function buildBillingVoucherHTML(staffId) {
     </div>
     <div style="padding:0 30px 26px">
       <div style="width:240px;margin-left:auto">
-        <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775855859/PNG1_xxe7ze.png" style="height:40px;object-fit:contain;opacity:0.55;display:block;margin:0 auto 6px">
+        <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:40px;object-fit:contain;opacity:0.75;height:56px;display:block;margin:0 auto 6px">
         <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
         <div style="font-size:12px;font-weight:600;color:#374151">ผู้จ่ายเงิน / Guin Home Studio</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:3px">${issueDate}</div>
