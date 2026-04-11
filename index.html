@@ -4508,13 +4508,14 @@ async function confirmSendEmailJS() {
   const e = window._pendingEmail;
   if (!e) { toast('ไม่มีข้อมูลอีเมล','error'); return; }
   if (!e.to || !e.to.includes('@')) {
-    toast('❌ Email ผู้รับไม่ถูกต้อง: "'+e.to+'" — กรุณาตรวจสอบ email ในระบบ','error');
+    toast('❌ Email ผู้รับไม่ถูกต้อง: "'+e.to+'"','error');
     return;
   }
-  toast('📤 กำลังส่งไปที่ '+e.to+'...','info');
+  console.log('📧 Sending to:', e.to, '| Subject:', e.subject);
+  toast('📤 กำลังส่งอีเมลถึง '+e.to+'...','info');
   const ok = await sendEmailJS(e.to, e.subject, e.message);
   if (ok) {
-    toast('✅ ส่งอีเมลถึง '+e.name+' ('+e.to+') สำเร็จแล้วค่ะ','success');
+    toast('✅ ส่งอีเมลถึง '+e.to+' สำเร็จแล้วค่ะ','success');
     window._pendingEmail = null;
   }
 }
@@ -5023,26 +5024,31 @@ function showEmailPreview(){
 
 async function sendEmailJS(to, subject, message) {
   if(typeof emailjs === 'undefined') {
-    toast('❌ EmailJS ไม่พร้อม — ลองรีเฟรชหน้าเว็บ', 'error');
+    toast('❌ EmailJS ไม่พร้อม','error');
+    return false;
+  }
+  if(!to || !to.includes('@')) {
+    toast('❌ Email ผู้รับไม่ถูกต้อง','error');
     return false;
   }
   try {
-    // แปลง newline เป็น <br> สำหรับ HTML email
-    var htmlMessage = '<div style="font-family:sans-serif;font-size:14px;line-height:1.8;color:#333">'+
-      message.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')+
-      '</div>';
-    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
-      to_email: to,
-      to_name: to,
-      from_name: 'Guin Home Studio',
-      reply_to: 'penguinstudiovoice@gmail.com',
-      subject: subject,
-      message: htmlMessage,
-    }, EMAILJS_CONFIG.publicKey);
+    console.log('EmailJS sending:', {to, subject});
+    const result = await emailjs.send(
+      EMAILJS_CONFIG.serviceId,
+      EMAILJS_CONFIG.templateId,
+      {
+        to_email: to.trim(),
+        from_name: 'Guin Home Studio',
+        subject: subject,
+        message: message,
+      },
+      EMAILJS_CONFIG.publicKey
+    );
+    console.log('EmailJS result:', result);
     return true;
   } catch(e) {
     console.error('EmailJS error:', e);
-    toast('❌ ส่งเมลไม่สำเร็จ: ' + (e.text||e.message||'unknown error'), 'error');
+    toast('❌ ส่งเมลไม่สำเร็จ: ' + (e.text||e.message||JSON.stringify(e)), 'error');
     return false;
   }
 }
