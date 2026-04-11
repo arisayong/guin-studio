@@ -2639,13 +2639,21 @@ function emailReceipt(){
   const s = ctx.staffId ? getStaffById(ctx.staffId) : null;
   const email = s?.email || prompt('กรอก Email:','');
   if(!email) return;
-  var nm = s?.name||email;
-  window._pendingEmail = {
-    to: email, name: nm,
-    subject: 'ใบสำคัญรับเงิน — Guin Home Studio',
-    message: 'เรียน คุณ'+nm+'\n\nขออนุญาตส่งใบสำคัญรับเงิน\n\nกรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio'
-  };
-  showEmailPreview();
+  const subject = encodeURIComponent('ใบสำคัญรับเงิน — Guin Home Studio');
+  const body = encodeURIComponent(
+    'เรียน คุณ'+(s?.name||'')+'\n\n'+
+    'ขออนุญาตส่งใบสำคัญรับเงิน\n\n'+
+    'กรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\n'+
+    'ขอบคุณค่ะ\nGuin Home Studio'
+  );
+  window.open(
+    'https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm'+
+    '&to='+encodeURIComponent(email)+
+    '&su='+subject+
+    '&body='+body,
+    '_blank'
+  );
+  toast('📧 เปิด Gmail แล้ว — กรุณาแนบ PDF ก่อนกดส่งครับ','info');
 }
 
 /* ── Fix 3: Download receipt as printable HTML file ── */
@@ -3462,73 +3470,26 @@ function saveAndSendQuotation() {
   if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
   if(!data.items.length){toast('กรุณาเพิ่มรายการ','error');return;}
   if(!data.email){toast('กรุณากรอก Email ลูกค้า','error');return;}
-
-  // บันทึกลง history
   const total = calcQtTotal();
   const saved = {...data, total, createdAt: new Date().toISOString()};
   const all = getDocsStore('quotations')||[];
   all.push(saved); saveDocsStore('quotations', all);
-
-  // เก็บ email data
-  window._pendingEmail = {
-    to: data.email,
-    name: data.client,
-    subject: 'ใบเสนอราคา '+data.docNo+' — Guin Home Studio',
-    message: 'เรียน คุณ'+data.client+'\n\nขออนุญาตส่งใบเสนอราคา '+data.docNo+' มาเพื่อพิจารณาค่ะ\nยอดรวม: ฿'+total.toLocaleString()+'\n\nกรุณาตรวจสอบเอกสารในไฟล์แนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio'
-  };
-  window._slipDataPending = null;
-  window._docDataPending  = null;
-
-  // เปิด popup อัปโหลด PDF
-  const old = document.getElementById('slip-upload-modal');
-  if(old) old.remove();
-  const div = document.createElement('div');
-  div.id = 'slip-upload-modal';
-  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
-  div.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:480px;max-width:98vw">'+
-    '<div style="font-size:17px;font-weight:800;margin-bottom:4px">📎 แนบใบเสนอราคา PDF</div>'+
-    '<div style="font-size:12px;color:var(--text2);margin-bottom:18px">ถึง <strong>'+data.client+'</strong> ('+data.email+')</div>'+
-    '<label style="cursor:pointer;display:block;margin-bottom:16px">'+
-    '<input type="file" accept="image/*,.pdf" style="display:none" id="qt-doc-input">'+
-    '<div id="qt-doc-zone" style="border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;transition:all .2s" onmouseover="this.style.borderColor=\'var(--accent2)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
-    '<div style="font-size:32px;margin-bottom:6px">📄</div>'+
-    '<div style="font-size:13px;color:var(--text2)">คลิกเพื่อเลือกใบเสนอราคา PDF ที่พิมพ์มาแล้ว</div>'+
-    '<div id="qt-doc-label" style="margin-top:8px;color:var(--accent2);font-size:12px;font-weight:700"></div>'+
-    '</div></label>'+
-    '<div style="display:flex;gap:8px">'+
-    '<button class="btn btn-outline btn-sm" style="flex:1" onclick="document.getElementById(\'slip-upload-modal\').remove()">ยกเลิก</button>'+
-    '<button class="btn btn-outline btn-sm" style="flex:1" id="qt-send-noattach">📧 ส่งโดยไม่แนบ PDF</button>'+
-    '<button class="btn btn-blue btn-sm" style="flex:1" id="qt-send-attach">💾 แนบ & ดูตัวอย่าง</button>'+
-    '</div></div>';
-  document.body.appendChild(div);
-
-  div.querySelector('#qt-doc-input').addEventListener('change', function(){
-    const file = this.files[0]; if(!file) return;
-    if(file.size > 10*1024*1024){toast('ไฟล์ใหญ่เกิน 10MB','error');return;}
-    const reader = new FileReader();
-    reader.onload = function(e2){
-      window._docDataPending = {base64:e2.target.result, name:file.name, savedAt:new Date().toISOString()};
-      document.getElementById('qt-doc-label').textContent = '📄 '+file.name;
-      document.getElementById('qt-doc-zone').style.borderColor = 'var(--green)';
-    };
-    reader.readAsDataURL(file);
-  });
-
-  document.getElementById('qt-send-noattach').onclick = function(){
-    window._pendingEmail.attachments = [];
-    div.remove(); showEmailPreview();
-  };
-  document.getElementById('qt-send-attach').onclick = function(){
-    var names = [];
-    if(window._docDataPending){
-      names.push({icon:'📄',name:window._docDataPending.name});
-      uploadToDrive('quotation', window._docDataPending.name, window._docDataPending.base64);
-    }
-    window._pendingEmail.attachments = names;
-    window._docDataPending = null;
-    div.remove(); showEmailPreview();
-  };
-
+  const subject = encodeURIComponent('ใบเสนอราคา '+data.docNo+' — Guin Home Studio');
+  const body = encodeURIComponent(
+    'เรียน คุณ'+data.client+'\n\n'+
+    'ขออนุญาตส่งใบเสนอราคา '+data.docNo+' มาเพื่อพิจารณาค่ะ\n'+
+    'ยอดรวม: ฿'+total.toLocaleString()+'\n\n'+
+    'กรุณาตรวจสอบเอกสารในไฟล์แนบค่ะ\n\n'+
+    'ขอบคุณค่ะ\nGuin Home Studio'
+  );
+  window.open(
+    'https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm'+
+    '&to='+encodeURIComponent(data.email)+
+    '&su='+subject+
+    '&body='+body,
+    '_blank'
+  );
+  toast('📧 เปิด Gmail แล้ว — กรุณาแนบ PDF ก่อนกดส่งครับ','info');
   renderDocsHistory();
 }
 function downloadQuotation() {
@@ -4343,9 +4304,10 @@ function downloadBillingVoucher(staffId) {
 }
 
 function sendBillingVoucherEmail(staffId) {
-  const s = getStaffById(staffId); if (!s) return;
+  const s = getStaffById(staffId);
+  if (!s) return;
   if (!s.email) { toast('ไม่มี email ของ '+s.nickname+' — กรุณาเพิ่มในหน้าจัดการทีม','error'); return; }
-  showSlipUploadModal(staffId); // เปิด popup อัปโหลดสลิป+เอกสาร แล้วค่อยส่ง
+  doSendVoucherEmail(staffId, false);
 }
 
 function showSlipUploadModal(staffId) {
@@ -4441,24 +4403,6 @@ function viewSavedSlip(key) {
 
 async function doSendVoucherEmail(staffId, withSlip) {
   const modal = document.getElementById('slip-upload-modal');
-
-  // เก็บชื่อไฟล์ก่อน clear
-  var attachNames = [];
-  if (withSlip) {
-    if (window._slipDataPending) {
-      attachNames.push({icon:'💸',name:window._slipDataPending.name});
-      const slipKey = 'billing_slip_'+staffId+'_'+billingYearSelected+'_'+billingMonthSelected+'_'+billingCycleSelected;
-      ls(slipKey, window._slipDataPending);
-      uploadToDrive('slip', window._slipDataPending.name, window._slipDataPending.base64);
-      window._slipDataPending = null;
-    }
-    if (window._docDataPending) {
-      attachNames.push({icon:'📄',name:window._docDataPending.name});
-      const docKey = 'billing_doc_'+staffId+'_'+billingYearSelected+'_'+billingMonthSelected+'_'+billingCycleSelected;
-      ls(docKey, window._docDataPending);
-      window._docDataPending = null;
-    }
-  }
   if (modal) modal.remove();
 
   const s = getStaffById(staffId);
@@ -4469,37 +4413,22 @@ async function doSendVoucherEmail(staffId, withSlip) {
     ? '1-15 '+TM[billingMonthSelected]+' '+(billingYearSelected+543)
     : '16-สิ้นเดือน '+TM[billingMonthSelected]+' '+(billingYearSelected+543);
 
-  // เก็บ email data ไว้ใน global ก่อนแสดง preview
-  window._pendingEmail = {
-    to: s.email,
-    name: s.name || s.nickname || '',
-    subject: 'ใบสำคัญจ่ายเงิน รอบ '+period+' — Guin Home Studio',
-    message: 'เรียน คุณ'+(s.name||s.nickname||'')+'\n\nขออนุญาตส่งใบสำคัญจ่ายเงินค่าตอบแทนรอบ '+period+'\n\nกรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio'
-  };
+  const subject = encodeURIComponent('ใบสำคัญจ่ายเงิน รอบ '+period+' — Guin Home Studio');
+  const body = encodeURIComponent(
+    'เรียน คุณ'+(s.name||s.nickname||'')+'\n\n'+
+    'ขออนุญาตส่งใบสำคัญจ่ายเงินค่าตอบแทนรอบ '+period+'\n\n'+
+    'กรุณาตรวจสอบยอดเงินในเอกสารแนบค่ะ\n\n'+
+    'ขอบคุณค่ะ\nGuin Home Studio'
+  );
 
-  // เก็บ attachments ใน pendingEmail
-  window._pendingEmail.attachments = attachNames;
-  // แสดง preview
-  const old = document.getElementById('email-preview-modal');
-  if (old) old.remove();
-  const prev = document.createElement('div');
-  prev.id = 'email-preview-modal';
-  prev.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
-  const e = window._pendingEmail;
-  prev.innerHTML =
-    '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:520px;max-width:98vw">'+
-    '<div style="font-size:17px;font-weight:800;margin-bottom:16px">📧 ตัวอย่างอีเมลก่อนส่ง</div>'+
-    '<div style="background:var(--bg2);border-radius:10px;padding:16px;font-size:13px;line-height:2;margin-bottom:14px">'+
-    '<div><span style="color:var(--text2);width:60px;display:inline-block">จาก:</span> <strong style="color:var(--green)">penguinstudiovoice@gmail.com</strong></div>'+
-    '<div><span style="color:var(--text2);width:60px;display:inline-block">ถึง:</span> <strong>'+e.to+'</strong> ('+e.name+')</div>'+
-    '<div><span style="color:var(--text2);width:60px;display:inline-block">หัวข้อ:</span> '+e.subject+'</div>'+
-    '</div>'+
-    '<div style="background:var(--bg2);border-radius:10px;padding:14px;font-size:13px;white-space:pre-line;line-height:1.8;margin-bottom:16px;border-left:3px solid var(--accent2)">'+e.message+'</div>'+
-    '<div style="display:flex;gap:10px">'+
-    '<button class="btn btn-outline" style="flex:1" onclick="document.getElementById(\'email-preview-modal\').remove()">✕ ยกเลิก</button>'+
-    '<button class="btn btn-blue" style="flex:1" onclick="confirmSendEmailJS()">✅ ยืนยันส่ง</button>'+
-    '</div></div>';
-  document.body.appendChild(prev);
+  window.open(
+    'https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm'+
+    '&to='+encodeURIComponent(s.email)+
+    '&su='+subject+
+    '&body='+body,
+    '_blank'
+  );
+  toast('📧 เปิด Gmail แล้ว — กรุณาแนบ PDF ก่อนกดส่งครับ','info');
 }
 
 async function confirmSendEmailJS() {
@@ -4605,13 +4534,14 @@ async function uploadToDrive(type, filename, content) {
     });
     const json = await res.json();
     if (json.success) {
-      toast('☁️ บันทึกขึ้น Google Drive แล้ว · ' + filename, 'success');
-      return json;
+      const url = json.url || json.fileUrl || null;
+      toast('☁️ อัปโหลดขึ้น Drive แล้ว · ' + filename, 'success');
+      return url; // return URL for use in email
     } else {
       toast('⚠️ Drive: ' + (json.error||'เกิดข้อผิดพลาด'), 'warn');
     }
   } catch(e) {
-    toast('⚠️ เชื่อมต่อ Drive ไม่ได้: ' + e.message, 'warn');
+    toast('⚠️ เชื่อมต่อ Drive ไม่ได้', 'warn');
   }
   return null;
 }
@@ -4988,11 +4918,15 @@ function showEmailPreview(){
 
   // ตรวจไฟล์ที่แนบจาก _pendingEmail.attachments
   var attachList = (e.attachments||[]);
+  var driveList  = (e.driveLinks||[]);
   var attachHtml = '';
   if(attachList.length){
     var rows = attachList.map(function(a){return '<div style="color:var(--text2);margin-top:4px">'+a.icon+' '+a.name+'</div>';}).join('');
+    var linkRows = driveList.map(function(l){return '<div style="margin-top:4px"><a href="'+l.url+'" target="_blank" style="color:var(--accent2)">🔗 '+l.label+'</a></div>';}).join('');
     attachHtml = '<div style="background:rgba(0,223,160,.08);border:1px solid rgba(0,223,160,.2);border-radius:10px;padding:12px;font-size:12px;margin-bottom:14px">'+
-      '<div style="font-weight:700;color:var(--green);margin-bottom:4px">📎 ไฟล์ที่จะแนบ:</div>'+rows+'</div>';
+      '<div style="font-weight:700;color:var(--green);margin-bottom:4px">📎 ไฟล์ที่อัปโหลด (ส่งเป็น Drive link ในเมล):</div>'+rows+
+      (linkRows?'<div style="margin-top:8px;font-size:11px;color:var(--text2)">Link ที่จะส่ง:</div>'+linkRows:'<div style="margin-top:6px;font-size:11px;color:var(--orange)">⚠️ ยังไม่ได้รับ Drive link — ตรวจสอบ Drive API</div>')+
+      '</div>';
   } else {
     attachHtml = '<div style="background:rgba(255,158,0,.08);border:1px solid rgba(255,158,0,.2);border-radius:10px;padding:10px;font-size:12px;color:var(--orange);margin-bottom:14px">⚠️ ไม่มีไฟล์แนบ</div>';
   }
