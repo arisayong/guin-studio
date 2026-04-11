@@ -4356,11 +4356,13 @@ function sendBillingVoucherEmail(staffId) {
     reader.readAsDataURL(file);
   });
   div.querySelector('#btn-skip-upload').onclick = function(){ div.remove(); doSendVoucherEmail(staffId, false); };
-  div.querySelector('#btn-save-upload').onclick = async function(){
+  div.querySelector('#btn-save-upload').onclick = function(){
     div.remove();
-    if(window._slipDataPending) { await uploadToDrive('slip', window._slipDataPending.name, window._slipDataPending.base64); window._slipDataPending=null; }
-    if(window._docDataPending)  { await uploadToDrive('voucher', window._docDataPending.name, window._docDataPending.base64); window._docDataPending=null; }
+    // เปิด Gmail ทันที ไม่รอ upload
     doSendVoucherEmail(staffId, false);
+    // Upload Drive ใน background พร้อมกัน
+    if(window._slipDataPending) { uploadToDrive('slip', window._slipDataPending.name, window._slipDataPending.base64); window._slipDataPending=null; }
+    if(window._docDataPending)  { uploadToDrive('voucher', window._docDataPending.name, window._docDataPending.base64); window._docDataPending=null; }
   };
 }
 
