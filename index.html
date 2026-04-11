@@ -1575,21 +1575,31 @@ function switchLoginTab(t){
 let _regStaffCache = null;
 async function preloadRegStaff(){
   const inp = document.getElementById('reg-staff-search');
-  if(_regStaffCache){ // มี cache อยู่แล้ว พร้อมใช้งานทันที
+  if(_regStaffCache && _regStaffCache.length > 0){
     if(inp){ inp.placeholder='🔍 พิมพ์ชื่อเพื่อค้นหา...'; inp.disabled=false; }
     return;
   }
   if(inp){ inp.placeholder='⏳ กำลังโหลดรายชื่อ...'; inp.disabled=true; }
   try {
-    if(_fbDatabase){
-      const snap = await _fbDatabase.ref('staff').get();
-      if(snap.exists()){
-        ls('staff_v3', snap.val());
-      }
+    if(_fbDatabase && _fbAuth){
+      // Anonymous sign-in เพื่อผ่าน Firebase Security Rules ก่อน login จริง
+      let anonUser = null;
+      try { const c = await _fbAuth.signInAnonymously(); anonUser = c.user; }
+      catch(e){ console.warn('anon sign-in:', e.message); }
+      try {
+        const snap = await _fbDatabase.ref('staff').get();
+        if(snap.exists()) ls('staff_v3', snap.val());
+      } catch(e){ console.warn('staff fetch:', e.message); }
+      // Sign out anonymous ทันที ไม่กระทบ login จริง
+      if(anonUser){ try{ await _fbAuth.signOut(); }catch(e){} }
     }
-  } catch(e){ console.warn('preloadRegStaff error:', e); }
-  _regStaffCache = getAllStaff(); // cache ผลลัพธ์ไว้
-  if(inp){ inp.placeholder='🔍 พิมพ์ชื่อเพื่อค้นหา...'; inp.disabled=false; inp.focus(); }
+  } catch(e){ console.warn('preloadRegStaff error:', e.message); }
+  _regStaffCache = getAllStaff();
+  if(inp){
+    const n = _regStaffCache.length;
+    inp.placeholder = n > 0 ? `🔍 พิมพ์ชื่อเพื่อค้นหา... (${n} คน)` : '🔍 พิมพ์ชื่อเพื่อค้นหา...';
+    inp.disabled=false; inp.focus();
+  }
 }
 
 function filterRegStaff(){
