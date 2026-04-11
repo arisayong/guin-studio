@@ -325,11 +325,41 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
 .upload-area:hover,.upload-area.drag{border-color:var(--accent2);background:var(--dim2)}
 
 @media(max-width:768px){
-  .sidebar{width:62px}
-  .sidebar .sname,.sidebar .ssub,.nav-item span:not(.nav-icon),.user-name,.user-role,.btn-logout,.nav-section{display:none}
-  .nav-item{padding:12px;justify-content:center}
-  .main-content{margin-left:62px;padding:16px}
-  .stats-grid{grid-template-columns:1fr 1fr}
+  /* Sidebar icon-only */
+  .sidebar{width:56px}
+  .sidebar .sname,.sidebar .ssub,.nav-item span:not(.nav-icon),
+  .user-name,.user-role,.btn-logout,.nav-section,.nav-chevron{display:none!important}
+  .nav-item{padding:13px 0;justify-content:center;border-left:none;border-right:3px solid transparent}
+  .nav-item.active{border-right-color:var(--accent2);border-left:none}
+  .nav-sub{display:none!important}
+  .sidebar-footer{padding:10px 0;display:flex;justify-content:center}
+  .user-avatar{width:30px;height:30px;font-size:12px}
+  /* Main content */
+  .main-content{margin-left:56px;padding:14px 12px;max-width:calc(100vw - 56px)}
+  .page-title{font-size:17px}
+  .page-actions{flex-direction:column;align-items:stretch}
+  .page-actions .search-bar,.page-actions .btn{width:100%}
+  .search-bar{width:100%!important;max-width:none!important}
+  /* Stats */
+  .stats-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .stat-value{font-size:20px}
+  /* Tables scroll */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .table-wrap table{min-width:460px}
+  td,th{padding:9px 8px;font-size:12px}
+  /* Calendar */
+  #my-cal-content,#proj-cal-content{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .trk-calendar-card{min-width:320px}
+  /* Modal bottom-sheet */
+  .modal{width:100vw;max-width:100vw;border-radius:14px 14px 0 0;max-height:95vh}
+  .modal-overlay{align-items:flex-end;padding:0}
+  .modal-body{padding:16px}
+  /* Form stack */
+  .form-row{grid-template-columns:1fr}
+  .section-card{padding:14px}
+  /* Toast */
+  .toast-wrap{bottom:12px;right:8px;left:8px}
+  .toast{min-width:unset;width:100%}
 }
 
 /* ── Worker Search Dropdown ── */
@@ -3322,34 +3352,92 @@ function deleteStaff(id,cat){
 function renderMyDash(){
   if(!currentUser?.staffId)return;const s=getStaffById(currentUser.staffId);if(!s)return;
   document.getElementById('my-welcome').textContent=`สวัสดี ${s.nickname} 👋`;
-  const projs=getProjects();let paid=0,pending=0;const rows=[];
+  const projs=getProjects();let paid=0,pending=0;const items=[];
   projs.forEach(p=>{const myWs=(p.workers||[]).filter(x=>x.id===s.id);if(!myWs.length)return;
-    myWs.forEach((w,wi)=>{
+    myWs.forEach(w=>{
       if(w.status==='paid')paid+=w.amount||0;else pending+=w.amount||0;
       const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';
       const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
-      const roleLabel=(_lbl[_pre]||CATS[s.category]?.label||'')+_suf;
-      rows.push('<tr>'+(wi===0?'<td rowspan="'+myWs.length+'"><strong>'+p.name+'</strong></td><td rowspan="'+myWs.length+'">'+fmtDate(p.date)+'</td>':'')+'<td style="color:var(--cyan);font-weight:700">'+roleLabel+'</td><td style="color:var(--accent2);font-weight:700">'+(w.amount?fmtB(w.amount):'TBD')+'</td><td>'+statusBadge(w.status)+'</td></tr>');
+      items.push({projName:p.name,date:fmtDate(p.date),role:(_lbl[_pre]||CATS[s.category]?.label||'')+_suf,amount:w.amount,status:w.status});
     });
   });
-  document.getElementById('my-paid').textContent=fmtB(paid);document.getElementById('my-pending').textContent=fmtB(pending);
-  document.getElementById('my-proj-table').innerHTML=rows.join('')||'<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:20px">ยังไม่มีงาน</td></tr>';
+  document.getElementById('my-paid').textContent=fmtB(paid);
+  document.getElementById('my-pending').textContent=fmtB(pending);
+  const isMobile=window.innerWidth<=768;
+  const tb=document.getElementById('my-proj-table');
+  if(!items.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:20px">ยังไม่มีงาน</td></tr>';return;}
+  if(isMobile){
+    // Card layout สำหรับมือถือ
+    tb.closest('table').style.minWidth='unset';
+    tb.innerHTML=items.map(it=>`
+      <tr><td colspan="5" style="padding:8px 4px;border:none">
+        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px">
+          <div style="font-weight:700;font-size:14px;margin-bottom:6px">${it.projName}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+            <div style="font-size:12px;color:var(--cyan);font-weight:600">${it.role}</div>
+            <div style="font-size:15px;font-weight:800;color:var(--accent2)">${it.amount?fmtB(it.amount):'TBD'}</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+            <div style="font-size:11px;color:var(--text2)">${it.date}</div>
+            <div>${statusBadge(it.status)}</div>
+          </div>
+        </div>
+      </td></tr>`).join('');
+  } else {
+    tb.closest('table').style.minWidth='';
+    tb.innerHTML=items.map(it=>`<tr>
+      <td><strong>${it.projName}</strong></td>
+      <td>${it.date}</td>
+      <td style="color:var(--cyan);font-weight:700">${it.role}</td>
+      <td style="color:var(--accent2);font-weight:700">${it.amount?fmtB(it.amount):'TBD'}</td>
+      <td>${statusBadge(it.status)}</td>
+    </tr>`).join('');
+  }
 }
+
 function renderMyHistory(){
   if(!currentUser?.staffId)return;const s=getStaffById(currentUser.staffId);if(!s)return;
   const q=(document.getElementById('my-hist-search')?.value||'').toLowerCase();
-  const projs=getProjects();const rows=[];
+  const projs=getProjects();const items=[];
   projs.forEach(p=>{
     if(q&&!(p.name||'').toLowerCase().includes(q))return;
     const myWorkers=(p.workers||[]).filter(x=>x.id===s.id);if(!myWorkers.length)return;
-    myWorkers.forEach((w,wi)=>{
+    myWorkers.forEach(w=>{
       const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';
       const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
-      const roleLabel=(_lbl[_pre]||CATS[s.category]?.label||'')+_suf;
-      rows.push('<tr>'+(wi===0?'<td rowspan="'+myWorkers.length+'"><strong>'+p.name+'</strong></td><td rowspan="'+myWorkers.length+'">'+fmtDate(p.date)+'</td>':'')+'<td style="color:var(--cyan);font-weight:700">'+roleLabel+'</td><td style="color:var(--accent2);font-weight:700">'+(w.amount?fmtB(w.amount):'TBD')+'</td><td style="font-size:12px;color:var(--text2)">'+s.bank+' '+s.account+'</td><td>'+statusBadge(w.status)+'</td></tr>');
+      items.push({projName:p.name,date:fmtDate(p.date),role:(_lbl[_pre]||CATS[s.category]?.label||'')+_suf,amount:w.amount,bank:s.bank+' '+s.account,status:w.status});
     });
   });
-  document.getElementById('my-hist-table').innerHTML=rows.join('')||'<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:20px">ยังไม่มีประวัติ</td></tr>';
+  const isMobile=window.innerWidth<=768;
+  const tb=document.getElementById('my-hist-table');
+  if(!items.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:20px">ยังไม่มีประวัติ</td></tr>';return;}
+  if(isMobile){
+    tb.closest('table').style.minWidth='unset';
+    tb.innerHTML=items.map(it=>`
+      <tr><td colspan="6" style="padding:8px 4px;border:none">
+        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px">
+          <div style="font-weight:700;font-size:14px;margin-bottom:6px">${it.projName}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+            <div style="font-size:12px;color:var(--cyan);font-weight:600">${it.role}</div>
+            <div style="font-size:15px;font-weight:800;color:var(--accent2)">${it.amount?fmtB(it.amount):'TBD'}</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap;gap:4px">
+            <div style="font-size:11px;color:var(--text2)">${it.date} · ${it.bank}</div>
+            <div>${statusBadge(it.status)}</div>
+          </div>
+        </div>
+      </td></tr>`).join('');
+  } else {
+    tb.closest('table').style.minWidth='';
+    tb.innerHTML=items.map(it=>`<tr>
+      <td><strong>${it.projName}</strong></td>
+      <td>${it.date}</td>
+      <td style="color:var(--cyan);font-weight:700">${it.role}</td>
+      <td style="color:var(--accent2);font-weight:700">${it.amount?fmtB(it.amount):'TBD'}</td>
+      <td style="font-size:12px;color:var(--text2)">${it.bank}</td>
+      <td>${statusBadge(it.status)}</td>
+    </tr>`).join('');
+  }
 }
 
 
