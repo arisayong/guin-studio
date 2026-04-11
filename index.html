@@ -2093,7 +2093,7 @@ function renderTrkCardHTML(card){
     const stSel = '<select data-cid="'+card.id+'" data-phk="'+ph.key+'" class="trk-st-sel" style="padding:3px 6px;border-radius:8px;background:'+stInfo.bg+';border:1px solid '+stInfo.border+';color:'+stInfo.color+';font-family:Kanit;font-size:11px;font-weight:700;cursor:pointer;max-width:130px" onchange="trkStChange(this)">'+stOpts+'</select>';
     const startDaysLeft = pd.deadline ? Math.ceil((new Date(pd.deadline)-new Date())/(864e5)) : null;
     const dlColor = startDaysLeft===null?'var(--text2)':startDaysLeft<0?'var(--red)':startDaysLeft<=3?'var(--orange)':'var(--green)';
-    const dlLabel = startDaysLeft===null?'':pd.status==='done'?'✅ เสร็จแล้ว':startDaysLeft<0?'⚠️ เกิน '+Math.abs(startDaysLeft)+'วัน':startDaysLeft===0?'🔴 วันนี้!':startDaysLeft<=3?'🟡 '+startDaysLeft+'วัน':startDaysLeft+'วัน';
+    const dlLabel = startDaysLeft===null?'':pd.status==='done'?'<span style="color:var(--green);font-weight:700">✅ เสร็จแล้ว</span>':startDaysLeft<0?'⚠️ เกิน '+Math.abs(startDaysLeft)+'วัน':startDaysLeft===0?'🔴 วันนี้!':startDaysLeft<=3?'🟡 '+startDaysLeft+'วัน':startDaysLeft+'วัน';
     const rowBg = startDaysLeft!==null&&startDaysLeft<=3&&startDaysLeft>=0?'rgba(255,158,0,.04)':startDaysLeft!==null&&startDaysLeft<0?'rgba(255,64,64,.04)':'';
     const dlBorder = startDaysLeft!==null&&startDaysLeft<0?'rgba(255,64,64,.5)':startDaysLeft!==null&&startDaysLeft<=3?'rgba(255,158,0,.5)':'var(--border2)';
     const dlLabelHtml = dlLabel?'<span style="font-size:10px;font-weight:700;color:'+dlColor+';margin-left:4px">'+dlLabel+'</span>':'';
@@ -4076,7 +4076,7 @@ function renderProjCal() {
         const isDone=ev.p.projStatus==='done'||getProjStatus(ev.p)==='paid';
         const isCancelled=ev.p.projStatus==='cancelled';
         const dColor=isDone?'var(--green)':isCancelled?'var(--text2)':ev.isOverdue?'var(--red)':ev.isUrgent?'var(--orange)':'var(--text2)';
-        const dLabel=isDone?'✅ เสร็จแล้ว':isCancelled?'❌ ยกเลิก':ev.daysLeft===0?'🔴 วันนี้!':ev.isOverdue?`⚠️ เกิน ${Math.abs(ev.daysLeft)} วัน`:`${ev.daysLeft} วัน`;
+        const dLabel=isDone?'<span style="color:var(--green);font-weight:700">✅ เสร็จแล้ว</span>':isCancelled?'❌ ยกเลิก':ev.daysLeft===0?'🔴 วันนี้!':ev.isOverdue?`⚠️ เกิน ${Math.abs(ev.daysLeft)} วัน`:`${ev.daysLeft} วัน`;
         return `<tr>
           <td style="cursor:pointer" onclick="openProjDetail('${ev.p.id}')">
             <div style="display:flex;align-items:center;gap:8px">
@@ -5343,21 +5343,34 @@ function toThaiTime(timeStr){
   const parts = timeStr.split(':');
   const h = parseInt(parts[0])||0;
   const m = parseInt(parts[1])||0;
-  const min = m>0 ? m+'นาที' : '';
-  const HOURS = ['เที่ยงคืน','ตีหนึ่ง','ตีสอง','ตีสาม','ตีสี่','ตีห้า',
-    '6โมงเช้า','7โมงเช้า','8โมงเช้า','9โมงเช้า','10โมงเช้า','11โมงเช้า',
-    'เที่ยง','บ่ายโมง','บ่ายสองโมง','บ่ายสามโมง',
-    '4โมงเย็น','5โมงเย็น','6โมงเย็น',
-    'หนึ่งทุ่ม','สองทุ่ม','สามทุ่ม','สี่ทุ่ม','ห้าทุ่ม'];
-  const base = HOURS[h]||timeStr;
-  if(!m) return base;
-  // แทรกนาที: "4โมง30นาทีเย็น"
-  if(base.includes('โมงเช้า')) return base.replace('โมงเช้า','โมง'+min+'เช้า');
-  if(base.includes('โมงเย็น')) return base.replace('โมงเย็น','โมง'+min+'เย็น');
-  if(base.includes('บ่าย')) return base+min;
-  if(base.includes('ทุ่ม')) return base.replace('ทุ่ม',min+'ทุ่ม');
-  if(base.includes('ตี')) return base+min;
-  return base+' '+min;
+
+  // แปลงนาทีเป็นภาษาไทย
+  function thaiNum(n){
+    const ones=['','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'];
+    if(n===0) return '';
+    if(n<10) return ones[n];
+    const t=Math.floor(n/10), u=n%10;
+    const tens=t===1?'สิบ':t===2?'ยี่สิบ':ones[t]+'สิบ';
+    return tens+(u?ones[u]:'');
+  }
+  const min = m>0 ? thaiNum(m) : '';
+
+  // ชั่วโมงภาษาไทย (ไม่รวมนาที)
+  let hourStr='';
+  if(h===0)  hourStr='เที่ยงคืน';
+  else if(h>=1&&h<=5) hourStr='ตี'+['','หนึ่ง','สอง','สาม','สี่','ห้า'][h];
+  else if(h>=6&&h<=11) hourStr=h+'โมงเช้า';
+  else if(h===12) hourStr='เที่ยง';
+  else if(h===13) hourStr='บ่ายโมง';
+  else if(h>=14&&h<=15) hourStr='บ่าย'+(h-12==='สอง'?'สอง':h===14?'สองโมง':'สามโมง');
+  else if(h>=16&&h<=18) hourStr=(h-12)+'โมงเย็น';
+  else if(h>=19&&h<=23){ const t=['','หนึ่ง','สอง','สาม','สี่','ห้า'];hourStr=t[h-18]+'ทุ่ม';}
+
+  // fix บ่าย
+  if(h===14) hourStr='บ่ายสองโมง';
+  if(h===15) hourStr='บ่ายสามโมง';
+
+  return hourStr+min;
 }
 // ══════════════════════════════════════════════
 // INIT
