@@ -3836,11 +3836,9 @@ function renderMyDash(){
 
   const projs=getProjects();let paid=0,pending=0;const items=[];
   projs.forEach(p=>{const myWs=(p.workers||[]).filter(x=>x.id===s.id);if(!myWs.length)return;
-    const dur=p.duration||0;
     myWs.forEach(w=>{
-      // คำนวณยอดจริง: ถ้าเป็นรายนาทีให้ × duration ของโปรเจกต์
-      const isMin=(w.unit||'').includes('นาที');
-      const realAmt=isMin&&dur>0?Math.round((w.amount||0)*dur):(w.amount||0);
+      // w.amount คือยอดที่คำนวณแล้ว (rate × duration) ตั้งแต่ตอน save โปรเจกต์
+      const realAmt=w.amount||0;
       if(w.status==='paid')paid+=realAmt;else pending+=realAmt;
       const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';
       const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
@@ -3888,10 +3886,9 @@ function renderMyHistory(){
   projs.forEach(p=>{
     if(q&&!(p.name||'').toLowerCase().includes(q))return;
     const myWorkers=(p.workers||[]).filter(x=>x.id===s.id);if(!myWorkers.length)return;
-    const dur2=p.duration||0;
     myWorkers.forEach(w=>{
-      const isMin2=(w.unit||'').includes('นาที');
-      const realAmt2=isMin2&&dur2>0?Math.round((w.amount||0)*dur2):(w.amount||0);
+      // w.amount คือยอดที่คำนวณแล้ว ไม่ต้องคูณ duration อีก
+      const realAmt2=w.amount||0;
       const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';
       const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
       items.push({projName:p.name,date:fmtDate(p.date),role:(_lbl[_pre]||CATS[s.category]?.label||'')+_suf,amount:realAmt2,bank:s.bank+' '+s.account,status:w.status});
