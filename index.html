@@ -489,7 +489,20 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div class="nav-item" onclick="nav('my-dashboard')"><span class="nav-icon">💰</span><span>ยอดของฉัน</span></div>
    <div class="nav-item" onclick="nav('my-history')"><span class="nav-icon">📋</span><span>ประวัติงาน</span></div>
   </nav>
+  <nav class="sidebar-nav hidden" id="manager-nav">
+   <div class="nav-section">ของฉัน</div>
+   <div class="nav-item active" onclick="nav('mgr-projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
+   <div class="nav-item" onclick="nav('mgr-track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
+   <div class="nav-item" onclick="nav('mgr-calendar')"><span class="nav-icon">🗓️</span><span>ปฏิทิน</span></div>
+   <div class="nav-item" onclick="nav('mgr-team')"><span class="nav-icon">👥</span><span>จัดการทีม</span></div>
+  </nav>
   <div class="sidebar-footer">
+   <div id="admin-inbox-bell" style="display:none;margin-bottom:10px">
+    <button onclick="openModal('modal-admin-inbox')" style="width:100%;display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(155,111,255,.1);border:1px solid rgba(155,111,255,.3);border-radius:9px;color:#9B6FFF;font-family:Kanit;font-size:12px;cursor:pointer;font-weight:500">
+     <span style="font-size:14px">📨</span><span style="flex:1">คำขอจาก Manager</span>
+     <span id="admin-inbox-count" style="padding:1px 8px;border-radius:20px;background:rgba(155,111,255,.2);color:#9B6FFF;font-size:11px;font-weight:700;border:1px solid rgba(155,111,255,.4)">0</span>
+    </button>
+   </div>
    <div class="sidebar-user" style="cursor:pointer" onclick="openProfileModal()" title="แก้ไขโปรไฟล์">
     <div class="user-avatar" id="sidebar-avatar">A</div>
     <div style="flex:1"><div class="user-name" id="sidebar-name">—</div><div class="user-role" id="sidebar-role">—</div></div>
@@ -832,6 +845,64 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    </div>
 
   </div>
+  <!-- ═══════════════ MANAGER PAGES ═══════════════ -->
+  <div id="page-mgr-projects" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">📁 โปรเจกต์ของฉัน</div>
+    <div class="page-subtitle">โปรเจกต์ที่แอดมินมอบหมาย</div>
+    <div class="page-actions"><div class="search-bar" style="margin:0;width:260px"><span class="icon">🔍</span><input id="mgr-proj-search" placeholder="ค้นหาโปรเจกต์..." oninput="renderMgrProjects()"></div></div>
+   </div>
+   <div id="mgr-proj-list"></div>
+  </div>
+
+  <div id="page-mgr-track" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">📅 ติดตามงาน</div>
+    <div class="page-subtitle">สถานะและ deadline โปรเจกต์ของฉัน</div>
+    <div class="page-actions" style="flex-wrap:wrap;gap:8px">
+     <div class="search-bar" style="margin:0;flex:1;max-width:260px"><span class="icon">🔍</span><input id="mgr-track-search" placeholder="ค้นหาโปรเจกต์..." oninput="renderMgrTrack()"></div>
+     <div id="mgr-track-chips" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
+     <div style="position:relative;margin-left:auto" id="mgr-cal-dd-wrap">
+      <button onclick="toggleMgrCalDD()" id="mgr-cal-dd-btn" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.1);border-radius:20px;color:var(--text);font-family:Kanit;font-size:12px;cursor:pointer;white-space:nowrap">
+       📅 แสดงในปฏิทิน <span id="mgr-cal-dd-count" style="padding:1px 8px;border-radius:20px;background:rgba(155,111,255,.15);color:#9B6FFF;border:1px solid rgba(155,111,255,.3);font-size:11px;font-weight:700">0</span> <span style="font-size:10px;color:var(--text2)">▼</span>
+      </button>
+      <div id="mgr-cal-dd-panel" style="display:none;position:absolute;right:0;top:calc(100% + 6px);min-width:260px;background:var(--card);border:1px solid rgba(21,101,255,.25);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:99;overflow:hidden">
+       <div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:11px;color:var(--text2)">เลือกโปรเจกต์ที่ต้องการแสดง</span>
+        <div style="display:flex;gap:8px"><span onclick="mgrCalSelAll()" style="font-size:11px;color:#9B6FFF;cursor:pointer;font-weight:500">ทั้งหมด</span><span onclick="mgrCalSelNone()" style="font-size:11px;color:#9B6FFF;cursor:pointer;font-weight:500">ล้าง</span></div>
+       </div>
+       <div id="mgr-cal-dd-items"></div>
+      </div>
+     </div>
+    </div>
+   </div>
+   <div id="mgr-track-cal" style="background:#fff;border-radius:12px;margin-bottom:16px;overflow:hidden"></div>
+   <div id="mgr-track-list"></div>
+  </div>
+
+  <div id="page-mgr-calendar" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">🗓️ ปฏิทิน</div>
+    <div class="page-subtitle">ภาพรวมทุกโปรเจกต์</div>
+    <div class="page-actions"><div class="search-bar" style="margin:0;width:260px"><span class="icon">🔍</span><input id="mgr-cal-search" placeholder="ค้นหาโปรเจกต์..." oninput="renderMgrCalendar()"></div></div>
+   </div>
+   <div style="display:flex;gap:6px;margin-bottom:14px">
+    <div onclick="mgrCalFilter('mine')" id="mgr-f-mine" style="padding:5px 14px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid rgba(155,111,255,.4);background:rgba(155,111,255,.15);color:#9B6FFF;font-weight:700;user-select:none">ของฉัน</div>
+    <div onclick="mgrCalFilter('all')" id="mgr-f-all" style="padding:5px 14px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid rgba(255,255,255,.1);color:var(--text2);user-select:none">ทั้งหมด</div>
+   </div>
+   <div id="mgr-calendar-list"></div>
+  </div>
+
+  <div id="page-mgr-team" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">👥</div><div class="page-title" style="display:inline"> จัดการทีม</div>
+    <div class="page-subtitle">รายชื่อสมาชิกทั้งหมด (ชื่อ + เบอร์โทร)</div>
+    <div class="page-actions"><div class="search-bar" style="margin:0;width:260px"><span class="icon">🔍</span><input id="mgr-team-search" placeholder="ค้นหาชื่อสมาชิก..." oninput="renderMgrTeam()"></div></div>
+   </div>
+   <div id="mgr-team-grid" style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;display:flex;flex-wrap:wrap;gap:8px"></div>
+  </div>
+
+
 
 
  </main>
@@ -891,6 +962,12 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
      </select>
     </div>
     <div class="form-group" style="margin:0"><label class="form-label">หมายเหตุ (การหัก / เงื่อนไข)</label><input class="form-input" id="pj-note" placeholder="เช่น หัก 3% ค่าธรรมเนียม"></div>
+   <div class="form-group" style="margin:0">
+    <label class="form-label">🗂️ มอบหมาย Manager</label>
+    <select class="form-input form-select" id="pj-manager">
+     <option value="">— ไม่มี / แอดมินจัดการเอง —</option>
+    </select>
+   </div>
    </div>
 
    <!-- CAT TOGGLES -->
@@ -1180,6 +1257,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
     <div class="form-group"><label class="form-label">เลขบัญชี</label><input class="form-input" id="st-account" placeholder="xxx-x-xxxxx-x"></div>
    </div>
    <div class="form-group"><label class="form-label">เบอร์ PromptPay <span style="color:var(--text2)">(ถ้ามี)</span></label><input class="form-input" id="st-promptpay" placeholder="0812345678"></div>
+   <div id="st-role-toggle" style="display:none"></div>
    <div class="form-group"><label class="form-label">📧 Email <span style="color:var(--text2)">(สำหรับส่งใบสำคัญ)</span></label><input class="form-input" id="st-email" type="email" placeholder="example@email.com"></div>
   </div>
   <!-- Warning section - แสดงเฉพาะตอนแก้ไข -->
@@ -1253,7 +1331,7 @@ let _db = {}; // local cache, synced from Firebase
 let projectsCache = []; // global projects cache
 let currentUser = null;  // logged-in user
 let formSlots = {};      // project form worker slots
-let staffViewMode = 'full';   // 'full' | 'compact'
+let staffViewMode = 'compact';   // 'full' | 'compact'
 let activeStaffCat = 'all';   // active staff category tab
 let editingStaffId = null;
 let editingStaffCat = null;
@@ -1591,7 +1669,7 @@ async function saveUserProfile(uid,data){ await fbSaveUserProfile(uid,data); }
 // ══════════════════════════════════════════════
 function fmtDate(d){if(!d)return'—';if(typeof d==='string'&&/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d))return d;try{return new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'})}catch{return String(d)}}
 function fmtB(n){return'฿'+(n||0).toLocaleString()}
-function openModal(id){document.getElementById(id).classList.remove('hidden')}
+function openModal(id){if(id==='modal-admin-inbox')renderAdminInbox();document.getElementById(id).classList.remove('hidden')}
 function closeModal(id){document.getElementById(id).classList.add('hidden')}
 function toast(msg,type='info'){
   const wrap=document.getElementById('toastWrap');const el=document.createElement('div');
@@ -1858,7 +1936,7 @@ function iwSelCat(idx, el) {
   el.classList.add('btn-blue');
   el.classList.remove('btn-outline');
   document.getElementById('iw-sub-list').innerHTML = IW_CATS[idx].items.map(it =>
-    `<div onclick="iwSelSub(this,'${it.replace(/'/g,"\'")}') "
+    `<div onclick="iwSelSub(this,'${it.replace(/'/g,"\'")}')"
       style="padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid rgba(255,255,255,.07);color:var(--text2);background:rgba(0,0,0,.2);display:flex;align-items:center;gap:8px;transition:all .15s"
       onmouseover="if(!this.classList.contains('iw-sel'))this.style.borderColor='rgba(255,64,64,.3)'"
       onmouseout="if(!this.classList.contains('iw-sel'))this.style.borderColor='rgba(255,255,255,.07)'">
@@ -2129,6 +2207,7 @@ async function enterApp(){
   showLoader(true);
   try { await loadProjects(); } catch(e) { console.warn('loadProjects skipped:', e.message); }
   try { await loadWarningsFromFirebase(); } catch(e) {}
+  try { await loadMgrRequests(); await loadManagerUsers(); } catch(e) {}
   // Load tracking cards from Firebase
   try {
     if(_fbDatabase){
@@ -2200,9 +2279,13 @@ async function enterApp(){
   const _sn=document.getElementById('sidebar-name');if(_sn)_sn.textContent=currentUser.nickname||currentUser.name||'';
   const _sr=document.getElementById('sidebar-role');if(_sr)_sr.textContent=currentUser.role==='admin'?'Administrator':'ทีมงาน';
   const _an=document.getElementById('admin-nav');if(_an)_an.classList.toggle('hidden',currentUser.role!=='admin');
-  const _stf=document.getElementById('staff-nav');if(_stf)_stf.classList.toggle('hidden',currentUser.role==='admin');
+  const _stf=document.getElementById('staff-nav');if(_stf)_stf.classList.toggle('hidden',currentUser.role!=='staff');
+  const _mgr=document.getElementById('manager-nav');if(_mgr)_mgr.classList.toggle('hidden',currentUser.role!=='manager');
   const undoBar=document.getElementById('undo-bar');if(undoBar)undoBar.style.display=currentUser.role==='admin'?'flex':'none';
-  if(currentUser.role==='admin')nav('dashboard');else nav('my-dashboard');
+  const _sr2=document.getElementById('sidebar-role');if(_sr2)_sr2.textContent=currentUser.role==='admin'?'Administrator':currentUser.role==='manager'?'🗂️ Manager':'ทีมงาน';
+  if(currentUser.role==='admin'){nav('dashboard');renderAdminInboxBell();}
+  else if(currentUser.role==='manager'){nav('mgr-projects');}
+  else nav('my-dashboard');
   updateQueueBadge();
   // Real-time Firebase sync
   startFirebaseSync();
@@ -2244,13 +2327,20 @@ async function seedDemo(){
 // NAVIGATION
 // ══════════════════════════════════════════════
 const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','profit','staff','docs','proj-cal'];
+const MANAGER_PAGES=['mgr-projects','mgr-track','mgr-calendar','mgr-team'];
 function nav(page){
-  if(currentUser&&currentUser.role!=='admin'&&ADMIN_PAGES.includes(page)){toast('ไม่มีสิทธิ์เข้าถึง 🔒','error');return}
+  const role=currentUser?.role||'staff';
+  if(role!=='admin'&&ADMIN_PAGES.includes(page)){toast('ไม่มีสิทธิ์เข้าถึง 🔒','error');return}
+  if(role==='staff'&&MANAGER_PAGES.includes(page)){toast('ไม่มีสิทธิ์เข้าถึง 🔒','error');return}
   document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
   document.querySelectorAll('.nav-item,.nav-sub-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
-  const renders={dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue,docs:renderDocs,'proj-cal':renderProjCal,'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar};
+  const renders={
+    dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue,docs:renderDocs,'proj-cal':renderProjCal,
+    'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar,
+    'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-calendar':renderMgrCalendar,'mgr-team':renderMgrTeam
+  };
   if(renders[page])renders[page]();
   window._currentPage=page;
 }
@@ -2713,6 +2803,7 @@ function openNewProject(){
   editingProjId=null;initFormSlots();
   document.getElementById('proj-modal-title').textContent='➕ สร้างโปรเจกต์ใหม่';
   ['pj-name','pj-client','pj-budget','pj-duration','pj-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const _ms=document.getElementById('pj-manager');if(_ms){const _mm=getAllManagerUsers();_ms.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+_mm.map(m=>`<option value="${m.uid}">${m.nickname||m.email}</option>`).join('');}
   ['pj-type','pj-cycle'].forEach(id=>{const el=document.getElementById(id);if(el)el.selectedIndex=0;});
   const today=new Date().toISOString().split('T')[0];
   const ps=document.getElementById('pj-start');if(ps)ps.value=isoToThai(today);
@@ -2902,6 +2993,7 @@ async function saveProject(){
     deadline:thaiToIso(document.getElementById('pj-deadline').value)||document.getElementById('pj-deadline').value,
     cycle:document.getElementById('pj-cycle')?.value||'ต้นเดือน (1-15)',
     note:document.getElementById('pj-note')?.value||'',
+    managerId:document.getElementById('pj-manager')?.value||'',
     workers,tax,evidenceLogs:[],snapshot:null,createdAt:new Date()
   };
   if(editingProjId){
@@ -2936,6 +3028,12 @@ function openEditProject(id){
   document.getElementById('proj-modal-title').textContent='✏️ แก้ไขโปรเจกต์';
   document.getElementById('pj-name').value=p.name||'';
   document.getElementById('pj-client').value=p.client||'';
+  // Populate manager dropdown
+  const mgrSel=document.getElementById('pj-manager');
+  if(mgrSel){
+    const managers=getAllManagerUsers();
+    mgrSel.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+managers.map(m=>`<option value="${m.uid}"${p.managerId===m.uid?' selected':''}>${m.nickname||m.email}</option>`).join('');
+  }
   document.getElementById('pj-budget').value=p.budget||'';
   document.getElementById('pj-duration').value=p.duration||'';
   document.getElementById('pj-note').value=p.note||'';
@@ -3590,7 +3688,7 @@ function renderStaffGrid(){
         const av=s.nickname?s.nickname[0]:'?';
         html+='<div onclick="openEditStaff(\''+s.id+'\',\''+key+'\')" style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:var(--bg2);border:1px solid '+color+'44;border-radius:20px;cursor:pointer;font-size:12px">';
         html+='<span style="width:20px;height:20px;border-radius:50%;background:'+color+'22;color:'+color+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px">'+av+'</span>';
-        html+='<span style="font-weight:700">'+(s.nickname||s.name)+'</span></div>';
+        const wc=getWarnings(s.id).length;html+='<span style="font-weight:700">'+(s.nickname||s.name)+'</span>'+(wc?'<span style="font-size:10px;color:#FF4040;font-weight:700;margin-left:2px">✉'+wc+'</span>':'')+' </div>';
       });
       html+='</div>';
     }else{
@@ -3646,6 +3744,20 @@ function openAddStaff(){
 function openEditStaff(id,cat){
   editingStaffId=id;editingStaffCat=cat;const data=getStaffData();const s=(data[cat]||[]).find(x=>x.id===id);if(!s)return;
   document.getElementById('addstaff-title').textContent='✏️ แก้ไขสมาชิก';
+  // Show role toggle for users who have accounts
+  const roleToggleEl = document.getElementById('st-role-toggle');
+  if(roleToggleEl){
+    const userProfile = s._userRole || null;
+    roleToggleEl.style.display = 'block';
+    roleToggleEl.innerHTML = `<div style="margin-bottom:14px;padding:10px 14px;background:rgba(155,111,255,.07);border:1px solid rgba(155,111,255,.2);border-radius:9px">
+      <label class="form-label">บทบาทในระบบ</label>
+      <select class="form-input form-select" id="st-role-sel" style="margin-top:6px">
+        <option value="staff">🎙️ Staff (ทีมงาน)</option>
+        <option value="manager"${(s._userRole==='manager')?' selected':''}>🗂️ Manager</option>
+      </select>
+      <div style="font-size:11px;color:var(--text2);margin-top:5px">เปลี่ยน role จะมีผลตอน login ครั้งถัดไป</div>
+    </div>`;
+  }
   document.getElementById('st-name').value=s.name||'';document.getElementById('st-nick').value=s.nickname||'';
   document.getElementById('st-bank').value=s.bank||'';document.getElementById('st-account').value=s.account||'';
   document.getElementById('st-promptpay').value=s.promptpay||'';document.getElementById('st-email').value=s.email||'';
@@ -3704,7 +3816,7 @@ function saveStaff(){
     if(!data[cat])data[cat]=[];
     data[cat].push({...baseStaff,category:cat});
   });
-  saveStaffData(data);closeModal('modal-addstaff');renderStaff();toast(editingStaffId?'อัพเดทแล้ว ✅':'เพิ่มสมาชิกแล้ว ✅','success');
+  saveStaffData(data);if(editingStaffId)saveStaffRoleIfChanged(editingStaffId);closeModal('modal-addstaff');renderStaff();toast(editingStaffId?'อัพเดทแล้ว ✅':'เพิ่มสมาชิกแล้ว ✅','success');
 }
 function deleteStaff(id,cat){
   if(!confirm('ลบสมาชิกนี้?'))return;
@@ -3724,11 +3836,15 @@ function renderMyDash(){
 
   const projs=getProjects();let paid=0,pending=0;const items=[];
   projs.forEach(p=>{const myWs=(p.workers||[]).filter(x=>x.id===s.id);if(!myWs.length)return;
+    const dur=p.duration||0;
     myWs.forEach(w=>{
-      if(w.status==='paid')paid+=w.amount||0;else pending+=w.amount||0;
+      // คำนวณยอดจริง: ถ้าเป็นรายนาทีให้ × duration ของโปรเจกต์
+      const isMin=(w.unit||'').includes('นาที');
+      const realAmt=isMin&&dur>0?Math.round((w.amount||0)*dur):(w.amount||0);
+      if(w.status==='paid')paid+=realAmt;else pending+=realAmt;
       const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';
       const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
-      items.push({projName:p.name,date:fmtDate(p.date),role:(_lbl[_pre]||CATS[s.category]?.label||'')+_suf,amount:w.amount,status:w.status});
+      items.push({projName:p.name,date:fmtDate(p.date),role:(_lbl[_pre]||CATS[s.category]?.label||'')+_suf,amount:realAmt,status:w.status});
     });
   });
   document.getElementById('my-paid').textContent=fmtB(paid);
@@ -3772,10 +3888,13 @@ function renderMyHistory(){
   projs.forEach(p=>{
     if(q&&!(p.name||'').toLowerCase().includes(q))return;
     const myWorkers=(p.workers||[]).filter(x=>x.id===s.id);if(!myWorkers.length)return;
+    const dur2=p.duration||0;
     myWorkers.forEach(w=>{
+      const isMin2=(w.unit||'').includes('นาที');
+      const realAmt2=isMin2&&dur2>0?Math.round((w.amount||0)*dur2):(w.amount||0);
       const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';
       const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
-      items.push({projName:p.name,date:fmtDate(p.date),role:(_lbl[_pre]||CATS[s.category]?.label||'')+_suf,amount:w.amount,bank:s.bank+' '+s.account,status:w.status});
+      items.push({projName:p.name,date:fmtDate(p.date),role:(_lbl[_pre]||CATS[s.category]?.label||'')+_suf,amount:realAmt2,bank:s.bank+' '+s.account,status:w.status});
     });
   });
   const isMobile=window.innerWidth<=768;
@@ -5938,7 +6057,586 @@ window.addEventListener('load',()=>{
   const today=new Date().toISOString().split('T')[0];
   document.querySelectorAll('input[type="date"]').forEach(i=>{if(!i.value)i.value=today});
 });
+
+
+// ══════════════════════════════════════════════
+// MANAGER SYSTEM
+// ══════════════════════════════════════════════
+
+const MGR_PROJ_COLORS = ['#F59F27','#AFA9EC','#5DCAA5','#F09595','#85B7EB','#C0DD97','#FAC775','#ED93B1'];
+let _mgrCalOn = {};     // {projId: true/false}
+let _mgrCalDDOpen = false;
+let _mgrWarnTargetId = '';
+let _mgrWarnSelItem = '';
+let _mgrWarnSelProjId = '';
+let _mgrCalMode = 'mine'; // 'mine' | 'all'
+let _mgrTrackFilter = 'all'; // 'all' | projId
+
+// ── Helpers ──
+function getMgrProjects() {
+  if (!currentUser?.uid) return [];
+  return getProjects().filter(p => p.managerId === currentUser.uid);
+}
+
+function getAllManagerUsers() {
+  // Read from Firebase users cache (ls)
+  const usersRaw = ls('mgr_users_cache') || {};
+  return Object.values(usersRaw).filter(u => u.role === 'manager');
+}
+
+async function loadManagerUsers() {
+  if (!_fbDatabase) return;
+  try {
+    const snap = await _fbDatabase.ref('users').get();
+    if (snap.exists()) {
+      const all = snap.val();
+      // Cache all users for manager dropdown
+      ls('mgr_users_cache', all);
+    }
+  } catch(e) {}
+}
+
+// ── Role upgrade/save ──
+async function saveStaffRoleIfChanged(staffId) {
+  const roleSel = document.getElementById('st-role-sel');
+  if (!roleSel || !staffId) return;
+  const newRole = roleSel.value;
+  // Find user with this staffId
+  if (!_fbDatabase) return;
+  try {
+    const snap = await _fbDatabase.ref('users').orderByChild('staffId').equalTo(staffId).get();
+    if (snap.exists()) {
+      const entries = Object.entries(snap.val());
+      for (const [uid, user] of entries) {
+        if (user.role !== newRole) {
+          await _fbDatabase.ref('users/'+uid+'/role').set(newRole);
+          toast(`✅ เปลี่ยน role เป็น ${newRole==='manager'?'Manager':'Staff'} แล้ว`, 'success');
+        }
+      }
+    }
+  } catch(e) { console.warn('saveStaffRole:', e); }
+}
+
+// ── Render: MGR Projects ──
+function renderMgrProjects() {
+  const el = document.getElementById('mgr-proj-list'); if (!el) return;
+  const q = (document.getElementById('mgr-proj-search')?.value||'').toLowerCase();
+  const projs = getMgrProjects().filter(p => !q || p.name.toLowerCase().includes(q));
+  if (!projs.length) {
+    el.innerHTML = '<div style="text-align:center;padding:48px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:12px">ยังไม่มีโปรเจกต์ที่ได้รับมอบหมาย</div>';
+    return;
+  }
+  el.innerHTML = projs.map((p,i) => {
+    const daysLeft = p.deadline ? Math.ceil((new Date(p.deadline)-new Date())/(864e5)) : null;
+    const dlBadge = daysLeft===null?'':`<span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;${daysLeft<0?'background:rgba(255,64,64,.12);color:#FF5050;border:1px solid rgba(255,64,64,.25)':daysLeft<=7?'background:rgba(255,158,0,.12);color:#FF9E00;border:1px solid rgba(255,158,0,.25)':'background:rgba(0,223,160,.08);color:#00DFA0;border:1px solid rgba(0,223,160,.2)'}">${daysLeft<0?'เกิน '+Math.abs(daysLeft)+' วัน':'เหลือ '+daysLeft+' วัน'}</span>`;
+    const workers = (p.workers||[]);
+    const totalAmt = workers.reduce((a,w)=>a+(w.amount||0),0);
+    const workerRows = workers.map(w=>{
+      const s=getStaffById(w.id);if(!s)return'';
+      const _pre=(w.slot||'').split('-')[0];
+      const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';
+      const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(0,0,0,.25);border-radius:9px;margin-bottom:6px;border:1px solid rgba(255,255,255,.05)">
+        <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--text)">${s.name} (${s.nickname})</div><div style="font-size:11px;color:var(--text2)">${(_lbl[_pre]||'')+_suf}</div></div>
+        <div style="font-size:13px;font-weight:700;color:var(--accent2)">${w.amount?fmtB(w.amount):'TBD'}</div>
+        <span style="font-size:11px;padding:2px 9px;border-radius:20px;${w.status==='paid'?'background:rgba(0,223,160,.1);color:#00DFA0;border:1px solid rgba(0,223,160,.2)':'background:rgba(255,158,0,.12);color:#FF9E00;border:1px solid rgba(255,158,0,.25)'}">${w.status==='paid'?'จ่ายแล้ว':'รอจ่าย'}</span>
+      </div>`;
+    }).join('');
+    return `<div style="background:var(--card);border:1px solid rgba(21,101,255,.2);border-radius:12px;margin-bottom:12px;overflow:hidden">
+      <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;cursor:pointer" onclick="toggleEl('mgr-pbody-${p.id}','mgr-pchv-${p.id}')">
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:700;color:var(--text)">${p.name} <span style="padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;background:rgba(155,111,255,.15);color:#9B6FFF;border:1px solid rgba(155,111,255,.3)">ของฉัน</span></div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">ลูกค้า: ${p.client||'—'} · Deadline: ${fmtDate(p.deadline)||'—'}</div>
+        </div>
+        ${dlBadge}
+        <span id="mgr-pchv-${p.id}" style="font-size:11px;color:var(--text2);transition:transform .2s">▼</span>
+      </div>
+      <div id="mgr-pbody-${p.id}" style="padding:14px 16px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:500;letter-spacing:.8px">ผู้ทำงาน</div>
+        ${workerRows||'<div style="color:var(--text2);font-size:13px;text-align:center;padding:16px">ยังไม่มีผู้ทำงาน</div>'}
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:12px;color:var(--text2)">ยอดค่าจ้างรวม</span>
+            <span style="font-size:16px;font-weight:700;color:var(--accent2)">${fmtB(totalAmt)}</span>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-cyan" onclick="openMgrAddWorker('${p.id}')">+ ผู้ทำงาน</button>
+            <button class="btn btn-sm btn-purple" onclick="openMgrRename('${p.id}','${p.name.replace(/'/g,"\'")}')">✏️ ขอเปลี่ยนชื่อ</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleEl(bodyId, chevId) {
+  const b=document.getElementById(bodyId), c=document.getElementById(chevId);
+  if(!b)return;
+  const hidden = b.style.display==='none';
+  b.style.display = hidden ? 'block' : 'none';
+  if(c) c.style.transform = hidden ? 'rotate(180deg)' : '';
+}
+
+// ── Render: MGR Track ──
+function renderMgrTrack() {
+  const projs = getMgrProjects();
+  const q = (document.getElementById('mgr-track-search')?.value||'').toLowerCase();
+  // Filter chips
+  const chipsEl = document.getElementById('mgr-track-chips');
+  if (chipsEl) {
+    chipsEl.innerHTML = `<div onclick="setMgrTrackFilter('all',this)" style="padding:5px 14px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid ${_mgrTrackFilter==='all'?'rgba(155,111,255,.5)':'rgba(255,255,255,.1)'};color:${_mgrTrackFilter==='all'?'#9B6FFF':'var(--text2)'};background:${_mgrTrackFilter==='all'?'rgba(155,111,255,.15)':'transparent'};font-weight:${_mgrTrackFilter==='all'?'700':'500'};user-select:none">ทั้งหมด</div>`
+      + projs.map(p=>`<div onclick="setMgrTrackFilter('${p.id}',this)" style="padding:5px 14px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid ${_mgrTrackFilter===p.id?'rgba(155,111,255,.5)':'rgba(255,255,255,.1)'};color:${_mgrTrackFilter===p.id?'#9B6FFF':'var(--text2)'};background:${_mgrTrackFilter===p.id?'rgba(155,111,255,.15)':'transparent'};font-weight:${_mgrTrackFilter===p.id?'700':'500'};user-select:none;white-space:nowrap">${p.name}</div>`).join('');
+  }
+  // Calendar dropdown items
+  renderMgrCalDD(projs);
+  // Calendar
+  renderMgrTrackCal(projs);
+  // Cards
+  const listEl = document.getElementById('mgr-track-list'); if(!listEl) return;
+  const filtered = projs.filter(p=>(_mgrTrackFilter==='all'||p.id===_mgrTrackFilter)&&(!q||p.name.toLowerCase().includes(q)));
+  if(!filtered.length){listEl.innerHTML='<div style="text-align:center;padding:32px;color:var(--text2)">ไม่พบโปรเจกต์</div>';return;}
+  const CIRC = 2*Math.PI*14;
+  listEl.innerHTML = filtered.map((p,i)=>{
+    const color = MGR_PROJ_COLORS[i%MGR_PROJ_COLORS.length];
+    const trkCard = getTrkCards().find(c=>c.projId===p.id);
+    const phases = trkCard ? Object.entries(trkCard.phases||{}) : [];
+    const done = phases.filter(([_,ph])=>ph.status==='done').length;
+    const total = phases.length||1;
+    const pct = total>0?Math.round(done/total*100):0;
+    const pctColor = pct>=80?'#00DFA0':pct>=50?'#00B4FF':'#FF9E00';
+    const circFill = (pct/100)*CIRC;
+    const phaseRows = phases.map(([phKey,ph])=>{
+      const PHASE_LABELS={adaptation:'✍️ Adaptation',dubbing:'🎤 Dubbing',mix:'🎧 Mix',qc:'✅ QC',subVideo:'🎬 Sub & Video',manager:'🗂️ Manager'};
+      const PHASE_COLORS={adaptation:'var(--cyan)',dubbing:'var(--orange)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
+      const stKey=ph.status||'none';
+      const stBg=stKey==='done'?'rgba(0,223,160,.1)':stKey==='doing'?'rgba(255,158,0,.1)':stKey==='briefed'?'rgba(0,180,255,.1)':'rgba(120,120,140,.12)';
+      const stBorder=stKey==='done'?'rgba(0,223,160,.3)':stKey==='doing'?'rgba(255,158,0,.3)':stKey==='briefed'?'rgba(0,180,255,.25)':'rgba(120,120,140,.2)';
+      const stColor=stKey==='done'?'#00DFA0':stKey==='doing'?'#FF9E00':stKey==='briefed'?'#00B4FF':'#888';
+      const daysLeft=ph.deadline?Math.ceil((new Date(ph.deadline)-new Date())/(864e5)):null;
+      const dlColor=daysLeft===null?'var(--text2)':daysLeft<0?'var(--red)':daysLeft<=3?'var(--orange)':'var(--text2)';
+      const dlText=ph.deadline?`<span style="font-size:11px;color:${dlColor}">${fmtDate(ph.deadline)}${daysLeft!==null&&daysLeft<0?' ⚠️':''}</span>`:'<span style="color:var(--text2);font-size:11px">—</span>';
+      return `<tr>
+        <td style="padding:8px;color:${PHASE_COLORS[phKey]||'var(--text)'};font-weight:700;font-size:12px">${PHASE_LABELS[phKey]||phKey}</td>
+        <td style="padding:8px;font-size:12px;color:var(--text2)">${ph.startDate?fmtDate(ph.startDate):'—'}</td>
+        <td style="padding:8px">${dlText}</td>
+        <td style="padding:8px">
+          <select onchange="mgrUpdatePhaseStatus('${p.id}','${phKey}',this)" style="padding:4px 8px;border-radius:8px;font-family:Kanit;font-size:11px;font-weight:700;cursor:pointer;background:${stBg};border:1px solid ${stBorder};color:${stColor}">
+            <option value="none" ${stKey==='none'?'selected':''}>⬜ ยังไม่บรีฟ</option>
+            <option value="briefed" ${stKey==='briefed'?'selected':''}>📋 บรีฟแล้ว</option>
+            <option value="doing" ${stKey==='doing'?'selected':''}>⚙️ กำลังทำ</option>
+            <option value="done" ${stKey==='done'?'selected':''}>✅ ส่งแล้ว</option>
+          </select>
+        </td>
+      </tr>`;
+    }).join('');
+    return `<div style="background:var(--card);border:1px solid rgba(21,101,255,.2);border-radius:12px;margin-bottom:10px;overflow:hidden">
+      <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px">
+        <div style="flex:1;font-size:14px;font-weight:700;color:var(--text)">${p.name} <span style="padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;background:rgba(155,111,255,.15);color:#9B6FFF;border:1px solid rgba(155,111,255,.3)">ของฉัน</span></div>
+        <div style="display:flex;align-items:center;gap:7px;flex-shrink:0">
+          <span style="font-size:12px;font-weight:700;color:var(--text)">${pct}%</span>
+          <div style="width:72px;height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;width:${pct}%;background:${pctColor};transition:width .3s"></div></div>
+          <div style="width:38px;height:38px;position:relative;flex-shrink:0">
+            <svg width="38" height="38" viewBox="0 0 38 38" style="transform:rotate(-90deg)"><circle cx="19" cy="19" r="14" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="4"/><circle cx="19" cy="19" r="14" fill="none" stroke="${pctColor}" stroke-width="4" stroke-dasharray="${circFill.toFixed(1)} ${(CIRC-circFill).toFixed(1)}" stroke-linecap="round"/></svg>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--text)">${pct}%</div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:12px 16px;overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:400px;font-size:12px">
+          <thead><tr><th style="text-align:left;color:var(--text2);padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:11px">หมวด</th><th style="text-align:left;color:var(--text2);padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:11px">วันเริ่ม</th><th style="text-align:left;color:var(--text2);padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:11px">Deadline</th><th style="text-align:left;color:var(--text2);padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:11px">สถานะ</th></tr></thead>
+          <tbody>${phaseRows||'<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:16px;font-size:13px">ยังไม่มีข้อมูล phase — แอดมินต้องกำหนดใน tracking cards ก่อน</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setMgrTrackFilter(id) {
+  _mgrTrackFilter = id;
+  renderMgrTrack();
+}
+
+function mgrUpdatePhaseStatus(projId, phKey, sel) {
+  const cards = getTrkCards();
+  const card = cards.find(c=>c.projId===projId);
+  if (!card) return;
+  if (!card.phases) card.phases = {};
+  if (!card.phases[phKey]) card.phases[phKey] = {};
+  card.phases[phKey].status = sel.value;
+  saveTrkCards(cards);
+  const stBg=sel.value==='done'?'rgba(0,223,160,.1)':sel.value==='doing'?'rgba(255,158,0,.1)':sel.value==='briefed'?'rgba(0,180,255,.1)':'rgba(120,120,140,.12)';
+  const stBorder=sel.value==='done'?'rgba(0,223,160,.3)':sel.value==='doing'?'rgba(255,158,0,.3)':sel.value==='briefed'?'rgba(0,180,255,.25)':'rgba(120,120,140,.2)';
+  const stColor=sel.value==='done'?'#00DFA0':sel.value==='doing'?'#FF9E00':sel.value==='briefed'?'#00B4FF':'#888';
+  sel.style.background=stBg; sel.style.borderColor=stBorder; sel.style.color=stColor;
+  // Re-render pct
+  renderMgrTrack();
+}
+
+// ── Calendar dropdown ──
+function renderMgrCalDD(projs) {
+  const items = document.getElementById('mgr-cal-dd-items'); if(!items) return;
+  items.innerHTML = projs.map((p,i)=>{
+    const color = MGR_PROJ_COLORS[i%MGR_PROJ_COLORS.length];
+    const on = _mgrCalOn[p.id] !== false;
+    return `<div onclick="toggleMgrCalOn('${p.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;transition:background .1s" onmouseover="this.style.background='rgba(21,101,255,.08)'" onmouseout="this.style.background=''">
+      <div id="mgr-ck-${p.id}" style="width:16px;height:16px;border-radius:4px;border:1.5px solid ${on?'#9B6FFF':'rgba(255,255,255,.2)'};background:${on?'#9B6FFF':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700">${on?'✓':''}</div>
+      <div style="width:10px;height:10px;border-radius:2px;background:${color};flex-shrink:0"></div>
+      <span style="font-size:13px;color:var(--text)">${p.name}</span>
+    </div>`;
+  }).join('');
+  const count = projs.filter(p=>_mgrCalOn[p.id]!==false).length;
+  const el = document.getElementById('mgr-cal-dd-count'); if(el) el.textContent = count;
+}
+
+function toggleMgrCalDD() {
+  _mgrCalDDOpen = !_mgrCalDDOpen;
+  const panel = document.getElementById('mgr-cal-dd-panel');
+  if(panel) panel.style.display = _mgrCalDDOpen ? 'block' : 'none';
+}
+function toggleMgrCalOn(projId) {
+  _mgrCalOn[projId] = (_mgrCalOn[projId] === false) ? true : false;
+  renderMgrTrack();
+}
+function mgrCalSelAll() { getMgrProjects().forEach(p=>_mgrCalOn[p.id]=true); renderMgrTrack(); }
+function mgrCalSelNone() { getMgrProjects().forEach(p=>_mgrCalOn[p.id]=false); renderMgrTrack(); }
+
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#mgr-cal-dd-wrap') && _mgrCalDDOpen) {
+    _mgrCalDDOpen = false;
+    const p = document.getElementById('mgr-cal-dd-panel'); if(p) p.style.display='none';
+  }
+});
+
+function renderMgrTrackCal(projs) {
+  const el = document.getElementById('mgr-track-cal'); if(!el) return;
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  const firstDay = new Date(y,m,1).getDay();
+  const lastDate = new Date(y,m+1,0).getDate();
+  const TH_MONTHS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const today = now.getDate();
+  // Build event map
+  const evMap = {};
+  projs.forEach((p,i)=>{
+    if(_mgrCalOn[p.id]===false) return;
+    const color = MGR_PROJ_COLORS[i%MGR_PROJ_COLORS.length];
+    const card = getTrkCards().find(c=>c.projId===p.id);
+    if(!card) return;
+    Object.entries(card.phases||{}).forEach(([phKey,ph])=>{
+      const PHASE_EMOJI={adaptation:'✍️',dubbing:'🎤',mix:'🎧',qc:'✅',subVideo:'🎬',manager:'🗂️'};
+      if(ph.deadline){
+        const d=new Date(ph.deadline).getDate();
+        if(new Date(ph.deadline).getMonth()===m){
+          if(!evMap[d])evMap[d]=[];
+          evMap[d].push({label:PHASE_EMOJI[phKey]+' '+p.name.slice(0,8),color});
+        }
+      }
+    });
+  });
+  // Build calendar HTML
+  const days=[]; for(let i=0;i<firstDay;i++)days.push(null); for(let d=1;d<=lastDate;d++)days.push(d);
+  while(days.length%7!==0)days.push(null);
+  const weeks=[]; for(let i=0;i<days.length;i+=7)weeks.push(days.slice(i,i+7));
+  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #edf2fa">
+    <button style="padding:5px 12px;background:transparent;border:1px solid #d0ddf0;border-radius:7px;color:#185FA5;font-family:Kanit;font-size:12px;cursor:pointer">‹</button>
+    <span style="font-size:13px;font-weight:700;color:#0C447C">📅 ${TH_MONTHS[m]} ${y+543}</span>
+    <button style="padding:5px 12px;background:transparent;border:1px solid #d0ddf0;border-radius:7px;color:#185FA5;font-family:Kanit;font-size:12px;cursor:pointer">›</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr)">${['อา','จ','อ','พ','พฤ','ศ','ส'].map(d=>`<div style="text-align:center;padding:7px 2px;font-size:11px;font-weight:700;color:#6890B8">${d}</div>`).join('')}</div>
+  ${weeks.map(w=>`<div style="display:grid;grid-template-columns:repeat(7,1fr)">${w.map(d=>{
+    if(!d)return'<div style="min-height:52px;border-right:1px solid #f0f4fa;border-top:1px solid #edf2fa"></div>';
+    const evs=evMap[d]||[];
+    return`<div style="min-height:52px;border-right:1px solid #f0f4fa;border-top:1px solid #edf2fa;padding:3px 2px;vertical-align:top">
+      <div style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-size:12px;font-weight:700;${d===today?'background:#1565FF;color:#fff':'color:#0d1f3c'};margin:1px auto">${d}</div>
+      ${evs.map(e=>`<div style="margin:1px 3px;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;color:#000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:${e.color}">${e.label}</div>`).join('')}
+    </div>`;
+  }).join('')}</div>`).join('')}
+  ${projs.filter((_,i)=>_mgrCalOn[projs[i]?.id]!==false).length?`<div style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 14px;background:#f8faff;border-top:1px solid #edf2fa">${projs.map((p,i)=>_mgrCalOn[p.id]===false?'':
+    `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#444"><div style="width:10px;height:10px;border-radius:2px;background:${MGR_PROJ_COLORS[i%MGR_PROJ_COLORS.length]}"></div>${p.name}</div>`).join('')}</div>`:''}`;
+}
+
+// ── Render: MGR Calendar page ──
+let _mgrCalPageFilter = 'mine';
+function mgrCalFilter(mode) {
+  _mgrCalPageFilter = mode;
+  document.getElementById('mgr-f-mine').style.cssText=`padding:5px 14px;border-radius:20px;font-size:12px;cursor:pointer;user-select:none;border:1px solid ${mode==='mine'?'rgba(155,111,255,.4)':'rgba(255,255,255,.1)'};background:${mode==='mine'?'rgba(155,111,255,.15)':'transparent'};color:${mode==='mine'?'#9B6FFF':'var(--text2)'};font-weight:${mode==='mine'?'700':'400'}`;
+  document.getElementById('mgr-f-all').style.cssText=`padding:5px 14px;border-radius:20px;font-size:12px;cursor:pointer;user-select:none;border:1px solid ${mode==='all'?'rgba(155,111,255,.4)':'rgba(255,255,255,.1)'};background:${mode==='all'?'rgba(155,111,255,.15)':'transparent'};color:${mode==='all'?'#9B6FFF':'var(--text2)'};font-weight:${mode==='all'?'700':'400'}`;
+  renderMgrCalendar();
+}
+function renderMgrCalendar() {
+  const el=document.getElementById('mgr-calendar-list');if(!el)return;
+  const q=(document.getElementById('mgr-cal-search')?.value||'').toLowerCase();
+  const myProjs=getMgrProjects();
+  const myIds=new Set(myProjs.map(p=>p.id));
+  const allProjs=getProjects();
+  const projs=_mgrCalPageFilter==='mine'?myProjs:allProjs;
+  const filtered=projs.filter(p=>!q||p.name.toLowerCase().includes(q));
+  el.innerHTML=filtered.map(p=>{
+    const isMine=myIds.has(p.id);
+    const daysLeft=p.deadline?Math.ceil((new Date(p.deadline)-new Date())/(864e5)):null;
+    const dlBadge=daysLeft===null?'':`<span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;${daysLeft<0?'background:rgba(255,64,64,.12);color:#FF5050;border:1px solid rgba(255,64,64,.25)':daysLeft<=7?'background:rgba(255,158,0,.12);color:#FF9E00;border:1px solid rgba(255,158,0,.25)':'background:rgba(0,223,160,.08);color:#00DFA0;border:1px solid rgba(0,223,160,.2)'}">${daysLeft<0?'เกิน '+Math.abs(daysLeft)+' วัน':'เหลือ '+daysLeft+' วัน'}</span>`;
+    // Find manager name if not mine
+    let mgrLabel='';
+    if(!isMine && p.managerId){
+      const usersCache=ls('mgr_users_cache')||{};
+      const mgrUser=usersCache[p.managerId];
+      mgrLabel=`<span style="font-size:11px;color:#9B6FFF">🗂️ ${mgrUser?.nickname||'Manager'}</span>`;
+    }
+    if(isMine) return `<div style="background:var(--card);border:1px solid rgba(21,101,255,.2);border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="toggleEl('mgr-cbody-${p.id}','mgr-cchv-${p.id}')">
+      <div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--text)">${p.name} <span style="padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;background:rgba(155,111,255,.15);color:#9B6FFF;border:1px solid rgba(155,111,255,.3)">ของฉัน</span></div><div style="font-size:11px;color:var(--text2);margin-top:2px">${fmtDate(p.startDate)||'—'} – ${fmtDate(p.deadline)||'—'}</div></div>
+      ${dlBadge}<span id="mgr-cchv-${p.id}" style="font-size:11px;color:var(--text2)">▼</span>
+    </div><div id="mgr-cbody-${p.id}" style="display:none;background:rgba(21,101,255,.04);border:1px solid rgba(21,101,255,.1);border-radius:0 0 10px 10px;padding:10px 16px;margin-top:-8px;margin-bottom:8px;font-size:12px;color:var(--text2)">กดดูรายละเอียด phase ได้ในหน้า ติดตามงาน</div>`;
+    else return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:10px;opacity:.75">
+      <div style="flex:1"><div style="font-size:13px;color:var(--text2)">${p.name}</div><div style="margin-top:3px">${mgrLabel}</div></div>${dlBadge}
+    </div>`;
+  }).join('')||'<div style="text-align:center;padding:32px;color:var(--text2)">ไม่พบโปรเจกต์</div>';
+}
+
+// ── Render: MGR Team ──
+function renderMgrTeam() {
+  const el=document.getElementById('mgr-team-grid');if(!el)return;
+  const q=(document.getElementById('mgr-team-search')?.value||'').toLowerCase();
+  const all=getAllStaff();
+  const filtered=all.filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q));
+  const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
+  const seen={};
+  el.innerHTML=filtered.filter(s=>{if(seen[s.id])return false;seen[s.id]=1;return true;}).map(s=>{
+    const col=catColors[s.category]||'var(--text2)';
+    return `<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:${col}18;border:1px solid ${col}44;border-radius:20px;font-size:12px">
+      <span style="width:20px;height:20px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px">${(s.nickname||s.name||'?')[0]}</span>
+      <span style="font-weight:700;color:var(--text)">${s.nickname||s.name}</span>
+      ${s.promptpay?`<span style="font-size:10px;color:var(--text2)">· ${s.promptpay}</span>`:''}
+    </div>`;
+  }).join('')||'<div style="color:var(--text2);font-size:13px">ไม่พบสมาชิก</div>';
+}
+
+// ── MGR: Add worker to project ──
+let _mgrAddWorkerProjId='';
+function openMgrAddWorker(projId){
+  _mgrAddWorkerProjId=projId;
+  toast('ฟีเจอร์นี้จะเปิดใช้งานในระบบจริง — เชื่อมกับฟอร์มเพิ่ม worker เดิม','info');
+}
+
+// ── MGR: Rename request ──
+let _mgrRenameProjId='';
+function openMgrRename(projId, name){
+  _mgrRenameProjId=projId;
+  const inp=document.getElementById('mgr-rename-cur');if(inp)inp.value=name;
+  document.getElementById('mgr-rename-new').value='';
+  document.getElementById('mgr-rename-reason').value='';
+  openModal('modal-mgr-rename');
+}
+async function submitMgrRenameReq(){
+  const newName=document.getElementById('mgr-rename-new').value.trim();
+  const reason=document.getElementById('mgr-rename-reason').value.trim();
+  const curName=document.getElementById('mgr-rename-cur').value;
+  if(!newName){toast('กรุณากรอกชื่อใหม่','error');return;}
+  const req={id:'REQ'+Date.now(),type:'rename',projId:_mgrRenameProjId,curName,newName,reason,
+    managerId:currentUser.uid,managerName:currentUser.nickname||currentUser.email,
+    status:'pending',createdAt:new Date().toISOString()};
+  await saveMgrRequest(req);
+  closeModal('modal-mgr-rename');
+  toast('📨 ส่งคำขอไปยังแอดมินแล้ว','success');
+}
+
+// ── MGR: Warning request ──
+const IW_CATS_MGR=[
+  {items:['ส่งงานล่าช้าโดยไม่แจ้งล่วงหน้า','ไม่แจ้งขยายเวลาก่อนถึง deadline','ละทิ้งงานกลางคัน']},
+  {items:['ไม่อัพเดทสถานะงานระหว่างดำเนินการ','หายจากการสื่อสารโดยไม่แจ้งเหตุผล']},
+  {items:['ส่งงานไม่ผ่านมาตรฐานซ้ำหลังแก้แล้ว','ไม่ปฏิบัติตามคำแนะนำ QC']},
+  {items:['เผยแพร่ไฟล์งานโดยไม่ได้รับอนุญาต','นำงานทีมไปอ้างอิงสร้างความเสียหาย']},
+  {items:['ใช้ภาษาหยาบคาย/ก้าวร้าวต่อสมาชิก','ไม่ให้ความร่วมมือโดยไม่มีเหตุผล','ไม่แจ้งปัญหาที่กระทบงานทีม']}
+];
+function openMgrWarnModal(staffId){
+  _mgrWarnTargetId=staffId;_mgrWarnSelItem='';_mgrWarnSelProjId='';
+  const s=getStaffById(staffId);
+  document.getElementById('mgr-warn-target').textContent=s?`${s.name} (${s.nickname})`:staffId;
+  document.getElementById('mgr-warn-subs').innerHTML='';
+  document.querySelectorAll('#mgr-warn-cats button').forEach(b=>{b.classList.remove('btn-blue');b.classList.add('btn-outline');});
+  document.getElementById('mgr-warn-proj-inp').value='';
+  document.getElementById('mgr-warn-proj-inp').style.display='block';
+  document.getElementById('mgr-warn-proj-sel').style.display='none';
+  document.getElementById('mgr-warn-note').value='';
+  document.getElementById('mgr-warn-submit').disabled=true;
+  openModal('modal-mgr-warn');
+}
+function mgrWarnSelCat(idx,el){
+  _mgrWarnSelItem='';
+  document.querySelectorAll('#mgr-warn-cats button').forEach(b=>{b.classList.remove('btn-blue');b.classList.add('btn-outline');});
+  el.classList.remove('btn-outline');el.classList.add('btn-blue');
+  document.getElementById('mgr-warn-subs').innerHTML=IW_CATS_MGR[idx].items.map(it=>
+    `<div onclick="mgrWarnSelSub(this,'${it.replace(/'/g,"\'")}') " style="padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid rgba(255,255,255,.07);color:var(--text2);background:rgba(0,0,0,.2);display:flex;align-items:center;gap:8px" onmouseover="this.style.borderColor='rgba(255,64,64,.3)'" onmouseout="if(!this.classList.contains('mw-sel'))this.style.borderColor='rgba(255,255,255,.07)'">
+      <span style="width:8px;height:8px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2)"></span>${it}</div>`
+  ).join('');
+  document.getElementById('mgr-warn-submit').disabled=true;
+}
+function mgrWarnSelSub(el,val){
+  _mgrWarnSelItem=val;
+  document.querySelectorAll('#mgr-warn-subs > div').forEach(d=>{d.classList.remove('mw-sel');d.style.borderColor='rgba(255,255,255,.07)';d.style.color='var(--text2)';d.style.background='rgba(0,0,0,.2)';});
+  el.classList.add('mw-sel');el.style.borderColor='rgba(255,64,64,.5)';el.style.color='#FF6060';el.style.background='rgba(255,64,64,.1)';
+  document.getElementById('mgr-warn-submit').disabled=false;
+}
+function mgrWarnFilterProj(q){
+  const projs=getProjects();const drop=document.getElementById('mgr-warn-proj-drop');
+  const filtered=q?projs.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())):projs;
+  drop.innerHTML=filtered.slice(0,10).map(p=>`<div onclick="mgrWarnPickProj('${p.id}','${p.name.replace(/'/g,"\'")}') " style="padding:9px 13px;cursor:pointer;font-size:13px;color:var(--text2)" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">${p.name}</div>`).join('');
+  drop.style.display='block';
+}
+function mgrWarnShowDrop(){mgrWarnFilterProj(document.getElementById('mgr-warn-proj-inp').value);}
+function mgrWarnHideDrop(){document.getElementById('mgr-warn-proj-drop').style.display='none';}
+function mgrWarnPickProj(id,name){_mgrWarnSelProjId=id;document.getElementById('mgr-warn-proj-inp').style.display='none';document.getElementById('mgr-warn-proj-name').textContent=name;document.getElementById('mgr-warn-proj-sel').style.display='flex';}
+function mgrWarnClearProj(){_mgrWarnSelProjId='';document.getElementById('mgr-warn-proj-inp').style.display='block';document.getElementById('mgr-warn-proj-inp').value='';document.getElementById('mgr-warn-proj-sel').style.display='none';}
+async function submitMgrWarnReq(){
+  if(!_mgrWarnSelItem){toast('กรุณาเลือกประเภทความผิด','error');return;}
+  const p=_mgrWarnSelProjId?getProjects().find(x=>x.id===_mgrWarnSelProjId):null;
+  const req={id:'WREQ'+Date.now(),type:'warning',staffId:_mgrWarnTargetId,
+    warnType:_mgrWarnSelItem,projId:_mgrWarnSelProjId||'',projName:p?p.name:'',
+    note:document.getElementById('mgr-warn-note').value.trim(),
+    managerId:currentUser.uid,managerName:currentUser.nickname||currentUser.email,
+    status:'pending',createdAt:new Date().toISOString()};
+  await saveMgrRequest(req);
+  closeModal('modal-mgr-warn');
+  toast('📨 ส่งคำขอใบเตือนไปยังแอดมินแล้ว — รออนุมัติก่อนส่งถึงสต๊าฟ','success');
+}
+
+// ── Request data store ──
+async function saveMgrRequest(req){
+  const all=ls('mgr_requests')||[];
+  all.push(req);
+  ls('mgr_requests',all);
+  if(_fbDatabase){try{await _fbDatabase.ref('mgrRequests/'+req.id).set(req);}catch(e){}}
+  if(currentUser?.role!=='manager') renderAdminInboxBell();
+}
+async function loadMgrRequests(){
+  if(!_fbDatabase)return;
+  try{const snap=await _fbDatabase.ref('mgrRequests').get();if(snap.exists()){const v=snap.val();ls('mgr_requests',Object.values(v));}}catch(e){}
+}
+function getMgrRequests(){return ls('mgr_requests')||[];}
+
+// ── Admin Inbox ──
+function renderAdminInboxBell(){
+  const bell=document.getElementById('admin-inbox-bell'); if(!bell)return;
+  if(currentUser?.role!=='admin'){bell.style.display='none';return;}
+  const pending=getMgrRequests().filter(r=>r.status==='pending');
+  const count=document.getElementById('admin-inbox-count');
+  bell.style.display=pending.length?'block':'none';
+  if(count)count.textContent=pending.length;
+}
+function renderAdminInbox(){
+  const el=document.getElementById('admin-inbox-body');if(!el)return;
+  const reqs=getMgrRequests();
+  if(!reqs.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--text2)">ยังไม่มีคำขอ</div>';return;}
+  el.innerHTML=[...reqs].reverse().map(r=>{
+    const isPend=r.status==='pending';
+    const badge=r.status==='approved'?'<span style="padding:2px 10px;border-radius:20px;font-size:11px;background:rgba(0,223,160,.1);color:#00DFA0;border:1px solid rgba(0,223,160,.2)">อนุมัติแล้ว</span>':r.status==='rejected'?'<span style="padding:2px 10px;border-radius:20px;font-size:11px;background:rgba(255,64,64,.1);color:#FF4040;border:1px solid rgba(255,64,64,.2)">ปฏิเสธ</span>':'<span style="padding:2px 10px;border-radius:20px;font-size:11px;background:rgba(255,158,0,.12);color:#FF9E00;border:1px solid rgba(255,158,0,.25)">รออนุมัติ</span>';
+    const isWarn=r.type==='warning';
+    const detail=isWarn
+      ?`<div style="font-size:12px;color:var(--text2)">ขอออกใบเตือน: <strong style="color:#FF7070">${getStaffById(r.staffId)?.nickname||r.staffId}</strong>${r.projName?' · โปรเจกต์: '+r.projName:''}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">ประเภท: ${r.warnType}</div>`
+      :`<div style="font-size:12px;color:var(--text2)">ขอเปลี่ยนชื่อ: <strong>${r.curName}</strong> → <strong style="color:var(--accent2)">${r.newName}</strong></div>`;
+    return `<div style="border-bottom:1px solid rgba(255,255,255,.06);padding:14px 0">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:700;color:var(--text)">${isWarn?'✉️ ขอออกใบเตือน':'✏️ ขอเปลี่ยนชื่อ'}</span>
+        ${badge}
+        <span style="font-size:11px;color:var(--text2);margin-left:auto">${r.managerName||'Manager'} · ${fmtWarnDate(r.createdAt?.split('T')[0]||'')}</span>
+      </div>
+      ${detail}
+      ${r.note?`<div style="font-size:12px;color:var(--text2);margin-top:4px;font-style:italic">หมายเหตุ: ${r.note}</div>`:''}
+      ${isPend?`<div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-sm btn-green" onclick="adminApproveReq('${r.id}')">✅ อนุมัติ</button>
+        <button class="btn btn-sm btn-red" onclick="adminRejectReq('${r.id}')">✕ ปฏิเสธ</button>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+async function adminApproveReq(reqId){
+  const reqs=getMgrRequests(); const req=reqs.find(r=>r.id===reqId); if(!req)return;
+  req.status='approved';
+  ls('mgr_requests',reqs);
+  if(_fbDatabase)await _fbDatabase.ref('mgrRequests/'+reqId+'/status').set('approved').catch(()=>{});
+  // Apply action
+  if(req.type==='rename'){
+    const projs=getProjects(); const p=projs.find(x=>x.id===req.projId); if(p){p.name=req.newName;await saveProjectDB(p);}
+  } else if(req.type==='warning'){
+    const warn={id:'W'+Date.now(),type:req.warnType,projId:req.projId||'',projName:req.projName||'',note:req.note||'',date:(()=>{const d=new Date();return d.getDate().toString().padStart(2,'0')+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+(d.getFullYear()+543);})(),issuedAt:new Date().toISOString()};
+    await saveWarning(req.staffId,warn);
+  }
+  toast('✅ อนุมัติแล้ว','success');
+  renderAdminInbox();renderAdminInboxBell();
+}
+async function adminRejectReq(reqId){
+  const reqs=getMgrRequests(); const req=reqs.find(r=>r.id===reqId); if(!req)return;
+  req.status='rejected';
+  ls('mgr_requests',reqs);
+  if(_fbDatabase)await _fbDatabase.ref('mgrRequests/'+reqId+'/status').set('rejected').catch(()=>{});
+  toast('คำขอถูกปฏิเสธ','info');
+  renderAdminInbox();renderAdminInboxBell();
+}
+
+// Hook admin inbox open
+const _origOpenModal = window.openModal;
+if(typeof openModal==='function'){
+  const _oOM=openModal;
+  window._openModalHook=(id)=>{
+    if(id==='modal-admin-inbox') renderAdminInbox();
+    _oOM(id);
+  };
+}
+
+// ── Upgrade role in saveStaff ──
+const _origSaveStaff = window.saveStaff;
+
 </script>
+
+<!-- ════ MANAGER: REQUEST MODALS ════ -->
+<div id="modal-mgr-rename" class="modal-overlay hidden">
+ <div class="modal" style="width:460px">
+  <div class="modal-head"><div class="modal-title">📨 ขอเปลี่ยนชื่อโปรเจกต์</div><button class="btn-close" onclick="closeModal('modal-mgr-rename')">✕</button></div>
+  <div class="modal-body">
+   <div class="form-group"><label class="form-label">ชื่อปัจจุบัน</label><input class="form-input" id="mgr-rename-cur" disabled style="opacity:.5"></div>
+   <div class="form-group"><label class="form-label">ชื่อใหม่ที่ต้องการ *</label><input class="form-input" id="mgr-rename-new" placeholder="กรอกชื่อใหม่..."></div>
+   <div class="form-group"><label class="form-label">เหตุผล</label><textarea class="form-input" id="mgr-rename-reason" style="height:70px;resize:none" placeholder="อธิบายเหตุผล..."></textarea></div>
+   <div style="padding:9px 12px;background:rgba(155,111,255,.07);border:1px solid rgba(155,111,255,.2);border-radius:8px;font-size:11px;color:#9B6FFF">คำขอจะส่งถึงแอดมินก่อน — แก้ไขได้หลังได้รับอนุมัติเท่านั้น</div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-outline" onclick="closeModal('modal-mgr-rename')">ยกเลิก</button><button class="btn btn-blue" onclick="submitMgrRenameReq()">📨 ส่งคำขอ</button></div>
+ </div>
+</div>
+
+<div id="modal-mgr-warn" class="modal-overlay hidden">
+ <div class="modal" style="width:500px">
+  <div class="modal-head"><div class="modal-title">✉️ ออกใบเตือน (รออนุมัติ) — <span id="mgr-warn-target" style="color:#FF4040"></span></div><button class="btn-close" onclick="closeModal('modal-mgr-warn')">✕</button></div>
+  <div class="modal-body">
+   <div class="form-group">
+    <label class="form-label">หมวดความผิด *</label>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px" id="mgr-warn-cats">
+     <button class="btn btn-outline btn-sm" onclick="mgrWarnSelCat(0,this)">1. ส่งงาน/เวลา</button>
+     <button class="btn btn-outline btn-sm" onclick="mgrWarnSelCat(1,this)">2. การสื่อสาร</button>
+     <button class="btn btn-outline btn-sm" onclick="mgrWarnSelCat(2,this)">3. คุณภาพงาน</button>
+     <button class="btn btn-outline btn-sm" onclick="mgrWarnSelCat(3,this)">4. ความลับ</button>
+     <button class="btn btn-outline btn-sm" onclick="mgrWarnSelCat(4,this)">5. พฤติกรรม</button>
+    </div>
+    <div id="mgr-warn-subs" style="display:flex;flex-direction:column;gap:5px"></div>
+   </div>
+   <div class="form-group">
+    <label class="form-label">โปรเจกต์ที่เกิดเหตุ</label>
+    <div style="position:relative"><input class="form-input" id="mgr-warn-proj-inp" placeholder="🔍 พิมพ์ชื่อโปรเจกต์..." oninput="mgrWarnFilterProj(this.value)" onfocus="mgrWarnShowDrop()" onblur="setTimeout(mgrWarnHideDrop,180)" autocomplete="off">
+    <div id="mgr-warn-proj-drop" style="display:none;position:absolute;z-index:999;width:100%;background:var(--card);border:1px solid rgba(21,101,255,.25);border-radius:9px;margin-top:2px;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div></div>
+    <div id="mgr-warn-proj-sel" style="display:none;margin-top:5px;padding:7px 12px;background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.2);border-radius:8px;font-size:13px;color:var(--accent2);display:flex;align-items:center;justify-content:space-between"><span id="mgr-warn-proj-name"></span><span style="font-size:11px;color:var(--text2);cursor:pointer" onclick="mgrWarnClearProj()">✕</span></div>
+   </div>
+   <div class="form-group"><label class="form-label">หมายเหตุ</label><textarea class="form-input" id="mgr-warn-note" style="height:64px;resize:none" placeholder="ระบุรายละเอียด..."></textarea></div>
+   <div style="padding:9px 12px;background:rgba(155,111,255,.07);border:1px solid rgba(155,111,255,.2);border-radius:8px;font-size:11px;color:#9B6FFF">ใบเตือนนี้จะ<strong>รออนุมัติจากแอดมิน</strong>ก่อน — สต๊าฟจะยังไม่เห็นจนกว่าแอดมินจะอนุมัติ</div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-outline" onclick="closeModal('modal-mgr-warn')">ยกเลิก</button><button class="btn" id="mgr-warn-submit" style="background:rgba(255,40,40,.15);border:1px solid rgba(255,40,40,.35);color:#FF4040" disabled onclick="submitMgrWarnReq()">ส่งคำขอใบเตือน</button></div>
+ </div>
+</div>
+
+<!-- ════ ADMIN: INBOX MODAL ════ -->
+<div id="modal-admin-inbox" class="modal-overlay hidden">
+ <div class="modal" style="width:580px">
+  <div class="modal-head"><div class="modal-title">📨 กล่องขาเข้า — คำขอจาก Manager</div><button class="btn-close" onclick="closeModal('modal-admin-inbox')">✕</button></div>
+  <div class="modal-body" id="admin-inbox-body" style="max-height:60vh;overflow-y:auto"></div>
+ </div>
+</div>
+
 
 <!-- ════ WARNING ISSUE MODAL ════ -->
 <div id="modal-issue-warning" class="modal-overlay hidden">
