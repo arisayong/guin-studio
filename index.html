@@ -7183,21 +7183,20 @@ function calcInvTotal(){
 function openInvItemProjPicker(btn, ev){
   if(ev) ev.stopPropagation();
   document.getElementById('inv-proj-picker')?.remove();
+  window._invPickSelected = new Set(); // reset selection
   const rect = btn.getBoundingClientRect();
   const vh = window.innerHeight;
   const vw = window.innerWidth;
   const popWidth = Math.min(380, vw - 20);
   const margin = 12;
-  const minHeight = 240;
+  const minHeight = 280;
 
-  // Decide whether to open above or below the button
   const spaceBelow = vh - rect.bottom - margin;
   const spaceAbove = rect.top - margin;
   const openUpward = spaceBelow < minHeight && spaceAbove > spaceBelow;
   const availableHeight = openUpward ? spaceAbove : spaceBelow;
-  const maxH = Math.max(minHeight, Math.min(availableHeight, 480));
+  const maxH = Math.max(minHeight, Math.min(availableHeight, 520));
 
-  // Horizontal clamp — don't overflow viewport right side
   let leftPos = rect.left;
   if (leftPos + popWidth > vw - 10) leftPos = vw - popWidth - 10;
   if (leftPos < 10) leftPos = 10;
@@ -7210,21 +7209,21 @@ function openInvItemProjPicker(btn, ev){
   pop.style.cssText='position:fixed;'+vertStyle+';left:'+leftPos+'px;z-index:9999;background:var(--card);border:1px solid var(--accent2);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);width:'+popWidth+'px;max-height:'+maxH+'px;display:flex;flex-direction:column;overflow:hidden';
   pop.innerHTML=`
     <div style="padding:8px 12px;border-bottom:1px solid var(--border2);background:rgba(0,180,255,.08);font-size:11px;color:var(--accent2);font-weight:700;flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
-      <span>🔗 เลือกโปรเจกต์เพิ่มเป็นรายการเรียกเก็บ</span>
+      <span>🔗 เลือกโปรเจกต์ (ติ๊กได้หลายอัน)</span>
       <span style="cursor:pointer;font-size:14px;opacity:.7;padding:0 4px" onclick="document.getElementById('inv-proj-picker')?.remove()" title="ปิด">✕</span>
     </div>
     <input type="text" id="invpp-search" placeholder="🔍 ค้นหาชื่อโปรเจกต์หรือลูกค้า..." style="width:100%;padding:9px 12px;background:var(--bg2);border:none;border-bottom:1px solid var(--border2);color:var(--text);font-family:Kanit;font-size:13px;outline:none;flex-shrink:0">
-    <div id="invpp-list" style="flex:1;overflow-y:auto;padding:4px;min-height:120px"></div>`;
+    <div id="invpp-list" style="flex:1;overflow-y:auto;padding:4px;min-height:120px"></div>
+    <div id="invpp-footer" style="flex-shrink:0;padding:8px 12px;border-top:1px solid var(--border2);background:var(--bg2);display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <span id="invpp-count" style="font-size:11px;color:var(--text2)">ยังไม่ได้ติ๊กเลือก</span>
+      <button id="invpp-add-btn" class="btn btn-blue btn-sm" onclick="confirmInvPPAdd()" disabled style="opacity:.5;cursor:not-allowed">➕ เพิ่ม</button>
+    </div>`;
   document.body.appendChild(pop);
   renderInvPPList('');
   setTimeout(()=>document.getElementById('invpp-search')?.focus(),50);
   const inp=document.getElementById('invpp-search');
   if(inp) inp.oninput = ()=>renderInvPPList(inp.value);
-  setTimeout(()=>{ document.addEventListener('click', _closeInvPPOnce, {once:true}); },100);
-}
-function _closeInvPPOnce(e){
-  const pop=document.getElementById('inv-proj-picker');
-  if(pop && !pop.contains(e.target)) pop.remove();
+  // No auto-close on outside click — user must confirm or press ✕
 }
 function renderInvPPList(q){
   const listEl=document.getElementById('invpp-list'); if(!listEl) return;
@@ -7237,30 +7236,77 @@ function renderInvPPList(q){
     return (p.name||'').toLowerCase().includes(qq) || (p.client||'').toLowerCase().includes(qq);
   });
   if(!filtered.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">'+(qq?'ไม่พบโปรเจกต์':'ไม่มีโปรเจกต์อื่นที่ยังไม่ได้เพิ่ม')+'</div>';return;}
-  listEl.innerHTML = filtered.map(p=>`<div onclick="addInvItemFromProject('${p.id}')" style="padding:10px 13px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;justify-content:space-between;gap:10px" onmouseover="this.style.background='var(--dim)'" onmouseout="this.style.background=''">
-    <div style="flex:1;min-width:0">
-      <div style="font-weight:700;color:var(--accent2)">${p.name}</div>
-      ${p.client?'<div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.client+'</div>':''}
-    </div>
-    <div style="font-size:13px;font-weight:700;color:var(--green);white-space:nowrap">${p.budget?fmtB(p.budget):'฿0'}</div>
-  </div>`).join('');
+  const selected = window._invPickSelected || new Set();
+  listEl.innerHTML = filtered.map(p=>{
+    const isSelected = selected.has(p.id);
+    return `<div onclick="toggleInvPPPick('${p.id}')" style="padding:9px 11px;border-radius:7px;cursor:pointer;border:1px solid ${isSelected?'rgba(0,180,255,.5)':'transparent'};background:${isSelected?'rgba(0,180,255,.12)':'transparent'};margin-bottom:2px;display:flex;align-items:center;gap:10px;transition:all .12s" onmouseover="if(!this.dataset.sel)this.style.background='var(--dim)'" onmouseout="if(!this.dataset.sel)this.style.background=''" ${isSelected?'data-sel="1"':''}>
+      <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${isSelected?'var(--accent2)':'var(--border2)'};background:${isSelected?'var(--accent2)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .12s">
+        ${isSelected?'<span style="color:#fff;font-size:11px;font-weight:800;line-height:1">✓</span>':''}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;color:${isSelected?'var(--accent2)':'var(--text)'};font-size:13px">${p.name}</div>
+        ${p.client?'<div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.client+'</div>':''}
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--green);white-space:nowrap">${p.budget?fmtB(p.budget):'฿0'}</div>
+    </div>`;
+  }).join('');
 }
+function toggleInvPPPick(projId){
+  if(!window._invPickSelected) window._invPickSelected = new Set();
+  if(window._invPickSelected.has(projId)) window._invPickSelected.delete(projId);
+  else window._invPickSelected.add(projId);
+  // Re-render list with new selection state
+  const currentQuery = document.getElementById('invpp-search')?.value || '';
+  renderInvPPList(currentQuery);
+  // Update footer count + button state
+  const count = window._invPickSelected.size;
+  const cntEl = document.getElementById('invpp-count');
+  const btn = document.getElementById('invpp-add-btn');
+  if(cntEl) cntEl.textContent = count>0 ? `ติ๊กไว้ ${count} โปรเจกต์` : 'ยังไม่ได้ติ๊กเลือก';
+  if(btn){
+    btn.disabled = count===0;
+    btn.style.opacity = count===0 ? '.5' : '1';
+    btn.style.cursor = count===0 ? 'not-allowed' : 'pointer';
+    btn.textContent = count>0 ? `➕ เพิ่ม ${count} โปรเจกต์` : '➕ เพิ่ม';
+  }
+}
+function confirmInvPPAdd(){
+  const selected = window._invPickSelected; if(!selected || !selected.size) return;
+  const ids = Array.from(selected);
+  let addedCount = 0;
+  let autoFillClient = '';
+  ids.forEach(pid => {
+    const p = getProjects().find(x=>x.id===pid); if(!p) return;
+    const shouldReplace = invItems.length===1 && !invItems[0].desc && !invItems[0].price && !invItems[0].projId;
+    const newItem = {
+      projId: p.id,
+      desc: p.name,
+      detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '',
+      qty: 1,
+      unit: 'งาน',
+      price: p.budget||0
+    };
+    if(shouldReplace && addedCount===0) invItems[0] = newItem;
+    else invItems.push(newItem);
+    if(!autoFillClient && p.client) autoFillClient = p.client;
+    addedCount++;
+  });
+  // Auto-fill client if empty
+  const cli = document.getElementById('inv-client');
+  if(cli && !cli.value && autoFillClient) cli.value = autoFillClient;
+  document.getElementById('inv-proj-picker')?.remove();
+  window._invPickSelected = null;
+  renderInvItems();
+  toast(`✅ เพิ่ม ${addedCount} โปรเจกต์เป็นรายการเรียกเก็บแล้ว`,'success');
+}
+
+// Legacy single-click add (kept for backward compat, no longer used by UI)
 function addInvItemFromProject(projId){
   const p = getProjects().find(x=>x.id===projId);
   if(!p){ toast('ไม่พบโปรเจกต์','error'); return; }
-  // If this is the first item and it's a blank default, replace it
   const shouldReplace = invItems.length===1 && !invItems[0].desc && !invItems[0].price && !invItems[0].projId;
-  const newItem = {
-    projId: p.id,
-    desc: p.name,
-    detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '',
-    qty: 1,
-    unit: 'งาน',
-    price: p.budget||0
-  };
-  if(shouldReplace) invItems[0] = newItem;
-  else invItems.push(newItem);
-  // Auto-fill client if empty
+  const newItem = { projId: p.id, desc: p.name, detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '', qty: 1, unit: 'งาน', price: p.budget||0 };
+  if(shouldReplace) invItems[0] = newItem; else invItems.push(newItem);
   const cli = document.getElementById('inv-client');
   if(cli && !cli.value && p?.client) cli.value = p.client;
   document.getElementById('inv-proj-picker')?.remove();
