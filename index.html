@@ -104,7 +104,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .nav-item.expanded .nav-chevron{transform:rotate(180deg)}
 .sidebar-footer{padding:16px 20px;border-top:1px solid var(--border2)}
 .user-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));
-  display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-weight:800;flex-shrink:0}
+  background-size:cover;background-position:center;
+  display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-weight:800;flex-shrink:0;overflow:hidden}
 .sidebar-user{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .user-name{font-size:12px;font-weight:700}
 .user-role{font-size:10px;color:var(--text2);margin-top:2px}
@@ -811,7 +812,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <!-- ══ TAB: ใบแจ้งหนี้ (INVOICE) ══ -->
    <div id="docs-invoice" class="hidden">
     <div class="section-card">
-     <div class="section-title" style="color:var(--red)">🧾 สร้างใบแจ้งหนี้</div>
+     <div class="section-title" style="color:var(--accent2)">🧾 สร้างใบแจ้งหนี้</div>
      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div class="form-group" style="margin:0">
        <label class="form-label">ลูกค้า / บริษัท *</label>
@@ -820,12 +821,6 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
       <div class="form-group" style="margin:0">
        <label class="form-label">Email ลูกค้า *</label>
        <input class="form-input" id="inv-email" type="email" placeholder="client@email.com">
-      </div>
-      <div class="form-group" style="margin:0">
-       <label class="form-label">โปรเจกต์ (ถ้ามี)</label>
-       <select class="form-input form-select" id="inv-proj" onchange="autoFillInvoice()">
-        <option value="">— เลือกจากโปรเจกต์ หรือกรอกเอง —</option>
-       </select>
       </div>
       <div class="form-group" style="margin:0">
        <label class="form-label">วันที่ออกใบ</label>
@@ -839,11 +834,21 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
        <label class="form-label">VAT (%)</label>
        <input class="form-input" id="inv-vat" type="number" placeholder="0" min="0" max="100" value="0" oninput="calcInvTotal()">
       </div>
+      <div class="form-group" style="margin:0">
+       <label class="form-label">หมายเหตุ / เงื่อนไขการชำระ</label>
+       <input class="form-input" id="inv-note" placeholder="เช่น โอน 15 วัน, บัญชี SCB xxx">
+      </div>
      </div>
-     <div class="form-group">
-      <label class="form-label">หมายเหตุ / เงื่อนไขการชำระ</label>
-      <input class="form-input" id="inv-note" placeholder="เช่น โอนภายใน 15 วัน, บัญชี SCB xxx-x-xxxxx-x">
+
+     <!-- Multi-project picker -->
+     <div style="margin-bottom:14px">
+      <label class="form-label" style="display:flex;align-items:center;gap:8px">
+       🔗 โปรเจกต์ที่อ้างถึง (เพิ่มได้หลายโปรเจกต์ ไม่บังคับ)
+       <button type="button" class="btn btn-xs btn-outline" onclick="openInvProjPicker(this,event)" style="margin-left:auto">+ เพิ่มโปรเจกต์</button>
+      </label>
+      <div id="inv-proj-chips" style="display:flex;flex-wrap:wrap;gap:6px;min-height:38px;padding:8px;background:var(--bg2);border:1px dashed var(--border2);border-radius:9px;align-items:center"></div>
      </div>
+
      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">รายการที่เรียกเก็บ</div>
      <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-bottom:10px">
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 36px;gap:0;padding:8px 12px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border2)">
@@ -860,7 +865,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
      </div>
      <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-outline" onclick="previewInvoice()">👁️ ดูตัวอย่าง</button>
-      <button class="btn btn-red" onclick="saveAndSendInvoice()">📧 บันทึก & ส่ง Email</button>
+      <button class="btn btn-outline" onclick="saveInvoiceDraft()" style="border-color:var(--orange);color:var(--orange)">📝 บันทึกเป็นดราฟ</button>
+      <button class="btn btn-blue" onclick="saveAndSendInvoice()">📧 บันทึก & ส่ง Email</button>
       <button class="btn btn-outline" onclick="downloadInvoice()">⬇️ ดาวน์โหลด PDF</button>
      </div>
     </div>
@@ -998,8 +1004,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <button class="btn-close" onclick="closeModal('modal-project')">✕</button>
   </div>
   <div class="modal-body">
-   <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:12px">
+   <div style="margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">ชื่อโปรเจกต์ *</label><input class="form-input" id="pj-name" placeholder="เช่น One Piece Ep.1100"></div>
+   </div>
+   <div style="margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">ประเภทงาน</label>
      <select class="form-input form-select" id="pj-type">
       <option value="">-- เลือก --</option>
@@ -1008,20 +1016,22 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
       <option>บรรยาย</option><option>หนังสือเสียง</option><option>เพลง</option><option>มิกซ์</option>
      </select>
     </div>
+   </div>
+   <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:12px;margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">Budget จากลูกค้า</label>
      <div style="display:flex;gap:6px">
       <select class="form-input form-select" id="pj-budget-type" style="width:100px;padding:10px 28px 10px 10px" onchange="calcProjSummary()" title="เหมา = ยอดรวม / นาที = คูณนาทีหนัง">
        <option value="flat">เหมา</option>
        <option value="per-minute">นาที</option>
       </select>
-      <input class="form-input" id="pj-budget" type="number" placeholder="0" oninput="calcProjSummary()" style="flex:1">
+      <input class="form-input" id="pj-budget" type="number" placeholder="0" oninput="calcProjSummary()" style="flex:1;min-width:0">
      </div>
      <div id="pj-budget-calc" style="font-size:11px;color:var(--text2);margin-top:4px;display:none"></div>
     </div>
-   </div>
-   <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px">
-    <div class="form-group" style="margin:0"><label class="form-label">ชื่อ / URL ลูกค้า</label><input class="form-input" id="pj-client" placeholder="ชื่อลูกค้า หรือ link"></div>
     <div class="form-group" style="margin:0"><label class="form-label">ความยาว (นาที)</label><input class="form-input" id="pj-duration" type="number" placeholder="ถ้ามี" oninput="calcProjSummary();renderAllWorkerLists()"></div>
+   </div>
+   <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px">
+    <div class="form-group" style="margin:0"><label class="form-label">ชื่อ / URL ลูกค้า</label><input class="form-input" id="pj-client" placeholder="ชื่อลูกค้า หรือ link"></div>
    </div>
    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">วันเริ่มงาน</label>
@@ -1769,12 +1779,18 @@ function toast(msg,type='info'){
   el.innerHTML=`<span>${ic[type]||'ℹ️'}</span><span>${msg}</span>`;wrap.appendChild(el);
   setTimeout(()=>{el.style.opacity='0';el.style.transform='translateX(20px)';setTimeout(()=>el.remove(),300)},3500);
 }
+// Fix: ปิด modal เฉพาะตอน click จริง (mousedown + mouseup บน overlay ทั้งคู่)
+// ก่อนนี้ถ้าลากเลือกข้อความในโมดัลแล้วปล่อยเมาส์นอก modal จะนับเป็น click ทำให้ปิดเอง
 document.querySelectorAll('.modal-overlay').forEach(ov=>{
-  ov.addEventListener('click',e=>{
-    if(e.target===ov) ov.classList.add('hidden');
+  let _mdownOnOv = false;
+  ov.addEventListener('mousedown', e=>{ _mdownOnOv = (e.target === ov); });
+  ov.addEventListener('mouseup', e=>{
+    if(e.target === ov && _mdownOnOv) ov.classList.add('hidden');
+    _mdownOnOv = false;
   });
+  // block click bubbling from inside modal
   const modal = ov.querySelector('.modal');
-  if(modal) modal.addEventListener('click',e=>e.stopPropagation());
+  if(modal) modal.addEventListener('mousedown', e=>e.stopPropagation());
 });
 function statusBadge(s){return`<span class="badge badge-${s||'pending'}">${{pending:'⏳ รอจ่าย',approved:'🔵 อนุมัติ',paid:'✅ จ่ายแล้ว'}[s]||s}</span>`}
 function getProjExpense(p){return(p.workers||[]).reduce((a,w)=>a+(w.amount||0),0)}
@@ -1875,38 +1891,99 @@ function selectRegStaff(id, nickname, fullName){
 function autoFillRegRole(){} // legacy - unused
 
 // ── Profile Modal ──
+// Helper: render avatar in a given element (by id) using photoURL or fallback letter
+function renderAvatarInto(elId, photoURL, letter){
+  const el = document.getElementById(elId); if(!el) return;
+  if(photoURL){
+    el.textContent = '';
+    el.style.backgroundImage = `url("${photoURL}")`;
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+  } else {
+    el.style.backgroundImage = '';
+    el.textContent = (letter||'?').toUpperCase();
+  }
+}
+
 function openProfileModal(){
   const m = document.getElementById('modal-profile'); if(!m) return;
-  // populate
   const nick = currentUser?.nickname || '';
+  const photo = currentUser?.photoURL || '';
   const inp = document.getElementById('profile-nickname-input'); if(inp) inp.value = nick;
-  const av = document.getElementById('profile-avatar-big'); if(av) av.textContent = (nick[0]||'?').toUpperCase();
+  const urlInp = document.getElementById('profile-photo-url'); if(urlInp) urlInp.value = photo;
+  renderAvatarInto('profile-avatar-big', photo, nick[0]);
   const em = document.getElementById('profile-email-show'); if(em) em.textContent = currentUser?.email || '—';
   const rl = document.getElementById('profile-role-show'); if(rl) rl.textContent = currentUser?.role==='admin' ? '👑 Administrator' : '🎙️ ทีมงาน';
+  const actions = document.getElementById('profile-photo-actions'); if(actions) actions.style.display = photo ? 'block' : 'none';
+  window._profilePendingPhoto = null; // reset pending upload
   m.classList.remove('hidden');
 }
 function closeProfileModal(){
   const m = document.getElementById('modal-profile'); if(m) m.classList.add('hidden');
+  window._profilePendingPhoto = null;
 }
-async function saveMyNickname(){
+function handleProfilePhotoUpload(ev){
+  const file = ev.target.files?.[0]; if(!file) return;
+  if(file.size > 2*1024*1024){ toast('❌ ไฟล์ใหญ่เกิน 2MB — ใช้ URL จากลิงก์แทนจะดีกว่า','error'); ev.target.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    window._profilePendingPhoto = e.target.result; // base64 data URL
+    renderAvatarInto('profile-avatar-big', e.target.result, (currentUser?.nickname||'?')[0]);
+    const urlInp = document.getElementById('profile-photo-url'); if(urlInp) urlInp.value = '';
+    const actions = document.getElementById('profile-photo-actions'); if(actions) actions.style.display = 'block';
+    toast('👁️ พรีวิวรูปแล้ว — กด "บันทึกโปรไฟล์" เพื่อยืนยัน','info');
+  };
+  reader.readAsDataURL(file);
+}
+function applyProfilePhotoFromURL(){
+  const url = (document.getElementById('profile-photo-url')?.value||'').trim();
+  if(!url){ toast('กรุณาวาง URL รูป','error'); return; }
+  if(!/^https?:\/\//i.test(url)){ toast('URL ต้องขึ้นต้นด้วย http หรือ https','error'); return; }
+  window._profilePendingPhoto = url;
+  renderAvatarInto('profile-avatar-big', url, (currentUser?.nickname||'?')[0]);
+  const actions = document.getElementById('profile-photo-actions'); if(actions) actions.style.display = 'block';
+  toast('👁️ พรีวิวรูปแล้ว — กด "บันทึกโปรไฟล์" เพื่อยืนยัน','info');
+}
+function removeProfilePhoto(){
+  if(!confirm('ลบรูปโปรไฟล์?')) return;
+  window._profilePendingPhoto = '__REMOVE__';
+  renderAvatarInto('profile-avatar-big', '', (currentUser?.nickname||'?')[0]);
+  const urlInp = document.getElementById('profile-photo-url'); if(urlInp) urlInp.value = '';
+  const actions = document.getElementById('profile-photo-actions'); if(actions) actions.style.display = 'none';
+}
+
+async function saveMyProfile(){
   const inp = document.getElementById('profile-nickname-input');
   const nick = (inp?.value||'').trim();
   if(!nick){ toast('กรุณากรอกชื่อเล่น','error'); return; }
+  const pendingPhoto = window._profilePendingPhoto;
   try {
     if(_fbDatabase && currentUser?.uid){
       await _fbDatabase.ref('users/'+currentUser.uid+'/nickname').set(nick);
+      if(pendingPhoto === '__REMOVE__'){
+        await _fbDatabase.ref('users/'+currentUser.uid+'/photoURL').remove();
+      } else if(pendingPhoto){
+        await _fbDatabase.ref('users/'+currentUser.uid+'/photoURL').set(pendingPhoto);
+      }
     }
     currentUser.nickname = nick;
+    if(pendingPhoto === '__REMOVE__') currentUser.photoURL = '';
+    else if(pendingPhoto) currentUser.photoURL = pendingPhoto;
+
+    const newPhoto = currentUser.photoURL || '';
     const _sn = document.getElementById('sidebar-name'); if(_sn) _sn.textContent = nick;
-    const _sa = document.getElementById('sidebar-avatar'); if(_sa) _sa.textContent = nick[0].toUpperCase();
-    const _av = document.getElementById('profile-avatar-big'); if(_av) _av.textContent = nick[0].toUpperCase();
+    renderAvatarInto('sidebar-avatar', newPhoto, nick[0]);
+    renderAvatarInto('profile-avatar-big', newPhoto, nick[0]);
     const _wl = document.getElementById('my-welcome'); if(_wl) _wl.textContent = `สวัสดี ${nick} 👋`;
-    toast('✅ เปลี่ยนชื่อเล่นเป็น "'+nick+'" แล้ว','success');
+    toast('✅ บันทึกโปรไฟล์แล้ว','success');
     closeProfileModal();
   } catch(e) {
     toast('❌ บันทึกไม่สำเร็จ: '+e.message,'error');
   }
 }
+
+// Backward compat — keep saveMyNickname as alias so old HTML buttons still work
+async function saveMyNickname(){ return saveMyProfile(); }
 
 // ══════════════════════════════════════════════
 // WARNING SYSTEM
@@ -2043,7 +2120,10 @@ function closeIssueAppreciation() {
 }
 function iaSelCat(idx, el) {
   _iaSelItem = '';
-  document.querySelectorAll('#ia-cat-tabs button').forEach(b => b.classList.remove('btn-blue'));
+  document.querySelectorAll('#ia-cat-tabs button').forEach(b => {
+    b.classList.remove('btn-blue');
+    b.classList.add('btn-outline'); // กลับเป็นสี outline ตอนไม่เลือก (fix bug สีขาว)
+  });
   el.classList.add('btn-blue');
   el.classList.remove('btn-outline');
   document.getElementById('ia-sub-list').innerHTML = APPR_CATS[idx].items.map(it =>
@@ -2058,12 +2138,21 @@ function iaSelCat(idx, el) {
   iaChk();
 }
 function iaSelSub(el, val) {
+  // Toggle off if clicking the already-selected item
+  if (el.classList.contains('ia-sel')) {
+    el.classList.remove('ia-sel');
+    el.style.cssText = 'padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid rgba(255,255,255,.07);color:var(--text2);background:rgba(0,0,0,.2);display:flex;align-items:center;gap:8px;transition:all .15s';
+    const dot = el.querySelector('.ia-dot');
+    if (dot) { dot.style.background=''; dot.style.borderColor='rgba(255,255,255,.2)'; }
+    _iaSelItem = '';
+    iaChk();
+    return;
+  }
   _iaSelItem = val;
   document.querySelectorAll('#ia-sub-list > div').forEach(d => {
     d.classList.remove('ia-sel');
-    d.style.borderColor = 'rgba(255,255,255,.07)';
-    d.style.color = 'var(--text2)';
-    d.style.background = 'rgba(0,0,0,.2)';
+    // Fully reset via cssText — guaranteed clean state identical to initial render
+    d.style.cssText = 'padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid rgba(255,255,255,.07);color:var(--text2);background:rgba(0,0,0,.2);display:flex;align-items:center;gap:8px;transition:all .15s';
     const dot = d.querySelector('.ia-dot');
     if (dot) { dot.style.background=''; dot.style.borderColor='rgba(255,255,255,.2)'; }
   });
@@ -2221,7 +2310,10 @@ function closeIssueWarning() {
 // ── Category selection ──
 function iwSelCat(idx, el) {
   _iwSelItem = '';
-  document.querySelectorAll('#iw-cat-tabs button').forEach(b => b.classList.remove('btn-blue'));
+  document.querySelectorAll('#iw-cat-tabs button').forEach(b => {
+    b.classList.remove('btn-blue');
+    b.classList.add('btn-outline'); // กลับเป็นสี outline ตอนไม่เลือก (fix bug สีขาว)
+  });
   el.classList.add('btn-blue');
   el.classList.remove('btn-outline');
   document.getElementById('iw-sub-list').innerHTML = IW_CATS[idx].items.map(it =>
@@ -2237,12 +2329,19 @@ function iwSelCat(idx, el) {
 }
 
 function iwSelSub(el, val) {
+  if (el.classList.contains('iw-sel')) {
+    el.classList.remove('iw-sel');
+    el.style.cssText = 'padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid rgba(255,255,255,.07);color:var(--text2);background:rgba(0,0,0,.2);display:flex;align-items:center;gap:8px;transition:all .15s';
+    const dot = el.querySelector('.iw-dot');
+    if (dot) { dot.style.background=''; dot.style.borderColor='rgba(255,255,255,.2)'; }
+    _iwSelItem = '';
+    iwChk();
+    return;
+  }
   _iwSelItem = val;
   document.querySelectorAll('#iw-sub-list > div').forEach(d => {
     d.classList.remove('iw-sel');
-    d.style.borderColor = 'rgba(255,255,255,.07)';
-    d.style.color = 'var(--text2)';
-    d.style.background = 'rgba(0,0,0,.2)';
+    d.style.cssText = 'padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid rgba(255,255,255,.07);color:var(--text2);background:rgba(0,0,0,.2);display:flex;align-items:center;gap:8px;transition:all .15s';
     const dot = d.querySelector('.iw-dot');
     if (dot) { dot.style.background=''; dot.style.borderColor='rgba(255,255,255,.2)'; }
   });
@@ -2569,7 +2668,16 @@ async function enterApp(){
   const _splash2 = document.getElementById('app-splash'); if(_splash2) _splash2.remove();
   document.getElementById('screen-login').classList.add('hidden');
   document.getElementById('app-layout').classList.remove('hidden');
-  const _sa=document.getElementById('sidebar-avatar');if(_sa)_sa.textContent=(currentUser.nickname||'A')[0].toUpperCase();
+  const _sa=document.getElementById('sidebar-avatar');
+  if(_sa){
+    if(currentUser.photoURL){
+      _sa.textContent='';
+      _sa.style.backgroundImage='url("'+currentUser.photoURL+'")';
+    } else {
+      _sa.textContent=(currentUser.nickname||'A')[0].toUpperCase();
+      _sa.style.backgroundImage='';
+    }
+  }
   const _sn=document.getElementById('sidebar-name');if(_sn)_sn.textContent=currentUser.nickname||currentUser.name||'';
   const _sr=document.getElementById('sidebar-role');if(_sr)_sr.textContent=currentUser.role==='admin'?'Administrator':'ทีมงาน';
   const _an=document.getElementById('admin-nav');if(_an)_an.classList.toggle('hidden',currentUser.role!=='admin');
@@ -4440,12 +4548,12 @@ function switchDocsMain(tab, el) {
   document.querySelectorAll('#docs-main-tabs .tab').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
   if (tab === 'history') renderDocsHistory();
-  if (tab === 'invoice') { initInvItems(); const _id=document.getElementById('inv-date'); if(_id&&!_id.value) _id.value=isoToThai(new Date().toISOString().split('T')[0]); }
+  if (tab === 'invoice') { initInvItems(); _invProjIds = []; renderInvProjChips(); const _id=document.getElementById('inv-date'); if(_id&&!_id.value) _id.value=isoToThai(new Date().toISOString().split('T')[0]); }
 }
 function populateDocsProjSelects() {
   const projs = getProjects();
   const opts = '<option value="">— เลือกโปรเจกต์ —</option>' + projs.map(p => `<option value="${p.id}">${p.name}${p.client?' · '+p.client:''}</option>`).join('');
-  ['qt-proj','vc-proj','inv-proj'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=opts.replace('— เลือกโปรเจกต์ —', (id==='qt-proj'||id==='inv-proj')?'— เลือกจากโปรเจกต์ หรือกรอกเอง —':'— เลือกโปรเจกต์ —'); });
+  ['qt-proj','vc-proj'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=opts.replace('— เลือกโปรเจกต์ —', id==='qt-proj'?'— เลือกจากโปรเจกต์ หรือกรอกเอง —':'— เลือกโปรเจกต์ —'); });
 }
 
 /* ══════════════════════
@@ -4987,22 +5095,38 @@ function renderDocsHistory() {
     invoice:  { icon:'🧾', label:'ใบแจ้งหนี้', color:'var(--red)',     bg:'rgba(255,64,64,.1)', border:'rgba(255,64,64,.25)' },
     voucher:  { icon:'💸', label:'ใบสำคัญจ่าย', color:'var(--green)',  bg:'rgba(0,223,160,.1)', border:'rgba(0,223,160,.25)' },
   };
-  el.innerHTML='<div class="table-wrap"><table><thead><tr><th>เลขที่</th><th>ประเภท</th><th>ถึง</th><th>โปรเจกต์</th><th>ยอด</th><th>วันที่</th><th>Action</th></tr></thead><tbody>'+
+  el.innerHTML='<div class="table-wrap"><table><thead><tr><th>เลขที่</th><th>ประเภท</th><th>สถานะ</th><th>ถึง</th><th>โปรเจกต์</th><th>ยอด</th><th>วันที่</th><th>Action</th></tr></thead><tbody>'+
   all.map(d=>{
     const t=typeInfo[d.type]||typeInfo.quotation;
     const to=d.type==='voucher'?d.staffName:d.client;
+    const isDraft = !!d.isDraft;
+    const statusBadge = isDraft
+      ? '<span style="padding:3px 8px;border-radius:10px;background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.3);font-size:10px;font-weight:700;color:var(--orange)">📝 ดราฟ</span>'
+      : '<span style="padding:3px 8px;border-radius:10px;background:rgba(0,223,160,.1);border:1px solid rgba(0,223,160,.25);font-size:10px;font-weight:700;color:var(--green)">✅ ส่งแล้ว</span>';
+    const projDisplay = d.projName || (d.projIds&&d.projIds.length ? d.projIds.map(id=>{const p=getProjects().find(x=>x.id===id);return p?p.name:'';}).filter(Boolean).join(', ') : '—');
     return`<tr>
       <td style="font-size:12px;font-weight:700;color:${t.color}">${d.docNo||'—'}</td>
       <td><span style="padding:3px 10px;border-radius:10px;background:${t.bg};border:1px solid ${t.border};font-size:11px;font-weight:700;color:${t.color}">${t.icon} ${t.label}</span></td>
+      <td>${statusBadge}</td>
       <td style="font-weight:600">${to||'—'}</td>
-      <td style="font-size:12px;color:var(--text2)">${d.projName||'—'}</td>
+      <td style="font-size:12px;color:var(--text2)">${projDisplay}</td>
       <td style="font-weight:700;color:var(--accent2)">${d.total||d.amount?fmtB(d.total||d.amount):'—'}</td>
       <td style="font-size:12px;color:var(--text2)">${fmtDate(d.date||d.createdAt)}</td>
       <td><div style="display:flex;gap:5px">
         <button class="btn btn-xs btn-outline" onclick="repreviewDoc('${d.type}','${d.docNo}')">👁️ ดู</button>
+        <button class="btn btn-xs" style="background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.3);color:#FF6060" onclick="deleteDoc('${d.type}','${d.docNo}')">🗑️</button>
       </div></td>
     </tr>`;
   }).join('')+'</tbody></table></div>';
+}
+
+function deleteDoc(type, docNo){
+  if(!confirm('ลบเอกสาร '+docNo+' จริง ๆ ใช่ไหม?\n(เฉพาะในประวัติ ไฟล์ Drive จะยังอยู่)')) return;
+  const storeKey = type==='invoice'?'invoices' : type==='quotation'?'quotations' : 'vouchers';
+  const arr = (getDocsStore(storeKey)||[]).filter(d=>d.docNo!==docNo);
+  saveDocsStore(storeKey, arr);
+  renderDocsHistory();
+  toast('🗑️ ลบเอกสาร '+docNo+' แล้ว','info');
 }
 
 function repreviewDoc(type, docNo) {
@@ -6634,13 +6758,25 @@ function calcDraftSummary(d){
   const budget = (d.budgetType==='per-minute' && dur>0) ? budgetRaw*dur : budgetRaw;
   let expense = 0;
   Object.entries(d.cats||{}).forEach(([k,c])=>{
-    const rate = parseFloat(c.rate)||0;
-    const ppl = parseInt(c.ppl)||1;
-    const tax = parseFloat(c.tax)||0;
-    const base = (c.unit==='per-minute' && dur>0) ? rate*dur : rate;
-    const total = base * ppl;
-    const afterTax = total * (1 - tax/100);
-    expense += afterTax;
+    if(k==='dub'){
+      // Sum main + sub
+      [c.main, c.sub].forEach(s=>{
+        if(!s) return;
+        const rate = parseFloat(s.rate)||0;
+        const ppl = parseInt(s.ppl)||1;
+        const tax = parseFloat(s.tax)||0;
+        const base = (s.unit==='per-minute' && dur>0) ? rate*dur : rate;
+        const total = base * ppl;
+        expense += total * (1 - tax/100);
+      });
+    } else {
+      const rate = parseFloat(c.rate)||0;
+      const ppl = parseInt(c.ppl)||1;
+      const tax = parseFloat(c.tax)||0;
+      const base = (c.unit==='per-minute' && dur>0) ? rate*dur : rate;
+      const total = base * ppl;
+      expense += total * (1 - tax/100);
+    }
   });
   return { budget:Math.round(budget), expense:Math.round(expense), profit:Math.round(budget-expense) };
 }
@@ -6678,7 +6814,7 @@ function renderCalcModal(){
       </div>
       <div class="form-group" style="margin:0">
         <label class="form-label">ความยาว (นาที)</label>
-        <input class="form-input" id="calc-dur" type="number" min="0" placeholder="0" value="${d.duration||''}" oninput="_calcEditing.duration=parseFloat(this.value)||0;renderCalcSummary();renderCalcCats()">
+        <input class="form-input" id="calc-dur" type="number" min="0" placeholder="0" value="${d.duration||''}" oninput="_calcEditing.duration=parseFloat(this.value)||0;Object.keys(_calcEditing.cats||{}).forEach(k=>updateCalcLive(k,'__all'));renderCalcSummary()">
       </div>
     </div>
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px;letter-spacing:1px;text-transform:uppercase">👥 เลือกหมวดที่มีในโปรเจกต์</div>
@@ -6701,8 +6837,114 @@ function renderCalcToggles(){
 
 function toggleCalcCat(key){
   if(_calcEditing.cats[key]) delete _calcEditing.cats[key];
-  else _calcEditing.cats[key] = {rate:0, unit:'per-minute', ppl:1, tax:0};
+  else {
+    if(key==='dub'){
+      _calcEditing.cats[key] = {
+        main: {rate:0, unit:'per-minute', ppl:1, tax:0},
+        sub:  {rate:0, unit:'per-minute', ppl:1, tax:0}
+      };
+    } else {
+      _calcEditing.cats[key] = {rate:0, unit:'per-minute', ppl:1, tax:0};
+    }
+  }
   renderCalcToggles(); renderCalcCats(); renderCalcSummary();
+}
+
+// Helper: compute subtotal for one sub-slot inside a calc category
+function _calcSlotTotal(slot, dur){
+  const rate = parseFloat(slot.rate)||0;
+  const ppl = parseInt(slot.ppl)||1;
+  const tax = parseFloat(slot.tax)||0;
+  const base = (slot.unit==='per-minute' && dur>0) ? rate*dur : rate;
+  const total = base * ppl;
+  const afterTax = Math.round(total * (1 - tax/100));
+  return { rate, ppl, tax, base:Math.round(base), total:Math.round(total), afterTax };
+}
+
+// Total for entire category (sums all slots - for dub it's main+sub)
+function _calcCatTotal(key, cc, dur){
+  const slots = key==='dub' ? [cc.main||{}, cc.sub||{}] : [cc];
+  let sum = 0, rawSum = 0;
+  slots.forEach(s => {
+    const t = _calcSlotTotal(s, dur);
+    sum += t.afterTax;
+    rawSum += t.total;
+  });
+  return { afterTax:sum, total:rawSum };
+}
+
+// Called by oninput — updates ONLY numbers shown, not re-creating inputs (preserves focus)
+function updateCalcLive(catKey, slotKey){
+  const dur = parseFloat(_calcEditing.duration)||0;
+  const cc = _calcEditing.cats[catKey]; if(!cc) return;
+  // Update this category's totals
+  const catSum = _calcCatTotal(catKey, cc, dur);
+  const headEl = document.getElementById('calc-head-'+catKey);
+  if(headEl){
+    const c = CALC_CATS.find(x=>x.key===catKey);
+    const tax = cc.tax||0;
+    if(catKey==='dub'){
+      headEl.innerHTML = '<span style="font-size:15px;font-weight:800;color:'+c.color+'">'+fmtB(catSum.afterTax)+'</span>';
+    } else {
+      headEl.innerHTML = tax>0
+        ? '<span style="font-size:15px;font-weight:800;color:'+c.color+'"><span style="font-size:11px;text-decoration:line-through;opacity:.5">'+fmtB(catSum.total)+'</span> → '+fmtB(catSum.afterTax)+'</span>'
+        : '<span style="font-size:15px;font-weight:800;color:'+c.color+'">'+fmtB(catSum.afterTax)+'</span>';
+    }
+  }
+  // Update per-slot subtotal note
+  if(slotKey){
+    const sl = slotKey==='main'?cc.main : slotKey==='sub'?cc.sub : cc;
+    const t = _calcSlotTotal(sl||{}, dur);
+    const noteEl = document.getElementById('calc-slot-note-'+catKey+'-'+slotKey);
+    if(noteEl){
+      noteEl.innerHTML = t.ppl>1
+        ? t.ppl+' คน × '+fmtB(t.base)+'/คน = <strong style="color:'+(CALC_CATS.find(x=>x.key===catKey)?.color||'#fff')+'">'+fmtB(t.total)+'</strong>'+(t.tax>0?' (หัก '+t.tax+'% → '+fmtB(t.afterTax)+')':'')
+        : (t.rate>0 ? '= '+fmtB(t.afterTax) : '');
+    }
+  }
+  renderCalcSummary();
+}
+
+// When unit select changes — need to re-render that slot but preserve focus on select
+function updateCalcSlotUnit(catKey, slotKey, val){
+  const cc = _calcEditing.cats[catKey]; if(!cc) return;
+  if(catKey==='dub' && slotKey==='main') cc.main = cc.main||{}, cc.main.unit=val;
+  else if(catKey==='dub' && slotKey==='sub') cc.sub = cc.sub||{}, cc.sub.unit=val;
+  else cc.unit=val;
+  updateCalcLive(catKey, slotKey);
+}
+
+function _calcSlotInputsHTML(catKey, slotKey, slot, color, labelPrefix){
+  const s = slot || {};
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">
+    <div>
+      <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">${labelPrefix?labelPrefix+' ราคา':'ราคา'}</label>
+      <input type="number" min="0" value="${s.rate||''}" placeholder="0" style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcSetSlot('${catKey}','${slotKey}','rate',this.value);updateCalcLive('${catKey}','${slotKey}')">
+    </div>
+    <div>
+      <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">หน่วย</label>
+      <select style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" onchange="updateCalcSlotUnit('${catKey}','${slotKey}',this.value)">
+        <option value="per-minute" ${s.unit==='per-minute'||!s.unit?'selected':''}>/นาที</option>
+        <option value="flat" ${s.unit==='flat'?'selected':''}>เหมา</option>
+      </select>
+    </div>
+    <div>
+      <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">จำนวนคน</label>
+      <input type="number" min="1" value="${s.ppl||1}" style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcSetSlot('${catKey}','${slotKey}','ppl',this.value);updateCalcLive('${catKey}','${slotKey}')">
+    </div>
+    <div>
+      <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">หัก %</label>
+      <input type="number" min="0" max="100" value="${s.tax||''}" placeholder="0" style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcSetSlot('${catKey}','${slotKey}','tax',this.value);updateCalcLive('${catKey}','${slotKey}')">
+    </div>
+  </div>
+  <div id="calc-slot-note-${catKey}-${slotKey}" style="margin-top:6px;font-size:11px;color:var(--text2);min-height:16px"></div>`;
+}
+
+function _calcSetSlot(catKey, slotKey, field, val){
+  const cc = _calcEditing.cats[catKey]; if(!cc) return;
+  const target = (catKey==='dub' && slotKey==='main') ? (cc.main=cc.main||{}) :
+                 (catKey==='dub' && slotKey==='sub')  ? (cc.sub=cc.sub||{}) : cc;
+  target[field] = (field==='ppl') ? (parseInt(val)||1) : (parseFloat(val)||0);
 }
 
 function renderCalcCats(){
@@ -6710,45 +6952,45 @@ function renderCalcCats(){
   const dur = parseFloat(_calcEditing.duration)||0;
   const blocks = CALC_CATS.filter(c=>_calcEditing.cats[c.key]).map(c=>{
     const cc = _calcEditing.cats[c.key];
-    const rate = parseFloat(cc.rate)||0;
-    const ppl = parseInt(cc.ppl)||1;
-    const tax = parseFloat(cc.tax)||0;
-    const base = (cc.unit==='per-minute' && dur>0) ? rate*dur : rate;
-    const total = base * ppl;
-    const afterTax = Math.round(total * (1 - tax/100));
-    const perPerson = Math.round(base);
+    const catSum = _calcCatTotal(c.key, cc, dur);
     const colBg = c.color.replace('var(--','rgba(').replace(')',',.05)');
     const colBorder = c.color.replace('var(--','rgba(').replace(')',',.3)');
+    // Special handling for dub: main + sub
+    if(c.key==='dub'){
+      if(!cc.main) cc.main = {rate:0,unit:'per-minute',ppl:1,tax:0};
+      if(!cc.sub)  cc.sub  = {rate:0,unit:'per-minute',ppl:1,tax:0};
+      return `<div class="cat-block" style="background:${colBg};border:1px solid ${colBorder};border-radius:11px;padding:13px 16px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-weight:700;color:${c.color}">${c.label}</span>
+          <span id="calc-head-${c.key}"><span style="font-size:15px;font-weight:800;color:${c.color}">${fmtB(catSum.afterTax)}</span></span>
+        </div>
+        <div style="border:1px solid rgba(255,158,0,.25);border-radius:9px;padding:10px;background:rgba(255,158,0,.04);margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;color:${c.color};margin-bottom:7px">🌟 นักพากย์หลัก</div>
+          ${_calcSlotInputsHTML('dub','main',cc.main,c.color)}
+        </div>
+        <div style="border:1px solid rgba(255,158,0,.25);border-radius:9px;padding:10px;background:rgba(255,158,0,.04)">
+          <div style="font-size:11px;font-weight:700;color:${c.color};margin-bottom:7px">🎭 นักพากย์รอง</div>
+          ${_calcSlotInputsHTML('dub','sub',cc.sub,c.color)}
+        </div>
+      </div>`;
+    }
+    // Non-dub categories — single slot
     return `<div class="cat-block" style="background:${colBg};border:1px solid ${colBorder};border-radius:11px;padding:13px 16px;margin-bottom:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <span style="font-weight:700;color:${c.color}">${c.label}</span>
-        <span style="font-size:15px;font-weight:800;color:${c.color}">${tax>0?'<span style="font-size:11px;text-decoration:line-through;opacity:.5">'+fmtB(total)+'</span> → ':''}${fmtB(afterTax)}</span>
+        <span id="calc-head-${c.key}">${cc.tax>0
+            ? '<span style="font-size:15px;font-weight:800;color:'+c.color+'"><span style="font-size:11px;text-decoration:line-through;opacity:.5">'+fmtB(catSum.total)+'</span> → '+fmtB(catSum.afterTax)+'</span>'
+            : '<span style="font-size:15px;font-weight:800;color:'+c.color+'">'+fmtB(catSum.afterTax)+'</span>'}</span>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">
-        <div>
-          <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">ราคา</label>
-          <input type="number" min="0" value="${cc.rate||''}" placeholder="0" style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcEditing.cats['${c.key}'].rate=parseFloat(this.value)||0;renderCalcCats();renderCalcSummary()">
-        </div>
-        <div>
-          <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">หน่วย</label>
-          <select style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" onchange="_calcEditing.cats['${c.key}'].unit=this.value;renderCalcCats();renderCalcSummary()">
-            <option value="per-minute" ${cc.unit==='per-minute'?'selected':''}>/นาที</option>
-            <option value="flat" ${cc.unit==='flat'?'selected':''}>เหมา</option>
-          </select>
-        </div>
-        <div>
-          <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">จำนวนคน</label>
-          <input type="number" min="1" value="${cc.ppl||1}" style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcEditing.cats['${c.key}'].ppl=parseInt(this.value)||1;renderCalcCats();renderCalcSummary()">
-        </div>
-        <div>
-          <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">หัก %</label>
-          <input type="number" min="0" max="100" value="${cc.tax||''}" placeholder="0" style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcEditing.cats['${c.key}'].tax=parseFloat(this.value)||0;renderCalcCats();renderCalcSummary()">
-        </div>
-      </div>
-      ${ppl>1?`<div style="margin-top:6px;font-size:11px;color:var(--text2)">${ppl} คน × ${fmtB(perPerson)}/คน = <strong style="color:${c.color}">${fmtB(total)}</strong>${tax>0?' (หัก '+tax+'% → '+fmtB(afterTax)+')':''}</div>`:''}
+      ${_calcSlotInputsHTML(c.key,'only',cc,c.color)}
     </div>`;
   }).join('');
   el.innerHTML = blocks || '<div style="padding:16px;text-align:center;color:var(--text2);font-size:13px;background:rgba(0,0,0,.2);border-radius:10px">↑ กดเลือกหมวดด้านบนเพื่อเริ่มคิดราคา</div>';
+  // Initialize slot notes after render
+  Object.keys(_calcEditing.cats||{}).forEach(k=>{
+    if(k==='dub'){ updateCalcLive(k,'main'); updateCalcLive(k,'sub'); }
+    else updateCalcLive(k,'only');
+  });
 }
 
 function renderCalcSummary(){
@@ -6829,7 +7071,8 @@ async function convertCalcToProject(id){
     note: d.note || '(สร้างจากแบบร่าง · กรุณาเลือกคนทำงาน)',
     workers: [], // empty - user must select real people
     tax: {
-      dub: d.cats.dub?.tax||0, adp: d.cats.adp?.tax||0, mix: d.cats.mix?.tax||0,
+      dub: d.cats.dub?.main?.tax || d.cats.dub?.tax || 0,
+      adp: d.cats.adp?.tax||0, mix: d.cats.mix?.tax||0,
       qc: d.cats.qc?.tax||0, sub: d.cats.sub?.tax||0, mgr: d.cats.mgr?.tax||0
     },
     evidenceLogs: [], snapshot: null,
@@ -6908,21 +7151,80 @@ function calcInvTotal(){
     : `<div style="font-size:24px;font-weight:800;color:var(--red)">${fmtB(total)}</div>`;
   return total;
 }
-function autoFillInvoice(){
-  const projId = document.getElementById('inv-proj')?.value; if(!projId) return;
-  const p = getProjects().find(x=>x.id===projId); if(!p) return;
-  document.getElementById('inv-client').value = p.client||'';
-  invItems = [];
-  if(p.budget) invItems.push({desc:p.name, qty:1, unit:'งาน', price:p.budget});
-  else invItems.push({desc:p.name, qty:1, unit:'งาน', price:0});
-  renderInvItems();
+// Multi-project chip state
+let _invProjIds = [];
+function renderInvProjChips(){
+  const el = document.getElementById('inv-proj-chips'); if(!el) return;
+  if(!_invProjIds.length){ el.innerHTML = '<div style="font-size:12px;color:var(--text2);padding:4px 8px">ยังไม่มีโปรเจกต์ · กด "+ เพิ่มโปรเจกต์" เพื่ออ้างถึงโปรเจกต์จริง</div>'; return; }
+  el.innerHTML = _invProjIds.map(id=>{
+    const p = getProjects().find(x=>x.id===id);
+    if(!p) return '';
+    return `<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 9px 5px 11px;background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.35);border-radius:14px;font-size:12px;color:var(--accent2);font-weight:600">
+      <span>📁 ${p.name}</span>${p.client?'<span style="font-size:10px;opacity:.75">· '+p.client+'</span>':''}
+      <span style="cursor:pointer;padding:0 3px;color:#FF6060" onclick="removeInvProj('${id}')">✕</span>
+    </div>`;
+  }).join('');
 }
+function removeInvProj(id){
+  _invProjIds = _invProjIds.filter(x=>x!==id);
+  renderInvProjChips();
+}
+function openInvProjPicker(btn, ev){
+  if(ev) ev.stopPropagation();
+  document.getElementById('inv-proj-picker')?.remove();
+  const rect = btn.getBoundingClientRect();
+  const pop = document.createElement('div');
+  pop.id='inv-proj-picker';
+  pop.style.cssText='position:fixed;top:'+(rect.bottom+6)+'px;right:'+Math.max(8,window.innerWidth-rect.right)+'px;z-index:9999;background:var(--card);border:1px solid var(--accent2);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);width:320px;overflow:hidden';
+  pop.innerHTML=`
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border2);background:rgba(0,180,255,.08);font-size:11px;color:var(--accent2);font-weight:700">🔗 เพิ่มโปรเจกต์</div>
+    <input type="text" id="invpp-search" placeholder="🔍 ค้นหาชื่อโปรเจกต์หรือลูกค้า..." style="width:100%;padding:9px 12px;background:var(--bg2);border:none;border-bottom:1px solid var(--border2);color:var(--text);font-family:Kanit;font-size:13px;outline:none">
+    <div id="invpp-list" style="max-height:260px;overflow-y:auto;padding:4px"></div>`;
+  document.body.appendChild(pop);
+  renderInvPPList('');
+  setTimeout(()=>document.getElementById('invpp-search')?.focus(),50);
+  const inp=document.getElementById('invpp-search');
+  if(inp) inp.oninput = ()=>renderInvPPList(inp.value);
+  setTimeout(()=>{
+    document.addEventListener('click', _closeInvPPOnce, {once:true});
+  },100);
+}
+function _closeInvPPOnce(e){
+  const pop=document.getElementById('inv-proj-picker');
+  if(pop && !pop.contains(e.target)) pop.remove();
+}
+function renderInvPPList(q){
+  const listEl=document.getElementById('invpp-list'); if(!listEl) return;
+  const projs = getProjects();
+  const qq = (q||'').toLowerCase().trim();
+  const filtered = projs.filter(p => {
+    if(_invProjIds.includes(p.id)) return false;
+    if(!qq) return true;
+    return (p.name||'').toLowerCase().includes(qq) || (p.client||'').toLowerCase().includes(qq);
+  });
+  if(!filtered.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">'+(qq?'ไม่พบโปรเจกต์':'ไม่มีโปรเจกต์อื่น')+'</div>';return;}
+  listEl.innerHTML = filtered.map(p=>`<div onclick="pickInvProj('${p.id}')" style="padding:8px 12px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04)" onmouseover="this.style.background='var(--dim)';this.style.color='var(--accent2)'" onmouseout="this.style.background='';this.style.color='var(--text)'"><strong>${p.name}</strong>${p.client?'<div style="font-size:11px;color:var(--text2);margin-top:1px">'+p.client+'</div>':''}</div>`).join('');
+}
+function pickInvProj(id){
+  if(!_invProjIds.includes(id)) _invProjIds.push(id);
+  document.getElementById('inv-proj-picker')?.remove();
+  renderInvProjChips();
+  // Auto-fill client if empty and only 1 proj
+  if(_invProjIds.length===1){
+    const p = getProjects().find(x=>x.id===id);
+    const cli = document.getElementById('inv-client');
+    if(cli && !cli.value && p?.client) cli.value = p.client;
+  }
+}
+
+function autoFillInvoice(){} // legacy - no longer used
+
 function getInvoiceData(){
   return {
     docNo: 'INV-' + (new Date().getFullYear()+543) + '-' + String((getDocsStore('invoices')||[]).length+1).padStart(3,'0'),
     client: document.getElementById('inv-client')?.value.trim()||'',
     email:  document.getElementById('inv-email')?.value.trim()||'',
-    projId: document.getElementById('inv-proj')?.value||'',
+    projIds: [..._invProjIds],
     date:   thaiToIso(document.getElementById('inv-date')?.value)||document.getElementById('inv-date')?.value||new Date().toISOString().split('T')[0],
     dueDate:thaiToIso(document.getElementById('inv-duedate')?.value)||document.getElementById('inv-duedate')?.value||'',
     vat:    parseFloat(document.getElementById('inv-vat')?.value)||0,
@@ -6931,8 +7233,9 @@ function getInvoiceData(){
   };
 }
 function buildInvoiceHTML(data){
-  const { docNo, client, email, projId, date, dueDate, vat=0, note, items } = data;
-  const p = projId ? getProjects().find(x=>x.id===projId) : null;
+  const { docNo, client, email, projIds=[], date, dueDate, vat=0, note, items } = data;
+  // Backward compat: handle old projId field
+  const allProjs = (projIds && projIds.length ? projIds : (data.projId ? [data.projId] : [])).map(pid => getProjects().find(x=>x.id===pid)).filter(Boolean);
   const subtotal = items.reduce((a,x)=>a+(x.qty||1)*(x.price||0), 0);
   const vatAmt = Math.round(subtotal*vat/100);
   const total = subtotal + vatAmt;
@@ -6945,49 +7248,57 @@ function buildInvoiceHTML(data){
     '<td style="padding:12px 14px;text-align:right;font-weight:600;color:#111827">฿'+((x.qty||1)*(x.price||0)).toLocaleString()+'</td>'+
     '</tr>').join('');
   const adminSig = ls('admin_signature');
+  const projListHtml = allProjs.length ? '<div style="font-size:12px;color:#6b7280;margin-top:6px"><strong style="color:#374151">อ้างถึงโปรเจกต์:</strong> '+allProjs.map(p=>p.name).join(', ')+'</div>' : '';
   return `<div id="printable-invoice" data-vno="${docNo}" style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:620px;margin:0 auto;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb">
-    <div style="background:#2a0d0d;padding:26px 30px">
+    <div style="background:#0d1e3d;padding:26px 30px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:72px;object-fit:contain;display:block">
-          <div style="color:#c9a09a;font-size:11px;margin-top:7px">penguinstudiovoice@gmail.com</div>
+          <div style="color:#a0c0ff;font-size:11px;margin-top:7px">penguinstudiovoice@gmail.com</div>
         </div>
         <div style="text-align:right">
           <div style="color:#fff;font-size:20px;font-weight:700;letter-spacing:1px">ใบแจ้งหนี้</div>
-          <div style="color:#c9a09a;font-size:10px;margin-top:2px;letter-spacing:0.5px">INVOICE</div>
+          <div style="color:#a0c0ff;font-size:10px;margin-top:2px;letter-spacing:0.5px">INVOICE</div>
           <div style="margin-top:10px;background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 12px">
-            <div style="color:#c9a09a;font-size:10px;letter-spacing:1px">เลขที่</div>
+            <div style="color:#a0c0ff;font-size:10px;letter-spacing:1px">เลขที่</div>
             <div style="color:#fff;font-size:15px;font-weight:600">${docNo}</div>
-            <div style="color:#c9a09a;font-size:11px;margin-top:3px">${thaiDate(date)}</div>
+            <div style="color:#a0c0ff;font-size:11px;margin-top:3px">${thaiDate(date)}</div>
           </div>
         </div>
       </div>
     </div>
-    <div style="height:5px;background:linear-gradient(90deg,#FF4040,#FF9E00,#FFD740)"></div>
+    <div style="height:5px;background:linear-gradient(90deg,#1565FF,#4080FF,#70A0FF)"></div>
     <div style="padding:22px 30px 0">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:14px">
         <div>
-          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">เรียกเก็บจาก</div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ลูกค้า</div>
           <div style="font-size:16px;font-weight:700;color:#111827">${client||'—'}</div>
           ${email?'<div style="font-size:12px;color:#6b7280;margin-top:3px">'+email+'</div>':''}
         </div>
         <div>
-          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ครบกำหนดชำระ</div>
-          <div style="font-size:15px;font-weight:700;color:#FF4040">${dueDate?thaiDate(dueDate):'ตามที่ตกลง'}</div>
-          ${p?'<div style="font-size:12px;color:#6b7280;margin-top:3px">โปรเจกต์: '+p.name+'</div>':''}
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ผู้ขาย</div>
+          <div style="font-size:16px;font-weight:700;color:#111827">Guin Home Studio</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:3px">penguinstudiovoice@gmail.com</div>
         </div>
+      </div>
+      <div style="padding:10px 14px;background:#f3f6fb;border:1px solid #e5e7eb;border-radius:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px;font-weight:600">ครบกำหนดชำระ</div>
+          <div style="font-size:14px;font-weight:700;color:#1565FF">${dueDate?thaiDate(dueDate):'ตามที่ตกลง'}</div>
+        </div>
+        ${projListHtml}
       </div>
     </div>
     <div style="height:1px;background:#f3f4f6;margin:18px 30px"></div>
     <div style="padding:0 30px">
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
-          <tr style="background:#2a0d0d">
-            <th style="text-align:left;padding:10px 14px;color:#FFAA70;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase">รายการ</th>
-            <th style="text-align:center;padding:10px 8px;color:#FFAA70;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">จำนวน</th>
-            <th style="text-align:center;padding:10px 8px;color:#FFAA70;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">หน่วย</th>
-            <th style="text-align:right;padding:10px 8px;color:#FFAA70;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:95px">ราคา/หน่วย</th>
-            <th style="text-align:right;padding:10px 14px;color:#FFAA70;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:105px">รวม</th>
+          <tr style="background:#0d1e3d">
+            <th style="text-align:left;padding:10px 14px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase">รายการ</th>
+            <th style="text-align:center;padding:10px 8px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">จำนวน</th>
+            <th style="text-align:center;padding:10px 8px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">หน่วย</th>
+            <th style="text-align:right;padding:10px 8px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:95px">ราคา/หน่วย</th>
+            <th style="text-align:right;padding:10px 14px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:105px">รวม</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -7000,9 +7311,9 @@ function buildInvoiceHTML(data){
           <span style="font-size:13px;color:#374151">฿${subtotal.toLocaleString()}</span>
         </div>
         ${vat>0?'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6"><span style="font-size:13px;color:#6b7280">VAT '+vat+'%</span><span style="font-size:13px;color:#374151">฿'+vatAmt.toLocaleString()+'</span></div>':''}
-        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:3px solid #2a0d0d">
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:3px solid #0d1e3d">
           <span style="font-size:14px;font-weight:700;color:#111827">ยอดที่ต้องชำระ</span>
-          <span style="font-size:20px;font-weight:700;color:#FF4040">฿${total.toLocaleString()}</span>
+          <span style="font-size:20px;font-weight:700;color:#1565FF">฿${total.toLocaleString()}</span>
         </div>
       </div>
     </div>
@@ -7018,9 +7329,9 @@ function buildInvoiceHTML(data){
     <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:9px 30px;display:flex;justify-content:space-between;align-items:center">
       <div style="font-size:10px;color:#9ca3af">GUIN HOME STUDIO · Payment System</div>
       <div style="display:flex;gap:5px">
-        <div style="width:6px;height:6px;border-radius:50%;background:#FF4040"></div>
-        <div style="width:6px;height:6px;border-radius:50%;background:#FF9E00"></div>
-        <div style="width:6px;height:6px;border-radius:50%;background:#FFD740"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#1565FF"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#4080FF"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#70A0FF"></div>
       </div>
     </div>
   </div>`;
@@ -7034,18 +7345,30 @@ function previewInvoice(){
   window._lastReceiptCtx = { staffId:null, vNo:data.docNo, type:'invoice', email:data.email };
   openModal('modal-receipt');
 }
+function saveInvoiceDraft(){
+  const data = getInvoiceData();
+  if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
+  if(!data.items.length){toast('กรุณาเพิ่มรายการ','error');return;}
+  const total = calcInvTotal();
+  const saved = {...data, total, createdAt: new Date().toISOString(), isDraft: true};
+  const all = getDocsStore('invoices')||[];
+  all.push(saved);
+  saveDocsStore('invoices', all);
+  toast('📝 บันทึกเป็นดราฟแล้ว — ไปดูที่ "ประวัติเอกสาร"','success');
+  renderDocsHistory();
+}
+
 function saveAndSendInvoice(){
   const data = getInvoiceData();
   if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
   if(!data.items.length){toast('กรุณาเพิ่มรายการ','error');return;}
   if(!data.email){toast('กรุณากรอก Email ลูกค้า','error');return;}
   const total = calcInvTotal();
-  const saved = {...data, total, createdAt: new Date().toISOString()};
+  const saved = {...data, total, createdAt: new Date().toISOString(), isDraft: false};
   const all = getDocsStore('invoices')||[];
   all.push(saved);
   saveDocsStore('invoices', all);
 
-  // แสดง popup แนบไฟล์ก่อนเปิด Gmail (เหมือน quotation)
   const old = document.getElementById('slip-upload-modal');
   if(old) old.remove();
   const div = document.createElement('div');
@@ -7055,24 +7378,24 @@ function saveAndSendInvoice(){
     '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:500px;max-width:98vw">'+
     '<div style="font-size:17px;font-weight:800;margin-bottom:4px">🧾 ส่งใบแจ้งหนี้</div>'+
     '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">ถึง: <strong>'+data.client+'</strong> ('+data.email+')</div>'+
-    '<div style="font-size:12px;background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.25);border-radius:8px;padding:7px 12px;margin-bottom:16px;color:var(--red)">📤 จาก: <strong>penguinstudiovoice@gmail.com</strong></div>'+
+    '<div style="font-size:12px;background:rgba(0,180,255,.1);border:1px solid rgba(0,180,255,.3);border-radius:8px;padding:7px 12px;margin-bottom:16px;color:var(--accent2)">📤 จาก: <strong>penguinstudiovoice@gmail.com</strong></div>'+
     '<div style="margin-bottom:16px">'+
     '<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">📄 แนบไฟล์ใบแจ้งหนี้ PDF (ถ้ามี)</div>'+
     '<label style="cursor:pointer;display:block"><input type="file" accept="image/*,.pdf" style="display:none" id="inv-doc-input">'+
-    '<div id="inv-doc-zone" style="border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;transition:all .2s" onmouseover="this.style.borderColor=\'var(--red)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'+
+    '<div id="inv-doc-zone" style="border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;transition:all .2s" onmouseover="this.style.borderColor=\'var(--accent2)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'+
     '<div style="font-size:22px">🧾</div><div style="font-size:12px;color:var(--text2)">คลิกเพื่อเลือกไฟล์ PDF</div>'+
     '<div id="inv-doc-label" style="margin-top:6px;color:var(--green);font-size:12px;font-weight:700"></div></div></label></div>'+
     '<div style="display:flex;gap:8px">'+
     '<button class="btn btn-outline btn-sm" style="flex:1" onclick="document.getElementById(\'slip-upload-modal\').remove()">ยกเลิก</button>'+
     '<button class="btn btn-outline btn-sm" style="flex:1" id="inv-send-noattach">ข้าม → เปิด Gmail</button>'+
-    '<button class="btn btn-red btn-sm" style="flex:1" id="inv-send-attach">💾 แบล็คอัพ & เปิด Gmail</button>'+
+    '<button class="btn btn-blue btn-sm" style="flex:1" id="inv-send-attach">💾 แบ็คอัพ & เปิด Gmail</button>'+
     '</div></div>';
   document.body.appendChild(div);
   window._invDataPending = null;
   div.querySelector('#inv-doc-input').addEventListener('change', function(){
     const file = this.files[0]; if(!file) return;
     const reader = new FileReader();
-    reader.onload = function(e){ window._invDataPending = {base64:e.target.result, name:file.name}; document.getElementById('inv-doc-label').textContent='🧾 '+file.name; document.getElementById('inv-doc-zone').style.borderColor='var(--red)'; };
+    reader.onload = function(e){ window._invDataPending = {base64:e.target.result, name:file.name}; document.getElementById('inv-doc-label').textContent='🧾 '+file.name; document.getElementById('inv-doc-zone').style.borderColor='var(--accent2)'; };
     reader.readAsDataURL(file);
   });
   const openGmail = function(){
@@ -7812,26 +8135,41 @@ const _origSaveStaff = window.saveStaff;
 
 <!-- ════ PROFILE MODAL ════ -->
 <div id="modal-profile" class="modal-overlay hidden" onclick="if(event.target===this)closeProfileModal()">
-  <div class="modal" style="width:380px;max-width:95vw">
+  <div class="modal" style="width:420px;max-width:95vw">
     <div class="modal-head">
       <div class="modal-title">👤 โปรไฟล์ของฉัน</div>
       <button class="btn-close" onclick="closeProfileModal()">✕</button>
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:16px">
       <div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding-bottom:16px;border-bottom:1px solid var(--border2)">
-        <div id="profile-avatar-big" style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;color:#fff">A</div>
+        <div style="position:relative">
+          <div id="profile-avatar-big" style="width:84px;height:84px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;color:#fff;overflow:hidden;background-size:cover;background-position:center">A</div>
+          <label for="profile-photo-file" style="position:absolute;right:-4px;bottom:-4px;width:30px;height:30px;border-radius:50%;background:var(--accent2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;border:2px solid var(--card);box-shadow:0 2px 6px rgba(0,0,0,.4)" title="อัพโหลดรูป">📷</label>
+          <input type="file" id="profile-photo-file" accept="image/*" style="display:none" onchange="handleProfilePhotoUpload(event)">
+        </div>
         <div id="profile-email-show" style="font-size:12px;color:var(--text2)">—</div>
         <div id="profile-role-show" style="font-size:11px;padding:3px 12px;border-radius:20px;background:var(--dim);color:var(--accent2);font-weight:700">—</div>
       </div>
       <div class="form-group" style="margin:0">
+        <label class="form-label">🔗 ใช้ URL รูปจากลิงก์ (ไม่บังคับ)</label>
+        <div style="display:flex;gap:6px">
+          <input class="form-input" id="profile-photo-url" placeholder="https://... (ก็อป URL รูปมาวาง)" style="flex:1;font-size:12px">
+          <button class="btn btn-outline btn-sm" onclick="applyProfilePhotoFromURL()">ใช้</button>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:5px">หรือกด 📷 ด้านบนเพื่ออัพโหลดรูปจากเครื่อง</div>
+      </div>
+      <div class="form-group" style="margin:0">
         <label class="form-label">ชื่อเล่นที่แสดงในระบบ</label>
         <input class="form-input" id="profile-nickname-input" placeholder="ชื่อเล่น" maxlength="30" style="font-size:15px;font-weight:700">
-        <div style="font-size:11px;color:var(--text2);margin-top:5px">ชื่อนี้แสดงใน sidebar และคำทักทาย — ไม่มีผลต่อข้อมูลที่แอดมินเห็น</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:5px">ชื่อนี้แสดงใน sidebar และคำทักทาย</div>
+      </div>
+      <div id="profile-photo-actions" style="display:none">
+        <button class="btn btn-outline btn-sm" style="width:100%;color:#FF6060;border-color:rgba(255,64,64,.3)" onclick="removeProfilePhoto()">🗑️ ลบรูปโปรไฟล์</button>
       </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-outline" onclick="closeProfileModal()">ยกเลิก</button>
-      <button class="btn btn-blue" onclick="saveMyNickname()">✅ บันทึกชื่อเล่น</button>
+      <button class="btn btn-blue" onclick="saveMyProfile()">✅ บันทึกโปรไฟล์</button>
     </div>
   </div>
 </div>
