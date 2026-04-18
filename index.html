@@ -813,6 +813,19 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div id="docs-invoice" class="hidden">
     <div class="section-card">
      <div class="section-title" style="color:var(--accent2)">🧾 สร้างใบแจ้งหนี้</div>
+     <!-- Admin signature widget (shared with quotation) -->
+     <div id="inv-sig-widget" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;margin-bottom:14px;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--text2);white-space:nowrap;font-weight:600">✍️ ลายเซ็นผู้ออกใบแจ้งหนี้:</span>
+      <div id="inv-sig-preview" style="height:36px;display:flex;align-items:center"></div>
+      <div style="margin-left:auto;display:flex;gap:6px">
+       <label style="cursor:pointer">
+        <input type="file" accept="image/*" style="display:none" onchange="uploadAdminSig(event)">
+        <span class="btn btn-xs btn-outline">📎 อัปโหลดลายเซ็น / โลโก้</span>
+       </label>
+       <button id="inv-sig-clear-btn" style="display:none" class="btn btn-xs btn-red" onclick="clearAdminSig()">✕ ลบ</button>
+      </div>
+      <div style="flex-basis:100%;font-size:11px;color:var(--text2);opacity:.8;margin-top:-2px">💡 ลายเซ็นนี้ใช้ร่วมกันกับใบเสนอราคา · อัพโหลดครั้งเดียวใช้ได้ทั้งสองใบ</div>
+     </div>
      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div class="form-group" style="margin:0">
        <label class="form-label">ลูกค้า / บริษัท *</label>
@@ -4544,7 +4557,7 @@ function switchDocsMain(tab, el) {
   document.querySelectorAll('#docs-main-tabs .tab').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
   if (tab === 'history') renderDocsHistory();
-  if (tab === 'invoice') { initInvItems(); const _id=document.getElementById('inv-date'); if(_id&&!_id.value) _id.value=isoToThai(new Date().toISOString().split('T')[0]); }
+  if (tab === 'invoice') { initInvItems(); renderAdminSigWidget(); const _id=document.getElementById('inv-date'); if(_id&&!_id.value) _id.value=isoToThai(new Date().toISOString().split('T')[0]); }
 }
 function populateDocsProjSelects() {
   const projs = getProjects();
@@ -5949,20 +5962,22 @@ function clearAdminSig() {
   toast('ลบลายเซ็นแล้ว','info');
 }
 function renderAdminSigWidget() {
+  const sig = ls('admin_signature');
+  const imgHtml = sig ? `<img src="${sig}" style="height:36px;max-width:120px;object-fit:contain;border-radius:4px;border:1px solid var(--border2)">` : `<span style="font-size:12px;color:var(--text2);font-style:italic">ยังไม่มีลายเซ็น</span>`;
+
+  // Quotation preview
   const preview = document.getElementById('admin-sig-preview');
   const clearBtn = document.getElementById('sig-clear-btn');
   const uploadLabel = document.getElementById('sig-upload-label');
-  if (!preview) return;
-  const sig = ls('admin_signature');
-  if (sig) {
-    preview.innerHTML = `<img src="${sig}" style="height:36px;max-width:120px;object-fit:contain;border-radius:4px;border:1px solid var(--border2)">`;
-    if (clearBtn) clearBtn.style.display='';
-    if (uploadLabel) uploadLabel.textContent = '🔄 เปลี่ยนลายเซ็น';
-  } else {
-    preview.innerHTML = `<span style="font-size:12px;color:var(--text2);font-style:italic">ยังไม่มีลายเซ็น</span>`;
-    if (clearBtn) clearBtn.style.display='none';
-    if (uploadLabel) uploadLabel.textContent = '📎 อัปโหลดลายเซ็น';
-  }
+  if (preview) preview.innerHTML = imgHtml;
+  if (clearBtn) clearBtn.style.display = sig ? '' : 'none';
+  if (uploadLabel) uploadLabel.textContent = sig ? '🔄 เปลี่ยนลายเซ็น' : '📎 อัปโหลดลายเซ็น';
+
+  // Invoice preview (shared sig)
+  const invPreview = document.getElementById('inv-sig-preview');
+  const invClearBtn = document.getElementById('inv-sig-clear-btn');
+  if (invPreview) invPreview.innerHTML = imgHtml;
+  if (invClearBtn) invClearBtn.style.display = sig ? '' : 'none';
 }
 
 
