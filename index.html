@@ -840,24 +840,20 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
       </div>
      </div>
 
-     <!-- Multi-project picker -->
-     <div style="margin-bottom:14px">
-      <label class="form-label" style="display:flex;align-items:center;gap:8px">
-       🔗 โปรเจกต์ที่อ้างถึง (เพิ่มได้หลายโปรเจกต์ ไม่บังคับ)
-       <button type="button" class="btn btn-xs btn-outline" onclick="openInvProjPicker(this,event)" style="margin-left:auto">+ เพิ่มโปรเจกต์</button>
-      </label>
-      <div id="inv-proj-chips" style="display:flex;flex-wrap:wrap;gap:6px;min-height:38px;padding:8px;background:var(--bg2);border:1px dashed var(--border2);border-radius:9px;align-items:center"></div>
-     </div>
+     <!-- Multi-project picker removed — projects now go directly into line items below -->
 
-     <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">รายการที่เรียกเก็บ</div>
+     <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">รายการที่เรียกเก็บ <span style="text-transform:none;font-weight:400;font-size:11px;opacity:.75;margin-left:6px">· แต่ละโปรเจกต์ = 1 รายการ (แก้ไขราคาต่อรายการได้)</span></div>
      <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-bottom:10px">
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 36px;gap:0;padding:8px 12px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border2)">
        <div>รายการ / รายละเอียด</div><div style="text-align:right">ราคา/หน่วย (฿)</div><div style="text-align:center">จำนวน</div><div style="text-align:center">หน่วย</div><div style="text-align:right">รวม</div><div></div>
       </div>
       <div id="inv-items"></div>
      </div>
-     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <button class="btn btn-outline btn-sm" onclick="addInvItem()">➕ เพิ่มรายการ</button>
+     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+       <button class="btn btn-blue btn-sm" onclick="openInvItemProjPicker(this,event)">🔗 เพิ่มจากโปรเจกต์</button>
+       <button class="btn btn-outline btn-sm" onclick="addInvItem()">➕ เพิ่มรายการเปล่า</button>
+      </div>
       <div style="text-align:right">
        <div style="font-size:11px;color:var(--text2)">ยอดที่ต้องชำระ</div>
        <div id="inv-total">฿0</div>
@@ -4548,7 +4544,7 @@ function switchDocsMain(tab, el) {
   document.querySelectorAll('#docs-main-tabs .tab').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
   if (tab === 'history') renderDocsHistory();
-  if (tab === 'invoice') { initInvItems(); _invProjIds = []; renderInvProjChips(); const _id=document.getElementById('inv-date'); if(_id&&!_id.value) _id.value=isoToThai(new Date().toISOString().split('T')[0]); }
+  if (tab === 'invoice') { initInvItems(); const _id=document.getElementById('inv-date'); if(_id&&!_id.value) _id.value=isoToThai(new Date().toISOString().split('T')[0]); }
 }
 function populateDocsProjSelects() {
   const projs = getProjects();
@@ -7103,8 +7099,7 @@ let invItems = [];
 
 function initInvItems(){
   invItems = [];
-  const el = document.getElementById('inv-items');
-  if(el && !el.children.length) { addInvItem(); }
+  renderInvItems();
 }
 function addInvItem(desc='', detail='', qty=1, unit='งาน', price=0){
   invItems.push({desc, detail, qty, unit, price});
@@ -7113,25 +7108,31 @@ function addInvItem(desc='', detail='', qty=1, unit='งาน', price=0){
 function removeInvItem(i){ invItems.splice(i,1); renderInvItems(); }
 function renderInvItems(){
   const el = document.getElementById('inv-items'); if(!el) return;
-  el.innerHTML = invItems.map((item,i)=>`
+  el.innerHTML = invItems.map((item,i)=>{
+    const proj = item.projId ? getProjects().find(x=>x.id===item.projId) : null;
+    return `
     <div style="border-bottom:1px solid var(--border2);padding:8px 12px">
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 36px;gap:6px;align-items:center;margin-bottom:4px">
-        <input class="form-input" style="padding:6px 10px;font-size:13px" placeholder="ชื่อรายการ" value="${item.desc}"
-          oninput="if(invItems[${i}])invItems[${i}].desc=this.value">
+        <div style="display:flex;align-items:center;gap:6px;min-width:0">
+          ${proj?'<span title="จากโปรเจกต์: '+proj.name+'" style="flex-shrink:0;padding:2px 7px;background:rgba(0,180,255,.15);border:1px solid rgba(0,180,255,.35);border-radius:10px;font-size:10px;font-weight:700;color:var(--accent2)">📁</span>':''}
+          <input class="form-input" style="padding:6px 10px;font-size:13px;flex:1;min-width:0" placeholder="ชื่อรายการ" value="${(item.desc||'').replace(/"/g,'&quot;')}"
+            oninput="if(invItems[${i}])invItems[${i}].desc=this.value">
+        </div>
         <input type="number" class="form-input" style="padding:6px 8px;font-size:13px;text-align:right"
           value="${item.price===0?'0':item.price||''}" placeholder="ราคา/หน่วย" min="0"
           oninput="if(invItems[${i}])invItems[${i}].price=this.value===''?0:parseFloat(this.value)||0;updateInvRowTotal(${i})">
         <input type="number" class="form-input" style="padding:6px 8px;font-size:13px;text-align:center"
           value="${item.qty||1}" min="1" placeholder="จำนวน"
           oninput="if(invItems[${i}])invItems[${i}].qty=parseFloat(this.value)||1;updateInvRowTotal(${i})">
-        <input class="form-input" style="padding:6px 8px;font-size:13px;text-align:center" value="${item.unit}"
+        <input class="form-input" style="padding:6px 8px;font-size:13px;text-align:center" value="${item.unit||'งาน'}"
           oninput="if(invItems[${i}])invItems[${i}].unit=this.value">
-        <div style="text-align:right;font-size:13px;font-weight:700;color:var(--red)" id="inv-row-total-${i}">${fmtB((item.qty||1)*(item.price||0))}</div>
-        <button onclick="removeInvItem(${i})" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:2px 6px">✕</button>
+        <div style="text-align:right;font-size:13px;font-weight:700;color:var(--accent2)" id="inv-row-total-${i}">${fmtB((item.qty||1)*(item.price||0))}</div>
+        <button onclick="removeInvItem(${i})" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:2px 6px" title="ลบรายการนี้">✕</button>
       </div>
-      <input class="form-input" style="padding:5px 10px;font-size:11px;color:var(--text2);background:rgba(255,255,255,.03)" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)" value="${item.detail||''}"
+      <input class="form-input" style="padding:5px 10px;font-size:11px;color:var(--text2);background:rgba(255,255,255,.03)" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)" value="${(item.detail||'').replace(/"/g,'&quot;')}"
         oninput="if(invItems[${i}])invItems[${i}].detail=this.value">
-    </div>`).join('') || '<div style="padding:16px;text-align:center;color:var(--text2);font-size:13px">กด ➕ เพิ่มรายการ</div>';
+    </div>`;
+  }).join('') || '<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px"><div style="margin-bottom:4px;opacity:.5;font-size:24px">📋</div>ยังไม่มีรายการ · กด <strong style="color:var(--accent2)">🔗 เพิ่มจากโปรเจกต์</strong> เพื่อสร้างจากงานที่มี</div>';
   calcInvTotal();
 }
 function updateInvRowTotal(i){
@@ -7151,43 +7152,24 @@ function calcInvTotal(){
     : `<div style="font-size:24px;font-weight:800;color:var(--red)">${fmtB(total)}</div>`;
   return total;
 }
-// Multi-project chip state
-let _invProjIds = [];
-function renderInvProjChips(){
-  const el = document.getElementById('inv-proj-chips'); if(!el) return;
-  if(!_invProjIds.length){ el.innerHTML = '<div style="font-size:12px;color:var(--text2);padding:4px 8px">ยังไม่มีโปรเจกต์ · กด "+ เพิ่มโปรเจกต์" เพื่ออ้างถึงโปรเจกต์จริง</div>'; return; }
-  el.innerHTML = _invProjIds.map(id=>{
-    const p = getProjects().find(x=>x.id===id);
-    if(!p) return '';
-    return `<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 9px 5px 11px;background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.35);border-radius:14px;font-size:12px;color:var(--accent2);font-weight:600">
-      <span>📁 ${p.name}</span>${p.client?'<span style="font-size:10px;opacity:.75">· '+p.client+'</span>':''}
-      <span style="cursor:pointer;padding:0 3px;color:#FF6060" onclick="removeInvProj('${id}')">✕</span>
-    </div>`;
-  }).join('');
-}
-function removeInvProj(id){
-  _invProjIds = _invProjIds.filter(x=>x!==id);
-  renderInvProjChips();
-}
-function openInvProjPicker(btn, ev){
+// Replaces old _invProjIds chips system — projects now go directly into invItems as line items
+function openInvItemProjPicker(btn, ev){
   if(ev) ev.stopPropagation();
   document.getElementById('inv-proj-picker')?.remove();
   const rect = btn.getBoundingClientRect();
   const pop = document.createElement('div');
   pop.id='inv-proj-picker';
-  pop.style.cssText='position:fixed;top:'+(rect.bottom+6)+'px;right:'+Math.max(8,window.innerWidth-rect.right)+'px;z-index:9999;background:var(--card);border:1px solid var(--accent2);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);width:320px;overflow:hidden';
+  pop.style.cssText='position:fixed;top:'+(rect.bottom+6)+'px;left:'+rect.left+'px;z-index:9999;background:var(--card);border:1px solid var(--accent2);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);width:360px;max-width:92vw;overflow:hidden';
   pop.innerHTML=`
-    <div style="padding:8px 12px;border-bottom:1px solid var(--border2);background:rgba(0,180,255,.08);font-size:11px;color:var(--accent2);font-weight:700">🔗 เพิ่มโปรเจกต์</div>
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border2);background:rgba(0,180,255,.08);font-size:11px;color:var(--accent2);font-weight:700">🔗 เลือกโปรเจกต์เพิ่มเป็นรายการเรียกเก็บ</div>
     <input type="text" id="invpp-search" placeholder="🔍 ค้นหาชื่อโปรเจกต์หรือลูกค้า..." style="width:100%;padding:9px 12px;background:var(--bg2);border:none;border-bottom:1px solid var(--border2);color:var(--text);font-family:Kanit;font-size:13px;outline:none">
-    <div id="invpp-list" style="max-height:260px;overflow-y:auto;padding:4px"></div>`;
+    <div id="invpp-list" style="max-height:300px;overflow-y:auto;padding:4px"></div>`;
   document.body.appendChild(pop);
   renderInvPPList('');
   setTimeout(()=>document.getElementById('invpp-search')?.focus(),50);
   const inp=document.getElementById('invpp-search');
   if(inp) inp.oninput = ()=>renderInvPPList(inp.value);
-  setTimeout(()=>{
-    document.addEventListener('click', _closeInvPPOnce, {once:true});
-  },100);
+  setTimeout(()=>{ document.addEventListener('click', _closeInvPPOnce, {once:true}); },100);
 }
 function _closeInvPPOnce(e){
   const pop=document.getElementById('inv-proj-picker');
@@ -7197,34 +7179,53 @@ function renderInvPPList(q){
   const listEl=document.getElementById('invpp-list'); if(!listEl) return;
   const projs = getProjects();
   const qq = (q||'').toLowerCase().trim();
+  const alreadyIds = invItems.filter(x=>x.projId).map(x=>x.projId);
   const filtered = projs.filter(p => {
-    if(_invProjIds.includes(p.id)) return false;
+    if(alreadyIds.includes(p.id)) return false;
     if(!qq) return true;
     return (p.name||'').toLowerCase().includes(qq) || (p.client||'').toLowerCase().includes(qq);
   });
-  if(!filtered.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">'+(qq?'ไม่พบโปรเจกต์':'ไม่มีโปรเจกต์อื่น')+'</div>';return;}
-  listEl.innerHTML = filtered.map(p=>`<div onclick="pickInvProj('${p.id}')" style="padding:8px 12px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04)" onmouseover="this.style.background='var(--dim)';this.style.color='var(--accent2)'" onmouseout="this.style.background='';this.style.color='var(--text)'"><strong>${p.name}</strong>${p.client?'<div style="font-size:11px;color:var(--text2);margin-top:1px">'+p.client+'</div>':''}</div>`).join('');
+  if(!filtered.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">'+(qq?'ไม่พบโปรเจกต์':'ไม่มีโปรเจกต์อื่นที่ยังไม่ได้เพิ่ม')+'</div>';return;}
+  listEl.innerHTML = filtered.map(p=>`<div onclick="addInvItemFromProject('${p.id}')" style="padding:10px 13px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;justify-content:space-between;gap:10px" onmouseover="this.style.background='var(--dim)'" onmouseout="this.style.background=''">
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:700;color:var(--accent2)">${p.name}</div>
+      ${p.client?'<div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.client+'</div>':''}
+    </div>
+    <div style="font-size:13px;font-weight:700;color:var(--green);white-space:nowrap">${p.budget?fmtB(p.budget):'฿0'}</div>
+  </div>`).join('');
 }
-function pickInvProj(id){
-  if(!_invProjIds.includes(id)) _invProjIds.push(id);
+function addInvItemFromProject(projId){
+  const p = getProjects().find(x=>x.id===projId);
+  if(!p){ toast('ไม่พบโปรเจกต์','error'); return; }
+  // If this is the first item and it's a blank default, replace it
+  const shouldReplace = invItems.length===1 && !invItems[0].desc && !invItems[0].price && !invItems[0].projId;
+  const newItem = {
+    projId: p.id,
+    desc: p.name,
+    detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '',
+    qty: 1,
+    unit: 'งาน',
+    price: p.budget||0
+  };
+  if(shouldReplace) invItems[0] = newItem;
+  else invItems.push(newItem);
+  // Auto-fill client if empty
+  const cli = document.getElementById('inv-client');
+  if(cli && !cli.value && p?.client) cli.value = p.client;
   document.getElementById('inv-proj-picker')?.remove();
-  renderInvProjChips();
-  // Auto-fill client if empty and only 1 proj
-  if(_invProjIds.length===1){
-    const p = getProjects().find(x=>x.id===id);
-    const cli = document.getElementById('inv-client');
-    if(cli && !cli.value && p?.client) cli.value = p.client;
-  }
+  renderInvItems();
+  toast('✅ เพิ่ม "'+p.name+'" เป็นรายการเรียกเก็บแล้ว','success');
 }
 
-function autoFillInvoice(){} // legacy - no longer used
+function autoFillInvoice(){} // legacy - unused
 
 function getInvoiceData(){
+  const projIdsFromItems = [...new Set(invItems.map(x=>x.projId).filter(Boolean))];
   return {
     docNo: 'INV-' + (new Date().getFullYear()+543) + '-' + String((getDocsStore('invoices')||[]).length+1).padStart(3,'0'),
     client: document.getElementById('inv-client')?.value.trim()||'',
     email:  document.getElementById('inv-email')?.value.trim()||'',
-    projIds: [..._invProjIds],
+    projIds: projIdsFromItems,
     date:   thaiToIso(document.getElementById('inv-date')?.value)||document.getElementById('inv-date')?.value||new Date().toISOString().split('T')[0],
     dueDate:thaiToIso(document.getElementById('inv-duedate')?.value)||document.getElementById('inv-duedate')?.value||'',
     vat:    parseFloat(document.getElementById('inv-vat')?.value)||0,
