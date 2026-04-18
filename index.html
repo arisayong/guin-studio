@@ -383,8 +383,15 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
 
 <div class="toast-wrap" id="toastWrap"></div>
 
+<!-- ════════════ SPLASH (ป้องกันหน้ากระพริบตอนโหลด) ════════════ -->
+<div id="app-splash" style="position:fixed;inset:0;background:var(--bg);z-index:9998;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px">
+ <div style="font-size:56px;filter:drop-shadow(0 0 28px rgba(21,101,255,.55))">🎙️</div>
+ <div style="color:var(--accent2);font-size:15px;font-weight:800;letter-spacing:4px">GUIN HOME STUDIO</div>
+ <div class="ai-loader" style="padding:0"><div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div></div>
+</div>
+
 <!-- ════════════ LOGIN ════════════ -->
-<div id="screen-login">
+<div id="screen-login" class="hidden">
  <div class="login-box">
   <div class="login-logo">
    <div class="login-logo-icon">🎙️</div>
@@ -475,6 +482,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div class="nav-item active" onclick="nav('dashboard')"><span class="nav-icon">🏠</span><span>Dashboard</span></div>
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span><span class="nav-badge hidden" id="track-badge">0</span></div>
    <div class="nav-item" onclick="nav('proj-cal')"><span class="nav-icon">🗓️</span><span>ปฏิทินโปรเจกต์</span></div>
+   <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คิดคำนวน</span></div>
    <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span><span class="nav-badge hidden" id="deadline-badge">0</span></div>
    <div class="nav-section">การเงิน</div>
    <div class="nav-item" onclick="nav('queue')"><span class="nav-icon">💸</span><span>คิวจ่ายเงิน</span><span class="nav-badge hidden" id="queue-badge">0</span></div>
@@ -554,6 +562,18 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
   </div>
 
   <!-- ── PROJECTS ── -->
+  <!-- ── CALCULATOR (คิดคำนวนโปรเจกต์ - แบบร่าง) ── -->
+  <div id="page-calc" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">🧮 คิดคำนวนโปรเจกต์ (แบบร่าง)</div>
+    <div class="page-subtitle">ลองคำนวนงบก่อนตัดสินใจรับงาน · แยกจากโปรเจกต์จริง · แปลงเป็นโปรเจกต์ได้ทีหลัง</div>
+    <div class="page-actions">
+     <button class="btn btn-blue" onclick="openCalcDraft()">➕ สร้างแบบร่างใหม่</button>
+    </div>
+   </div>
+   <div id="calc-list"></div>
+  </div>
+
   <div id="page-projects" class="page hidden">
    <div class="page-header">
     <div class="page-title">📁 โปรเจกต์ทั้งหมด</div>
@@ -675,7 +695,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
       <div class="page-title" id="my-welcome">สวัสดี 👋</div>
       <div class="page-subtitle">ยอดค่าตอบแทนของคุณ</div>
      </div>
-     <div id="my-warn-bell-wrap"></div>
+     <div style="display:flex;align-items:center;gap:6px"><div id="my-appr-bell-wrap"></div><div id="my-warn-bell-wrap"></div></div>
     </div>
    </div>
    <div class="my-earnings-banner">
@@ -718,7 +738,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
     <div class="page-subtitle">ออกใบเสนอราคาสำหรับลูกค้า · ออกใบสำคัญจ่ายสำหรับทีมงาน</div>
    </div>
    <div class="tabs" id="docs-main-tabs">
-    <div class="tab active" onclick="switchDocsMain('client',this)">📋 สำหรับลูกค้า</div>
+    <div class="tab active" onclick="switchDocsMain('client',this)">📋 ใบเสนอราคา</div>
+    <div class="tab" onclick="switchDocsMain('invoice',this)">🧾 ใบแจ้งหนี้</div>
     <div class="tab" onclick="switchDocsMain('history',this)">📁 ประวัติเอกสาร</div>
    </div>
 
@@ -787,6 +808,64 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
     </div>
    </div>
 
+   <!-- ══ TAB: ใบแจ้งหนี้ (INVOICE) ══ -->
+   <div id="docs-invoice" class="hidden">
+    <div class="section-card">
+     <div class="section-title" style="color:var(--red)">🧾 สร้างใบแจ้งหนี้</div>
+     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div class="form-group" style="margin:0">
+       <label class="form-label">ลูกค้า / บริษัท *</label>
+       <input class="form-input" id="inv-client" placeholder="ชื่อลูกค้า หรือบริษัท">
+      </div>
+      <div class="form-group" style="margin:0">
+       <label class="form-label">Email ลูกค้า *</label>
+       <input class="form-input" id="inv-email" type="email" placeholder="client@email.com">
+      </div>
+      <div class="form-group" style="margin:0">
+       <label class="form-label">โปรเจกต์ (ถ้ามี)</label>
+       <select class="form-input form-select" id="inv-proj" onchange="autoFillInvoice()">
+        <option value="">— เลือกจากโปรเจกต์ หรือกรอกเอง —</option>
+       </select>
+      </div>
+      <div class="form-group" style="margin:0">
+       <label class="form-label">วันที่ออกใบ</label>
+       <input class="form-input" id="inv-date" type="text" placeholder="วว/ดด/ปปปป" maxlength="10">
+      </div>
+      <div class="form-group" style="margin:0">
+       <label class="form-label">ครบกำหนดชำระ</label>
+       <input class="form-input" id="inv-duedate" type="text" placeholder="วว/ดด/ปปปป" maxlength="10">
+      </div>
+      <div class="form-group" style="margin:0">
+       <label class="form-label">VAT (%)</label>
+       <input class="form-input" id="inv-vat" type="number" placeholder="0" min="0" max="100" value="0" oninput="calcInvTotal()">
+      </div>
+     </div>
+     <div class="form-group">
+      <label class="form-label">หมายเหตุ / เงื่อนไขการชำระ</label>
+      <input class="form-input" id="inv-note" placeholder="เช่น โอนภายใน 15 วัน, บัญชี SCB xxx-x-xxxxx-x">
+     </div>
+     <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">รายการที่เรียกเก็บ</div>
+     <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 36px;gap:0;padding:8px 12px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border2)">
+       <div>รายการ / รายละเอียด</div><div style="text-align:right">ราคา/หน่วย (฿)</div><div style="text-align:center">จำนวน</div><div style="text-align:center">หน่วย</div><div style="text-align:right">รวม</div><div></div>
+      </div>
+      <div id="inv-items"></div>
+     </div>
+     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <button class="btn btn-outline btn-sm" onclick="addInvItem()">➕ เพิ่มรายการ</button>
+      <div style="text-align:right">
+       <div style="font-size:11px;color:var(--text2)">ยอดที่ต้องชำระ</div>
+       <div id="inv-total">฿0</div>
+      </div>
+     </div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="previewInvoice()">👁️ ดูตัวอย่าง</button>
+      <button class="btn btn-red" onclick="saveAndSendInvoice()">📧 บันทึก & ส่ง Email</button>
+      <button class="btn btn-outline" onclick="downloadInvoice()">⬇️ ดาวน์โหลด PDF</button>
+     </div>
+    </div>
+   </div>
+
    <!-- ══ TAB: ทีมงาน — ใบสำคัญจ่าย ══ -->
    <div id="docs-worker" class="hidden">
     <div class="section-card" style="margin-bottom:14px">
@@ -838,6 +917,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
      <div class="tabs" style="margin:0">
       <div class="tab active" onclick="setDocsHistFilter('all',this)">ทั้งหมด</div>
       <div class="tab" onclick="setDocsHistFilter('quotation',this)">📋 ใบเสนอราคา</div>
+      <div class="tab" onclick="setDocsHistFilter('invoice',this)">🧾 ใบแจ้งหนี้</div>
       <div class="tab" onclick="setDocsHistFilter('voucher',this)">💸 ใบสำคัญจ่าย</div>
      </div>
     </div>
@@ -928,7 +1008,16 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
       <option>บรรยาย</option><option>หนังสือเสียง</option><option>เพลง</option><option>มิกซ์</option>
      </select>
     </div>
-    <div class="form-group" style="margin:0"><label class="form-label">Budget จากลูกค้า (฿)</label><input class="form-input" id="pj-budget" type="number" placeholder="0" oninput="calcProjSummary()"></div>
+    <div class="form-group" style="margin:0"><label class="form-label">Budget จากลูกค้า</label>
+     <div style="display:flex;gap:6px">
+      <select class="form-input form-select" id="pj-budget-type" style="width:100px;padding:10px 28px 10px 10px" onchange="calcProjSummary()" title="เหมา = ยอดรวม / นาที = คูณนาทีหนัง">
+       <option value="flat">เหมา</option>
+       <option value="per-minute">นาที</option>
+      </select>
+      <input class="form-input" id="pj-budget" type="number" placeholder="0" oninput="calcProjSummary()" style="flex:1">
+     </div>
+     <div id="pj-budget-calc" style="font-size:11px;color:var(--text2);margin-top:4px;display:none"></div>
+    </div>
    </div>
    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">ชื่อ / URL ลูกค้า</label><input class="form-input" id="pj-client" placeholder="ชื่อลูกค้า หรือ link"></div>
@@ -955,19 +1044,13 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
       </div></div>
    </div>
    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px" id="pj-admin-fields">
+    <div class="form-group" style="margin:0"><label class="form-label">หมายเหตุ (การหัก / เงื่อนไข)</label><input class="form-input" id="pj-note" placeholder="เช่น หัก 3% ค่าธรรมเนียม"></div>
     <div class="form-group" style="margin:0">
-     <label class="form-label">รอบการจ่าย <span style="color:var(--text2);font-size:9px">(Admin เท่านั้น)</span></label>
-     <select class="form-input form-select" id="pj-cycle">
-      <option>ต้นเดือน (1-15)</option><option>ปลายเดือน (16-31)</option><option>รอการชำระ</option>
+     <label class="form-label">🗂️ มอบหมาย Manager</label>
+     <select class="form-input form-select" id="pj-manager">
+      <option value="">— ไม่มี / แอดมินจัดการเอง —</option>
      </select>
     </div>
-    <div class="form-group" style="margin:0"><label class="form-label">หมายเหตุ (การหัก / เงื่อนไข)</label><input class="form-input" id="pj-note" placeholder="เช่น หัก 3% ค่าธรรมเนียม"></div>
-   <div class="form-group" style="margin:0">
-    <label class="form-label">🗂️ มอบหมาย Manager</label>
-    <select class="form-input form-select" id="pj-manager">
-     <option value="">— ไม่มี / แอดมินจัดการเอง —</option>
-    </select>
-   </div>
    </div>
 
    <!-- CAT TOGGLES -->
@@ -1268,6 +1351,14 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    </div>
    <div id="st-warn-history"></div>
   </div>
+  <!-- Appreciation section -->
+  <div id="st-appr-section" class="hidden" style="margin:0 24px 14px;padding:12px 14px;background:rgba(255,199,0,.06);border:1px solid rgba(255,199,0,.2);border-radius:10px">
+   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div style="font-size:12px;color:#FFD93D;font-weight:700;display:flex;align-items:center;gap:6px">⭐ ใบชื่นชมสะสม (<span id="st-appr-count">0</span> ใบ · ครบ 3 ใบได้โบนัส)</div>
+    <button class="btn btn-sm" style="background:rgba(255,199,0,.16);border:1px solid rgba(255,199,0,.32);color:#FFD93D;font-size:11px" onclick="openIssueAppreciation()">+ ออกใบชื่นชม</button>
+   </div>
+   <div id="st-appr-history"></div>
+  </div>
   <div class="modal-foot"><button class="btn btn-outline" onclick="closeModal('modal-addstaff')">ยกเลิก</button><button class="btn btn-blue" onclick="saveStaff()">💾 บันทึก</button></div>
  </div>
 </div>
@@ -1275,6 +1366,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
 <div class="undo-bar" id="undo-bar" style="display:none">
  <button id="undo-btn" class="btn btn-outline btn-sm" onclick="undo()" title="Undo" style="opacity:.4;padding:4px 8px;font-size:14px">↩️</button>
  <button id="redo-btn" class="btn btn-outline btn-sm" onclick="redo()" title="Redo" style="opacity:.4;padding:4px 8px;font-size:14px">↪️</button>
+ <button class="btn btn-outline btn-sm" onclick="shuffleDemo()" title="สลับข้อมูลเดโม่" style="padding:4px 10px;font-size:12px;color:var(--purple);border-color:rgba(155,111,255,.3)">🎲 เดโม่</button>
 </div>
 
 <script>
@@ -1875,6 +1967,203 @@ async function loadWarningsFromFirebase() {
     }
   } catch(e) {}
 }
+// ══════════════════════════════════════════════
+// APPRECIATION SYSTEM (ใบชื่นชม) — mirrors warning
+// ══════════════════════════════════════════════
+const APPR_CATS = [
+  {items:['ส่งงานก่อนเวลากำหนด','ทำงานตรงเวลาอย่างสม่ำเสมอ','รับผิดชอบงานจนจบ ไม่ละทิ้ง']},
+  {items:['สื่อสารอัพเดทสถานะตลอด','ตอบกลับไว','แก้ปัญหาด้วยตนเองได้ดี']},
+  {items:['คุณภาพงานเกินคาดหวัง','ใส่ใจรายละเอียด','เสนอไอเดียปรับปรุงงาน']},
+  {items:['รักษาความลับของโปรเจกต์ดีมาก','ทำงานเป็นมืออาชีพ']},
+  {items:['ทัศนคติดีต่อทีม','ช่วยเหลือสมาชิกใหม่','มีภาวะผู้นำ']}
+];
+let _iaStaffId = '';
+let _iaSelItem = '';
+let _iaSelProj = '';
+
+function getAppreciations(staffId) {
+  const raw = ls('appreciations_v1') || {};
+  return raw[staffId] || [];
+}
+function getAllAppreciations() { return ls('appreciations_v1') || {}; }
+async function saveAppreciation(staffId, appr) {
+  const all = getAllAppreciations();
+  if (!all[staffId]) all[staffId] = [];
+  all[staffId].push(appr);
+  ls('appreciations_v1', all);
+  if (_fbDatabase) { try { await _fbDatabase.ref('appreciations/'+staffId).set(all[staffId]); } catch(e){} }
+}
+async function deleteAppreciation(staffId, apprId) {
+  const all = getAllAppreciations();
+  if (all[staffId]) all[staffId] = all[staffId].filter(a => a.id !== apprId);
+  ls('appreciations_v1', all);
+  if (_fbDatabase) {
+    try {
+      const remaining = all[staffId] || [];
+      if (remaining.length === 0) await _fbDatabase.ref('appreciations/'+staffId).remove();
+      else await _fbDatabase.ref('appreciations/'+staffId).set(remaining);
+    } catch(e){}
+  }
+}
+async function loadAppreciationsFromFirebase() {
+  if (!_fbDatabase) return;
+  try {
+    const snap = await _fbDatabase.ref('appreciations').get();
+    ls('appreciations_v1', snap.exists() ? snap.val() : {});
+  } catch(e){}
+}
+function startAppreciationsSync() {
+  if (!_fbDatabase) return;
+  _fbDatabase.ref('appreciations').on('value', snap => {
+    ls('appreciations_v1', snap.exists() ? snap.val() : {});
+    if (currentUser?.role !== 'admin') renderMyApprBell();
+  });
+}
+
+function openIssueAppreciation() {
+  const s = _iaStaffId ? getStaffById(_iaStaffId) : null;
+  if (!s && !_iaStaffId) { toast('กรุณาบันทึกข้อมูลก่อนออกใบชื่นชม','warn'); return; }
+  document.getElementById('ia-target').textContent = s ? (s.nickname||s.name) : _iaStaffId;
+  _iaSelItem = ''; _iaSelProj = '';
+  document.querySelectorAll('#ia-cat-tabs button').forEach(b => b.style.cssText = '');
+  document.getElementById('ia-sub-list').innerHTML = '';
+  document.getElementById('ia-proj-inp').value = '';
+  document.getElementById('ia-proj-inp').style.display = 'block';
+  document.getElementById('ia-proj-sel').style.display = 'none';
+  document.getElementById('ia-submit-btn').disabled = true;
+  closeModal('modal-addstaff');
+  openModal('modal-issue-appreciation');
+}
+function closeIssueAppreciation() {
+  closeModal('modal-issue-appreciation');
+  if (_iaStaffId) {
+    const s = getStaffById(_iaStaffId);
+    if (s) openEditStaff(_iaStaffId, s.category || s.categories?.[0] || 'dubbing');
+  }
+}
+function iaSelCat(idx, el) {
+  _iaSelItem = '';
+  document.querySelectorAll('#ia-cat-tabs button').forEach(b => b.classList.remove('btn-blue'));
+  el.classList.add('btn-blue');
+  el.classList.remove('btn-outline');
+  document.getElementById('ia-sub-list').innerHTML = APPR_CATS[idx].items.map(it =>
+    `<div onclick="iaSelSub(this,'${it.replace(/'/g,"\'")}')"
+      style="padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid rgba(255,255,255,.07);color:var(--text2);background:rgba(0,0,0,.2);display:flex;align-items:center;gap:8px;transition:all .15s"
+      onmouseover="if(!this.classList.contains('ia-sel'))this.style.borderColor='rgba(255,199,0,.35)'"
+      onmouseout="if(!this.classList.contains('ia-sel'))this.style.borderColor='rgba(255,255,255,.07)'">
+      <span style="width:8px;height:8px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);flex-shrink:0;display:inline-block" class="ia-dot"></span>
+      ${it}
+    </div>`
+  ).join('');
+  iaChk();
+}
+function iaSelSub(el, val) {
+  _iaSelItem = val;
+  document.querySelectorAll('#ia-sub-list > div').forEach(d => {
+    d.classList.remove('ia-sel');
+    d.style.borderColor = 'rgba(255,255,255,.07)';
+    d.style.color = 'var(--text2)';
+    d.style.background = 'rgba(0,0,0,.2)';
+    const dot = d.querySelector('.ia-dot');
+    if (dot) { dot.style.background=''; dot.style.borderColor='rgba(255,255,255,.2)'; }
+  });
+  el.classList.add('ia-sel');
+  el.style.borderColor = 'rgba(255,199,0,.55)';
+  el.style.color = '#FFD93D';
+  el.style.background = 'rgba(255,199,0,.12)';
+  const dot = el.querySelector('.ia-dot');
+  if (dot) { dot.style.background='#FFC700'; dot.style.borderColor='#FFC700'; }
+  iaChk();
+}
+function iaChk() { document.getElementById('ia-submit-btn').disabled = !_iaSelItem; }
+function iaFilterProj(q) {
+  const projs = getProjects();
+  const drop = document.getElementById('ia-proj-drop');
+  const filtered = q ? projs.filter(p => (p.name||'').toLowerCase().includes(q.toLowerCase())) : projs;
+  drop.innerHTML = filtered.length
+    ? filtered.slice(0,10).map(p => '<div onclick="iaPickProj(\''+p.id+'\',\''+p.name.replace(/\'/g,"\\\'")+'\')"'
+        + ' style="padding:9px 13px;cursor:pointer;font-size:13px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--text2)"'
+        + ' onmouseover="this.style.background=\'var(--bg2)\'" onmouseout="this.style.background=\'\'">'+p.name+'</div>').join('')
+    : '<div style="padding:10px 13px;font-size:13px;color:var(--text2)">ไม่พบโปรเจกต์</div>';
+  drop.style.display = 'block';
+}
+function iaShowDrop() { if (!_iaSelProj) iaFilterProj(document.getElementById('ia-proj-inp').value); }
+function iaHideDrop() { document.getElementById('ia-proj-drop').style.display = 'none'; }
+function iaPickProj(id, name) {
+  _iaSelProj = id;
+  document.getElementById('ia-proj-inp').style.display = 'none';
+  document.getElementById('ia-proj-sel-name').textContent = name;
+  document.getElementById('ia-proj-sel').style.display = 'flex';
+  document.getElementById('ia-proj-drop').style.display = 'none';
+}
+function iaClearProj() {
+  _iaSelProj = '';
+  document.getElementById('ia-proj-inp').style.display = 'block';
+  document.getElementById('ia-proj-inp').value = '';
+  document.getElementById('ia-proj-sel').style.display = 'none';
+}
+async function submitAppreciation() {
+  if (!_iaSelItem) { toast('กรุณาเลือกหมวดการชื่นชม','error'); return; }
+  const p = _iaSelProj ? getProjects().find(x => x.id === _iaSelProj) : null;
+  const appr = {
+    id: 'A' + Date.now(),
+    type: _iaSelItem,
+    projId: _iaSelProj || '',
+    projName: p ? p.name : '',
+    note: document.getElementById('ia-note').value.trim(),
+    date: (()=>{ const d=new Date(); return d.getDate().toString().padStart(2,'0')+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+(d.getFullYear()+543); })(),
+    issuedAt: new Date().toISOString()
+  };
+  await saveAppreciation(_iaStaffId, appr);
+  closeModal('modal-issue-appreciation');
+  const s = getStaffById(_iaStaffId);
+  const count = getAppreciations(_iaStaffId).length;
+  toast('⭐ ออกใบชื่นชมแล้ว — '+(s?.nickname||_iaStaffId)+' ได้ครบ '+count+' ใบ'+(count>=3?' 🎁 ถึงเกณฑ์โบนัสแล้ว!':''),'success');
+  renderStaff();
+  setTimeout(() => { if (s) openEditStaff(_iaStaffId, s.category || s.categories?.[0] || 'dubbing'); }, 300);
+}
+
+// Staff view: appreciation bell
+function renderMyApprBell() {
+  // Prepend to warn-bell-wrap container (or its own spot)
+  if (!currentUser?.staffId) return;
+  const apprs = getAppreciations(currentUser.staffId);
+  const n = apprs.length;
+  const el = document.getElementById('my-appr-bell-wrap');
+  if (!el) return;
+  if (!n) { el.innerHTML = ''; return; }
+  const full = n >= 3;
+  el.innerHTML = `<div style="position:relative;display:inline-block;margin-right:8px">
+    <button onclick="openMyApprDetail()" style="display:flex;align-items:center;gap:5px;padding:6px 14px 6px 10px;background:${full?'rgba(255,199,0,.22)':'rgba(255,199,0,.12)'};border:1px solid ${full?'rgba(255,199,0,.55)':'rgba(255,199,0,.3)'};border-radius:20px;cursor:pointer;font-family:Kanit;transition:all .15s">
+      <span style="font-size:15px">⭐</span>
+      <span style="font-size:13px;font-weight:700;color:#FFC700">${n}</span>
+      <span style="font-size:11px;color:#D4A900">ใบชื่นชม</span>
+    </button>
+  </div>`;
+}
+function openMyApprDetail() {
+  const apprs = getAppreciations(currentUser?.staffId || '');
+  const n = apprs.length;
+  const body = document.getElementById('my-apprs-body');
+  if (!body) return;
+  const dots = [1,2,3].map(i=>`<div style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;${i<=n?'background:rgba(255,199,0,.22);color:#FFC700;border:1px solid rgba(255,199,0,.45)':'background:rgba(255,255,255,.05);color:var(--text2);border:1px solid rgba(255,255,255,.08)'}">${i<=n?'⭐':i}</div>`).join('');
+  body.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;padding:12px;background:${n>=3?'rgba(255,199,0,.08)':'rgba(255,255,255,.03)'};border-radius:9px;border:1px solid ${n>=3?'rgba(255,199,0,.25)':'rgba(255,255,255,.07)'}">
+      ${dots}
+      <span style="font-size:12px;color:${n>=3?'#FFD93D':'var(--text2)'};margin-left:6px;font-weight:${n>=3?'700':'400'}">${n>=3?'🎁 ครบ 3 ใบ — ได้รับโบนัส!':'สะสม '+n+' ใบ · อีก '+Math.max(0,3-n)+' ใบได้โบนัส'}</span>
+    </div>
+    ${apprs.map((a,i)=>`
+      <div style="background:var(--bg2);border:1px solid rgba(255,199,0,.2);border-radius:9px;padding:11px 14px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
+          <div style="width:20px;height:20px;border-radius:50%;background:rgba(255,199,0,.22);color:#FFC700;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">⭐</div>
+          <div style="font-size:13px;font-weight:700;color:#FFD93D">${a.type}</div>
+        </div>
+        ${a.projName?`<div style="font-size:11px;color:var(--text2)">โปรเจกต์: ${a.projName} · ${fmtWarnDate(a.date)}</div>`:`<div style="font-size:11px;color:var(--text2)">${fmtWarnDate(a.date)}</div>`}
+        ${a.note?`<div style="font-size:12px;color:var(--text2);margin-top:5px;font-style:italic">"${a.note}"</div>`:''}
+      </div>`).join('')}`;
+  openModal('modal-my-appreciations');
+}
+
 function startWarningsSync() {
   if (!_fbDatabase) return;
   _fbDatabase.ref('warnings').on('value', snap => {
@@ -2111,9 +2400,11 @@ auth.onAuthStateChanged(async(fbUser)=>{
     console.log('⏩ Skipping anonymous user');
     return;
   }
+  const _splash = document.getElementById('app-splash');
   if(!fbUser){
     document.getElementById('app-layout').classList.add('hidden');
     document.getElementById('screen-login').classList.remove('hidden');
+    if(_splash) _splash.remove();
     showLoader(false);
     return;
   }
@@ -2207,6 +2498,8 @@ async function enterApp(){
   showLoader(true);
   try { await loadProjects(); } catch(e) { console.warn('loadProjects skipped:', e.message); }
   try { await loadWarningsFromFirebase(); } catch(e) {}
+  try { await loadAppreciationsFromFirebase(); } catch(e) {}
+  try { await loadCalcDraftsFromFirebase(); } catch(e) {}
   try { await loadMgrRequests(); await loadManagerUsers(); } catch(e) {}
   // Load tracking cards from Firebase
   try {
@@ -2273,6 +2566,7 @@ async function enterApp(){
   }
   // Never seed demo in production — only load existing data
   showLoader(false);
+  const _splash2 = document.getElementById('app-splash'); if(_splash2) _splash2.remove();
   document.getElementById('screen-login').classList.add('hidden');
   document.getElementById('app-layout').classList.remove('hidden');
   const _sa=document.getElementById('sidebar-avatar');if(_sa)_sa.textContent=(currentUser.nickname||'A')[0].toUpperCase();
@@ -2290,11 +2584,14 @@ async function enterApp(){
   // Real-time Firebase sync
   startFirebaseSync();
   startWarningsSync();
+  try{startAppreciationsSync();}catch(e){}
+  try{startCalcDraftsSync();}catch(e){}
   } catch(e) {
     console.error('enterApp failed:', e);
     toast('เกิดข้อผิดพลาดในการโหลดระบบ: ' + e.message, 'error');
   } finally {
     showLoader(false);
+    const _sp=document.getElementById('app-splash'); if(_sp) _sp.remove();
   }
 }
 function showLoader(on){
@@ -2323,10 +2620,87 @@ async function seedDemo(){
   ls('voucher_seq','4');voucherSeq=4;
 }
 
+
+// ══════════════════════════════════════════════
+// DEMO SHUFFLE (admin only)
+// ══════════════════════════════════════════════
+const _DEMO_SETS = [
+  {
+    label:'เซ็ต A — ต้นเดือน',
+    projs:[
+      {id:'P001',name:'JW8_วิวาห์รักป่วนหัวใจ',client:'Hope Bis',type:'ซีรีย์',budget:12000,duration:135,date:'2026-02-10',startDate:'2026-02-08',deadline:'2026-02-15',cycle:'ต้นเดือน (1-15)',note:'',createdAt:new Date(),
+        workers:[{id:'D001',slot:'dub-main',amount:2085,unit:'นาที',status:'paid',voucherNo:'GS-2569-0001'},{id:'D002',slot:'dub-sub',amount:1350,unit:'เหมา',status:'paid',voucherNo:'GS-2569-0002'},{id:'M001',slot:'mix-only',amount:2700,unit:'เหมา',status:'paid',voucherNo:'GS-2569-0003'}],
+        tax:{dub:3,adp:0,mix:3,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
+      {id:'P002',name:'JW10_บ่วงรัก',client:'Hope Bis',type:'ซีรีย์',budget:12000,duration:139,date:'2026-03-05',startDate:'2026-03-03',deadline:'2026-03-10',cycle:'ต้นเดือน (1-15)',note:'',createdAt:new Date(),
+        workers:[{id:'D003',slot:'dub-main',amount:2085,unit:'นาที',status:'paid',voucherNo:'GS-2569-0004'},{id:'D001',slot:'dub-sub',amount:1390,unit:'เหมา',status:'approved'},{id:'M002',slot:'mix-only',amount:2780,unit:'เหมา',status:'pending'}],
+        tax:{dub:3,adp:0,mix:3,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
+      {id:'P003',name:'JW13_ตำนานบทใหม่',client:'Hope Bis',type:'ซีรีย์',budget:12000,duration:145,date:'2026-04-01',startDate:'2026-04-01',deadline:'2026-04-20',cycle:'ปลายเดือน (16-31)',note:'',createdAt:new Date(),
+        workers:[{id:'D004',slot:'dub-main',amount:2175,unit:'นาที',status:'pending'},{id:'A001',slot:'adp-only',amount:1500,unit:'เหมา',status:'pending'},{id:'M001',slot:'mix-only',amount:2900,unit:'เหมา',status:'pending'}],
+        tax:{dub:3,adp:0,mix:3,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
+    ]
+  },
+  {
+    label:'เซ็ต B — ปลายเดือน',
+    projs:[
+      {id:'P101',name:'ดาวหฤทัย Season 2',client:'Rabbit Film',type:'ซีรีย์',budget:18000,duration:158,date:'2026-02-16',startDate:'2026-02-16',deadline:'2026-02-28',cycle:'ปลายเดือน (16-31)',note:'',createdAt:new Date(),
+        workers:[{id:'D005',slot:'dub-main',amount:3476,unit:'เหมา',status:'paid',voucherNo:'GS-2569-0010'},{id:'Q001',slot:'qc-only',amount:1500,unit:'เหมา',status:'paid',voucherNo:'GS-2569-0011'},{id:'M003',slot:'mix-only',amount:3200,unit:'เหมา',status:'approved'}],
+        tax:{dub:0,adp:0,mix:0,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
+      {id:'P102',name:'สายลมและแสงดาว',client:'Mango Studio',type:'ภาพยนตร์',budget:25000,duration:102,date:'2026-03-16',startDate:'2026-03-16',deadline:'2026-03-31',cycle:'ปลายเดือน (16-31)',note:'เร่งด่วน',createdAt:new Date(),
+        workers:[{id:'D001',slot:'dub-main',amount:4080,unit:'เหมา',status:'pending'},{id:'A002',slot:'adp-only',amount:2000,unit:'เหมา',status:'pending'},{id:'M001',slot:'mix-only',amount:4500,unit:'เหมา',status:'pending'}],
+        tax:{dub:3,adp:0,mix:3,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
+      {id:'P103',name:'มหัศจรรย์สองโลก',client:'Rabbit Film',type:'ซีรีย์',budget:15000,duration:120,date:'2026-04-16',startDate:'2026-04-16',deadline:'2026-04-30',cycle:'ปลายเดือน (16-31)',note:'',createdAt:new Date(),
+        workers:[{id:'D002',slot:'dub-main',amount:2400,unit:'เหมา',status:'pending'},{id:'M002',slot:'mix-only',amount:2800,unit:'เหมา',status:'pending'}],
+        tax:{dub:0,adp:0,mix:0,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
+    ]
+  },
+  {
+    label:'เซ็ต C — คละสถานะ',
+    projs:[
+      {id:'P201',name:'เสียงกระซิบแห่งฟากฟ้า',client:'Hope Bis',type:'ซีรีย์',budget:17550,duration:117,date:'2026-03-01',startDate:'2026-03-01',deadline:'2026-03-20',cycle:'ต้นเดือน (1-15)',note:'',createdAt:new Date(),
+        workers:[{id:'D003',slot:'dub-main',amount:2340,unit:'เหมา',status:'paid',voucherNo:'GS-2569-0020'},{id:'S001',slot:'sub-only',amount:1170,unit:'เหมา',status:'paid',voucherNo:'GS-2569-0021'},{id:'M003',slot:'mix-only',amount:2340,unit:'เหมา',status:'approved'}],
+        tax:{dub:0,adp:0,mix:0,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
+      {id:'P202',name:'ปาฏิหาริย์แห่งรัก',client:'Daisy Film',type:'ภาพยนตร์',budget:20000,duration:128,date:'2026-04-01',startDate:'2026-04-01',deadline:'2026-04-15',cycle:'ต้นเดือน (1-15)',note:'สำคัญมาก',createdAt:new Date(),
+        workers:[{id:'D001',slot:'dub-main',amount:5120,unit:'เหมา',status:'pending'},{id:'D004',slot:'dub-sub',amount:2560,unit:'เหมา',status:'pending'},{id:'A001',slot:'adp-only',amount:2000,unit:'เหมา',status:'pending'},{id:'M001',slot:'mix-only',amount:4500,unit:'เหมา',status:'pending'}],
+        tax:{dub:3,adp:0,mix:3,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
+      {id:'P203',name:'ลมหายใจสุดท้าย',client:'Mango Studio',type:'ซีรีย์',budget:9800,duration:98,date:'2026-04-10',startDate:'2026-04-10',deadline:'2026-04-25',cycle:'ปลายเดือน (16-31)',note:'',createdAt:new Date(),
+        workers:[{id:'D005',slot:'dub-main',amount:1960,unit:'เหมา',status:'approved'},{id:'Q001',slot:'qc-only',amount:980,unit:'เหมา',status:'pending'}],
+        tax:{dub:0,adp:0,mix:0,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
+    ]
+  }
+];
+
+let _demoSetIdx = 0;
+async function shuffleDemo(){
+  if(currentUser?.role !== 'admin'){toast('เฉพาะแอดมินเท่านั้น 🔒','error');return;}
+  if(!confirm('สลับข้อมูลเดโม่? โปรเจกต์ปัจจุบันทั้งหมดจะถูกลบและแทนด้วยชุดข้อมูลใหม่'))return;
+  showLoader(true);
+  try {
+    // Clear existing projects
+    const existing = getProjects();
+    for(const p of existing){
+      try{
+        if(_fbDatabase) await _fbDatabase.ref('projects/'+p.id).remove();
+      }catch(e){}
+    }
+    projectsCache=[];ls('projects_v3',[]);
+    // Cycle to next set
+    _demoSetIdx = (_demoSetIdx + 1) % _DEMO_SETS.length;
+    const set = _DEMO_SETS[_demoSetIdx];
+    for(const p of set.projs) await saveProjectDB(p);
+    await loadProjects();
+    renderDash();
+    toast(`✅ สลับเป็น "${set.label}" แล้ว`,'success');
+  } catch(e){
+    toast('เกิดข้อผิดพลาด: '+e.message,'error');
+  } finally {
+    showLoader(false);
+  }
+}
+
 // ══════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════
-const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','profit','staff','docs','proj-cal'];
+const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','profit','staff','docs','proj-cal','calc'];
 const MANAGER_PAGES=['mgr-projects','mgr-track','mgr-calendar','mgr-team'];
 function nav(page){
   const role=currentUser?.role||'staff';
@@ -2337,7 +2711,7 @@ function nav(page){
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
   const renders={
-    dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue,docs:renderDocs,'proj-cal':renderProjCal,
+    dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue,docs:renderDocs,'proj-cal':renderProjCal,calc:renderCalcList,
     'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar,
     'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-calendar':renderMgrCalendar,'mgr-team':renderMgrTeam
   };
@@ -2804,7 +3178,7 @@ function openNewProject(){
   document.getElementById('proj-modal-title').textContent='➕ สร้างโปรเจกต์ใหม่';
   ['pj-name','pj-client','pj-budget','pj-duration','pj-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const _ms=document.getElementById('pj-manager');if(_ms){const _mm=getAllManagerUsers();_ms.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+_mm.map(m=>`<option value="${m.uid}">${m.nickname||m.email}</option>`).join('');}
-  ['pj-type','pj-cycle'].forEach(id=>{const el=document.getElementById(id);if(el)el.selectedIndex=0;});
+  ['pj-type'].forEach(id=>{const el=document.getElementById(id);if(el)el.selectedIndex=0;});
   const today=new Date().toISOString().split('T')[0];
   const ps=document.getElementById('pj-start');if(ps)ps.value=isoToThai(today);
   const pspk=document.getElementById('pj-start-pk');if(pspk)pspk.value=today;
@@ -2895,8 +3269,9 @@ function renderWorkerList(cat,slot){
           : `<span id="wamt-${cat}-${slot}-${i}" style="font-size:11px;color:var(--accent2);padding:3px 8px;background:rgba(0,180,255,.1);border-radius:6px;white-space:nowrap">= ${fmtB(showAmt)}</span>`)
       : `<span id="wamt-${cat}-${slot}-${i}"></span>`;
     const calcHtml = amtLabel;
-    return`<div class="worker-rate-row">
-      <span class="worker-name-badge" style="color:${catColors[cat]||'var(--text)'}">${s.nickname}</span>
+    const hasComment = !!(w.comment||'').trim();
+    return`<div class="worker-rate-row" style="flex-wrap:wrap">
+      <span class="worker-name-badge" style="color:${catColors[cat]||'var(--text)'};cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px" onclick="openReplaceWorker('${cat}','${slot}',${i},event)" title="คลิกเพื่อเปลี่ยนคน">${s.nickname} <span style="font-size:9px;opacity:.55">🔄</span></span>
       <input type="number" value="${w.amount||''}" placeholder="ราคา" min="0"
         style="flex:1;min-width:80px;padding:6px 9px;background:rgba(0,0,0,.35);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px"
         oninput="updateSlotAmount('${cat}','${slot}',${i},this.value)">
@@ -2906,9 +3281,76 @@ function renderWorkerList(cat,slot){
        <option value="เหมา"${w.unit==='เหมา'?' selected':''}>เหมา</option>
       </select>
       ${calcHtml}
+      <button class="btn btn-xs" style="background:${hasComment?'rgba(155,111,255,.18)':'rgba(255,255,255,.05)'};color:${hasComment?'#9B6FFF':'var(--text2)'};border:1px solid ${hasComment?'rgba(155,111,255,.35)':'var(--border2)'};padding:3px 8px" onclick="toggleWorkerComment('${cat}','${slot}',${i})" title="หมายเหตุ/คอมเมนต์">💬${hasComment?' •':''}</button>
       <button class="btn btn-xs btn-red" onclick="removeFromSlot('${cat}','${slot}',${i})">✕</button>
+      <div id="wcom-${cat}-${slot}-${i}" style="display:${hasComment?'block':'none'};flex-basis:100%;margin-top:6px">
+        <textarea placeholder="หมายเหตุรายบุคคล เช่น หัก 200฿, ตักเตือนการส่งงานช้า, คนแทน..." style="width:100%;min-height:48px;background:rgba(155,111,255,.05);border:1px solid rgba(155,111,255,.2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px;padding:7px 10px;resize:vertical" oninput="updateSlotComment('${cat}','${slot}',${i},this.value)">${(w.comment||'').replace(/</g,'&lt;')}</textarea>
+      </div>
     </div>`;
   }).join('');
+}
+
+// Toggle the comment textarea for a worker
+function toggleWorkerComment(cat,slot,i){
+  const el=document.getElementById('wcom-'+cat+'-'+slot+'-'+i);
+  if(!el)return;
+  el.style.display=el.style.display==='none'?'block':'none';
+  if(el.style.display==='block'){setTimeout(()=>el.querySelector('textarea')?.focus(),80);}
+}
+function updateSlotComment(cat,slot,i,val){
+  if(formSlots[cat]&&formSlots[cat][slot]&&formSlots[cat][slot][i]){
+    formSlots[cat][slot][i].comment=val;
+  }
+}
+
+// Replace a worker in-place via search popup
+function openReplaceWorker(cat,slot,idx,ev){
+  if(ev) ev.stopPropagation();
+  // Close any existing replace popup
+  document.getElementById('replace-worker-popup')?.remove();
+  const rect = ev?.target?.getBoundingClientRect ? ev.target.getBoundingClientRect() : {left:200,bottom:200};
+  const pop = document.createElement('div');
+  pop.id = 'replace-worker-popup';
+  pop.style.cssText = `position:fixed;top:${rect.bottom+6}px;left:${rect.left}px;z-index:99999;background:var(--card);border:1px solid var(--accent2);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);width:280px;overflow:hidden`;
+  const list = (typeof buildWorkerList==='function'?buildWorkerList():[]);
+  pop.innerHTML = `
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border2);background:rgba(0,180,255,.08);font-size:11px;color:var(--cyan);font-weight:700">🔄 เปลี่ยนคนทำงาน</div>
+    <input type="text" id="rw-search" placeholder="🔍 พิมพ์ชื่อ..." autocomplete="off" style="width:100%;padding:9px 12px;background:var(--bg2);border:none;border-bottom:1px solid var(--border2);color:var(--text);font-family:Kanit;font-size:13px;outline:none">
+    <div id="rw-list" style="max-height:240px;overflow-y:auto;padding:4px"></div>`;
+  document.body.appendChild(pop);
+  window._rwTarget = {cat,slot,idx};
+  window._rwAll = list;
+  renderReplaceList('');
+  setTimeout(()=>{document.getElementById('rw-search')?.focus();},50);
+  const inp = document.getElementById('rw-search');
+  if(inp) inp.oninput = ()=>renderReplaceList(inp.value);
+  // close on outside click
+  setTimeout(()=>{
+    document.addEventListener('click', _closeRwOnce, {once:true});
+  }, 100);
+}
+function _closeRwOnce(e){
+  const pop=document.getElementById('replace-worker-popup');
+  if(pop && !pop.contains(e.target)) pop.remove();
+}
+function renderReplaceList(q){
+  const listEl=document.getElementById('rw-list');if(!listEl)return;
+  const all=window._rwAll||[];
+  const qq=(q||'').toLowerCase().trim();
+  const filtered=qq?all.filter(s=>(s.nickname||'').toLowerCase().includes(qq)||(s.name||'').toLowerCase().includes(qq)):all;
+  if(!filtered.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">ไม่พบสมาชิก</div>';return;}
+  listEl.innerHTML=filtered.map(s=>`<div onclick="doReplaceWorker('${s.id}')" style="padding:8px 12px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text)" onmouseover="this.style.background='var(--dim)';this.style.color='var(--accent2)'" onmouseout="this.style.background='';this.style.color='var(--text)'"><strong>${s.nickname||s.name}</strong> <span style="color:var(--text2);font-size:11px">· ${(s.name||'').split(' ')[0]||''}</span></div>`).join('');
+}
+function doReplaceWorker(newId){
+  const t=window._rwTarget;if(!t)return;
+  if(formSlots[t.cat]&&formSlots[t.cat][t.slot]&&formSlots[t.cat][t.slot][t.idx]){
+    // check duplicate
+    if((formSlots[t.cat][t.slot]||[]).some((x,i)=>i!==t.idx&&x.staffId===newId)){toast('คนนี้อยู่ในหมวดนี้แล้ว','warn');return;}
+    formSlots[t.cat][t.slot][t.idx].staffId=newId;
+    document.getElementById('replace-worker-popup')?.remove();
+    renderWorkerList(t.cat,t.slot);calcProjSummary();
+    toast('✅ เปลี่ยนคนแล้ว — ราคาและคอมเมนต์ยังเหมือนเดิม','success');
+  }
 }
 function updateSlotAmount(cat,slot,idx,val){
   if(formSlots[cat]&&formSlots[cat][slot]){
@@ -2951,7 +3393,16 @@ function calcProjSummary(){
       }
     }
   });
-  const budget=parseFloat(document.getElementById('pj-budget')?.value)||0;
+  const budgetRaw=parseFloat(document.getElementById('pj-budget')?.value)||0;
+  const budgetType=document.getElementById('pj-budget-type')?.value||'flat';
+  const budget=(budgetType==='per-minute'&&dur>0)?budgetRaw*dur:budgetRaw;
+  const _bcEl=document.getElementById('pj-budget-calc');
+  if(_bcEl){
+    if(budgetType==='per-minute'&&budgetRaw>0){
+      _bcEl.style.display='block';
+      _bcEl.innerHTML=dur>0?('= '+fmtB(budgetRaw)+' × '+dur+' นาที <strong style="color:var(--accent2)">= '+fmtB(budget)+'</strong>'):'<span style="color:var(--orange)">⚠️ ใส่ความยาว (นาที) เพื่อคำนวนยอดรวม</span>';
+    } else { _bcEl.style.display='none'; }
+  }
   const profit=budget-totalExp;
   document.getElementById('sum-budget').textContent=fmtB(budget);
   document.getElementById('sum-expense').textContent=fmtB(Math.round(totalExp));
@@ -2976,7 +3427,7 @@ async function saveProject(){
     Object.entries(slots).forEach(([slot,arr])=>{
       arr.forEach(w=>{
         const amt=w.unit==='นาที'&&dur>0?(w.amount||0)*dur:(w.amount||0);
-        workers.push({id:w.staffId,slot:cat+'-'+slot,amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'เหมา',status:'pending',note:''});
+        workers.push({id:w.staffId,slot:cat+'-'+slot,amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'นาที',status:'pending',note:'',comment:w.comment||''});
       });
     });
   });
@@ -2987,19 +3438,24 @@ async function saveProject(){
     id:editingProjId||('P'+Date.now()),name,date:existingProj?.date||today,
     client:document.getElementById('pj-client').value.trim(),
     type:document.getElementById('pj-type').value,
-    budget:parseFloat(document.getElementById('pj-budget').value)||0,
+    budget:(function(){const r=parseFloat(document.getElementById('pj-budget').value)||0;const t=document.getElementById('pj-budget-type')?.value||'flat';return (t==='per-minute'&&dur>0)?r*dur:r;})(),
+    budgetRate:parseFloat(document.getElementById('pj-budget').value)||0,
+    budgetType:document.getElementById('pj-budget-type')?.value||'flat',
     duration:dur,
     startDate:thaiToIso(document.getElementById('pj-start').value)||document.getElementById('pj-start').value,
     deadline:thaiToIso(document.getElementById('pj-deadline').value)||document.getElementById('pj-deadline').value,
-    cycle:document.getElementById('pj-cycle')?.value||'ต้นเดือน (1-15)',
+    cycle:'',
     note:document.getElementById('pj-note')?.value||'',
     managerId:document.getElementById('pj-manager')?.value||'',
     workers,tax,evidenceLogs:[],snapshot:null,createdAt:new Date()
   };
   if(editingProjId){
     const existing=getProjects().find(p=>p.id===editingProjId);
-    if(existing)proj.workers=proj.workers.map(w=>{const ex=(existing.workers||[]).find(x=>x.id===w.id&&x.slot===w.slot);return ex?{...w,status:ex.status,voucherNo:ex.voucherNo}:w});
+    if(existing)proj.workers=proj.workers.map(w=>{const ex=(existing.workers||[]).find(x=>x.id===w.id&&x.slot===w.slot);return ex?{...w,status:ex.status,voucherNo:ex.voucherNo,paidAt:ex.paidAt}:w});
     proj.evidenceLogs=existing?.evidenceLogs||[];proj.snapshot=existing?.snapshot||null;
+    // Fix: preserve projStatus so editing doesn't reset "เสร็จแล้ว" back to "ยังไม่เริ่ม"
+    if(existing && existing.projStatus) proj.projStatus = existing.projStatus;
+    if(existing && existing.createdAt) proj.createdAt = existing.createdAt;
   }
   await saveProjectDB(proj);closeModal('modal-project');renderProjects();renderDash();
   toast(editingProjId?'อัพเดทแล้ว ✅':'สร้างโปรเจกต์แล้ว ✅','success');updateQueueBadge();
@@ -3034,13 +3490,22 @@ function openEditProject(id){
     const managers=getAllManagerUsers();
     mgrSel.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+managers.map(m=>`<option value="${m.uid}"${p.managerId===m.uid?' selected':''}>${m.nickname||m.email}</option>`).join('');
   }
-  document.getElementById('pj-budget').value=p.budget||'';
+  // Restore budget type & rate
+  const _btEl=document.getElementById('pj-budget-type');
+  if(_btEl){
+    _btEl.value=p.budgetType||'flat';
+  }
+  if(p.budgetType==='per-minute'&&p.budgetRate){
+    document.getElementById('pj-budget').value=p.budgetRate;
+  } else {
+    document.getElementById('pj-budget').value=p.budget||'';
+  }
   document.getElementById('pj-duration').value=p.duration||'';
   document.getElementById('pj-note').value=p.note||'';
   document.getElementById('pj-start').value=isoToThai(p.startDate||'');document.getElementById('pj-start-pk').value=p.startDate||'';
   document.getElementById('pj-deadline').value=isoToThai(p.deadline||'');document.getElementById('pj-deadline-pk').value=p.deadline||'';
   const typeEl=document.getElementById('pj-type');[...typeEl.options].forEach((o,i)=>{if(o.value===p.type)typeEl.selectedIndex=i});
-  const cycleEl=document.getElementById('pj-cycle');[...cycleEl.options].forEach((o,i)=>{if(o.value===p.cycle||o.text===p.cycle)cycleEl.selectedIndex=i});
+  // cycle removed - ignored
   const tax=p.tax||{};['dub','adp','mix','qc','sub','mgr'].forEach(k=>{const el=document.getElementById(k+'-tax');if(el)el.value=tax[k]||''});
   document.querySelectorAll('.cat-toggle-btn').forEach(b=>b.classList.remove('on'));
   ['dub','adp','mix','qc','sub','mgr'].forEach(k=>{const c=document.getElementById('catblock-'+k);if(c)c.classList.add('hidden')});
@@ -3048,7 +3513,7 @@ function openEditProject(id){
   (p.workers||[]).forEach(w=>{
     const parts=w.slot.split('-');const cat=parts[0];const slot=parts.slice(1).join('-')||'only';
     if(!activeCats.has(cat)){activeCats.add(cat);const btn=document.getElementById('toggle-'+cat);const block=document.getElementById('catblock-'+cat);if(btn)btn.classList.add('on');if(block)block.classList.remove('hidden')}
-    if(formSlots[cat]&&formSlots[cat][slot]!==undefined)formSlots[cat][slot].push({staffId:w.id,amount:w.ratePerUnit||w.amount||0,unit:w.unit||'เหมา'});
+    if(formSlots[cat]&&formSlots[cat][slot]!==undefined)formSlots[cat][slot].push({staffId:w.id,amount:w.ratePerUnit||w.amount||0,unit:w.unit||'นาที',comment:w.comment||''});
   });
   populateWorkerSelects();renderAllWorkerLists();calcProjSummary();
   openModal('modal-project');
@@ -3241,8 +3706,9 @@ function initQueueMonthFilter(){ try {
   if(monthSel&&monthSel.options.length<=1){
     const months=new Map();
     getProjects().forEach(p=>{
-      if(!p.deadline)return;
-      const d=new Date(p.deadline);
+      const _ref=p.startDate||p.deadline;
+      if(!_ref)return;
+      const d=new Date(_ref);
       const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
       const label=`${TM[d.getMonth()]} ${d.getFullYear()+543}`;
       months.set(key,label);
@@ -3310,16 +3776,18 @@ function renderQueue() {
   // Build project groups that match filters
   const groups = [];
   projs.forEach(p => {
-    if (selectedQYear && p.deadline) {
-      if (new Date(p.deadline).getFullYear() !== parseInt(selectedQYear)) return;
+    // FIX: รอบจ่ายอ้างอิงจาก startDate (วันเริ่มงาน) ไม่ใช่ deadline
+    const _ref = p.startDate || p.deadline;
+    if (selectedQYear && _ref) {
+      if (new Date(_ref).getFullYear() !== parseInt(selectedQYear)) return;
     }
-    if (selectedMonth && p.deadline) {
-      const d = new Date(p.deadline);
+    if (selectedMonth && _ref) {
+      const d = new Date(_ref);
       const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
       if (key !== selectedMonth) return;
     }
-    if (queueCycleFilter !== 'all' && p.deadline) {
-      const day = new Date(p.deadline).getDate();
+    if (queueCycleFilter !== 'all' && _ref) {
+      const day = new Date(_ref).getDate();
       if (queueCycleFilter === '1' && day > 15) return;
       if (queueCycleFilter === '2' && day <= 15) return;
     }
@@ -3586,9 +4054,9 @@ function renderProfit(){
     <div class="stat-card"><span class="stat-icon">💹</span><div class="stat-label">รายได้รวม</div><div class="stat-value" style="color:var(--green)">${fmtB(revenue)}</div></div>
     <div class="stat-card"><span class="stat-icon">💸</span><div class="stat-label">จ่ายออกแล้ว</div><div class="stat-value" style="color:var(--red)">${fmtB(paid)}</div></div>
     <div class="stat-card"><span class="stat-icon">⏳</span><div class="stat-label">ค้างจ่าย</div><div class="stat-value" style="color:var(--orange)">${fmtB(pending)}</div></div>`;
-  const months=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.'];
-  const mData=new Array(6).fill(0);
-  projs.forEach(p=>{const m=new Date(p.date||p.createdAt).getMonth();if(m<6)(p.workers||[]).forEach(w=>{if(w.status==='paid')mData[m]+=w.amount||0})});
+  const months=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const mData=new Array(12).fill(0);
+  projs.forEach(p=>{const _rd=p.startDate||p.date||p.createdAt;if(!_rd)return;const m=new Date(_rd).getMonth();if(isNaN(m)||m<0||m>11)return;(p.workers||[]).forEach(w=>{if(w.status==='paid')mData[m]+=(w.amount||0)})});
   if(chartMonthly)chartMonthly.destroy();
   chartMonthly=new Chart(document.getElementById('chart-monthly'),{type:'bar',data:{labels:months,datasets:[{label:'฿',data:mData,backgroundColor:'rgba(21,101,255,.7)',borderColor:'var(--accent)',borderWidth:2,borderRadius:8}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6890B8'},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#6890B8'},grid:{color:'rgba(255,255,255,.04)'}}}}});
   const catTotals={dubbing:0,adaptation:0,mix:0,qc:0,subVideo:0,manager:0};
@@ -3686,9 +4154,11 @@ function renderStaffGrid(){
       html+='<div style="display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px">';
       staff.forEach(s=>{
         const av=s.nickname?s.nickname[0]:'?';
+        const fn_=(s.name||'').split(' ')[0]||s.name||'';const disp_=s.nickname?(s.nickname+(fn_&&fn_!==s.nickname?' · '+fn_:'')):fn_;
         html+='<div onclick="openEditStaff(\''+s.id+'\',\''+key+'\')" style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:var(--bg2);border:1px solid '+color+'44;border-radius:20px;cursor:pointer;font-size:12px">';
         html+='<span style="width:20px;height:20px;border-radius:50%;background:'+color+'22;color:'+color+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px">'+av+'</span>';
-        const wc=getWarnings(s.id).length;html+='<span style="font-weight:700">'+(s.nickname||s.name)+'</span>'+(wc?'<span style="font-size:10px;color:#FF4040;font-weight:700;margin-left:2px">✉'+wc+'</span>':'')+' </div>';
+        const wc=getWarnings(s.id).length;const ac=(typeof getAppreciations==='function'?getAppreciations(s.id).length:0);
+        html+='<span style="font-weight:700">'+disp_+'</span>'+(wc?'<span style="font-size:10px;color:#FF4040;font-weight:700;margin-left:2px">✉'+wc+'</span>':'')+(ac?'<span style="font-size:10px;color:#FFC700;font-weight:700;margin-left:2px">⭐'+ac+'</span>':'')+' </div>';
       });
       html+='</div>';
     }else{
@@ -3734,7 +4204,7 @@ function toggleStaffBody(id){
   if(arr)arr.textContent=hidden?'▼':'▶';
 }
 function openAddStaff(){
-  editingStaffId=null;editingStaffCat=null;_iwStaffId='';document.getElementById('addstaff-title').textContent='➕ เพิ่มสมาชิกใหม่';const _ws=document.getElementById('st-warn-section');if(_ws)_ws.classList.add('hidden');
+  editingStaffId=null;editingStaffCat=null;_iwStaffId='';_iaStaffId='';document.getElementById('addstaff-title').textContent='➕ เพิ่มสมาชิกใหม่';const _ws=document.getElementById('st-warn-section');if(_ws)_ws.classList.add('hidden');const _wa=document.getElementById('st-appr-section');if(_wa)_wa.classList.add('hidden');
   ['st-name','st-nick','st-bank','st-account','st-promptpay','st-email'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('st-gender').selectedIndex=0;
   setStaffCatsChecked(['dubbing']); // default = Dubbing
@@ -3763,6 +4233,22 @@ function openEditStaff(id,cat){
   document.getElementById('st-promptpay').value=s.promptpay||'';document.getElementById('st-email').value=s.email||'';
   const catSel=document.getElementById('st-cat-wrap');setStaffCatsChecked(s.categories||[cat]);
   const genderSel=document.getElementById('st-gender');[...genderSel.options].forEach((o,i)=>{if(o.text===s.gender)genderSel.selectedIndex=i});
+  // Load appreciations
+  _iaStaffId = id;
+  const apprSec = document.getElementById('st-appr-section');
+  if (apprSec) {
+    apprSec.classList.remove('hidden');
+    const apprs = getAppreciations(id);
+    document.getElementById('st-appr-count').textContent = apprs.length;
+    const histA = document.getElementById('st-appr-history');
+    if(histA) histA.innerHTML = apprs.length ? apprs.map((a,i)=>`
+      <div style="display:flex;align-items:center;gap:7px;padding:6px 10px;background:rgba(0,0,0,.3);border-radius:7px;margin-bottom:5px">
+        <div style="width:18px;height:18px;border-radius:50%;background:rgba(255,199,0,.22);color:#FFC700;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0">⭐</div>
+        <div style="flex:1;font-size:11px;color:#FFD93D">${a.type}${a.projName?' · '+a.projName:''}</div>
+        <div style="font-size:10px;color:var(--text2)">${fmtWarnDate(a.date)}</div>
+        <button onclick="deleteAppreciation('${id}','${a.id}').then(()=>openEditStaff('${id}','${cat}'))" style="padding:2px 8px;background:none;border:1px solid rgba(255,255,255,.1);border-radius:5px;color:var(--text2);font-size:10px;cursor:pointer;font-family:Kanit" onmouseover="this.style.borderColor='rgba(255,199,0,.4)';this.style.color='#FFD93D'" onmouseout="this.style.borderColor='rgba(255,255,255,.1)';this.style.color='var(--text2)'">ลบ</button>
+      </div>`).join('') : '<div style="font-size:11px;color:var(--text2);text-align:center;padding:8px">ยังไม่มีใบชื่นชม</div>';
+  }
   // Load warnings
   _iwStaffId = id;
   const warnSec = document.getElementById('st-warn-section');
@@ -3833,6 +4319,7 @@ function renderMyDash(){
   if(!currentUser?.staffId)return;const s=getStaffById(currentUser.staffId);if(!s)return;
   document.getElementById('my-welcome').textContent=`สวัสดี ${currentUser.nickname||s.nickname} 👋`;
   renderMyWarnBell();
+  try{renderMyApprBell();}catch(e){}
 
   const projs=getProjects();let paid=0,pending=0;const items=[];
   projs.forEach(p=>{const myWs=(p.workers||[]).filter(x=>x.id===s.id);if(!myWs.length)return;
@@ -3946,18 +4433,19 @@ function renderDocs() {
   initQtItems();
 }
 function switchDocsMain(tab, el) {
-  ['client','worker','history'].forEach(t => {
+  ['client','invoice','worker','history'].forEach(t => {
     const d = document.getElementById('docs-' + t);
     if (d) d.classList.toggle('hidden', t !== tab);
   });
   document.querySelectorAll('#docs-main-tabs .tab').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
   if (tab === 'history') renderDocsHistory();
+  if (tab === 'invoice') { initInvItems(); const _id=document.getElementById('inv-date'); if(_id&&!_id.value) _id.value=isoToThai(new Date().toISOString().split('T')[0]); }
 }
 function populateDocsProjSelects() {
   const projs = getProjects();
   const opts = '<option value="">— เลือกโปรเจกต์ —</option>' + projs.map(p => `<option value="${p.id}">${p.name}${p.client?' · '+p.client:''}</option>`).join('');
-  ['qt-proj','vc-proj'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=opts.replace('— เลือกโปรเจกต์ —', id==='qt-proj'?'— เลือกจากโปรเจกต์ หรือกรอกเอง —':'— เลือกโปรเจกต์ —'); });
+  ['qt-proj','vc-proj','inv-proj'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=opts.replace('— เลือกโปรเจกต์ —', (id==='qt-proj'||id==='inv-proj')?'— เลือกจากโปรเจกต์ หรือกรอกเอง —':'— เลือกโปรเจกต์ —'); });
 }
 
 /* ══════════════════════
@@ -4489,18 +4977,20 @@ function renderDocsHistory() {
   const q = (document.getElementById('docs-search')?.value||'').toLowerCase();
   const quotations = (getDocsStore('quotations')||[]).map(d=>({...d,type:'quotation'}));
   const vouchers   = (getDocsStore('vouchers')||[]).map(d=>({...d,type:'voucher'}));
-  let all = [...quotations,...vouchers].sort((a,b)=>b.createdAt?.localeCompare(a.createdAt||'')||0);
+  const invoices   = (getDocsStore('invoices')||[]).map(d=>({...d,type:'invoice'}));
+  let all = [...quotations,...invoices,...vouchers].sort((a,b)=>b.createdAt?.localeCompare(a.createdAt||'')||0);
   if(docsHistFilter!=='all') all=all.filter(d=>d.type===docsHistFilter);
   if(q) all=all.filter(d=>(d.docNo||'').toLowerCase().includes(q)||(d.client||d.staffName||'').toLowerCase().includes(q)||(d.projName||'').toLowerCase().includes(q));
   if(!all.length){el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">ยังไม่มีเอกสาร</div>';return;}
   const typeInfo = {
     quotation:{ icon:'📋', label:'ใบเสนอราคา', color:'var(--accent2)', bg:'rgba(0,180,255,.1)', border:'rgba(0,180,255,.25)' },
+    invoice:  { icon:'🧾', label:'ใบแจ้งหนี้', color:'var(--red)',     bg:'rgba(255,64,64,.1)', border:'rgba(255,64,64,.25)' },
     voucher:  { icon:'💸', label:'ใบสำคัญจ่าย', color:'var(--green)',  bg:'rgba(0,223,160,.1)', border:'rgba(0,223,160,.25)' },
   };
   el.innerHTML='<div class="table-wrap"><table><thead><tr><th>เลขที่</th><th>ประเภท</th><th>ถึง</th><th>โปรเจกต์</th><th>ยอด</th><th>วันที่</th><th>Action</th></tr></thead><tbody>'+
   all.map(d=>{
     const t=typeInfo[d.type]||typeInfo.quotation;
-    const to=d.type==='quotation'?d.client:d.staffName;
+    const to=d.type==='voucher'?d.staffName:d.client;
     return`<tr>
       <td style="font-size:12px;font-weight:700;color:${t.color}">${d.docNo||'—'}</td>
       <td><span style="padding:3px 10px;border-radius:10px;background:${t.bg};border:1px solid ${t.border};font-size:11px;font-weight:700;color:${t.color}">${t.icon} ${t.label}</span></td>
@@ -4516,13 +5006,19 @@ function renderDocsHistory() {
 }
 
 function repreviewDoc(type, docNo) {
-  // Re-build from stored data
   if(type==='quotation'){
     const d=(getDocsStore('quotations')||[]).find(x=>x.docNo===docNo);
     if(!d){toast('ไม่พบข้อมูล','warn');return;}
     const el=document.getElementById('receipt-body');
     if(el) el.innerHTML=buildQuotationHTML(d);
     window._lastReceiptCtx={staffId:null,vNo:docNo,type:'quotation',email:d.email||''};
+    openModal('modal-receipt');
+  } else if(type==='invoice'){
+    const d=(getDocsStore('invoices')||[]).find(x=>x.docNo===docNo);
+    if(!d){toast('ไม่พบข้อมูล','warn');return;}
+    const el=document.getElementById('receipt-body');
+    if(el) el.innerHTML=buildInvoiceHTML(d);
+    window._lastReceiptCtx={staffId:null,vNo:docNo,type:'invoice',email:d.email||''};
     openModal('modal-receipt');
   } else {
     const d=(getDocsStore('vouchers')||[]).find(x=>x.docNo===docNo);
@@ -4862,8 +5358,9 @@ function renderBillingStaffCards() {
   // Find all workers in this billing cycle
   const staffMap = {}; // staffId → { staff, items: [{proj,worker}], total }
   getProjects().forEach(p => {
-    if (!p.deadline) return;
-    const dl = new Date(p.deadline);
+    const _refB = p.startDate || p.deadline;
+    if (!_refB) return;
+    const dl = new Date(_refB);
     if (dl.getFullYear() !== billingYearSelected) return;
     if (billingMonthSelected !== -1 && dl.getMonth() !== billingMonthSelected) return;
     if (billingCycleSelected === 1 && dl.getDate() > 15) return;
@@ -4946,8 +5443,9 @@ function buildBillingVoucherHTML(staffId) {
   const s = getStaffById(staffId); if (!s) return null;
   const items = [];
   getProjects().forEach(p => {
-    if (!p.deadline) return;
-    const dl = new Date(p.deadline);
+    const _refV = p.startDate || p.deadline;
+    if (!_refV) return;
+    const dl = new Date(_refV);
     if (!billingMonthAll) {
       if (dl.getFullYear() !== billingYearSelected) return;
       if (dl.getMonth() !== billingMonthSelected) return;
@@ -6057,6 +6555,558 @@ window.addEventListener('load',()=>{
 
 
 // ══════════════════════════════════════════════
+// 🧮 PROJECT COST CALCULATOR (แบบร่าง)
+// ══════════════════════════════════════════════
+const CALC_CATS = [
+  {key:'dub', label:'🎤 Dubbing',     color:'var(--orange)'},
+  {key:'adp', label:'✍️ Adaptation',  color:'var(--cyan)'},
+  {key:'mix', label:'🎧 Mix',          color:'var(--green)'},
+  {key:'qc',  label:'✅ QC',           color:'var(--purple)'},
+  {key:'sub', label:'🎬 Sub & Video', color:'var(--red)'},
+  {key:'mgr', label:'🗂️ Manager',    color:'var(--accent2)'},
+];
+function getCalcDrafts(){ return ls('calc_drafts_v1') || []; }
+async function saveCalcDrafts(arr){
+  ls('calc_drafts_v1', arr);
+  if(_fbDatabase){ try{ await _fbDatabase.ref('calcDrafts').set(arr); }catch(e){} }
+}
+async function loadCalcDraftsFromFirebase(){
+  if(!_fbDatabase) return;
+  try{
+    const snap = await _fbDatabase.ref('calcDrafts').get();
+    if(snap.exists()){
+      const v = snap.val();
+      ls('calc_drafts_v1', Array.isArray(v)?v:Object.values(v||{}));
+    }
+  }catch(e){}
+}
+function newCalcDraft(){
+  return {
+    id:'C'+Date.now(),
+    name:'',
+    budgetType:'flat',
+    budgetRate:0,
+    duration:0,
+    cats:{}, // {dub:{rate:0,unit:'นาที',ppl:1,tax:0}, ...}
+    note:'',
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  };
+}
+let _calcEditing = null;
+
+function renderCalcList(){
+  const el = document.getElementById('calc-list'); if(!el) return;
+  const drafts = getCalcDrafts();
+  if(!drafts.length){
+    el.innerHTML = '<div style="text-align:center;padding:56px 20px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)"><div style="font-size:42px;opacity:.3;margin-bottom:8px">🧮</div>ยังไม่มีแบบร่าง — กด ➕ สร้างแบบร่างใหม่<br><span style="font-size:11px;opacity:.7">แบบร่างไม่กระทบโปรเจกต์จริง · แปลงเป็นโปรเจกต์ได้ทีหลัง</span></div>';
+    return;
+  }
+  // sort newest first
+  const sorted = [...drafts].sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  el.innerHTML = sorted.map(d=>{
+    const sum = calcDraftSummary(d);
+    return `<div style="background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:16px 20px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <div style="font-weight:800;font-size:15px">${d.name||'<span style=\"color:var(--text2);font-weight:400\">(ไม่มีชื่อ)</span>'}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:3px">อัพเดท ${new Date(d.updatedAt||d.createdAt).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${d.duration?' · '+d.duration+' นาที':''}</div>
+        </div>
+        <div style="display:flex;gap:14px;text-align:right;flex-wrap:wrap">
+          <div><div style="font-size:10px;color:var(--text2);letter-spacing:1px">งบลูกค้า</div><div style="font-size:15px;font-weight:700;color:var(--accent2)">${fmtB(sum.budget)}</div></div>
+          <div><div style="font-size:10px;color:var(--text2);letter-spacing:1px">รายจ่าย</div><div style="font-size:15px;font-weight:700;color:var(--red)">${fmtB(sum.expense)}</div></div>
+          <div><div style="font-size:10px;color:var(--text2);letter-spacing:1px">กำไร</div><div style="font-size:17px;font-weight:800;color:${sum.profit>=0?'var(--green)':'var(--red)'}">${fmtB(sum.profit)}</div></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+        <button class="btn btn-sm btn-outline" onclick="openCalcDraft('${d.id}')">✏️ แก้ไข</button>
+        <button class="btn btn-sm btn-outline" onclick="duplicateCalcDraft('${d.id}')">📋 สำเนา</button>
+        <button class="btn btn-sm btn-green" onclick="convertCalcToProject('${d.id}')">🚀 แปลงเป็นโปรเจกต์</button>
+        <button class="btn btn-sm btn-red" onclick="deleteCalcDraft('${d.id}')">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function calcDraftSummary(d){
+  const dur = parseFloat(d.duration)||0;
+  const budgetRaw = parseFloat(d.budgetRate)||0;
+  const budget = (d.budgetType==='per-minute' && dur>0) ? budgetRaw*dur : budgetRaw;
+  let expense = 0;
+  Object.entries(d.cats||{}).forEach(([k,c])=>{
+    const rate = parseFloat(c.rate)||0;
+    const ppl = parseInt(c.ppl)||1;
+    const tax = parseFloat(c.tax)||0;
+    const base = (c.unit==='per-minute' && dur>0) ? rate*dur : rate;
+    const total = base * ppl;
+    const afterTax = total * (1 - tax/100);
+    expense += afterTax;
+  });
+  return { budget:Math.round(budget), expense:Math.round(expense), profit:Math.round(budget-expense) };
+}
+
+function openCalcDraft(id){
+  if(id){
+    const d = getCalcDrafts().find(x=>x.id===id);
+    if(!d){toast('ไม่พบแบบร่าง','error');return;}
+    _calcEditing = JSON.parse(JSON.stringify(d));
+  } else {
+    _calcEditing = newCalcDraft();
+  }
+  renderCalcModal();
+  openModal('modal-calc');
+}
+
+function renderCalcModal(){
+  const d = _calcEditing; if(!d) return;
+  const body = document.getElementById('calc-modal-body'); if(!body) return;
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:12px">
+      <div class="form-group" style="margin:0">
+        <label class="form-label">ชื่อแบบร่าง (ไม่บังคับ)</label>
+        <input class="form-input" id="calc-name" value="${(d.name||'').replace(/"/g,'&quot;')}" placeholder="เช่น JW15 ลองคิดราคา" oninput="_calcEditing.name=this.value">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Budget จากลูกค้า</label>
+        <div style="display:flex;gap:6px">
+          <select class="form-input form-select" id="calc-btype" style="width:90px;padding:10px 26px 10px 10px" onchange="_calcEditing.budgetType=this.value;renderCalcSummary()">
+            <option value="flat" ${d.budgetType==='flat'?'selected':''}>เหมา</option>
+            <option value="per-minute" ${d.budgetType==='per-minute'?'selected':''}>นาที</option>
+          </select>
+          <input class="form-input" id="calc-bval" type="number" min="0" placeholder="0" value="${d.budgetRate||''}" style="flex:1" oninput="_calcEditing.budgetRate=parseFloat(this.value)||0;renderCalcSummary()">
+        </div>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">ความยาว (นาที)</label>
+        <input class="form-input" id="calc-dur" type="number" min="0" placeholder="0" value="${d.duration||''}" oninput="_calcEditing.duration=parseFloat(this.value)||0;renderCalcSummary();renderCalcCats()">
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px;letter-spacing:1px;text-transform:uppercase">👥 เลือกหมวดที่มีในโปรเจกต์</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px" id="calc-toggles"></div>
+    <div id="calc-cat-blocks"></div>
+    <div id="calc-summary-box" style="margin-top:14px"></div>
+  `;
+  renderCalcToggles();
+  renderCalcCats();
+  renderCalcSummary();
+}
+
+function renderCalcToggles(){
+  const el = document.getElementById('calc-toggles'); if(!el) return;
+  el.innerHTML = CALC_CATS.map(c=>{
+    const on = !!_calcEditing.cats[c.key];
+    return `<div class="cat-toggle-btn ${on?'on':''}" onclick="toggleCalcCat('${c.key}')" style="border-color:${c.color.replace('var(--','rgba(').replace(')',',.5)')};color:${c.color}">${c.label}</div>`;
+  }).join('');
+}
+
+function toggleCalcCat(key){
+  if(_calcEditing.cats[key]) delete _calcEditing.cats[key];
+  else _calcEditing.cats[key] = {rate:0, unit:'per-minute', ppl:1, tax:0};
+  renderCalcToggles(); renderCalcCats(); renderCalcSummary();
+}
+
+function renderCalcCats(){
+  const el = document.getElementById('calc-cat-blocks'); if(!el) return;
+  const dur = parseFloat(_calcEditing.duration)||0;
+  const blocks = CALC_CATS.filter(c=>_calcEditing.cats[c.key]).map(c=>{
+    const cc = _calcEditing.cats[c.key];
+    const rate = parseFloat(cc.rate)||0;
+    const ppl = parseInt(cc.ppl)||1;
+    const tax = parseFloat(cc.tax)||0;
+    const base = (cc.unit==='per-minute' && dur>0) ? rate*dur : rate;
+    const total = base * ppl;
+    const afterTax = Math.round(total * (1 - tax/100));
+    const perPerson = Math.round(base);
+    const colBg = c.color.replace('var(--','rgba(').replace(')',',.05)');
+    const colBorder = c.color.replace('var(--','rgba(').replace(')',',.3)');
+    return `<div class="cat-block" style="background:${colBg};border:1px solid ${colBorder};border-radius:11px;padding:13px 16px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-weight:700;color:${c.color}">${c.label}</span>
+        <span style="font-size:15px;font-weight:800;color:${c.color}">${tax>0?'<span style="font-size:11px;text-decoration:line-through;opacity:.5">'+fmtB(total)+'</span> → ':''}${fmtB(afterTax)}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">
+        <div>
+          <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">ราคา</label>
+          <input type="number" min="0" value="${cc.rate||''}" placeholder="0" style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcEditing.cats['${c.key}'].rate=parseFloat(this.value)||0;renderCalcCats();renderCalcSummary()">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">หน่วย</label>
+          <select style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" onchange="_calcEditing.cats['${c.key}'].unit=this.value;renderCalcCats();renderCalcSummary()">
+            <option value="per-minute" ${cc.unit==='per-minute'?'selected':''}>/นาที</option>
+            <option value="flat" ${cc.unit==='flat'?'selected':''}>เหมา</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">จำนวนคน</label>
+          <input type="number" min="1" value="${cc.ppl||1}" style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcEditing.cats['${c.key}'].ppl=parseInt(this.value)||1;renderCalcCats();renderCalcSummary()">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">หัก %</label>
+          <input type="number" min="0" max="100" value="${cc.tax||''}" placeholder="0" style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcEditing.cats['${c.key}'].tax=parseFloat(this.value)||0;renderCalcCats();renderCalcSummary()">
+        </div>
+      </div>
+      ${ppl>1?`<div style="margin-top:6px;font-size:11px;color:var(--text2)">${ppl} คน × ${fmtB(perPerson)}/คน = <strong style="color:${c.color}">${fmtB(total)}</strong>${tax>0?' (หัก '+tax+'% → '+fmtB(afterTax)+')':''}</div>`:''}
+    </div>`;
+  }).join('');
+  el.innerHTML = blocks || '<div style="padding:16px;text-align:center;color:var(--text2);font-size:13px;background:rgba(0,0,0,.2);border-radius:10px">↑ กดเลือกหมวดด้านบนเพื่อเริ่มคิดราคา</div>';
+}
+
+function renderCalcSummary(){
+  const el = document.getElementById('calc-summary-box'); if(!el) return;
+  const sum = calcDraftSummary(_calcEditing);
+  const dur = parseFloat(_calcEditing.duration)||0;
+  const budgetRaw = parseFloat(_calcEditing.budgetRate)||0;
+  const budgetCalcNote = _calcEditing.budgetType==='per-minute' && budgetRaw>0
+    ? (dur>0 ? `<span style="font-size:10px;color:var(--text2)">(${fmtB(budgetRaw)} × ${dur} นาที)</span>` : '<span style="font-size:10px;color:var(--orange)">⚠️ ใส่นาที</span>')
+    : '';
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:11px">
+    <div style="text-align:center">
+      <div style="font-size:10px;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase">งบลูกค้า</div>
+      <div style="font-size:20px;font-weight:800;color:var(--accent2);margin-top:4px">${fmtB(sum.budget)}</div>
+      ${budgetCalcNote}
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:10px;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase">รายจ่ายทีม</div>
+      <div style="font-size:20px;font-weight:800;color:var(--red);margin-top:4px">${fmtB(sum.expense)}</div>
+    </div>
+    <div style="text-align:center;border-left:1px solid var(--border2);padding-left:10px">
+      <div style="font-size:10px;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase">กำไรสุทธิ</div>
+      <div style="font-size:22px;font-weight:800;color:${sum.profit>=0?'var(--green)':'var(--red)'};margin-top:4px">${fmtB(sum.profit)}</div>
+      ${sum.budget>0?`<div style="font-size:11px;color:var(--text2);margin-top:2px">(${Math.round(sum.profit/sum.budget*100)}%)</div>`:''}
+    </div>
+  </div>`;
+}
+
+async function saveCalcDraft(){
+  if(!_calcEditing) return;
+  _calcEditing.updatedAt = new Date().toISOString();
+  const all = getCalcDrafts();
+  const idx = all.findIndex(x=>x.id===_calcEditing.id);
+  if(idx>=0) all[idx] = _calcEditing;
+  else all.unshift(_calcEditing);
+  await saveCalcDrafts(all);
+  closeModal('modal-calc');
+  renderCalcList();
+  toast('💾 บันทึกแบบร่างแล้ว','success');
+}
+
+async function duplicateCalcDraft(id){
+  const d = getCalcDrafts().find(x=>x.id===id); if(!d) return;
+  const copy = JSON.parse(JSON.stringify(d));
+  copy.id = 'C'+Date.now();
+  copy.name = '[สำเนา] '+(d.name||'');
+  copy.createdAt = copy.updatedAt = new Date().toISOString();
+  const all = getCalcDrafts(); all.unshift(copy);
+  await saveCalcDrafts(all);
+  renderCalcList();
+  toast('📋 คัดลอกแบบร่างแล้ว','success');
+}
+
+async function deleteCalcDraft(id){
+  if(!confirm('ลบแบบร่างนี้?')) return;
+  const all = getCalcDrafts().filter(x=>x.id!==id);
+  await saveCalcDrafts(all);
+  renderCalcList();
+  toast('🗑️ ลบแล้ว','info');
+}
+
+async function convertCalcToProject(id){
+  const d = getCalcDrafts().find(x=>x.id===id); if(!d) return;
+  if(!confirm('แปลงแบบร่างนี้เป็นโปรเจกต์จริง?\n(คุณต้องเลือกคนทำงานจริงในหน้าแก้ไขโปรเจกต์ทีหลัง)')) return;
+  const sum = calcDraftSummary(d);
+  const proj = {
+    id: 'P'+Date.now(),
+    name: d.name || '(จากแบบร่าง) '+new Date().toLocaleDateString('th-TH'),
+    client: '', type: '',
+    budget: sum.budget,
+    budgetRate: parseFloat(d.budgetRate)||0,
+    budgetType: d.budgetType || 'flat',
+    duration: parseFloat(d.duration)||0,
+    date: new Date().toISOString().split('T')[0],
+    startDate: new Date().toISOString().split('T')[0],
+    deadline: '',
+    cycle: '',
+    note: d.note || '(สร้างจากแบบร่าง · กรุณาเลือกคนทำงาน)',
+    workers: [], // empty - user must select real people
+    tax: {
+      dub: d.cats.dub?.tax||0, adp: d.cats.adp?.tax||0, mix: d.cats.mix?.tax||0,
+      qc: d.cats.qc?.tax||0, sub: d.cats.sub?.tax||0, mgr: d.cats.mgr?.tax||0
+    },
+    evidenceLogs: [], snapshot: null,
+    createdAt: new Date().toISOString(),
+    projStatus: 'notstarted',
+    fromCalcId: d.id
+  };
+  await saveProjectDB(proj);
+  toast('🚀 แปลงเป็นโปรเจกต์แล้ว — ไปที่หน้าโปรเจกต์เพื่อเลือกคนทำงาน','success');
+  setTimeout(()=>{nav('projects');openEditProject(proj.id);}, 400);
+}
+
+// Real-time sync for calc drafts
+function startCalcDraftsSync(){
+  if(!_fbDatabase) return;
+  _fbDatabase.ref('calcDrafts').on('value', snap => {
+    const v = snap.exists() ? snap.val() : [];
+    ls('calc_drafts_v1', Array.isArray(v)?v:Object.values(v||{}));
+    const pg = document.getElementById('page-calc');
+    if(pg && !pg.classList.contains('hidden')) try{renderCalcList();}catch(e){}
+  });
+}
+
+// ══════════════════════════════════════════════
+// 📑 INVOICE (ใบแจ้งหนี้) — mirrors quotation
+// ══════════════════════════════════════════════
+let invItems = [];
+
+function initInvItems(){
+  invItems = [];
+  const el = document.getElementById('inv-items');
+  if(el && !el.children.length) { addInvItem(); }
+}
+function addInvItem(desc='', detail='', qty=1, unit='งาน', price=0){
+  invItems.push({desc, detail, qty, unit, price});
+  renderInvItems();
+}
+function removeInvItem(i){ invItems.splice(i,1); renderInvItems(); }
+function renderInvItems(){
+  const el = document.getElementById('inv-items'); if(!el) return;
+  el.innerHTML = invItems.map((item,i)=>`
+    <div style="border-bottom:1px solid var(--border2);padding:8px 12px">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 36px;gap:6px;align-items:center;margin-bottom:4px">
+        <input class="form-input" style="padding:6px 10px;font-size:13px" placeholder="ชื่อรายการ" value="${item.desc}"
+          oninput="if(invItems[${i}])invItems[${i}].desc=this.value">
+        <input type="number" class="form-input" style="padding:6px 8px;font-size:13px;text-align:right"
+          value="${item.price===0?'0':item.price||''}" placeholder="ราคา/หน่วย" min="0"
+          oninput="if(invItems[${i}])invItems[${i}].price=this.value===''?0:parseFloat(this.value)||0;updateInvRowTotal(${i})">
+        <input type="number" class="form-input" style="padding:6px 8px;font-size:13px;text-align:center"
+          value="${item.qty||1}" min="1" placeholder="จำนวน"
+          oninput="if(invItems[${i}])invItems[${i}].qty=parseFloat(this.value)||1;updateInvRowTotal(${i})">
+        <input class="form-input" style="padding:6px 8px;font-size:13px;text-align:center" value="${item.unit}"
+          oninput="if(invItems[${i}])invItems[${i}].unit=this.value">
+        <div style="text-align:right;font-size:13px;font-weight:700;color:var(--red)" id="inv-row-total-${i}">${fmtB((item.qty||1)*(item.price||0))}</div>
+        <button onclick="removeInvItem(${i})" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:2px 6px">✕</button>
+      </div>
+      <input class="form-input" style="padding:5px 10px;font-size:11px;color:var(--text2);background:rgba(255,255,255,.03)" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)" value="${item.detail||''}"
+        oninput="if(invItems[${i}])invItems[${i}].detail=this.value">
+    </div>`).join('') || '<div style="padding:16px;text-align:center;color:var(--text2);font-size:13px">กด ➕ เพิ่มรายการ</div>';
+  calcInvTotal();
+}
+function updateInvRowTotal(i){
+  const item = invItems[i]; if(!item) return;
+  const rowEl = document.getElementById('inv-row-total-'+i);
+  if(rowEl) rowEl.textContent = fmtB((item.qty||1)*(item.price||0));
+  calcInvTotal();
+}
+function calcInvTotal(){
+  const subtotal = invItems.reduce((a,x)=>a+(x.qty||1)*(x.price||0), 0);
+  const vat = parseFloat(document.getElementById('inv-vat')?.value)||0;
+  const vatAmt = Math.round(subtotal * vat / 100);
+  const total = subtotal + vatAmt;
+  const el = document.getElementById('inv-total');
+  if(el) el.innerHTML = vat>0
+    ? `<div style="font-size:13px;color:var(--text2);margin-bottom:2px">ก่อน VAT: ${fmtB(subtotal)}</div><div style="font-size:13px;color:var(--text2);">VAT ${vat}%: ${fmtB(vatAmt)}</div><div style="font-size:24px;font-weight:800;color:var(--red)">${fmtB(total)}</div>`
+    : `<div style="font-size:24px;font-weight:800;color:var(--red)">${fmtB(total)}</div>`;
+  return total;
+}
+function autoFillInvoice(){
+  const projId = document.getElementById('inv-proj')?.value; if(!projId) return;
+  const p = getProjects().find(x=>x.id===projId); if(!p) return;
+  document.getElementById('inv-client').value = p.client||'';
+  invItems = [];
+  if(p.budget) invItems.push({desc:p.name, qty:1, unit:'งาน', price:p.budget});
+  else invItems.push({desc:p.name, qty:1, unit:'งาน', price:0});
+  renderInvItems();
+}
+function getInvoiceData(){
+  return {
+    docNo: 'INV-' + (new Date().getFullYear()+543) + '-' + String((getDocsStore('invoices')||[]).length+1).padStart(3,'0'),
+    client: document.getElementById('inv-client')?.value.trim()||'',
+    email:  document.getElementById('inv-email')?.value.trim()||'',
+    projId: document.getElementById('inv-proj')?.value||'',
+    date:   thaiToIso(document.getElementById('inv-date')?.value)||document.getElementById('inv-date')?.value||new Date().toISOString().split('T')[0],
+    dueDate:thaiToIso(document.getElementById('inv-duedate')?.value)||document.getElementById('inv-duedate')?.value||'',
+    vat:    parseFloat(document.getElementById('inv-vat')?.value)||0,
+    note:   document.getElementById('inv-note')?.value.trim()||'',
+    items:  [...invItems],
+  };
+}
+function buildInvoiceHTML(data){
+  const { docNo, client, email, projId, date, dueDate, vat=0, note, items } = data;
+  const p = projId ? getProjects().find(x=>x.id===projId) : null;
+  const subtotal = items.reduce((a,x)=>a+(x.qty||1)*(x.price||0), 0);
+  const vatAmt = Math.round(subtotal*vat/100);
+  const total = subtotal + vatAmt;
+  const thaiDate = d => d ? new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}) : '—';
+  const rows = items.map((x,i)=>'<tr style="border-bottom:1px solid #f3f4f6;background:'+(i%2?'#fafafa':'#fff')+'">'+
+    '<td style="padding:12px 14px"><div style="font-weight:600;color:#111827">'+(x.desc||'—')+'</div>'+(x.detail?'<div style="font-size:11px;color:#9ca3af;margin-top:2px">'+x.detail+'</div>':'')+'</td>'+
+    '<td style="padding:12px 8px;text-align:center;color:#374151">'+(x.qty||1)+'</td>'+
+    '<td style="padding:12px 8px;text-align:center;color:#6b7280">'+(x.unit||'งาน')+'</td>'+
+    '<td style="padding:12px 8px;text-align:right;color:#374151">฿'+(x.price||0).toLocaleString()+'</td>'+
+    '<td style="padding:12px 14px;text-align:right;font-weight:600;color:#111827">฿'+((x.qty||1)*(x.price||0)).toLocaleString()+'</td>'+
+    '</tr>').join('');
+  const adminSig = ls('admin_signature');
+  return `<div id="printable-invoice" data-vno="${docNo}" style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:620px;margin:0 auto;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb">
+    <div style="background:#2a0d0d;padding:26px 30px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:72px;object-fit:contain;display:block">
+          <div style="color:#c9a09a;font-size:11px;margin-top:7px">penguinstudiovoice@gmail.com</div>
+        </div>
+        <div style="text-align:right">
+          <div style="color:#fff;font-size:20px;font-weight:700;letter-spacing:1px">ใบแจ้งหนี้</div>
+          <div style="color:#c9a09a;font-size:10px;margin-top:2px;letter-spacing:0.5px">INVOICE</div>
+          <div style="margin-top:10px;background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 12px">
+            <div style="color:#c9a09a;font-size:10px;letter-spacing:1px">เลขที่</div>
+            <div style="color:#fff;font-size:15px;font-weight:600">${docNo}</div>
+            <div style="color:#c9a09a;font-size:11px;margin-top:3px">${thaiDate(date)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="height:5px;background:linear-gradient(90deg,#FF4040,#FF9E00,#FFD740)"></div>
+    <div style="padding:22px 30px 0">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+        <div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">เรียกเก็บจาก</div>
+          <div style="font-size:16px;font-weight:700;color:#111827">${client||'—'}</div>
+          ${email?'<div style="font-size:12px;color:#6b7280;margin-top:3px">'+email+'</div>':''}
+        </div>
+        <div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ครบกำหนดชำระ</div>
+          <div style="font-size:15px;font-weight:700;color:#FF4040">${dueDate?thaiDate(dueDate):'ตามที่ตกลง'}</div>
+          ${p?'<div style="font-size:12px;color:#6b7280;margin-top:3px">โปรเจกต์: '+p.name+'</div>':''}
+        </div>
+      </div>
+    </div>
+    <div style="height:1px;background:#f3f4f6;margin:18px 30px"></div>
+    <div style="padding:0 30px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:#2a0d0d">
+            <th style="text-align:left;padding:10px 14px;color:#FFAA70;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase">รายการ</th>
+            <th style="text-align:center;padding:10px 8px;color:#FFAA70;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">จำนวน</th>
+            <th style="text-align:center;padding:10px 8px;color:#FFAA70;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">หน่วย</th>
+            <th style="text-align:right;padding:10px 8px;color:#FFAA70;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:95px">ราคา/หน่วย</th>
+            <th style="text-align:right;padding:10px 14px;color:#FFAA70;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:105px">รวม</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:flex-end;padding:18px 30px">
+      <div style="min-width:240px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6">
+          <span style="font-size:13px;color:#6b7280">ราคารวม</span>
+          <span style="font-size:13px;color:#374151">฿${subtotal.toLocaleString()}</span>
+        </div>
+        ${vat>0?'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6"><span style="font-size:13px;color:#6b7280">VAT '+vat+'%</span><span style="font-size:13px;color:#374151">฿'+vatAmt.toLocaleString()+'</span></div>':''}
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:3px solid #2a0d0d">
+          <span style="font-size:14px;font-weight:700;color:#111827">ยอดที่ต้องชำระ</span>
+          <span style="font-size:20px;font-weight:700;color:#FF4040">฿${total.toLocaleString()}</span>
+        </div>
+      </div>
+    </div>
+    ${note?'<div style="padding:0 30px 10px;font-size:11px;color:#6b7280"><strong>หมายเหตุ:</strong> '+note+'</div>':''}
+    <div style="padding:0 30px 26px">
+      <div style="width:220px;margin-left:auto;text-align:center">
+        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="height:44px;object-fit:contain;opacity:0.75;display:block;margin:0 auto 6px">
+        <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
+        <div style="font-size:12px;font-weight:600;color:#374151">ผู้ออกใบแจ้งหนี้ / Guin Home Studio</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(date)}</div>
+      </div>
+    </div>
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:9px 30px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:10px;color:#9ca3af">GUIN HOME STUDIO · Payment System</div>
+      <div style="display:flex;gap:5px">
+        <div style="width:6px;height:6px;border-radius:50%;background:#FF4040"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#FF9E00"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#FFD740"></div>
+      </div>
+    </div>
+  </div>`;
+}
+function previewInvoice(){
+  const data = getInvoiceData();
+  if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
+  if(!data.items.length){toast('กรุณาเพิ่มรายการ','error');return;}
+  const el = document.getElementById('receipt-body');
+  if(el) el.innerHTML = buildInvoiceHTML(data);
+  window._lastReceiptCtx = { staffId:null, vNo:data.docNo, type:'invoice', email:data.email };
+  openModal('modal-receipt');
+}
+function saveAndSendInvoice(){
+  const data = getInvoiceData();
+  if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
+  if(!data.items.length){toast('กรุณาเพิ่มรายการ','error');return;}
+  if(!data.email){toast('กรุณากรอก Email ลูกค้า','error');return;}
+  const total = calcInvTotal();
+  const saved = {...data, total, createdAt: new Date().toISOString()};
+  const all = getDocsStore('invoices')||[];
+  all.push(saved);
+  saveDocsStore('invoices', all);
+
+  // แสดง popup แนบไฟล์ก่อนเปิด Gmail (เหมือน quotation)
+  const old = document.getElementById('slip-upload-modal');
+  if(old) old.remove();
+  const div = document.createElement('div');
+  div.id = 'slip-upload-modal';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
+  div.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:500px;max-width:98vw">'+
+    '<div style="font-size:17px;font-weight:800;margin-bottom:4px">🧾 ส่งใบแจ้งหนี้</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">ถึง: <strong>'+data.client+'</strong> ('+data.email+')</div>'+
+    '<div style="font-size:12px;background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.25);border-radius:8px;padding:7px 12px;margin-bottom:16px;color:var(--red)">📤 จาก: <strong>penguinstudiovoice@gmail.com</strong></div>'+
+    '<div style="margin-bottom:16px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">📄 แนบไฟล์ใบแจ้งหนี้ PDF (ถ้ามี)</div>'+
+    '<label style="cursor:pointer;display:block"><input type="file" accept="image/*,.pdf" style="display:none" id="inv-doc-input">'+
+    '<div id="inv-doc-zone" style="border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;transition:all .2s" onmouseover="this.style.borderColor=\'var(--red)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'+
+    '<div style="font-size:22px">🧾</div><div style="font-size:12px;color:var(--text2)">คลิกเพื่อเลือกไฟล์ PDF</div>'+
+    '<div id="inv-doc-label" style="margin-top:6px;color:var(--green);font-size:12px;font-weight:700"></div></div></label></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn btn-outline btn-sm" style="flex:1" onclick="document.getElementById(\'slip-upload-modal\').remove()">ยกเลิก</button>'+
+    '<button class="btn btn-outline btn-sm" style="flex:1" id="inv-send-noattach">ข้าม → เปิด Gmail</button>'+
+    '<button class="btn btn-red btn-sm" style="flex:1" id="inv-send-attach">💾 แบล็คอัพ & เปิด Gmail</button>'+
+    '</div></div>';
+  document.body.appendChild(div);
+  window._invDataPending = null;
+  div.querySelector('#inv-doc-input').addEventListener('change', function(){
+    const file = this.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e){ window._invDataPending = {base64:e.target.result, name:file.name}; document.getElementById('inv-doc-label').textContent='🧾 '+file.name; document.getElementById('inv-doc-zone').style.borderColor='var(--red)'; };
+    reader.readAsDataURL(file);
+  });
+  const openGmail = function(){
+    const subject = encodeURIComponent('ใบแจ้งหนี้ '+data.docNo+' — Guin Home Studio');
+    const body = encodeURIComponent('เรียน คุณ'+data.client+'\n\nขออนุญาตส่งใบแจ้งหนี้ '+data.docNo+' เพื่อแจ้งยอดที่ต้องชำระค่ะ\nยอดรวม: ฿'+total.toLocaleString()+(data.dueDate?'\nครบกำหนดชำระ: '+new Date(data.dueDate).toLocaleDateString('th-TH'):'')+'\n\nกรุณาตรวจสอบเอกสารในไฟล์แนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio');
+    window.open('https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm&to='+encodeURIComponent(data.email)+'&su='+subject+'&body='+body,'_blank');
+    toast('📧 เปิด Gmail แล้ว — กรุณาแนบ PDF ก่อนกดส่ง','info');
+  };
+  div.querySelector('#inv-send-noattach').onclick = function(){ div.remove(); openGmail(); };
+  div.querySelector('#inv-send-attach').onclick = function(){
+    div.remove();
+    openGmail();
+    if(window._invDataPending){ uploadToDrive('invoice', window._invDataPending.name, window._invDataPending.base64); window._invDataPending=null; }
+  };
+  renderDocsHistory();
+}
+function downloadInvoice(){
+  const data = getInvoiceData();
+  if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
+  const html = buildInvoiceHTML(data);
+  const fname = (data.docNo||'invoice')+'_'+data.client;
+  const fullHtml = '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>'+fname+'</title>'+
+    '<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">'+
+    '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Kanit,sans-serif;background:#f5f7fa;padding:32px}'+
+    '@media print{body{background:#fff;padding:0}.no-print{display:none}@page{margin:12mm;size:A4}}</style>'+
+    '</head><body>'+html+
+    '<div class="no-print" style="text-align:center;margin:24px 0">'+
+    '<button onclick="window.print()" style="padding:12px 32px;background:#FF4040;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF</button>'+
+    '</div></body></html>';
+  const w = window.open('','_blank');
+  if(w){w.document.write(fullHtml);w.document.close();w.onload=function(){setTimeout(()=>w.print(),800);};}
+}
+
+// ══════════════════════════════════════════════
 // MANAGER SYSTEM
 // ══════════════════════════════════════════════
 
@@ -6636,6 +7686,21 @@ const _origSaveStaff = window.saveStaff;
 
 
 <!-- ════ WARNING ISSUE MODAL ════ -->
+<!-- ════ CALCULATOR MODAL ════ -->
+<div id="modal-calc" class="modal-overlay hidden">
+ <div class="modal" style="width:780px">
+  <div class="modal-head">
+   <div class="modal-title">🧮 คิดคำนวนโปรเจกต์ (แบบร่าง)</div>
+   <button class="btn-close" onclick="closeModal('modal-calc')">✕</button>
+  </div>
+  <div class="modal-body" id="calc-modal-body"></div>
+  <div class="modal-foot" style="gap:8px">
+   <button class="btn btn-outline" onclick="closeModal('modal-calc')">ยกเลิก</button>
+   <button class="btn btn-blue" onclick="saveCalcDraft()">💾 บันทึกแบบร่าง</button>
+  </div>
+ </div>
+</div>
+
 <div id="modal-issue-warning" class="modal-overlay hidden">
  <div class="modal" style="width:500px">
   <div class="modal-head">
@@ -6677,6 +7742,58 @@ const _origSaveStaff = window.saveStaff;
    <button class="btn btn-outline" onclick="closeIssueWarning()">ยกเลิก</button>
    <button class="btn" id="iw-submit-btn" style="background:rgba(255,40,40,.15);border:1px solid rgba(255,40,40,.35);color:#FF4040" disabled onclick="submitWarning()">ออกใบเตือน</button>
   </div>
+ </div>
+</div>
+
+<!-- ════ APPRECIATION ISSUE MODAL ════ -->
+<div id="modal-issue-appreciation" class="modal-overlay hidden">
+ <div class="modal" style="width:500px">
+  <div class="modal-head">
+   <div class="modal-title">⭐ ออกใบชื่นชม — <span id="ia-target" style="color:#FFD93D"></span></div>
+   <button class="btn-close" onclick="closeIssueAppreciation()">✕</button>
+  </div>
+  <div class="modal-body">
+   <div class="form-group">
+    <label class="form-label">หมวดการชื่นชม *</label>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px" id="ia-cat-tabs">
+     <button class="btn btn-outline btn-sm" onclick="iaSelCat(0,this)">1. ส่งงาน/เวลา</button>
+     <button class="btn btn-outline btn-sm" onclick="iaSelCat(1,this)">2. การสื่อสาร</button>
+     <button class="btn btn-outline btn-sm" onclick="iaSelCat(2,this)">3. คุณภาพงาน</button>
+     <button class="btn btn-outline btn-sm" onclick="iaSelCat(3,this)">4. ความเป็นมืออาชีพ</button>
+     <button class="btn btn-outline btn-sm" onclick="iaSelCat(4,this)">5. ทัศนคติ/ทีม</button>
+    </div>
+    <div id="ia-sub-list" style="display:flex;flex-direction:column;gap:5px"></div>
+   </div>
+   <div class="form-group">
+    <label class="form-label">โปรเจกต์</label>
+    <div style="position:relative">
+     <input class="form-input" id="ia-proj-inp" placeholder="🔍 พิมพ์ชื่อโปรเจกต์..." oninput="iaFilterProj(this.value)" onfocus="iaShowDrop()" onblur="setTimeout(iaHideDrop,180)" autocomplete="off">
+     <div id="ia-proj-drop" style="display:none;position:absolute;z-index:999;width:100%;background:var(--card);border:1px solid rgba(255,199,0,.3);border-radius:9px;margin-top:2px;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
+    </div>
+    <div id="ia-proj-sel" style="display:none;margin-top:5px;padding:8px 12px;background:rgba(255,199,0,.1);border:1px solid rgba(255,199,0,.25);border-radius:8px;font-size:13px;color:#FFD93D;display:flex;align-items:center;justify-content:space-between">
+     <span id="ia-proj-sel-name"></span>
+     <span style="font-size:11px;color:var(--text2);cursor:pointer" onclick="iaClearProj()">✕ เปลี่ยน</span>
+    </div>
+   </div>
+   <div class="form-group"><label class="form-label">หมายเหตุ / ข้อความชื่นชมเพิ่มเติม</label><textarea class="form-input" id="ia-note" style="height:60px;resize:none" placeholder="เช่น ทำได้ดีมาก, ขอบคุณที่ช่วยทีม..."></textarea></div>
+   <div style="padding:9px 12px;background:rgba(255,199,0,.06);border:1px solid rgba(255,199,0,.2);border-radius:8px;font-size:11px;color:#D4A900">⭐ ใบชื่นชมครบ 3 ใบ = ได้รับโบนัส</div>
+  </div>
+  <div class="modal-foot">
+   <button class="btn btn-outline" onclick="closeIssueAppreciation()">ยกเลิก</button>
+   <button class="btn" id="ia-submit-btn" style="background:rgba(255,199,0,.2);border:1px solid rgba(255,199,0,.4);color:#FFD93D;font-weight:700" disabled onclick="submitAppreciation()">⭐ ออกใบชื่นชม</button>
+  </div>
+ </div>
+</div>
+
+<!-- ════ STAFF APPRECIATION DETAIL MODAL ════ -->
+<div id="modal-my-appreciations" class="modal-overlay hidden">
+ <div class="modal" style="width:480px">
+  <div class="modal-head">
+   <div class="modal-title">⭐ ใบชื่นชมของฉัน</div>
+   <button class="btn-close" onclick="closeModal('modal-my-appreciations')">✕</button>
+  </div>
+  <div class="modal-body" id="my-apprs-body"></div>
+  <div class="modal-foot"><button class="btn btn-blue" onclick="closeModal('modal-my-appreciations')">ปิด</button></div>
  </div>
 </div>
 
