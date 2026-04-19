@@ -754,7 +754,6 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
     <div class="page-actions">
      <div class="search-bar" style="margin:0;flex:1;max-width:280px"><span class="icon">🔍</span><input placeholder="ค้นหา..." id="proj-search" oninput="renderProjList()"></div>
      <button class="btn btn-blue" onclick="openNewProject()">➕ สร้างโปรเจกต์ใหม่</button>
-     <button class="btn btn-xs btn-outline" style="background:rgba(255,80,80,.1);border-color:rgba(255,80,80,.4);color:var(--red)" onclick="adminCleanDuplicates()" title="ล้างโปรเจกต์ซ้ำ">🧹 ล้างซ้ำ</button>
      <button class="btn btn-outline btn-sm" onclick="exportPaymentCSV()">⬇️ CSV</button>
     </div>
    </div>
@@ -3960,7 +3959,7 @@ async function deleteProjConfirm(id){
   const p=getProjects().find(x=>x.id===id);if(!p)return;
   const wrap=document.getElementById('toastWrap');const el=document.createElement('div');
   el.className='toast warn';el.style.cssText='min-width:320px;flex-direction:column;gap:8px;align-items:flex-start';
-  el.innerHTML=`<div>⚠️ ลบ <strong>${p.name}</strong>?</div><div style="display:flex;gap:8px;width:100%"><button class="btn btn-red btn-sm" style="flex:1" onclick="confirmDeleteProj('${id}',this.closest('.toast'))">🗑️ ยืนยันลบ</button><button class="btn btn-outline btn-sm" style="flex:1" onclick="this.closest('.toast').remove()">ยกเลิก</button></div>`;
+  el.innerHTML=`<div>⚠️ ลบ <strong>${p.name}</strong>?</div><div style="display:flex;gap:8px;width:100%"><button style="flex:1;padding:8px 14px;background:#FF4040;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-weight:700;font-size:13px;cursor:pointer" onclick="confirmDeleteProj('${id}',this.closest('.toast'))">🗑️ ยืนยันลบ</button><button style="flex:1;padding:8px 14px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:8px;font-family:Kanit;font-size:13px;cursor:pointer" onclick="this.closest('.toast').remove()">ยกเลิก</button></div>`;
   wrap.appendChild(el);setTimeout(()=>{if(el.parentNode)el.remove()},8000);
 }
 async function confirmDeleteProj(id,toastEl){
@@ -8588,7 +8587,13 @@ function renderSettings(){
   // Show system info
   const info = document.getElementById('system-info'); if(info){
     const projs = getProjects();
-    const staff = getStaffData();
+    const staffData = getStaffData();
+    // Count all staff across all categories (staff is stored as {dubbing:[], mix:[], ...})
+    const allStaffIds = new Set();
+    Object.values(staffData||{}).forEach(arr => {
+      (Array.isArray(arr)?arr:[]).forEach(s => { if(s?.id) allStaffIds.add(s.id); });
+    });
+    const staffCount = allStaffIds.size;
     const invoices = getDocsStore('invoices')||[];
     const quotations = getDocsStore('quotations')||[];
     const vouchers = getDocsStore('vouchers')||[];
@@ -8596,7 +8601,7 @@ function renderSettings(){
     const lastBk = ls('last_backup_time');
     info.innerHTML = `
       📁 โปรเจกต์: <strong style="color:var(--text)">${projs.length}</strong> รายการ<br>
-      👥 ทีมงาน: <strong style="color:var(--text)">${staff.length}</strong> คน<br>
+      👥 ทีมงาน: <strong style="color:var(--text)">${staffCount}</strong> คน<br>
       💳 บัญชีรับเงิน: <strong style="color:var(--text)">${accounts.length}</strong> บัญชี<br>
       🧾 ใบแจ้งหนี้: <strong style="color:var(--text)">${invoices.length}</strong> ฉบับ<br>
       📋 ใบเสนอราคา: <strong style="color:var(--text)">${quotations.length}</strong> ฉบับ<br>
@@ -8638,7 +8643,7 @@ function exportBackup(){
       exportedBy: currentUser?.email || 'unknown',
       data: {
         projects:         getProjects(),
-        staff:            getStaffData(),
+        staff:            ls('staff_v3') || {},
         paymentAccounts:  getPaymentAccounts(),
         docs_invoices:    getDocsStore('invoices'),
         docs_quotations:  getDocsStore('quotations'),
