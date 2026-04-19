@@ -813,6 +813,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
      </div>
      <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-outline" onclick="previewQuotation()">👁️ ดูตัวอย่าง</button>
+      <button class="btn btn-outline" onclick="saveQuotationDraft()" style="border-color:var(--orange);color:var(--orange)">📝 บันทึกเป็นดราฟ</button>
       <button class="btn btn-blue" onclick="saveAndSendQuotation()">📧 บันทึก & ส่ง Email</button>
       <button class="btn btn-outline" onclick="downloadQuotation()">⬇️ ดาวน์โหลด PDF</button>
      </div>
@@ -4848,10 +4849,10 @@ function buildQuotationHTML(data) {
       </div>
     </div>
     <div style="padding:0 30px 26px">
-      <div style="width:220px;margin-left:auto;text-align:center">
-        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="height:44px;object-fit:contain;opacity:0.75;height:56px;display:block;margin:0 auto 6px">
+      <div style="width:260px;margin-left:auto;text-align:center">
+        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="height:96px;max-width:220px;object-fit:contain;display:block;margin:0 auto 8px">
         <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
-        <div style="font-size:12px;font-weight:600;color:#374151">ผู้เสนอราคา / Guin Home Studio</div>
+        <div style="font-size:13px;font-weight:700;color:#111827">ผู้เสนอราคา / Guin Home Studio</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(date)}</div>
       </div>
     </div>
@@ -4870,7 +4871,7 @@ function buildQuotationHTML(data) {
 function getQuotationData() {
   const projIdsFromItems = [...new Set(qtItems.map(x=>x.projId).filter(Boolean))];
   return {
-    docNo: 'QT-' + (new Date().getFullYear()+543) + '-' + String((getDocsStore('quotations')||[]).length+1).padStart(3,'0'),
+    docNo: _qtEditingDocNo || ('QT-' + (new Date().getFullYear()+543) + '-' + String((getDocsStore('quotations')||[]).length+1).padStart(3,'0')),
     client: document.getElementById('qt-client')?.value.trim()||'',
     email:  document.getElementById('qt-email')?.value.trim()||'',
     projId: projIdsFromItems[0] || '',  // backward compat for buildQuotationHTML
@@ -4890,15 +4891,28 @@ function previewQuotation() {
   window._lastReceiptCtx = { staffId:null, vNo:data.docNo, type:'quotation', email:data.email };
   openModal('modal-receipt');
 }
+function saveQuotationDraft() {
+  const data = getQuotationData();
+  if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
+  if(!data.items.length){toast('กรุณาเพิ่มรายการ','error');return;}
+  const total = calcQtTotal();
+  const saved = {...data, total, createdAt: new Date().toISOString(), isDraft: true};
+  const all = (getDocsStore('quotations')||[]).filter(x => x.docNo !== data.docNo);
+  all.push(saved); saveDocsStore('quotations', all);
+  _qtEditingDocNo = null;
+  toast('📝 บันทึกเป็นดราฟแล้ว ('+data.docNo+')','success');
+  renderDocsHistory();
+}
 function saveAndSendQuotation() {
   const data = getQuotationData();
   if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
   if(!data.items.length){toast('กรุณาเพิ่มรายการ','error');return;}
   if(!data.email){toast('กรุณากรอก Email ลูกค้า','error');return;}
   const total = calcQtTotal();
-  const saved = {...data, total, createdAt: new Date().toISOString()};
-  const all = getDocsStore('quotations')||[];
+  const saved = {...data, total, createdAt: new Date().toISOString(), isDraft: false};
+  const all = (getDocsStore('quotations')||[]).filter(x => x.docNo !== data.docNo);
   all.push(saved); saveDocsStore('quotations', all);
+  _qtEditingDocNo = null;
 
   // เปิด popup แสดง From/To + อัปโหลดไฟล์
   const old = document.getElementById('slip-upload-modal');
@@ -5268,6 +5282,8 @@ function renderDocsHistory() {
       <td style="font-size:12px;color:var(--text2)">${fmtDate(d.date||d.createdAt)}</td>
       <td><div style="display:flex;gap:5px">
         <button class="btn btn-xs btn-outline" onclick="repreviewDoc('${d.type}','${d.docNo}')">👁️ ดู</button>
+        ${d.type==='invoice'?'<button class="btn btn-xs" style="background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.35);color:var(--accent2)" onclick="editInvoice(\''+d.docNo+'\')">✏️ แก้ไข</button>':''}
+        ${d.type==='quotation'?'<button class="btn btn-xs" style="background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.35);color:var(--accent2)" onclick="editQuotation(\''+d.docNo+'\')">✏️ แก้ไข</button>':''}
         <button class="btn btn-xs" style="background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.3);color:#FF6060" onclick="deleteDoc('${d.type}','${d.docNo}')">🗑️</button>
       </div></td>
     </tr>`;
@@ -5281,6 +5297,53 @@ function deleteDoc(type, docNo){
   saveDocsStore(storeKey, arr);
   renderDocsHistory();
   toast('🗑️ ลบเอกสาร '+docNo+' แล้ว','info');
+}
+
+// ── Edit an existing saved draft/sent document ──
+let _invEditingDocNo = null;
+let _qtEditingDocNo = null;
+
+function editInvoice(docNo){
+  const d = (getDocsStore('invoices')||[]).find(x=>x.docNo===docNo);
+  if(!d){ toast('ไม่พบเอกสาร','error'); return; }
+  // Switch to invoice tab first (this clears the form)
+  const invTab = document.querySelector('#docs-main-tabs .tab[onclick*="invoice"]');
+  if(invTab) switchDocsMain('invoice', invTab);
+  // Now load data into form
+  setTimeout(()=>{
+    const clientEl = document.getElementById('inv-client'); if(clientEl) clientEl.value = d.client||'';
+    const emailEl  = document.getElementById('inv-email');  if(emailEl)  emailEl.value  = d.email||'';
+    const dateEl   = document.getElementById('inv-date');   if(dateEl)   dateEl.value   = d.date ? isoToThai(d.date) : '';
+    const dueEl    = document.getElementById('inv-duedate');if(dueEl)    dueEl.value    = d.dueDate ? isoToThai(d.dueDate) : '';
+    const vatEl    = document.getElementById('inv-vat');    if(vatEl)    vatEl.value    = d.vat||0;
+    const noteEl   = document.getElementById('inv-note');   if(noteEl)   noteEl.value   = d.note||'';
+    invItems = (d.items||[]).map(x=>({...x}));
+    _invPayAccountIds = [...(d.payAccountIds||[])];
+    _invEditingDocNo = docNo;
+    renderInvItems();
+    renderInvPayChips();
+    calcInvTotal();
+    toast('✏️ โหลดเอกสาร '+docNo+' มาแก้ไข — แก้แล้วกดบันทึกใหม่ (เลขเดิม)','info');
+  }, 100);
+}
+
+function editQuotation(docNo){
+  const d = (getDocsStore('quotations')||[]).find(x=>x.docNo===docNo);
+  if(!d){ toast('ไม่พบเอกสาร','error'); return; }
+  const cliTab = document.querySelector('#docs-main-tabs .tab[onclick*="client"]');
+  if(cliTab) switchDocsMain('client', cliTab);
+  setTimeout(()=>{
+    const clientEl = document.getElementById('qt-client'); if(clientEl) clientEl.value = d.client||'';
+    const emailEl  = document.getElementById('qt-email');  if(emailEl)  emailEl.value  = d.email||'';
+    const dateEl   = document.getElementById('qt-date');   if(dateEl)   dateEl.value   = d.date ? isoToThai(d.date) : '';
+    const vatEl    = document.getElementById('qt-vat');    if(vatEl)    vatEl.value    = d.vat||0;
+    const noteEl   = document.getElementById('qt-note');   if(noteEl)   noteEl.value   = d.note||'';
+    qtItems = (d.items||[]).map(x=>({...x}));
+    _qtEditingDocNo = docNo;
+    renderQtItems();
+    calcQtTotal();
+    toast('✏️ โหลดเอกสาร '+docNo+' มาแก้ไข — แก้แล้วกดบันทึกใหม่ (เลขเดิม)','info');
+  }, 100);
 }
 
 function repreviewDoc(type, docNo) {
@@ -7486,7 +7549,7 @@ function autoFillInvoice(){} // legacy - unused
 function getInvoiceData(){
   const projIdsFromItems = [...new Set(invItems.map(x=>x.projId).filter(Boolean))];
   return {
-    docNo: 'INV-' + (new Date().getFullYear()+543) + '-' + String((getDocsStore('invoices')||[]).length+1).padStart(3,'0'),
+    docNo: _invEditingDocNo || ('INV-' + (new Date().getFullYear()+543) + '-' + String((getDocsStore('invoices')||[]).length+1).padStart(3,'0')),
     client: document.getElementById('inv-client')?.value.trim()||'',
     email:  document.getElementById('inv-email')?.value.trim()||'',
     projIds: projIdsFromItems,
@@ -7586,10 +7649,10 @@ function buildInvoiceHTML(data){
     ${note?'<div style="padding:0 30px 10px;font-size:11px;color:#6b7280"><strong>หมายเหตุ:</strong> '+note+'</div>':''}
     ${buildPaymentSectionHTML(data.payAccountIds)}
     <div style="padding:0 30px 26px">
-      <div style="width:220px;margin-left:auto;text-align:center">
-        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="height:44px;object-fit:contain;opacity:0.75;display:block;margin:0 auto 6px">
+      <div style="width:260px;margin-left:auto;text-align:center">
+        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="height:96px;max-width:220px;object-fit:contain;display:block;margin:0 auto 8px">
         <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
-        <div style="font-size:12px;font-weight:600;color:#374151">ผู้ออกใบแจ้งหนี้ / Guin Home Studio</div>
+        <div style="font-size:13px;font-weight:700;color:#111827">ผู้ออกใบแจ้งหนี้ / Guin Home Studio</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(date)}</div>
       </div>
     </div>
@@ -7618,10 +7681,12 @@ function saveInvoiceDraft(){
   if(!data.items.length){toast('กรุณาเพิ่มรายการ','error');return;}
   const total = calcInvTotal();
   const saved = {...data, total, createdAt: new Date().toISOString(), isDraft: true};
-  const all = getDocsStore('invoices')||[];
+  // Remove any existing entry with same docNo (for edit-mode), then push
+  const all = (getDocsStore('invoices')||[]).filter(x => x.docNo !== data.docNo);
   all.push(saved);
   saveDocsStore('invoices', all);
-  toast('📝 บันทึกเป็นดราฟแล้ว — ไปดูที่ "ประวัติเอกสาร"','success');
+  _invEditingDocNo = null; // clear edit mode
+  toast('📝 บันทึกเป็นดราฟแล้ว ('+data.docNo+') — ไปดูที่ "ประวัติเอกสาร"','success');
   renderDocsHistory();
 }
 
@@ -7632,9 +7697,10 @@ function saveAndSendInvoice(){
   if(!data.email){toast('กรุณากรอก Email ลูกค้า','error');return;}
   const total = calcInvTotal();
   const saved = {...data, total, createdAt: new Date().toISOString(), isDraft: false};
-  const all = getDocsStore('invoices')||[];
+  const all = (getDocsStore('invoices')||[]).filter(x => x.docNo !== data.docNo);
   all.push(saved);
   saveDocsStore('invoices', all);
+  _invEditingDocNo = null; // clear edit mode
 
   const old = document.getElementById('slip-upload-modal');
   if(old) old.remove();
