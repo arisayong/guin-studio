@@ -7630,14 +7630,14 @@ function buildInvoiceHTML(data){
           <div style="font-size:16px;font-weight:700;color:#111827">${client||'—'}</div>
           ${email?'<div style="font-size:12px;color:#6b7280;margin-top:3px">'+email+'</div>':''}
         </div>
-        <div>
+        <div style="text-align:right">
           <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ผู้ขาย</div>
-          <div style="font-size:16px;font-weight:700;color:#111827">Guin Home Studio</div>
+          <div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:10px">Guin Home Studio</div>
+          <div style="display:inline-block;text-align:left;padding:8px 12px;background:#f3f6fb;border:1px solid #e5e7eb;border-radius:6px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+            <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px;font-weight:600">ครบกำหนดชำระ</div>
+            <div style="font-size:13px;font-weight:700;color:#1565FF">${dueDate?thaiDate(dueDate):'ตามที่ตกลง'}</div>
+          </div>
         </div>
-      </div>
-      <div style="padding:10px 14px;background:#f3f6fb;border:1px solid #e5e7eb;border-radius:6px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
-        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px;font-weight:600">ครบกำหนดชำระ</div>
-        <div style="font-size:14px;font-weight:700;color:#1565FF">${dueDate?thaiDate(dueDate):'ตามที่ตกลง'}</div>
       </div>
     </div>
     <div style="height:1px;background:#f3f4f6;margin:18px 30px"></div>
