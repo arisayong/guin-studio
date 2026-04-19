@@ -3823,12 +3823,13 @@ function downloadReceiptHTML(){
   const vNo=el.dataset?.vno||'receipt';
   const html='<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>'+vNo+'</title>'+
     '<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">'+
-    '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Kanit,sans-serif;background:#f5f7fa;display:flex;justify-content:center;padding:32px}'+
+    '<style>*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}body{font-family:Kanit,sans-serif;background:#f5f7fa;display:flex;justify-content:center;padding:32px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}'+
     '.wrap{background:#fff;border-radius:12px;padding:36px;max-width:520px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.12)}'+
-    '@media print{body{background:#fff;padding:0}.wrap{box-shadow:none}.no-print{display:none}}</style>'+
+    '@media print{html,body{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}body{background:#fff;padding:0}.wrap{box-shadow:none}.no-print{display:none}}</style>'+
     '</head><body><div class="wrap">'+el.outerHTML+
     '<div class="no-print" style="margin-top:24px;text-align:center">'+
     '<button onclick="window.print()" style="padding:10px 28px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:14px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF</button>'+
+    '<div style="margin-top:10px;font-size:12px;color:#6b7280">💡 ใน popup Print → เปิด <strong>"More settings"</strong> → ติ๊ก <strong>"Background graphics"</strong></div>'+
     '</div></div></body></html>';
   const w=window.open('','_blank');
   if(w){w.document.write(html);w.document.close();w.onload=function(){setTimeout(()=>w.print(),800);};}
@@ -4706,22 +4707,32 @@ function renderQtPPList(q){
   const projs = getProjects();
   const qq = (q||'').toLowerCase().trim();
   const alreadyIds = qtItems.filter(x=>x.projId).map(x=>x.projId);
-  const filtered = projs.filter(p => {
+  let filtered = projs.filter(p => {
     if(alreadyIds.includes(p.id)) return false;
     if(!qq) return true;
     return (p.name||'').toLowerCase().includes(qq) || (p.client||'').toLowerCase().includes(qq);
+  });
+  filtered.sort((a,b)=>{
+    const aD = a.startDate || a.date || a.createdAt || '';
+    const bD = b.startDate || b.date || b.createdAt || '';
+    return bD.localeCompare(aD);
   });
   if(!filtered.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">'+(qq?'ไม่พบโปรเจกต์':'ไม่มีโปรเจกต์อื่นที่ยังไม่ได้เพิ่ม')+'</div>';return;}
   const selected = window._qtPickSelected || new Set();
   listEl.innerHTML = filtered.map(p=>{
     const isSelected = selected.has(p.id);
+    const _sd = p.startDate || p.date || p.createdAt;
+    const sdDisplay = _sd ? new Date(_sd).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '';
     return `<div onclick="toggleQtPPPick('${p.id}')" style="padding:9px 11px;border-radius:7px;cursor:pointer;border:1px solid ${isSelected?'rgba(0,180,255,.5)':'transparent'};background:${isSelected?'rgba(0,180,255,.12)':'transparent'};margin-bottom:2px;display:flex;align-items:center;gap:10px;transition:all .12s" onmouseover="if(!this.dataset.sel)this.style.background='var(--dim)'" onmouseout="if(!this.dataset.sel)this.style.background=''" ${isSelected?'data-sel="1"':''}>
       <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${isSelected?'var(--accent2)':'var(--border2)'};background:${isSelected?'var(--accent2)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .12s">
         ${isSelected?'<span style="color:#fff;font-size:11px;font-weight:800;line-height:1">✓</span>':''}
       </div>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:700;color:${isSelected?'var(--accent2)':'var(--text)'};font-size:13px">${p.name}</div>
-        ${p.client?'<div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.client+'</div>':''}
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+          <span style="font-weight:700;color:${isSelected?'var(--accent2)':'var(--text)'};font-size:13px">${p.name}</span>
+          ${sdDisplay?'<span style="font-size:10px;color:var(--orange);background:rgba(255,158,0,.12);padding:2px 8px;border-radius:10px;border:1px solid rgba(255,158,0,.3);white-space:nowrap;font-weight:600" title="วันรับงาน">📅 รับงาน '+sdDisplay+'</span>':'<span style="font-size:10px;color:var(--text2);opacity:.6;padding:2px 8px">— ไม่ระบุวันรับงาน</span>'}
+        </div>
+        ${p.client?'<div style="font-size:11px;color:var(--text2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 '+p.client+'</div>':''}
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--green);white-space:nowrap">${p.budget?fmtB(p.budget):'฿0'}</div>
     </div>`;
@@ -4792,7 +4803,7 @@ function buildQuotationHTML(data) {
     '</tr>').join('');
   const adminSig = ls('admin_signature');
   return `<div id="printable-quotation" data-vno="${docNo}" style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:620px;margin:0 auto;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb">
-    <div style="background:#0d0d2b;padding:26px 30px">
+    <div style="background:#0d0d2b;padding:26px 30px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:72px;object-fit:contain;display:block">
@@ -4809,22 +4820,25 @@ function buildQuotationHTML(data) {
         </div>
       </div>
     </div>
-    <div style="height:5px;background:linear-gradient(90deg,#1565FF,#00B4FF,#00DFA0)"></div>
+    <div style="height:5px;background:linear-gradient(90deg,#1565FF,#00B4FF,#00DFA0);-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important"></div>
     <div style="padding:22px 30px 0">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
         <div>
-          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">เสนอให้</div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ลูกค้า</div>
           <div style="font-size:16px;font-weight:700;color:#111827">${client||'—'}</div>
           ${email?'<div style="font-size:12px;color:#6b7280;margin-top:3px">'+email+'</div>':''}
         </div>
-        ${p?'<div><div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">โปรเจกต์</div><div style="font-size:14px;font-weight:600;color:#111827">'+p.name+'</div>'+(p.type?'<div style="font-size:12px;color:#6b7280;margin-top:3px">'+p.type+'</div>':'')+'</div>':'<div></div>'}
+        <div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ผู้เสนอราคา</div>
+          <div style="font-size:16px;font-weight:700;color:#111827">Guin Home Studio</div>
+        </div>
       </div>
     </div>
     <div style="height:1px;background:#f3f4f6;margin:18px 30px"></div>
     <div style="padding:0 30px">
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
-          <tr style="background:#0d0d2b">
+          <tr style="background:#0d0d2b;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
             <th style="text-align:left;padding:10px 14px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase">รายการ</th>
             <th style="text-align:center;padding:10px 8px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">จำนวน</th>
             <th style="text-align:center;padding:10px 8px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">หน่วย</th>
@@ -4968,12 +4982,12 @@ function downloadQuotation() {
   const fname = (data.docNo||'quotation')+'_'+data.client;
   const fullHtml = '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>'+fname+'</title>'+
     '<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">'+
-    '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Kanit,sans-serif;background:#f5f7fa;padding:32px}'+
-    '@media print{body{background:#fff;padding:0}.no-print{display:none}@page{margin:12mm;size:A4}}</style>'+
+    '<style>*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}body{font-family:Kanit,sans-serif;background:#f5f7fa;padding:32px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}'+
+    '@media print{html,body{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}body{background:#fff;padding:0}.no-print{display:none}@page{margin:12mm;size:A4}}</style>'+
     '</head><body>'+html+
     '<div class="no-print" style="text-align:center;margin:24px 0">'+
-
     '<button onclick="window.print()" style="padding:12px 32px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF</button>'+
+    '<div style="margin-top:10px;font-size:12px;color:#6b7280">💡 ใน popup Print → เปิด <strong>"More settings"</strong> → ติ๊ก <strong>"Background graphics"</strong> เพื่อให้สีขึ้นครบ</div>'+
     '</div></body></html>';
   const w = window.open('','_blank');
   if(w){w.document.write(fullHtml);w.document.close();w.onload=function(){setTimeout(()=>w.print(),800);};}
@@ -5108,7 +5122,7 @@ function buildVoucherHTML(projId, workerId, slot, vNo, issueDate, note) {
     <div style="padding:0 30px">
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
-          <tr style="background:#0d0d2b">
+          <tr style="background:#0d0d2b;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
             <th style="text-align:left;padding:10px 14px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase">รายการ</th>
             <th style="text-align:center;padding:10px 8px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:80px">หน่วย</th>
             <th style="text-align:right;padding:10px 14px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:120px">จำนวน</th>
@@ -5216,9 +5230,10 @@ function downloadDocHTML(bodyHtml, filename) {
 <meta charset="UTF-8"><title>${filename}</title>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Kanit',sans-serif;background:#fff;padding:20px}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}
+body{font-family:'Kanit',sans-serif;background:#fff;padding:20px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
 @media print{
+  html,body{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
   body{padding:0}
   .no-print{display:none!important}
   @page{margin:12mm;size:A4}
@@ -5227,7 +5242,7 @@ body{font-family:'Kanit',sans-serif;background:#fff;padding:20px}
 </head><body>${bodyHtml}
 <div class="no-print" style="text-align:center;margin:24px 0">
   <button onclick="window.print()" style="padding:12px 32px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF</button>
-  <p style="margin-top:8px;font-size:12px;color:#666">กด Ctrl+P หรือกดปุ่มด้านบน → เลือก "Save as PDF"</p>
+  <p style="margin-top:8px;font-size:12px;color:#666">💡 ใน popup Print → เปิด <strong>"More settings"</strong> → ติ๊ก <strong>"Background graphics"</strong> เพื่อให้สีขึ้นครบ</p>
 </div>
 </body></html>`;
   const w = window.open('','_blank');
@@ -5855,7 +5870,7 @@ function buildBillingVoucherHTML(staffId) {
     <div style="padding:0 30px">
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
-          <tr style="background:#0d0d2b">
+          <tr style="background:#0d0d2b;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
             <th style="text-align:left;padding:10px 14px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase">รายการโปรเจกต์</th>
             <th style="text-align:center;padding:10px 8px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:80px">หน่วย</th>
             <th style="text-align:right;padding:10px 14px;color:#00B4FF;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:120px">จำนวน</th>
@@ -5913,12 +5928,12 @@ function downloadBillingVoucher(staffId) {
   const fname = 'voucher_'+(s?.nickname||staffId)+'_'+period+'_'+(billingYearSelected+543);
   const fullHtml = '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>'+fname+'</title>'+
     '<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">'+
-    '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Kanit,sans-serif;background:#f5f7fa;padding:32px}'+
-    '@media print{body{background:#fff;padding:0}.no-print{display:none}@page{margin:12mm;size:A4}}</style>'+
+    '<style>*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}body{font-family:Kanit,sans-serif;background:#f5f7fa;padding:32px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}'+
+    '@media print{html,body{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}body{background:#fff;padding:0}.no-print{display:none}@page{margin:12mm;size:A4}}</style>'+
     '</head><body><div>'+html+'</div>'+
     '<div class="no-print" style="text-align:center;margin:24px 0">'+
-
     '<button onclick="window.print()" style="padding:12px 32px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF ('+fname+')</button>'+
+    '<div style="margin-top:10px;font-size:12px;color:#6b7280">💡 ใน popup Print → เปิด <strong>"More settings"</strong> → ติ๊ก <strong>"Background graphics"</strong> เพื่อให้สีขึ้นครบ</div>'+
     '</div></body></html>';
   const w = window.open('','_blank');
   if(w){ w.document.write(fullHtml); w.document.close(); w.onload=function(){setTimeout(()=>w.print(),800);}; }
@@ -7460,22 +7475,33 @@ function renderInvPPList(q){
   const projs = getProjects();
   const qq = (q||'').toLowerCase().trim();
   const alreadyIds = invItems.filter(x=>x.projId).map(x=>x.projId);
-  const filtered = projs.filter(p => {
+  let filtered = projs.filter(p => {
     if(alreadyIds.includes(p.id)) return false;
     if(!qq) return true;
     return (p.name||'').toLowerCase().includes(qq) || (p.client||'').toLowerCase().includes(qq);
+  });
+  // Sort by startDate DESC (newest first) - so user can see recent projects at top
+  filtered.sort((a,b)=>{
+    const aD = a.startDate || a.date || a.createdAt || '';
+    const bD = b.startDate || b.date || b.createdAt || '';
+    return bD.localeCompare(aD);
   });
   if(!filtered.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">'+(qq?'ไม่พบโปรเจกต์':'ไม่มีโปรเจกต์อื่นที่ยังไม่ได้เพิ่ม')+'</div>';return;}
   const selected = window._invPickSelected || new Set();
   listEl.innerHTML = filtered.map(p=>{
     const isSelected = selected.has(p.id);
+    const _sd = p.startDate || p.date || p.createdAt;
+    const sdDisplay = _sd ? new Date(_sd).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '';
     return `<div onclick="toggleInvPPPick('${p.id}')" style="padding:9px 11px;border-radius:7px;cursor:pointer;border:1px solid ${isSelected?'rgba(0,180,255,.5)':'transparent'};background:${isSelected?'rgba(0,180,255,.12)':'transparent'};margin-bottom:2px;display:flex;align-items:center;gap:10px;transition:all .12s" onmouseover="if(!this.dataset.sel)this.style.background='var(--dim)'" onmouseout="if(!this.dataset.sel)this.style.background=''" ${isSelected?'data-sel="1"':''}>
       <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${isSelected?'var(--accent2)':'var(--border2)'};background:${isSelected?'var(--accent2)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .12s">
         ${isSelected?'<span style="color:#fff;font-size:11px;font-weight:800;line-height:1">✓</span>':''}
       </div>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:700;color:${isSelected?'var(--accent2)':'var(--text)'};font-size:13px">${p.name}</div>
-        ${p.client?'<div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.client+'</div>':''}
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+          <span style="font-weight:700;color:${isSelected?'var(--accent2)':'var(--text)'};font-size:13px">${p.name}</span>
+          ${sdDisplay?'<span style="font-size:10px;color:var(--orange);background:rgba(255,158,0,.12);padding:2px 8px;border-radius:10px;border:1px solid rgba(255,158,0,.3);white-space:nowrap;font-weight:600" title="วันรับงาน">📅 รับงาน '+sdDisplay+'</span>':'<span style="font-size:10px;color:var(--text2);opacity:.6;padding:2px 8px">— ไม่ระบุวันรับงาน</span>'}
+        </div>
+        ${p.client?'<div style="font-size:11px;color:var(--text2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 '+p.client+'</div>':''}
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--green);white-space:nowrap">${p.budget?fmtB(p.budget):'฿0'}</div>
     </div>`;
@@ -7579,7 +7605,7 @@ function buildInvoiceHTML(data){
   const adminSig = ls('admin_signature');
   const projListHtml = allProjs.length ? '<div style="font-size:12px;color:#6b7280;margin-top:6px"><strong style="color:#374151">อ้างถึงโปรเจกต์:</strong> '+allProjs.map(p=>p.name).join(', ')+'</div>' : '';
   return `<div id="printable-invoice" data-vno="${docNo}" style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:620px;margin:0 auto;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb">
-    <div style="background:#0d1e3d;padding:26px 30px">
+    <div style="background:#0d1e3d;padding:26px 30px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:72px;object-fit:contain;display:block">
@@ -7596,7 +7622,7 @@ function buildInvoiceHTML(data){
         </div>
       </div>
     </div>
-    <div style="height:5px;background:linear-gradient(90deg,#1565FF,#4080FF,#70A0FF)"></div>
+    <div style="height:5px;background:linear-gradient(90deg,#1565FF,#4080FF,#70A0FF);-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important"></div>
     <div style="padding:22px 30px 0">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:14px">
         <div>
@@ -7607,22 +7633,18 @@ function buildInvoiceHTML(data){
         <div>
           <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ผู้ขาย</div>
           <div style="font-size:16px;font-weight:700;color:#111827">Guin Home Studio</div>
-          <div style="font-size:12px;color:#6b7280;margin-top:3px">penguinstudiovoice@gmail.com</div>
         </div>
       </div>
-      <div style="padding:10px 14px;background:#f3f6fb;border:1px solid #e5e7eb;border-radius:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-        <div>
-          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px;font-weight:600">ครบกำหนดชำระ</div>
-          <div style="font-size:14px;font-weight:700;color:#1565FF">${dueDate?thaiDate(dueDate):'ตามที่ตกลง'}</div>
-        </div>
-        ${projListHtml}
+      <div style="padding:10px 14px;background:#f3f6fb;border:1px solid #e5e7eb;border-radius:6px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px;font-weight:600">ครบกำหนดชำระ</div>
+        <div style="font-size:14px;font-weight:700;color:#1565FF">${dueDate?thaiDate(dueDate):'ตามที่ตกลง'}</div>
       </div>
     </div>
     <div style="height:1px;background:#f3f4f6;margin:18px 30px"></div>
     <div style="padding:0 30px">
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
-          <tr style="background:#0d1e3d">
+          <tr style="background:#0d1e3d;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
             <th style="text-align:left;padding:10px 14px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase">รายการ</th>
             <th style="text-align:center;padding:10px 8px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">จำนวน</th>
             <th style="text-align:center;padding:10px 8px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">หน่วย</th>
@@ -7752,11 +7774,12 @@ function downloadInvoice(){
   const fname = (data.docNo||'invoice')+'_'+data.client;
   const fullHtml = '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>'+fname+'</title>'+
     '<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">'+
-    '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Kanit,sans-serif;background:#f5f7fa;padding:32px}'+
-    '@media print{body{background:#fff;padding:0}.no-print{display:none}@page{margin:12mm;size:A4}}</style>'+
+    '<style>*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}body{font-family:Kanit,sans-serif;background:#f5f7fa;padding:32px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}'+
+    '@media print{html,body{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}body{background:#fff;padding:0}.no-print{display:none}@page{margin:12mm;size:A4}}</style>'+
     '</head><body>'+html+
     '<div class="no-print" style="text-align:center;margin:24px 0">'+
-    '<button onclick="window.print()" style="padding:12px 32px;background:#FF4040;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF</button>'+
+    '<button onclick="window.print()" style="padding:12px 32px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF</button>'+
+    '<div style="margin-top:10px;font-size:12px;color:#6b7280">💡 ใน popup Print → เปิด <strong>"More settings"</strong> → ติ๊ก <strong>"Background graphics"</strong> เพื่อให้สีขึ้นครบ</div>'+
     '</div></body></html>';
   const w = window.open('','_blank');
   if(w){w.document.write(fullHtml);w.document.close();w.onload=function(){setTimeout(()=>w.print(),800);};}
