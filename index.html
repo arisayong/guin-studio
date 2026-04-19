@@ -681,6 +681,26 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
     <div id="backup-history" style="margin-top:14px"></div>
    </div>
 
+   <!-- Public Staff Sync — migration helper -->
+   <div class="section-card" style="border-left:4px solid #9B6FFF;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">🔐</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:#9B6FFF">Sync รายชื่อสำหรับหน้าสมัคร</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">อัพเดท public/staff_list เพื่อให้สมาชิกใหม่สมัครได้ (จำเป็นหลังเปลี่ยน security rules)</div>
+     </div>
+    </div>
+    <div style="background:rgba(155,111,255,.06);border:1px solid rgba(155,111,255,.2);border-radius:10px;padding:14px;margin-bottom:12px">
+     <div style="font-size:12px;color:var(--text);line-height:1.7">
+      💡 <strong style="color:#9B6FFF">ทำครั้งเดียวพอ:</strong> กดปุ่มนี้หลังอัพเกรดระบบใหม่ เพื่อ copy รายชื่อทีมงานไป public path<br>
+      🔒 <strong>ปลอดภัย:</strong> copy แค่ ชื่อ + ชื่อเล่น + ประเภทงาน (ไม่ copy ธนาคาร/เมล/ข้อมูลส่วนตัว)<br>
+      ⚙️ <strong>หลังกดครั้งแรก:</strong> ระบบจะอัพเดท public list อัตโนมัติทุกครั้งที่เพิ่ม/แก้/ลบทีมงาน
+     </div>
+    </div>
+    <button class="btn" style="background:rgba(155,111,255,.15);border:1px solid rgba(155,111,255,.35);color:#9B6FFF;display:flex;align-items:center;gap:8px" onclick="syncPublicStaffList()">🔐 Sync รายชื่อสู่ Public List เดี๋ยวนี้</button>
+    <div id="public-sync-status" style="margin-top:10px"></div>
+   </div>
+
    <!-- Safe Mode section -->
    <div class="section-card" style="border-left:4px solid var(--accent2);margin-bottom:16px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
@@ -1997,6 +2017,21 @@ function saveStaffData(d){
     ['dubbing','adaptation','mix','qc','subVideo','manager'].forEach(cat=>{
       updates['staff/'+cat] = d[cat]||[];
     });
+    // Mirror to public/staff_list — flat array for registration page (no auth needed to read)
+    // Only expose minimal fields (id, name, nickname, category) — no bank/email/sensitive data
+    const publicList = [];
+    Object.entries(d||{}).forEach(([cat,arr])=>{
+      (Array.isArray(arr)?arr:Object.values(arr||{})).filter(Boolean).forEach(s=>{
+        if(!s?.id) return;
+        publicList.push({
+          id: s.id,
+          name: s.name || '',
+          nickname: s.nickname || '',
+          category: cat
+        });
+      });
+    });
+    updates['public/staff_list'] = publicList;
     _fbDatabase.ref().update(updates).catch(e=>console.warn('Staff save error:',e));
   }
 }
@@ -2127,17 +2162,27 @@ async function preloadRegStaff(){
   }
   if(inp){ inp.placeholder='⏳ กำลังโหลดรายชื่อ...'; inp.disabled=true; }
   try {
-    if(_fbDatabase && _fbAuth){
-      // Anonymous sign-in เพื่อผ่าน Firebase Security Rules ก่อน login จริง
-      let anonUser = null;
-      try { const c = await _fbAuth.signInAnonymously(); anonUser = c.user; }
-      catch(e){ console.warn('anon sign-in:', e.message); }
+    if(_fbDatabase){
+      // อ่านจาก public/staff_list (path เปิดให้อ่านได้โดยไม่ต้อง auth)
+      // ไม่ต้องใช้ anonymous sign-in อีกต่อไป ป้องกัน orphan anonymous users สะสม
       try {
-        const snap = await _fbDatabase.ref('staff').get();
-        if(snap.exists()) ls('staff_v3', snap.val());
-      } catch(e){ console.warn('staff fetch:', e.message); }
-      // Sign out anonymous ทันที ไม่กระทบ login จริง
-      if(anonUser){ try{ await _fbAuth.signOut(); }catch(e){} }
+        const snap = await _fbDatabase.ref('public/staff_list').get();
+        if(snap.exists()){
+          // public list คือ flat array ของ staff (เฉพาะข้อมูลที่จำเป็นสำหรับ register)
+          const publicList = snap.val() || [];
+          // แปลงกลับเป็น structured object เหมือน staff_v3 (แยกตาม category)
+          const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
+          (Array.isArray(publicList)?publicList:Object.values(publicList)).forEach(s => {
+            if(!s || !s.id) return;
+            const cat = s.category || 'dubbing';
+            if(!structured[cat]) structured[cat] = [];
+            structured[cat].push(s);
+          });
+          ls('staff_v3', structured);
+        } else {
+          console.warn('public/staff_list is empty — admin may need to sync staff');
+        }
+      } catch(e){ console.warn('public staff fetch:', e.message); }
     }
   } catch(e){ console.warn('preloadRegStaff error:', e.message); }
   // Deduplicate by id (staff ที่มีหลายตำแหน่งจะขึ้นแค่ชื่อเดียว)
@@ -8842,6 +8887,44 @@ function toggleSafeMode(enabled){
 (function initSafeMode(){
   try{ if(ls('safe_mode')==='1') document.body.classList.add('safe-mode'); }catch(e){}
 })();
+
+// ── SYNC PUBLIC STAFF LIST ──
+// One-time migration + manual re-sync: copies staff list to public path
+// so the registration page can read it without anonymous auth
+async function syncPublicStaffList(){
+  const statusEl = document.getElementById('public-sync-status');
+  if(!_fbDatabase){
+    if(statusEl) statusEl.innerHTML = '<div style="color:var(--red);font-size:12px;padding:8px">❌ Firebase ไม่ได้เชื่อมต่อ</div>';
+    return;
+  }
+  if(statusEl) statusEl.innerHTML = '<div style="color:var(--text2);font-size:12px;padding:8px">⏳ กำลัง sync...</div>';
+  try {
+    const d = getStaffData();
+    const publicList = [];
+    Object.entries(d||{}).forEach(([cat,arr])=>{
+      (Array.isArray(arr)?arr:Object.values(arr||{})).filter(Boolean).forEach(s=>{
+        if(!s?.id) return;
+        publicList.push({
+          id: s.id,
+          name: s.name || '',
+          nickname: s.nickname || '',
+          category: cat
+        });
+      });
+    });
+    await _fbDatabase.ref('public/staff_list').set(publicList);
+    if(statusEl) statusEl.innerHTML = `<div style="background:rgba(0,223,160,.12);border:1px solid rgba(0,223,160,.35);border-radius:9px;padding:10px 14px;font-size:12px;color:var(--green);line-height:1.6">
+      ✅ <strong>Sync เสร็จเรียบร้อย!</strong><br>
+      <span style="color:var(--text2)">Copy ${publicList.length} รายชื่อไป public/staff_list</span><br>
+      <span style="color:var(--text2)">📌 ต่อไประบบจะ auto-sync ทุกครั้งที่แก้ไขทีมงาน</span>
+    </div>`;
+    toast(`🔐 Sync เสร็จ: ${publicList.length} รายชื่อ`,'success');
+  } catch(e){
+    console.error('[syncPublicStaffList]', e);
+    if(statusEl) statusEl.innerHTML = `<div style="background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.3);border-radius:9px;padding:10px 14px;font-size:12px;color:var(--red)">❌ Sync ไม่สำเร็จ: ${e.message||e.code}</div>`;
+    toast('❌ Sync ไม่สำเร็จ: '+e.message,'error');
+  }
+}
 
 
 
