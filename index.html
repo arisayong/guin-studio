@@ -166,6 +166,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 .badge-pending{background:rgba(255,158,0,.1);color:var(--orange);border:1px solid rgba(255,158,0,.25)}
 .badge-paid{background:rgba(0,223,160,.1);color:var(--green);border:1px solid rgba(0,223,160,.25)}
 .badge-approved{background:rgba(0,180,255,.1);color:var(--cyan);border:1px solid rgba(0,180,255,.25)}
+.badge-waiting_client{background:rgba(255,215,0,.12);color:#FFD700;border:1px solid rgba(255,215,0,.35)}
 
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(6px);
@@ -242,6 +243,48 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 /* TOAST */
 .toast-wrap{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+/* Toggle switch */
+.toggle{position:relative;display:inline-block;width:52px;height:28px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;inset:0;background:rgba(150,150,150,.3);border:1px solid rgba(255,255,255,.1);transition:.3s;border-radius:14px}
+.toggle-slider:before{content:"";position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;transition:.3s;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.toggle input:checked + .toggle-slider{background:var(--accent2);border-color:var(--accent2)}
+.toggle input:checked + .toggle-slider:before{transform:translateX(24px)}
+/* Safe mode — hide money values by blurring specific elements */
+body.safe-mode .stat-value,
+body.safe-mode .my-total,
+body.safe-mode #my-paid,
+body.safe-mode #my-pending,
+body.safe-mode #qt-total,
+body.safe-mode #inv-total,
+body.safe-mode #sum-budget,
+body.safe-mode #sum-expense,
+body.safe-mode #sum-profit,
+body.safe-mode [id^="qt-row-total-"],
+body.safe-mode [id^="inv-row-total-"],
+body.safe-mode [id^="wamt-"],
+body.safe-mode .proj-sum-value,
+body.safe-mode .my-earnings-banner,
+body.safe-mode [data-money]{
+  filter:blur(8px) !important;
+  user-select:none;
+  transition:filter .15s
+}
+body.safe-mode .stat-value:hover,
+body.safe-mode .my-total:hover,
+body.safe-mode #my-paid:hover,
+body.safe-mode #my-pending:hover,
+body.safe-mode #qt-total:hover,
+body.safe-mode #inv-total:hover,
+body.safe-mode #sum-budget:hover,
+body.safe-mode #sum-expense:hover,
+body.safe-mode #sum-profit:hover,
+body.safe-mode [id^="qt-row-total-"]:hover,
+body.safe-mode [id^="inv-row-total-"]:hover,
+body.safe-mode [id^="wamt-"]:hover,
+body.safe-mode .proj-sum-value:hover,
+body.safe-mode .my-earnings-banner:hover,
+body.safe-mode [data-money]:hover{filter:blur(0) !important}
 .toast{background:var(--card2);border:1px solid var(--border);border-radius:13px;padding:13px 17px;
   font-size:13px;min-width:260px;display:flex;align-items:center;gap:10px;pointer-events:auto;
   animation:slideInR .3s ease;box-shadow:0 12px 36px rgba(0,0,0,.6)}
@@ -492,12 +535,13 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div class="nav-item" onclick="nav('payment')"><span class="nav-icon">💳</span><span>บัญชีรับเงิน</span></div>
    <div class="nav-section">ทีม</div>
    <div class="nav-item" onclick="nav('staff')"><span class="nav-icon">👥</span><span>จัดการทีม</span></div>
+   <div class="nav-section">ระบบ</div>
+   <div class="nav-item" onclick="nav('settings')"><span class="nav-icon">🛠️</span><span>ตั้งค่า & สำรองข้อมูล</span></div>
   </nav>
   <nav class="sidebar-nav hidden" id="staff-nav">
    <div class="nav-section">ของฉัน</div>
    <div class="nav-item active" onclick="nav('my-calendar')"><span class="nav-icon">📅</span><span>ปฏิทินงาน</span></div>
-   <div class="nav-item" onclick="nav('my-dashboard')"><span class="nav-icon">💰</span><span>ยอดของฉัน</span></div>
-   <div class="nav-item" onclick="nav('my-history')"><span class="nav-icon">📋</span><span>ประวัติงาน</span></div>
+   <div class="nav-item" onclick="nav('my-dashboard')"><span class="nav-icon">💰</span><span>งานของฉัน</span></div>
   </nav>
   <nav class="sidebar-nav hidden" id="manager-nav">
    <div class="nav-section">ของฉัน</div>
@@ -529,6 +573,37 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div class="page-header">
     <div class="page-title">🏠 ภาพรวมระบบ</div>
     <div class="page-subtitle">GuinStudio — อัปเดต ณ วันนี้</div>
+   </div>
+   <!-- Quick Actions Bar — ทำบ่อย ๆ คลิกเดียวถึง -->
+   <div id="quick-actions" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:18px">
+    <button onclick="openProjectModal()" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(135deg,rgba(0,180,255,.12),rgba(0,180,255,.05));border:1px solid rgba(0,180,255,.3);border-radius:12px;color:var(--text);font-family:Kanit;font-size:14px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.background='rgba(0,180,255,.18)';this.style.transform='translateY(-1px)'" onmouseout="this.style.background='';this.style.transform=''">
+     <span style="font-size:24px">➕</span>
+     <div style="flex:1">
+      <div style="font-weight:700;color:var(--accent2)">สร้างโปรเจกต์</div>
+      <div style="font-size:11px;color:var(--text2);font-weight:400">เพิ่มงานใหม่เข้าระบบ</div>
+     </div>
+    </button>
+    <button onclick="nav('queue')" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(135deg,rgba(255,158,0,.12),rgba(255,158,0,.05));border:1px solid rgba(255,158,0,.3);border-radius:12px;color:var(--text);font-family:Kanit;font-size:14px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.background='rgba(255,158,0,.18)';this.style.transform='translateY(-1px)'" onmouseout="this.style.background='';this.style.transform=''">
+     <span style="font-size:24px">💸</span>
+     <div style="flex:1">
+      <div style="font-weight:700;color:var(--orange)">ออกใบสำคัญจ่าย</div>
+      <div style="font-size:11px;color:var(--text2);font-weight:400">จ่ายเงินทีมงาน</div>
+     </div>
+    </button>
+    <button onclick="nav('docs');setTimeout(()=>{const t=document.querySelector('#docs-main-tabs .tab[onclick*=invoice]');if(t)switchDocsMain('invoice',t);},100)" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(135deg,rgba(0,223,160,.12),rgba(0,223,160,.05));border:1px solid rgba(0,223,160,.3);border-radius:12px;color:var(--text);font-family:Kanit;font-size:14px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.background='rgba(0,223,160,.18)';this.style.transform='translateY(-1px)'" onmouseout="this.style.background='';this.style.transform=''">
+     <span style="font-size:24px">🧾</span>
+     <div style="flex:1">
+      <div style="font-weight:700;color:var(--green)">สร้างใบแจ้งหนี้</div>
+      <div style="font-size:11px;color:var(--text2);font-weight:400">เรียกเก็บเงินลูกค้า</div>
+     </div>
+    </button>
+    <button onclick="nav('staff');setTimeout(()=>openStaffModal(),100)" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(135deg,rgba(155,111,255,.12),rgba(155,111,255,.05));border:1px solid rgba(155,111,255,.3);border-radius:12px;color:var(--text);font-family:Kanit;font-size:14px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.background='rgba(155,111,255,.18)';this.style.transform='translateY(-1px)'" onmouseout="this.style.background='';this.style.transform=''">
+     <span style="font-size:24px">👤</span>
+     <div style="flex:1">
+      <div style="font-weight:700;color:#9B6FFF">เพิ่มทีมงาน</div>
+      <div style="font-size:11px;color:var(--text2);font-weight:400">เพิ่มสมาชิกใหม่</div>
+     </div>
+    </button>
    </div>
    <div class="stats-grid" id="dash-stats"></div>
    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
@@ -565,6 +640,90 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
 
   <!-- ── PROJECTS ── -->
   <!-- ── CALCULATOR (คิดคำนวนโปรเจกต์ - แบบร่าง) ── -->
+  <!-- ── ⚙️ SETTINGS & BACKUP ── -->
+  <div id="page-settings" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">🛠️ ตั้งค่า & สำรองข้อมูล</div>
+    <div class="page-subtitle">จัดการความปลอดภัยของข้อมูล · ปุ่มอันตรายและทำงานไม่สามารถกู้คืนได้</div>
+   </div>
+
+   <!-- Backup section -->
+   <div class="section-card" style="border-left:4px solid var(--green);margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+     <span style="font-size:28px">💾</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:var(--green)">สำรองข้อมูล (Backup)</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">ดาวน์โหลดข้อมูลทั้งหมดเป็นไฟล์ — กู้คืนได้เมื่อต้องการ</div>
+     </div>
+    </div>
+    <div style="background:rgba(0,223,160,.06);border:1px solid rgba(0,223,160,.2);border-radius:10px;padding:14px;margin-bottom:12px">
+     <div style="font-size:12px;color:var(--text2);line-height:1.7">
+      💡 <strong style="color:var(--green)">แนะนำ:</strong> สำรองข้อมูลทุกสัปดาห์ หรือก่อนทำการแก้ไขสำคัญ<br>
+      📁 ไฟล์ที่ได้เป็น JSON ขนาดเล็ก — เก็บใน Google Drive/OneDrive/โฟลเดอร์ในเครื่อง
+     </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+     <button class="btn btn-green" onclick="exportBackup()" style="display:flex;align-items:center;gap:8px">💾 สำรองเดี๋ยวนี้ (ดาวน์โหลด)</button>
+     <button class="btn btn-outline" onclick="openRestoreModal()" style="display:flex;align-items:center;gap:8px">🔄 กู้คืนจากไฟล์สำรอง</button>
+    </div>
+    <div id="backup-history" style="margin-top:14px"></div>
+   </div>
+
+   <!-- Safe Mode section -->
+   <div class="section-card" style="border-left:4px solid var(--accent2);margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">🙈</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:var(--accent2)">Safe Mode (ซ่อนยอดเงิน)</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">ซ่อนตัวเลขทุกที่ในเว็บ — ใช้ตอนโชว์ในที่สาธารณะ</div>
+     </div>
+     <label class="toggle" style="margin-left:auto">
+      <input type="checkbox" id="safe-mode-toggle" onchange="toggleSafeMode(this.checked)">
+      <span class="toggle-slider"></span>
+     </label>
+    </div>
+    <div style="font-size:12px;color:var(--text2);padding:10px 14px;background:var(--bg2);border-radius:8px;line-height:1.6">
+     💡 เมื่อเปิด: ตัวเลขทั้งหมดจะเปลี่ยนเป็น <code style="background:rgba(0,0,0,.3);padding:2px 6px;border-radius:3px">฿***</code><br>
+     🔓 ปิดเมื่อไหร่ก็ได้ — ไม่กระทบข้อมูลจริง
+    </div>
+   </div>
+
+   <!-- Danger Zone -->
+   <div class="section-card" style="border-left:4px solid var(--red);margin-bottom:16px;background:rgba(255,64,64,.04)">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+     <span style="font-size:28px">⚠️</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:var(--red)">⚠️ Danger Zone (เขตอันตราย)</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">ปุ่มเหล่านี้ลบข้อมูลถาวรไม่กู้คืนได้ — ใช้ด้วยความระมัดระวัง</div>
+     </div>
+    </div>
+    <div style="background:rgba(255,64,64,.08);border:1px solid rgba(255,64,64,.25);border-radius:10px;padding:14px;margin-bottom:12px">
+     <div style="font-size:12px;color:var(--text);line-height:1.7">
+      ⚠️ <strong style="color:var(--red)">คำเตือน:</strong> ปุ่มในส่วนนี้จะต้องพิมพ์คำยืนยันก่อนลบทุกครั้ง<br>
+      💾 แนะนำให้ <strong style="color:var(--green)">สำรองข้อมูลก่อน</strong> เสมอ
+     </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+     <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px">
+       <div style="font-size:13px;font-weight:700">🧹 ล้างโปรเจกต์ซ้ำ</div>
+       <div style="font-size:11px;color:var(--text2);margin-top:2px">ลบโปรเจกต์ชื่อที่มี [คัดลอก] ทั้งหมด</div>
+      </div>
+      <button class="btn btn-sm btn-red" onclick="adminCleanDuplicates()">🧹 ล้างซ้ำ</button>
+     </div>
+    </div>
+   </div>
+
+   <!-- Info section -->
+   <div class="section-card" style="border-left:4px solid #8b8fa8">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+     <span style="font-size:20px">ℹ️</span>
+     <div style="font-size:14px;font-weight:700">ข้อมูลระบบ</div>
+    </div>
+    <div id="system-info" style="font-size:12px;color:var(--text2);line-height:1.8"></div>
+   </div>
+  </div>
+
   <!-- ── PAYMENT ACCOUNTS (บัญชีรับเงิน) ── -->
   <div id="page-payment" class="page hidden">
    <div class="page-header">
@@ -707,34 +866,43 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
      <div>
       <div class="page-title" id="my-welcome">สวัสดี 👋</div>
-      <div class="page-subtitle">ยอดค่าตอบแทนของคุณ</div>
+      <div class="page-subtitle">งานและยอดค่าตอบแทนของคุณ</div>
      </div>
      <div style="display:flex;align-items:center;gap:6px"><div id="my-appr-bell-wrap"></div><div id="my-warn-bell-wrap"></div></div>
     </div>
    </div>
-   <div class="my-earnings-banner">
-    <div style="font-size:12px;color:var(--text2);margin-bottom:5px;letter-spacing:1px">รับไปแล้ว</div>
-    <div class="my-total" id="my-paid">฿0</div>
-    <div style="font-size:13px;color:var(--text2);margin-top:8px">⏳ รอรับอีก: <span id="my-pending" style="color:var(--orange)">฿0</span></div>
+
+   <!-- Summary cards: 4 statuses -->
+   <div id="my-summary-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px"></div>
+
+   <!-- Filter chips -->
+   <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+     <input id="my-search" placeholder="🔍 ค้นหาชื่อโปรเจกต์..." style="flex:1;min-width:180px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;outline:none" oninput="renderMyDash()">
+     <button class="btn btn-xs btn-outline" onclick="myExportPDF()" title="ดาวน์โหลดสรุปเป็น PDF">⬇️ Export PDF</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px">
+     <span style="font-size:10px;color:var(--text2);letter-spacing:.5px;font-weight:700;min-width:50px">สถานะ:</span>
+     <div id="my-filter-status" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px">
+     <span style="font-size:10px;color:var(--text2);letter-spacing:.5px;font-weight:700;min-width:50px">ประเภท:</span>
+     <div id="my-filter-role" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+     <span style="font-size:10px;color:var(--text2);letter-spacing:.5px;font-weight:700;min-width:50px">เวลา:</span>
+     <div id="my-filter-time" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+    </div>
    </div>
+
    <div class="table-wrap">
-    <div class="table-header"><div class="table-title">📋 งานของฉัน</div></div>
-    <table><thead><tr><th>โปรเจกต์</th><th>วันที่</th><th>หน้าที่</th><th>ยอด</th><th>สถานะ</th></tr></thead><tbody id="my-proj-table"></tbody></table>
+    <div class="table-header"><div class="table-title">📋 รายการงาน (<span id="my-proj-count">0</span>)</div></div>
+    <table><thead><tr><th>โปรเจกต์</th><th>วันที่</th><th>หน้าที่</th><th>ยอด</th><th>ธนาคาร</th><th>สถานะ</th></tr></thead><tbody id="my-proj-table"></tbody></table>
    </div>
   </div>
 
-  <!-- ── MY HISTORY ── -->
-  <div id="page-my-history" class="page hidden">
-   <div class="page-header">
-    <div class="page-title">📋 ประวัติงานของฉัน</div>
-    <div class="page-actions">
-     <div class="search-bar" style="margin:0;width:260px"><span class="icon">🔍</span><input id="my-hist-search" placeholder="ค้นหาชื่อโปรเจกต์..." oninput="renderMyHistory()"></div>
-    </div>
-   </div>
-   <div class="table-wrap">
-    <table><thead><tr><th>โปรเจกต์</th><th>วันที่</th><th>หน้าที่</th><th>ยอด</th><th>ธนาคาร</th><th>สถานะ</th></tr></thead><tbody id="my-hist-table"></tbody></table>
-   </div>
-  </div>
+  <!-- Legacy page kept hidden for backward compat (redirect to dashboard) -->
+  <div id="page-my-history" class="page hidden"></div>
 
   <!-- ── MY CALENDAR ── -->
   <div id="page-my-calendar" class="page hidden">
@@ -1910,7 +2078,15 @@ document.querySelectorAll('.modal-overlay').forEach(ov=>{
   const modal = ov.querySelector('.modal');
   if(modal) modal.addEventListener('mousedown', e=>e.stopPropagation());
 });
-function statusBadge(s){return`<span class="badge badge-${s||'pending'}">${{pending:'⏳ รอจ่าย',approved:'🔵 อนุมัติ',paid:'✅ จ่ายแล้ว'}[s]||s}</span>`}
+function statusBadge(s){
+  const labels = {
+    pending: '⏳ รอจ่าย',
+    approved: '🔵 อนุมัติ',
+    waiting_client: '🟡 รอลูกค้าจ่าย',
+    paid: '✅ จ่ายแล้ว'
+  };
+  return `<span class="badge badge-${s||'pending'}">${labels[s]||s}</span>`;
+}
 function getProjExpense(p){return(p.workers||[]).reduce((a,w)=>a+(w.amount||0),0)}
 function getProjStatus(p){
   if(!p.workers||!p.workers.length)return'pending';
@@ -2610,6 +2786,113 @@ document.addEventListener('click', function(e){
 });
 // Trigger initial null so login screen shows properly
 setTimeout(()=>{if(window._authCb&&!window._mockUser)window._authCb(null)},50);
+// ══════════════════════════════════════════════
+// 📧 EMAIL VERIFICATION GATE (Security Level 2)
+// ══════════════════════════════════════════════
+// บังคับให้ verify email ก่อนเข้าใช้งาน — ป้องกันคนสุ่มสมัครแล้วเข้าระบบได้
+function showEmailVerificationScreen(fbUser){
+  // Remove any existing verification screen
+  document.getElementById('email-verify-screen')?.remove();
+
+  const screen = document.createElement('div');
+  screen.id = 'email-verify-screen';
+  screen.style.cssText = 'position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px';
+  screen.innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px 28px;width:460px;max-width:98vw;text-align:center">
+      <div style="font-size:56px;margin-bottom:10px">📧</div>
+      <div style="font-size:22px;font-weight:800;color:var(--accent2);margin-bottom:6px">กรุณายืนยันอีเมลของคุณ</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.6">
+        เพื่อความปลอดภัย คุณต้องยืนยันอีเมลก่อนใช้งาน<br>
+        <strong style="color:var(--text)">${fbUser.email}</strong>
+      </div>
+
+      <div style="background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.25);border-radius:12px;padding:14px 18px;margin-bottom:16px;text-align:left">
+        <div style="font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:8px">📬 ขั้นตอนยืนยัน:</div>
+        <div style="font-size:12px;color:var(--text);line-height:1.9">
+          <strong style="color:var(--accent2)">1.</strong> กดปุ่ม <strong>"📨 ส่งลิงก์ยืนยัน"</strong> ด้านล่าง<br>
+          <strong style="color:var(--accent2)">2.</strong> เปิดอีเมลในกล่องข้อความ (+ เช็ค <strong style="color:var(--orange)">Spam/Junk</strong>)<br>
+          <strong style="color:var(--accent2)">3.</strong> กด<strong>ลิงก์ยืนยัน</strong>ในอีเมล<br>
+          <strong style="color:var(--accent2)">4.</strong> กลับมาที่หน้านี้ → กด <strong>"✅ ฉันยืนยันแล้ว"</strong>
+        </div>
+      </div>
+
+      <div id="verify-status" style="min-height:40px;margin-bottom:12px"></div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button id="verify-send-btn" onclick="sendVerificationEmail()" style="padding:12px;background:var(--accent2);border:none;border-radius:10px;color:#fff;font-family:Kanit;font-size:14px;font-weight:700;cursor:pointer">📨 ส่งลิงก์ยืนยัน</button>
+        <button onclick="recheckEmailVerified()" style="padding:12px;background:rgba(0,223,160,.12);border:1px solid rgba(0,223,160,.35);border-radius:10px;color:var(--green);font-family:Kanit;font-size:14px;font-weight:700;cursor:pointer">✅ ฉันยืนยันแล้ว — โหลดใหม่</button>
+        <button onclick="verifyLogout()" style="padding:10px;background:transparent;border:1px solid var(--border2);border-radius:10px;color:var(--text2);font-family:Kanit;font-size:12px;cursor:pointer">🚪 ออกจากระบบ — ใช้บัญชีอื่น</button>
+      </div>
+
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border2);font-size:11px;color:var(--text2);line-height:1.5">
+        💡 หากลิงก์ยืนยันในอีเมลหมดอายุ → กดปุ่ม "📨 ส่งลิงก์ยืนยัน" อีกครั้งเพื่อรับลิงก์ใหม่
+      </div>
+    </div>`;
+  document.body.appendChild(screen);
+
+  // Track current user for the helpers
+  window._verifyingUser = fbUser;
+  // Auto-send on first show (only once per session)
+  if(!sessionStorage.getItem('verify_sent_' + fbUser.uid)){
+    setTimeout(()=>sendVerificationEmail(), 500);
+  }
+}
+
+async function sendVerificationEmail(){
+  const user = window._verifyingUser || _fbAuth?.currentUser;
+  if(!user){ toast('ไม่พบข้อมูลผู้ใช้','error'); return; }
+  const statusEl = document.getElementById('verify-status');
+  const btn = document.getElementById('verify-send-btn');
+  if(btn) btn.disabled = true;
+  if(statusEl) statusEl.innerHTML = '<div style="color:var(--text2);font-size:12px;padding:8px">⏳ กำลังส่งลิงก์ยืนยัน...</div>';
+
+  try {
+    await user.sendEmailVerification();
+    sessionStorage.setItem('verify_sent_' + user.uid, '1');
+    if(statusEl) statusEl.innerHTML = `<div style="background:rgba(0,223,160,.12);border:1px solid rgba(0,223,160,.35);border-radius:9px;padding:10px 14px;font-size:12px;color:var(--green);text-align:left;line-height:1.6">
+      ✅ <strong>ส่งลิงก์ยืนยันเรียบร้อย!</strong><br>
+      <span style="color:var(--text2)">ไปที่ ${user.email} → กดลิงก์ในอีเมล<br>⚠️ เช็คในโฟลเดอร์ Spam/Junk ด้วย</span>
+    </div>`;
+    if(btn){ btn.disabled = false; btn.textContent = '🔄 ส่งซ้ำอีกครั้ง'; }
+  } catch(e){
+    console.error('sendEmailVerification error:', e);
+    let msg = 'ไม่สามารถส่งอีเมลได้';
+    if((e.code||'').includes('too-many-requests')) msg = '⏰ ส่งบ่อยเกินไป — รอ 15-60 นาทีแล้วลองใหม่';
+    else if((e.code||'').includes('network')) msg = '🌐 เน็ตหลุด — เช็คการเชื่อมต่อ';
+    else msg = '⚠️ '+(e.message||e.code||'Unknown error');
+    if(statusEl) statusEl.innerHTML = `<div style="background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.3);border-radius:9px;padding:10px 14px;font-size:12px;color:var(--red);text-align:left">${msg}</div>`;
+    if(btn) btn.disabled = false;
+  }
+}
+
+async function recheckEmailVerified(){
+  const user = _fbAuth?.currentUser;
+  if(!user){ window.location.reload(); return; }
+  const statusEl = document.getElementById('verify-status');
+  if(statusEl) statusEl.innerHTML = '<div style="color:var(--text2);font-size:12px;padding:8px">⏳ กำลังตรวจสอบ...</div>';
+
+  try {
+    // Force reload to get latest emailVerified status
+    await user.reload();
+    if(user.emailVerified){
+      if(statusEl) statusEl.innerHTML = '<div style="color:var(--green);font-size:13px;padding:8px;font-weight:700">✅ ยืนยันแล้ว! กำลังเข้าสู่ระบบ...</div>';
+      setTimeout(()=>window.location.reload(), 1000);
+    } else {
+      if(statusEl) statusEl.innerHTML = `<div style="background:rgba(255,158,0,.1);border:1px solid rgba(255,158,0,.3);border-radius:9px;padding:10px 14px;font-size:12px;color:var(--orange);text-align:left;line-height:1.6">
+        ⚠️ <strong>ยังไม่ได้ยืนยันอีเมล</strong><br>
+        <span style="color:var(--text2)">กรุณาเปิดอีเมลและกดลิงก์ยืนยันก่อน<br>ถ้าไม่เจออีเมล — กด "📨 ส่งลิงก์ยืนยัน" อีกครั้ง</span>
+      </div>`;
+    }
+  } catch(e){
+    if(statusEl) statusEl.innerHTML = `<div style="color:var(--red);font-size:12px;padding:8px">⚠️ Error: ${e.message}</div>`;
+  }
+}
+
+function verifyLogout(){
+  if(_fbAuth) _fbAuth.signOut().then(()=>window.location.reload());
+  else window.location.reload();
+}
+
 auth.onAuthStateChanged(async(fbUser)=>{
   console.log('🔐 Auth state:', fbUser ? (fbUser.email||'anonymous') : 'null');
   // ข้าม anonymous user ที่ใช้แค่ดึง staff list ตอนสมัครสมาชิก
@@ -2617,6 +2900,19 @@ auth.onAuthStateChanged(async(fbUser)=>{
     console.log('⏩ Skipping anonymous user');
     return;
   }
+
+  // ═══ MAGIC LINK CHECK ═══
+  // If URL contains sign-in link params, let the magic link handler process it first
+  // This will sign in the user automatically if link is valid
+  try {
+    if (fbUser === null && _fbAuth?.isSignInWithEmailLink?.(window.location.href)) {
+      console.log('🔗 Detected magic link in URL, processing...');
+      await handleMagicLinkSignIn();
+      // After successful magic link sign-in, Firebase will trigger onAuthStateChanged again with the user
+      return;
+    }
+  } catch(e) { console.error('Magic link check error:', e); }
+
   const _splash = document.getElementById('app-splash');
   if(!fbUser){
     document.getElementById('app-layout').classList.add('hidden');
@@ -2625,6 +2921,28 @@ auth.onAuthStateChanged(async(fbUser)=>{
     showLoader(false);
     return;
   }
+
+  // ═══ EMAIL VERIFICATION CHECK ═══
+  // บังคับให้ verify email ก่อนเข้าใช้งาน (ตามกฎ Firebase Rules ระดับ 2)
+  // ข้อยกเว้น:
+  //   1. Admin ที่เป็น known admin (ให้ผ่านเพื่อไม่ให้ล็อกตัวเองออก)
+  //   2. User ที่เข้าผ่าน Magic Link (Firebase auto-set email_verified = true แล้ว)
+  try {
+    const emailLowerCheck = (fbUser.email||'').toLowerCase().trim();
+    const KNOWN_ADMINS_CHK = ['penguinstudiovoice@gmail.com','haruyami231@gmail.com'];
+    const isAdminBypass = KNOWN_ADMINS_CHK.includes(emailLowerCheck);
+    // Magic link users have email_verified auto-set, so this only catches sign-up/password users
+    if (!fbUser.emailVerified && !isAdminBypass) {
+      // Show verification screen — block access to app
+      document.getElementById('app-layout').classList.add('hidden');
+      document.getElementById('screen-login').classList.add('hidden');
+      if(_splash) _splash.remove();
+      showLoader(false);
+      showEmailVerificationScreen(fbUser);
+      return;
+    }
+  } catch(e) { console.error('Email verify check error:', e); }
+
   try {
     showLoader(true);
     // Build profile from Firebase Auth user directly — no DB lookup needed for first version
@@ -2651,6 +2969,10 @@ auth.onAuthStateChanged(async(fbUser)=>{
     currentUser = {uid: fbUser.uid, ...profile};
     console.log('✅ currentUser:', currentUser.email, currentUser.role);
     await enterApp();
+
+    // ═══ FORCE PASSWORD SETUP AFTER MAGIC LINK ═══
+    // If the user just logged in via magic link, prompt them to set a password
+    try { await promptForNewPasswordAfterMagicLink(); } catch(e) { console.error('Password setup error:', e); }
   } catch(e) {
     console.error('❌ enterApp error:', e);
     showLoader(false);
@@ -2857,7 +3179,7 @@ async function seedDemo(){
 // ══════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════
-const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','profit','staff','docs','proj-cal','calc','payment'];
+const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','profit','staff','docs','proj-cal','calc','payment','settings'];
 const MANAGER_PAGES=['mgr-projects','mgr-track','mgr-calendar','mgr-team'];
 function nav(page){
   const role=currentUser?.role||'staff';
@@ -2868,7 +3190,7 @@ function nav(page){
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
   const renders={
-    dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue,docs:renderDocs,'proj-cal':renderProjCal,calc:renderCalcList,payment:renderPaymentAccounts,
+    dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue,docs:renderDocs,'proj-cal':renderProjCal,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
     'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar,
     'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-calendar':renderMgrCalendar,'mgr-team':renderMgrTeam
   };
@@ -4003,6 +4325,7 @@ function renderQueue() {
     const cfg = {
       pending:  { label:'⏳ รอจ่าย',   bg:'rgba(255,158,0,.12)',  color:'var(--orange)', border:'rgba(255,158,0,.3)' },
       approved: { label:'🔵 อนุมัติแล้ว',bg:'rgba(0,180,255,.12)',  color:'var(--cyan)',   border:'rgba(0,180,255,.3)' },
+      waiting_client: { label:'🟡 รอลูกค้าจ่าย',bg:'rgba(255,215,0,.12)',color:'#FFD700',border:'rgba(255,215,0,.35)' },
       paid:     { label:'✅ จ่ายแล้ว',  bg:'rgba(0,223,160,.12)', color:'var(--green)',  border:'rgba(0,223,160,.3)' },
     };
     const s = cfg[status] || cfg.pending;
@@ -4011,14 +4334,21 @@ function renderQueue() {
   function actionBtns(pid, wid, slot, status) {
     if (status === 'pending') return `
       <div style="display:flex;gap:5px;flex-wrap:wrap">
-        <button class="btn btn-xs btn-cyan" onclick="qApprove('${pid}','${wid}','${slot}')">🔵 อนุมัติ</button>
-        <button class="btn btn-xs btn-green" onclick="qPay('${pid}','${wid}','${slot}')">💸 จ่ายเลย</button>
+        <button class="btn btn-xs btn-cyan" onclick="qApprove('${pid}','${wid}','${slot}')" title="รอทำ → อนุมัติ (ทีมทำเสร็จแล้ว)">🔵 อนุมัติ</button>
+        <button class="btn btn-xs btn-green" onclick="qPay('${pid}','${wid}','${slot}')" title="ข้ามขั้นตอน — จ่ายทันที">💸 จ่ายเลย</button>
         <button class="btn btn-xs btn-outline" onclick="openPayAmt('${pid}','${wid}','${slot}')">💰 แก้ยอด</button>
       </div>`;
     if (status === 'approved') return `
       <div style="display:flex;gap:5px;flex-wrap:wrap">
-        <button class="btn btn-xs btn-green" style="font-weight:800" onclick="qPay('${pid}','${wid}','${slot}')">💸 จ่ายเงิน</button>
+        <button class="btn btn-xs" style="background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.35);color:#FFD700" onclick="qWaitingClient('${pid}','${wid}','${slot}')" title="อนุมัติ → รอลูกค้าจ่าย (ส่งงานแล้ว)">🟡 รอลูกค้าจ่าย</button>
+        <button class="btn btn-xs btn-green" style="font-weight:800" onclick="qPay('${pid}','${wid}','${slot}')" title="ลูกค้าจ่ายแล้ว — จ่ายทีมเลย">💸 จ่ายเงิน</button>
         <button class="btn btn-xs btn-outline" onclick="openPayAmt('${pid}','${wid}','${slot}')">💰 แก้ยอด</button>
+        <button class="btn btn-xs btn-outline" onclick="qRevert('${pid}','${wid}','${slot}')" title="ย้อนกลับ (ถ้ากดผิด)">↩️</button>
+      </div>`;
+    if (status === 'waiting_client') return `
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="btn btn-xs btn-green" style="font-weight:800" onclick="qPay('${pid}','${wid}','${slot}')" title="ลูกค้าจ่ายแล้ว — จ่ายทีมได้">💸 ลูกค้าจ่ายแล้ว — จ่ายทีม</button>
+        <button class="btn btn-xs btn-outline" onclick="qRevert('${pid}','${wid}','${slot}')" title="ย้อนกลับ">↩️</button>
       </div>`;
     if (status === 'paid') return `
       <span style="font-size:11px;color:var(--green);font-weight:700">✅ โอนแล้ว</span>`;
@@ -4186,7 +4516,32 @@ async function qApprove(projId, workerId, slot) {
   await saveProjectDB(p);
   updateQueueBadge();
   renderQueue();
-  toast('🔵 อนุมัติแล้ว — กด 💸 จ่ายเงิน เพื่อดำเนินการต่อ', 'success');
+  toast('🔵 อนุมัติแล้ว — กด "🟡 ส่งให้ลูกค้า" เมื่อรอลูกค้าจ่าย หรือ "💸 จ่ายเงิน" ถ้าพร้อมจ่ายเลย', 'success');
+}
+
+/* approved → waiting_client (รอลูกค้าจ่าย) */
+async function qWaitingClient(projId, workerId, slot) {
+  const p = getProjects().find(x => x.id === projId); if (!p) return;
+  const w = (p.workers||[]).find(x => x.id === workerId && x.slot === slot); if (!w) return;
+  w.status = 'waiting_client';
+  w.waitingClientSince = new Date().toISOString();
+  await saveProjectDB(p);
+  updateQueueBadge();
+  renderQueue();
+  toast('🟡 เปลี่ยนเป็น "รอลูกค้าจ่าย" — สต๊าฟจะเห็นสถานะนี้ด้วย', 'success');
+}
+
+/* ย้อนกลับ: waiting_client/approved → pending (ถ้ากดผิด) */
+async function qRevert(projId, workerId, slot) {
+  const p = getProjects().find(x => x.id === projId); if (!p) return;
+  const w = (p.workers||[]).find(x => x.id === workerId && x.slot === slot); if (!w) return;
+  const oldStatus = w.status;
+  w.status = 'pending';
+  delete w.waitingClientSince;
+  await saveProjectDB(p);
+  updateQueueBadge();
+  renderQueue();
+  toast('↩️ ย้อนกลับเป็น "รอจ่าย"','info');
 }
 
 /* เปิด modal จ่าย — ทำงานจาก pending หรือ approved ก็ได้ */
@@ -4486,77 +4841,140 @@ function deleteStaff(id,cat){
 // MY DASHBOARD & HISTORY (Staff View)
 // ══════════════════════════════════════════════
 function renderMyDash(){
-  if(!currentUser?.staffId)return;const s=getStaffById(currentUser.staffId);if(!s)return;
-  document.getElementById('my-welcome').textContent=`สวัสดี ${currentUser.nickname||s.nickname} 👋`;
-  renderMyWarnBell();
+  if(!currentUser?.staffId) return;
+  const s = getStaffById(currentUser.staffId); if(!s) return;
+  const welcomeEl = document.getElementById('my-welcome');
+  if(welcomeEl) welcomeEl.textContent = `สวัสดี ${currentUser.nickname||s.nickname} 👋`;
+  try{renderMyWarnBell();}catch(e){}
   try{renderMyApprBell();}catch(e){}
 
-  const projs=getProjects();let paid=0,pending=0;const items=[];
-  projs.forEach(p=>{const myWs=(p.workers||[]).filter(x=>x.id===s.id);if(!myWs.length)return;
-    myWs.forEach(w=>{
-      // w.amount คือยอดที่คำนวณแล้ว (rate × duration) ตั้งแต่ตอน save โปรเจกต์
-      const realAmt=w.amount||0;
-      if(w.status==='paid')paid+=realAmt;else pending+=realAmt;
-      const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';
-      const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
-      items.push({projName:p.name,date:fmtDate(p.date),role:(_lbl[_pre]||CATS[s.category]?.label||'')+_suf,amount:realAmt,status:w.status});
-    });
-  });
-  document.getElementById('my-paid').textContent=fmtB(paid);
-  document.getElementById('my-pending').textContent=fmtB(pending);
-  const isMobile=window.innerWidth<=768;
-  const tb=document.getElementById('my-proj-table');
-  if(!items.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:20px">ยังไม่มีงาน</td></tr>';return;}
-  if(isMobile){
-    // Card layout สำหรับมือถือ
-    tb.closest('table').style.minWidth='unset';
-    tb.innerHTML=items.map(it=>`
-      <tr><td colspan="5" style="padding:8px 4px;border:none">
-        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px">
-          <div style="font-weight:700;font-size:14px;margin-bottom:6px">${it.projName}</div>
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
-            <div style="font-size:12px;color:var(--cyan);font-weight:600">${it.role}</div>
-            <div style="font-size:15px;font-weight:800;color:var(--accent2)">${it.amount?fmtB(it.amount):'TBD'}</div>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
-            <div style="font-size:11px;color:var(--text2)">${it.date}</div>
-            <div>${statusBadge(it.status)}</div>
-          </div>
-        </div>
-      </td></tr>`).join('');
-  } else {
-    tb.closest('table').style.minWidth='';
-    tb.innerHTML=items.map(it=>`<tr>
-      <td><strong>${it.projName}</strong></td>
-      <td>${it.date}</td>
-      <td style="color:var(--cyan);font-weight:700">${it.role}</td>
-      <td style="color:var(--accent2);font-weight:700">${it.amount?fmtB(it.amount):'TBD'}</td>
-      <td>${statusBadge(it.status)}</td>
-    </tr>`).join('');
-  }
-}
+  // State: filters
+  if(!window._myFilter) window._myFilter = { status:'all', role:'all', time:'all' };
+  const f = window._myFilter;
+  const q = (document.getElementById('my-search')?.value || '').toLowerCase();
 
-function renderMyHistory(){
-  if(!currentUser?.staffId)return;const s=getStaffById(currentUser.staffId);if(!s)return;
-  const q=(document.getElementById('my-hist-search')?.value||'').toLowerCase();
-  const projs=getProjects();const items=[];
-  projs.forEach(p=>{
-    if(q&&!(p.name||'').toLowerCase().includes(q))return;
-    const myWorkers=(p.workers||[]).filter(x=>x.id===s.id);if(!myWorkers.length)return;
-    myWorkers.forEach(w=>{
-      // w.amount คือยอดที่คำนวณแล้ว ไม่ต้องคูณ duration อีก
-      const realAmt2=w.amount||0;
-      const _pre=(w.slot||'').split('-')[0];const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';
-      const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
-      items.push({projName:p.name,date:fmtDate(p.date),role:(_lbl[_pre]||CATS[s.category]?.label||'')+_suf,amount:realAmt2,bank:s.bank+' '+s.account,status:w.status});
+  // Collect all items
+  const projs = getProjects();
+  const allItems = [];
+  projs.forEach(p => {
+    const myWs = (p.workers||[]).filter(x => x.id === s.id);
+    if(!myWs.length) return;
+    myWs.forEach(w => {
+      const realAmt = w.amount || 0;
+      const _pre = (w.slot||'').split('-')[0];
+      const _suf = (w.slot||'').includes('main') ? ' · หลัก' : (w.slot||'').includes('-sub') ? ' · รอง' : '';
+      const _lbl = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+      allItems.push({
+        projName: p.name,
+        projDate: p.date,
+        date: fmtDate(p.date),
+        roleKey: _pre,
+        role: (_lbl[_pre] || CATS[s.category]?.label || '') + _suf,
+        amount: realAmt,
+        bank: s.bank + ' ' + s.account,
+        status: w.status
+      });
     });
   });
-  const isMobile=window.innerWidth<=768;
-  const tb=document.getElementById('my-hist-table');
-  if(!items.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:20px">ยังไม่มีประวัติ</td></tr>';return;}
+
+  // Summary (unfiltered — total counts)
+  let pending=0, approved=0, waitingClient=0, paid=0;
+  let pendingN=0, approvedN=0, waitingN=0, paidN=0;
+  allItems.forEach(it => {
+    if(it.status === 'paid'){ paid += it.amount; paidN++; }
+    else if(it.status === 'waiting_client'){ waitingClient += it.amount; waitingN++; }
+    else if(it.status === 'approved'){ approved += it.amount; approvedN++; }
+    else { pending += it.amount; pendingN++; }
+  });
+
+  // Render summary cards
+  const sg = document.getElementById('my-summary-grid');
+  if(sg){
+    sg.innerHTML = `
+      <div style="background:rgba(0,223,160,.08);border:1px solid rgba(0,223,160,.25);border-radius:12px;padding:14px 16px">
+        <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700;text-transform:uppercase">✅ รับไปแล้ว</div>
+        <div style="font-size:24px;font-weight:800;color:var(--green);margin-top:3px">${fmtB(paid)}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">${paidN} งาน</div>
+      </div>
+      <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.3);border-radius:12px;padding:14px 16px">
+        <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700;text-transform:uppercase">🟡 รอลูกค้าจ่าย</div>
+        <div style="font-size:24px;font-weight:800;color:#FFD700;margin-top:3px">${fmtB(waitingClient)}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">${waitingN} งาน</div>
+      </div>
+      <div style="background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.25);border-radius:12px;padding:14px 16px">
+        <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700;text-transform:uppercase">🔵 อนุมัติแล้ว</div>
+        <div style="font-size:24px;font-weight:800;color:var(--cyan);margin-top:3px">${fmtB(approved)}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">${approvedN} งาน</div>
+      </div>
+      <div style="background:rgba(255,158,0,.08);border:1px solid rgba(255,158,0,.25);border-radius:12px;padding:14px 16px">
+        <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700;text-transform:uppercase">⏳ รอจ่าย</div>
+        <div style="font-size:24px;font-weight:800;color:var(--orange);margin-top:3px">${fmtB(pending)}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">${pendingN} งาน</div>
+      </div>`;
+  }
+
+  // Render filter chips
+  function chipHtml(active, val, label){
+    return `<button onclick="myFilterSet('${val.group}','${val.key}')" style="padding:4px 11px;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer;font-family:Kanit;border:1px solid ${active?'var(--accent2)':'var(--border2)'};background:${active?'rgba(0,180,255,.15)':'transparent'};color:${active?'var(--accent2)':'var(--text2)'};transition:all .12s">${label}</button>`;
+  }
+  const fs = document.getElementById('my-filter-status');
+  if(fs){
+    fs.innerHTML = [
+      ['all','ทั้งหมด'], ['pending','⏳ รอจ่าย'], ['approved','🔵 อนุมัติ'],
+      ['waiting_client','🟡 รอลูกค้าจ่าย'], ['paid','✅ จ่ายแล้ว']
+    ].map(([k,l]) => chipHtml(f.status===k, {group:'status',key:k}, l)).join('');
+  }
+  const fr = document.getElementById('my-filter-role');
+  if(fr){
+    fr.innerHTML = [
+      ['all','ทั้งหมด'],['dub','🎤 Dubbing'],['adp','✍️ Adaptation'],['mix','🎧 Mix'],
+      ['qc','✅ QC'],['sub','🎬 Sub'],['mgr','🗂️ Manager']
+    ].map(([k,l]) => chipHtml(f.role===k, {group:'role',key:k}, l)).join('');
+  }
+  const ft = document.getElementById('my-filter-time');
+  if(ft){
+    ft.innerHTML = [
+      ['all','ทั้งหมด'],['thismonth','เดือนนี้'],['lastmonth','เดือนก่อน'],['3months','3 เดือน']
+    ].map(([k,l]) => chipHtml(f.time===k, {group:'time',key:k}, l)).join('');
+  }
+
+  // Apply filters
+  let filtered = allItems.filter(it => {
+    if(q && !(it.projName||'').toLowerCase().includes(q)) return false;
+    if(f.status !== 'all' && it.status !== f.status) return false;
+    if(f.role !== 'all' && it.roleKey !== f.role) return false;
+    if(f.time !== 'all' && it.projDate){
+      const now = new Date(); const d = new Date(it.projDate);
+      if(isNaN(d.getTime())) return true;
+      if(f.time === 'thismonth'){
+        if(!(d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth())) return false;
+      } else if(f.time === 'lastmonth'){
+        const last = new Date(now.getFullYear(), now.getMonth()-1, 1);
+        if(!(d.getFullYear()===last.getFullYear() && d.getMonth()===last.getMonth())) return false;
+      } else if(f.time === '3months'){
+        const cutoff = new Date(now.getFullYear(), now.getMonth()-3, 1);
+        if(d < cutoff) return false;
+      }
+    }
+    return true;
+  });
+  // Sort newest first
+  filtered.sort((a,b) => (b.projDate||'').localeCompare(a.projDate||''));
+
+  // Update count
+  const cntEl = document.getElementById('my-proj-count');
+  if(cntEl) cntEl.textContent = filtered.length;
+
+  const isMobile = window.innerWidth <= 768;
+  const tb = document.getElementById('my-proj-table');
+  if(!tb) return;
+  if(!filtered.length){
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:30px">' + (allItems.length?'ไม่พบรายการตามเงื่อนไข — ลองเปลี่ยน filter':'ยังไม่มีงาน') + '</td></tr>';
+    return;
+  }
   if(isMobile){
-    tb.closest('table').style.minWidth='unset';
-    tb.innerHTML=items.map(it=>`
+    tb.closest('table').style.minWidth = 'unset';
+    tb.innerHTML = filtered.map(it => `
       <tr><td colspan="6" style="padding:8px 4px;border:none">
         <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px">
           <div style="font-weight:700;font-size:14px;margin-bottom:6px">${it.projName}</div>
@@ -4571,8 +4989,8 @@ function renderMyHistory(){
         </div>
       </td></tr>`).join('');
   } else {
-    tb.closest('table').style.minWidth='';
-    tb.innerHTML=items.map(it=>`<tr>
+    tb.closest('table').style.minWidth = '';
+    tb.innerHTML = filtered.map(it => `<tr>
       <td><strong>${it.projName}</strong></td>
       <td>${it.date}</td>
       <td style="color:var(--cyan);font-weight:700">${it.role}</td>
@@ -4582,6 +5000,125 @@ function renderMyHistory(){
     </tr>`).join('');
   }
 }
+
+function myFilterSet(group, key){
+  if(!window._myFilter) window._myFilter = { status:'all', role:'all', time:'all' };
+  window._myFilter[group] = key;
+  renderMyDash();
+}
+
+// Legacy alias — nav('my-history') was in backward compat but now just redirects to dashboard
+function renderMyHistory(){ nav('my-dashboard'); }
+
+// Export PDF for staff — summary + all visible items
+function myExportPDF(){
+  if(!currentUser?.staffId){ toast('ไม่พบข้อมูล','error'); return; }
+  const s = getStaffById(currentUser.staffId); if(!s){ toast('ไม่พบข้อมูลสต๊าฟ','error'); return; }
+  // Gather all items (not filtered — for statement)
+  const projs = getProjects();
+  const items = [];
+  let totalPaid=0, totalWaiting=0, totalApproved=0, totalPending=0;
+  projs.forEach(p => {
+    const myWs = (p.workers||[]).filter(x => x.id === s.id);
+    myWs.forEach(w => {
+      const amt = w.amount||0;
+      const _pre = (w.slot||'').split('-')[0];
+      const _suf = (w.slot||'').includes('main') ? ' · หลัก' : (w.slot||'').includes('-sub') ? ' · รอง' : '';
+      const _lbl = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub',mgr:'🗂️ Manager'};
+      items.push({ name:p.name, date:fmtDate(p.date), role:(_lbl[_pre]||'')+_suf, amount:amt, status:w.status });
+      if(w.status==='paid') totalPaid+=amt;
+      else if(w.status==='waiting_client') totalWaiting+=amt;
+      else if(w.status==='approved') totalApproved+=amt;
+      else totalPending+=amt;
+    });
+  });
+  items.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  const statusLabel = st => ({pending:'รอจ่าย',approved:'อนุมัติ',waiting_client:'รอลูกค้าจ่าย',paid:'จ่ายแล้ว'})[st]||st;
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
+
+  const html = `
+    <div style="max-width:800px;margin:0 auto;background:#fff;padding:40px;font-family:Kanit,sans-serif;color:#111">
+      <div style="background:#0d1e3d;color:#fff;padding:22px 30px;margin:-40px -40px 22px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-size:20px;font-weight:800">สรุปยอดรายรับ</div>
+            <div style="font-size:11px;color:#a0c0ff;margin-top:4px">Earnings Statement</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:13px;font-weight:700">${s.name}</div>
+            <div style="font-size:11px;color:#a0c0ff;margin-top:3px">ออก: ${dateStr}</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
+        <div style="background:rgba(0,223,160,.1);border:1px solid rgba(0,223,160,.3);border-radius:8px;padding:12px 14px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:1px">✅ รับแล้ว</div>
+          <div style="font-size:22px;font-weight:800;color:#00a870;margin-top:3px">${fmtB(totalPaid)}</div>
+        </div>
+        <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.4);border-radius:8px;padding:12px 14px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:1px">🟡 รอลูกค้าจ่าย</div>
+          <div style="font-size:22px;font-weight:800;color:#b48a00;margin-top:3px">${fmtB(totalWaiting)}</div>
+        </div>
+        <div style="background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.3);border-radius:8px;padding:12px 14px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:1px">🔵 อนุมัติ</div>
+          <div style="font-size:22px;font-weight:800;color:#1565FF;margin-top:3px">${fmtB(totalApproved)}</div>
+        </div>
+        <div style="background:rgba(255,158,0,.08);border:1px solid rgba(255,158,0,.3);border-radius:8px;padding:12px 14px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:1px">⏳ รอจ่าย</div>
+          <div style="font-size:22px;font-weight:800;color:#cc7700;margin-top:3px">${fmtB(totalPending)}</div>
+        </div>
+      </div>
+      <div style="background:#f9fafb;padding:14px 18px;border-radius:8px;margin-bottom:18px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;color:#374151;font-weight:600">รวมทั้งหมด (${items.length} งาน)</span>
+          <span style="font-size:22px;font-weight:800;color:#111827">${fmtB(totalPaid+totalWaiting+totalApproved+totalPending)}</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:8px">รายการงาน</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:#0d1e3d;color:#fff;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+            <th style="padding:8px 10px;text-align:left;font-weight:600;font-size:10px;text-transform:uppercase">โปรเจกต์</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:600;font-size:10px;text-transform:uppercase">วันที่</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:600;font-size:10px;text-transform:uppercase">หน้าที่</th>
+            <th style="padding:8px 10px;text-align:right;font-weight:600;font-size:10px;text-transform:uppercase">ยอด</th>
+            <th style="padding:8px 10px;text-align:center;font-weight:600;font-size:10px;text-transform:uppercase">สถานะ</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map((it,i)=>`<tr style="border-bottom:1px solid #e5e7eb;background:${i%2?'#fafafa':'#fff'}">
+            <td style="padding:8px 10px">${it.name}</td>
+            <td style="padding:8px 10px;color:#6b7280">${it.date}</td>
+            <td style="padding:8px 10px;color:#1565FF;font-weight:600">${it.role}</td>
+            <td style="padding:8px 10px;text-align:right;font-weight:700;color:#111">${fmtB(it.amount)}</td>
+            <td style="padding:8px 10px;text-align:center;font-size:10px;color:#6b7280">${statusLabel(it.status)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <div style="margin-top:30px;padding-top:18px;border-top:2px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center">
+        GUIN HOME STUDIO · Earnings Statement · Generated ${dateStr}
+      </div>
+    </div>
+  `;
+
+  const fname = `earnings_${s.nickname||s.id}_${today.toISOString().split('T')[0]}`;
+  const fullHtml = '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>'+fname+'</title>'+
+    '<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">'+
+    '<style>*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}body{font-family:Kanit,sans-serif;background:#f5f7fa;padding:32px}'+
+    '@media print{html,body{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}body{background:#fff;padding:0}.no-print{display:none}@page{margin:12mm;size:A4}}</style>'+
+    '</head><body>'+html+
+    '<div class="no-print" style="text-align:center;margin:24px 0">'+
+    '<button onclick="window.print()" style="padding:12px 32px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF</button>'+
+    '<div style="margin-top:10px;font-size:12px;color:#6b7280">💡 ใน popup Print → เปิด <strong>"More settings"</strong> → ติ๊ก <strong>"Background graphics"</strong></div>'+
+    '</div></body></html>';
+  const w = window.open('','_blank');
+  if(w){ w.document.write(fullHtml); w.document.close(); w.onload=function(){setTimeout(()=>w.print(),800);}; }
+  toast('📄 เปิดหน้า Export — กด Print เพื่อบันทึก','info');
+}
+
+
 
 
 // ══════════════════════════════════════════════
@@ -6431,20 +6968,27 @@ async function sendPasswordReset() {
 }
 
 // ══════════════════════════════════════════════
-// ADMIN RESET STAFF PASSWORD
+// ADMIN MAGIC LINK — ส่งลิงก์เข้าสู่ระบบ (แทนการรีเซ็ตรหัสแบบเดิม)
 // ══════════════════════════════════════════════
 async function adminResetStaffPassword(email, nickname) {
   // Confirm first
   const confirmed = await new Promise(resolve => {
     const div = document.createElement('div');
     div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:5000;display:flex;align-items:center;justify-content:center;padding:16px';
-    div.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:380px;max-width:98vw;text-align:center">
-      <div style="font-size:32px;margin-bottom:10px">🔑</div>
-      <div style="font-size:16px;font-weight:700;margin-bottom:8px">รีเซ็ตรหัสผ่านให้ <span style="color:var(--accent2)">${nickname}</span>?</div>
-      <div style="font-size:13px;color:var(--text2);margin-bottom:20px">ระบบจะส่งลิงก์รีเซ็ตรหัสผ่านไปที่<br><strong style="color:var(--text)">${email}</strong></div>
+    div.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:420px;max-width:98vw;text-align:center">
+      <div style="font-size:36px;margin-bottom:10px">🔗</div>
+      <div style="font-size:17px;font-weight:700;margin-bottom:8px">ส่ง Magic Link ให้ <span style="color:var(--accent2)">${nickname}</span>?</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:8px;line-height:1.6">
+        ระบบจะส่งลิงก์ไปที่<br><strong style="color:var(--text)">${email}</strong><br>
+        <span style="color:var(--green);font-size:12px">กดลิงก์แล้วเข้าเว็บได้เลย ไม่ต้องใส่รหัส</span>
+      </div>
+      <div style="background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.2);border-radius:8px;padding:8px 12px;margin-bottom:18px;font-size:11px;color:var(--text2);line-height:1.6">
+        💡 พอ ${nickname} เข้าเว็บมาครั้งแรก ระบบจะพาไปตั้งรหัสใหม่อัตโนมัติ<br>
+        ⏱️ ลิงก์อายุ <strong style="color:var(--text)">6 ชั่วโมง</strong>
+      </div>
       <div style="display:flex;gap:10px">
         <button onclick="this.closest('[style*=fixed]').dataset.r='0'" style="flex:1;padding:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;color:var(--text);font-family:Kanit;cursor:pointer">ยกเลิก</button>
-        <button onclick="this.closest('[style*=fixed]').dataset.r='1'" style="flex:1;padding:10px;background:var(--accent2);border:none;border-radius:10px;color:#fff;font-family:Kanit;font-weight:700;cursor:pointer">📧 ส่งลิงก์</button>
+        <button onclick="this.closest('[style*=fixed]').dataset.r='1'" style="flex:1;padding:10px;background:var(--accent2);border:none;border-radius:10px;color:#fff;font-family:Kanit;font-weight:700;cursor:pointer">🔗 ส่งลิงก์</button>
       </div>
     </div>`;
     document.body.appendChild(div);
@@ -6462,23 +7006,38 @@ async function adminResetStaffPassword(email, nickname) {
 
   try {
     if (!_fbAuth) { toast('Firebase ไม่ได้เชื่อมต่อ', 'error'); return; }
-    await _fbAuth.sendPasswordResetEmail(email);
-    // Show detailed success modal with troubleshooting tips
+
+    // Action code settings for the magic link
+    const actionCodeSettings = {
+      // URL ที่สมาชิกจะถูก redirect มาหลังกดลิงก์ — กลับมาเว็บของเรานั่นเอง
+      url: window.location.origin + window.location.pathname + '?magic=1',
+      handleCodeInApp: true,
+    };
+
+    await _fbAuth.sendSignInLinkToEmail(email, actionCodeSettings);
+    // Save email locally so we can verify on redirect
+    // (แต่ save ให้ email ที่ถูกส่ง ไม่ใช่ของ admin ที่ทำการส่ง)
+    localStorage.setItem('guin3_magicLinkEmail_' + email, email);
+
+    // Show success modal with instructions
     const okModal = document.createElement('div');
     okModal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:5001;display:flex;align-items:center;justify-content:center;padding:16px';
-    okModal.innerHTML = `<div style="background:var(--card);border:1px solid rgba(0,223,160,.4);border-radius:16px;padding:24px;width:460px;max-width:98vw">
+    okModal.innerHTML = `<div style="background:var(--card);border:1px solid rgba(0,223,160,.4);border-radius:16px;padding:24px;width:480px;max-width:98vw">
       <div style="font-size:40px;text-align:center;margin-bottom:8px">✅</div>
-      <div style="font-size:17px;font-weight:800;text-align:center;margin-bottom:4px;color:var(--green)">ส่งลิงก์รีเซ็ตไปแล้ว</div>
+      <div style="font-size:17px;font-weight:800;text-align:center;margin-bottom:4px;color:var(--green)">ส่ง Magic Link ไปแล้ว</div>
       <div style="font-size:13px;text-align:center;color:var(--text2);margin-bottom:18px">ไปที่ <strong style="color:var(--text)">${email}</strong></div>
-      <div style="background:rgba(255,158,0,.1);border:1px solid rgba(255,158,0,.3);border-radius:9px;padding:12px 14px;margin-bottom:14px">
-        <div style="font-size:12px;font-weight:700;color:var(--orange);margin-bottom:6px">⚠️ ถ้า ${nickname} ไม่ได้รับอีเมล ให้บอกเขาตรวจตามนี้:</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.7">
-          1. เช็ค <strong style="color:var(--text)">Spam / Junk / โปรโมชั่น</strong> (สำคัญ!) <br>
-          2. ค้นหาคำว่า <strong style="color:var(--accent2)">"Firebase"</strong> หรือ <strong style="color:var(--accent2)">"guinhomestudio"</strong> ในเมล<br>
-          3. ผู้ส่งจะเป็น <strong style="color:var(--text)">noreply@guinhomestudio.firebaseapp.com</strong><br>
-          4. รออีก 5-15 นาที Firebase บางทีดีเลย์<br>
-          5. ลิงก์หมดอายุใน 1 ชั่วโมง — ถ้าเกินนี้ต้องส่งใหม่
+      <div style="background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.25);border-radius:9px;padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:var(--accent2);margin-bottom:10px">📱 บอก ${nickname} ให้ทำตามนี้:</div>
+        <div style="font-size:12px;color:var(--text);line-height:1.9">
+          <strong style="color:var(--accent2)">1.</strong> เปิดเมลจาก <em style="color:var(--text2)">noreply@guinhomestudio.firebaseapp.com</em><br>
+          <strong style="color:var(--accent2)">2.</strong> <strong>ถ้าไม่เจอ</strong> — เช็คโฟลเดอร์ <strong style="color:var(--orange)">Spam / Junk / โปรโมชั่น</strong><br>
+          <strong style="color:var(--accent2)">3.</strong> กด <strong>ลิงก์ยาว ๆ</strong> ในเมล (จาก <code style="color:var(--green)">guinhomestudio.firebaseapp.com</code>)<br>
+          <strong style="color:var(--accent2)">4.</strong> เว็บจะเปิดขึ้นมา → ระบบพาไปตั้งรหัสใหม่ให้เอง<br>
+          <strong style="color:var(--accent2)">5.</strong> ตั้งรหัสใหม่ → ใช้งานได้เลย ✨
         </div>
+      </div>
+      <div style="background:rgba(255,158,0,.08);border:1px solid rgba(255,158,0,.25);border-radius:9px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:var(--orange);line-height:1.6">
+        ⏱️ <strong>ลิงก์อายุ 6 ชั่วโมง</strong> — ถ้ากดช้าต้องให้แอดมินส่งใหม่
       </div>
       <div style="text-align:center;display:flex;gap:8px;justify-content:center">
         <button onclick="this.closest('[style*=fixed]').remove();adminResetStaffPassword('${email.replace(/'/g,"\\'")}','${nickname.replace(/'/g,"\\'")}')" style="padding:9px 16px;background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.35);border-radius:9px;color:var(--orange);font-family:Kanit;font-size:12px;font-weight:700;cursor:pointer">🔄 ส่งซ้ำอีกครั้ง</button>
@@ -6487,34 +7046,33 @@ async function adminResetStaffPassword(email, nickname) {
     </div>`;
     document.body.appendChild(okModal);
   } catch(e) {
-    console.error('[adminResetStaffPassword] Firebase error:', e);
-    // Detailed error messages for different failure modes
+    console.error('[adminResetStaffPassword/MagicLink] error:', e);
     let title, body, hint;
     const code = e.code || '';
-    if (code.includes('user-not-found')) {
-      title = '❌ ไม่พบ Email ในระบบ';
-      body = `Email <strong>${email}</strong> ยังไม่เคย login เข้าเว็บ<br>จึงยังไม่มี account ใน Firebase ให้รีเซ็ต`;
-      hint = 'ให้ <strong>'+nickname+'</strong> ไปที่หน้า login → กด "สมัครใหม่" → ใช้ Email นี้สมัครก่อน จึงจะรีเซ็ตได้ในอนาคต';
-    } else if (code.includes('invalid-email')) {
+    if (code.includes('invalid-email')) {
       title = '❌ Email รูปแบบไม่ถูกต้อง';
       body = `"${email}" สะกดผิด หรือไม่ใช่ Email`;
       hint = 'เข้าไปแก้ Email ในหน้า "จัดการทีม" แล้วลองใหม่';
     } else if (code.includes('too-many-requests')) {
       title = '⏰ ส่งบ่อยเกินไป';
       body = `Firebase block การส่งเมลชั่วคราว (ปกติ 15-60 นาที)`;
-      hint = 'รอสักพักแล้วลองใหม่ หรือให้ '+nickname+' ไปกด "ลืมรหัสผ่าน?" เองที่หน้า login';
+      hint = 'รอสักพักแล้วลองใหม่';
     } else if (code.includes('network-request-failed')) {
       title = '🌐 เน็ตหลุด';
       body = 'การเชื่อมต่ออินเทอร์เน็ตมีปัญหา';
       hint = 'เช็คเน็ตแล้วลองใหม่';
+    } else if (code.includes('unauthorized-continue-uri') || code.includes('invalid-continue-uri')) {
+      title = '⚙️ ต้องตั้งค่า Firebase ก่อน';
+      body = `Domain ของเว็บนี้ยังไม่ได้ authorize ใน Firebase Console`;
+      hint = 'Firebase Console → Authentication → Settings → Authorized domains → เพิ่ม domain ของเว็บนี้';
     } else {
       title = '⚠️ เกิดข้อผิดพลาด';
       body = `Error code: <code style="background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px">${code||'unknown'}</code><br>${e.message||''}`;
-      hint = 'ถ้าเจอบ่อย ให้เช็คที่ Firebase Console → Authentication → Templates → Password reset ว่าเปิดใช้งานอยู่ไหม';
+      hint = 'เช็คที่ Firebase Console → Authentication → Sign-in method → ต้องเปิด "Email link (passwordless sign-in)" ด้วย';
     }
     const errModal = document.createElement('div');
     errModal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:5001;display:flex;align-items:center;justify-content:center;padding:16px';
-    errModal.innerHTML = `<div style="background:var(--card);border:1px solid rgba(255,64,64,.4);border-radius:16px;padding:24px;width:420px;max-width:98vw">
+    errModal.innerHTML = `<div style="background:var(--card);border:1px solid rgba(255,64,64,.4);border-radius:16px;padding:24px;width:440px;max-width:98vw">
       <div style="font-size:17px;font-weight:800;text-align:center;margin-bottom:10px;color:var(--red)">${title}</div>
       <div style="font-size:13px;color:var(--text);line-height:1.6;margin-bottom:14px;text-align:center">${body}</div>
       <div style="background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.2);border-radius:9px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--text2);line-height:1.6">
@@ -6526,6 +7084,154 @@ async function adminResetStaffPassword(email, nickname) {
     </div>`;
     document.body.appendChild(errModal);
   }
+}
+
+// ══════════════════════════════════════════════
+// MAGIC LINK SIGN-IN HANDLER — runs on page load
+// ══════════════════════════════════════════════
+async function handleMagicLinkSignIn() {
+  // Check if current URL is a sign-in-with-email-link callback
+  if (!_fbAuth || !_fbAuth.isSignInWithEmailLink) return false;
+  if (!_fbAuth.isSignInWithEmailLink(window.location.href)) return false;
+
+  // Ask user for their email (needed to complete sign-in)
+  let email = null;
+  // Try to find stored email
+  const stored = Object.keys(localStorage).find(k => k.startsWith('guin3_magicLinkEmail_'));
+  if (stored) email = localStorage.getItem(stored);
+
+  // If not found, ask
+  if (!email) {
+    email = await new Promise(resolve => {
+      const div = document.createElement('div');
+      div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+      div.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:400px;max-width:98vw">
+        <div style="font-size:36px;text-align:center;margin-bottom:8px">🔗</div>
+        <div style="font-size:18px;font-weight:800;text-align:center;margin-bottom:6px">ยืนยันอีเมลของคุณ</div>
+        <div style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:18px;line-height:1.6">
+          เพื่อความปลอดภัย กรุณากรอก Email ของคุณอีกครั้ง<br>
+          <em style="color:var(--orange);font-size:11px">(Email เดียวกับที่ได้รับลิงก์)</em>
+        </div>
+        <input id="ml-email-confirm" type="email" placeholder="your@email.com" style="width:100%;padding:12px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:Kanit;font-size:14px;margin-bottom:14px">
+        <button onclick="const v=document.getElementById('ml-email-confirm').value.trim();if(v)this.closest('[style*=fixed]').dataset.email=v" style="width:100%;padding:12px;background:var(--accent2);border:none;border-radius:9px;color:#fff;font-family:Kanit;font-size:14px;font-weight:700;cursor:pointer">ยืนยัน</button>
+      </div>`;
+      document.body.appendChild(div);
+      document.getElementById('ml-email-confirm').focus();
+      const obs = new MutationObserver(() => {
+        if (div.dataset.email) {
+          obs.disconnect();
+          const v = div.dataset.email;
+          div.remove();
+          resolve(v);
+        }
+      });
+      obs.observe(div, {attributes:true});
+    });
+  }
+
+  if (!email) return false;
+
+  try {
+    // Complete sign-in
+    const result = await _fbAuth.signInWithEmailLink(email, window.location.href);
+    // Clean up stored email + URL
+    Object.keys(localStorage).filter(k=>k.startsWith('guin3_magicLinkEmail_')).forEach(k=>localStorage.removeItem(k));
+    // Clean URL (remove magic link params)
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    // Mark user as needing password setup
+    sessionStorage.setItem('guin3_needsPasswordSetup', '1');
+
+    toast('✅ ล็อกอินสำเร็จ — กำลังพาไปตั้งรหัสผ่านใหม่','success');
+    // promptForNewPassword will be called from the main auth flow after enterApp()
+    return true;
+  } catch(e) {
+    console.error('[handleMagicLinkSignIn] error:', e);
+    const errDiv = document.createElement('div');
+    errDiv.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+    const code = e.code || '';
+    let msg = 'ไม่สามารถเข้าสู่ระบบด้วยลิงก์นี้ได้';
+    if (code.includes('expired')) msg = '⏰ ลิงก์หมดอายุแล้ว — ขอให้แอดมินส่งลิงก์ใหม่ให้';
+    else if (code.includes('invalid')) msg = '❌ ลิงก์ไม่ถูกต้อง';
+    errDiv.innerHTML = `<div style="background:var(--card);border:1px solid rgba(255,64,64,.4);border-radius:16px;padding:28px;width:400px;max-width:98vw;text-align:center">
+      <div style="font-size:40px;margin-bottom:8px">⚠️</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:8px;color:var(--red)">${msg}</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:16px">Error: ${code||'unknown'}</div>
+      <button onclick="window.location.href=window.location.pathname" style="padding:10px 24px;background:var(--accent2);border:none;border-radius:9px;color:#fff;font-family:Kanit;font-weight:700;cursor:pointer">กลับหน้า Login</button>
+    </div>`;
+    document.body.appendChild(errDiv);
+    return false;
+  }
+}
+
+// ══════════════════════════════════════════════
+// FORCE PASSWORD SETUP — after magic link login
+// ══════════════════════════════════════════════
+async function promptForNewPasswordAfterMagicLink() {
+  if (sessionStorage.getItem('guin3_needsPasswordSetup') !== '1') return;
+  if (!_fbAuth?.currentUser) return;
+
+  const newPass = await new Promise(resolve => {
+    const div = document.createElement('div');
+    div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+    div.innerHTML = `<div style="background:var(--card);border:1px solid var(--accent2);border-radius:16px;padding:28px;width:420px;max-width:98vw">
+      <div style="font-size:42px;text-align:center;margin-bottom:6px">🔐</div>
+      <div style="font-size:18px;font-weight:800;text-align:center;margin-bottom:6px;color:var(--accent2)">ตั้งรหัสผ่านใหม่</div>
+      <div style="font-size:12px;color:var(--text2);text-align:center;margin-bottom:18px;line-height:1.6">
+        เข้าสู่ระบบสำเร็จแล้ว! 🎉<br>
+        ตั้งรหัสผ่านไว้ใช้ครั้งต่อไป (อย่างน้อย 6 ตัว)
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bottom:5px">รหัสผ่านใหม่</label>
+        <input id="ml-new-pass" type="password" placeholder="อย่างน้อย 6 ตัวอักษร" style="width:100%;padding:11px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:Kanit;font-size:14px">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bottom:5px">ยืนยันรหัสผ่าน</label>
+        <input id="ml-new-pass-confirm" type="password" placeholder="พิมพ์อีกครั้ง" style="width:100%;padding:11px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:Kanit;font-size:14px">
+      </div>
+      <div id="ml-pass-err" style="color:#FF6060;font-size:12px;margin-bottom:12px;min-height:18px"></div>
+      <button id="ml-pass-submit" style="width:100%;padding:12px;background:var(--accent2);border:none;border-radius:9px;color:#fff;font-family:Kanit;font-size:14px;font-weight:700;cursor:pointer">💾 บันทึกรหัสใหม่</button>
+      <div style="margin-top:10px;text-align:center">
+        <button id="ml-pass-skip" style="background:none;border:none;color:var(--text2);font-size:11px;cursor:pointer;font-family:Kanit;text-decoration:underline">ข้ามไปก่อน (ตั้งรหัสทีหลังใน 'โปรไฟล์ฉัน')</button>
+      </div>
+    </div>`;
+    document.body.appendChild(div);
+    setTimeout(()=>document.getElementById('ml-new-pass')?.focus(), 100);
+
+    const errEl = document.getElementById('ml-pass-err');
+    document.getElementById('ml-pass-submit').onclick = () => {
+      const p1 = document.getElementById('ml-new-pass').value;
+      const p2 = document.getElementById('ml-new-pass-confirm').value;
+      if (!p1 || p1.length < 6) { errEl.textContent = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'; return; }
+      if (p1 !== p2) { errEl.textContent = 'รหัสผ่าน 2 ช่องไม่ตรงกัน'; return; }
+      div.remove();
+      resolve(p1);
+    };
+    document.getElementById('ml-pass-skip').onclick = () => {
+      div.remove();
+      resolve(null);
+    };
+  });
+
+  sessionStorage.removeItem('guin3_needsPasswordSetup');
+
+  if (!newPass) {
+    toast('ข้ามไป — ตั้งรหัสได้ทีหลังในหน้าโปรไฟล์','info');
+    return;
+  }
+
+  try {
+    await _fbAuth.currentUser.updatePassword(newPass);
+    toast('✅ ตั้งรหัสผ่านใหม่เรียบร้อย','success');
+  } catch(e) {
+    console.error('[updatePassword] error:', e);
+    toast('⚠️ ตั้งรหัสไม่สำเร็จ: '+(e.code||e.message)+' — ลองใหม่ที่หน้าโปรไฟล์','error');
+  }
+}
+
+async function adminResetStaffPassword_OLD_DO_NOT_USE(email, nickname) {
+  // Legacy function — kept as reference only, not called anywhere
+  return;
 }
 
 // ══════════════════════════════════════════════
@@ -7869,8 +8575,252 @@ function downloadInvoice(){
 }
 
 // ══════════════════════════════════════════════
-// 💳 PAYMENT ACCOUNTS (บัญชีรับเงิน)
+// 🛠️ SETTINGS & BACKUP SYSTEM
 // ══════════════════════════════════════════════
+
+function renderSettings(){
+  // Sync safe mode toggle with saved state
+  const sm = ls('safe_mode') === '1';
+  const tgl = document.getElementById('safe-mode-toggle');
+  if(tgl) tgl.checked = sm;
+  if(sm) document.body.classList.add('safe-mode');
+
+  // Show system info
+  const info = document.getElementById('system-info'); if(info){
+    const projs = getProjects();
+    const staff = getStaffData();
+    const invoices = getDocsStore('invoices')||[];
+    const quotations = getDocsStore('quotations')||[];
+    const vouchers = getDocsStore('vouchers')||[];
+    const accounts = getPaymentAccounts();
+    const lastBk = ls('last_backup_time');
+    info.innerHTML = `
+      📁 โปรเจกต์: <strong style="color:var(--text)">${projs.length}</strong> รายการ<br>
+      👥 ทีมงาน: <strong style="color:var(--text)">${staff.length}</strong> คน<br>
+      💳 บัญชีรับเงิน: <strong style="color:var(--text)">${accounts.length}</strong> บัญชี<br>
+      🧾 ใบแจ้งหนี้: <strong style="color:var(--text)">${invoices.length}</strong> ฉบับ<br>
+      📋 ใบเสนอราคา: <strong style="color:var(--text)">${quotations.length}</strong> ฉบับ<br>
+      💸 ใบสำคัญจ่าย: <strong style="color:var(--text)">${vouchers.length}</strong> ฉบับ<br>
+      <br>
+      🕒 สำรองข้อมูลครั้งล่าสุด: <strong style="color:${lastBk?'var(--green)':'var(--orange)'}">${lastBk?new Date(lastBk).toLocaleString('th-TH'):'— ยังไม่เคย (แนะนำให้สำรองตอนนี้)'}</strong>
+    `;
+  }
+
+  // Show backup history
+  renderBackupHistory();
+}
+
+function renderBackupHistory(){
+  const el = document.getElementById('backup-history'); if(!el) return;
+  const hist = ls('backup_history') || [];
+  if(!hist.length){
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = `
+    <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-weight:700">📜 ประวัติการสำรอง (5 ครั้งล่าสุด)</div>
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px">
+      ${hist.slice(-5).reverse().map(h=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;font-size:12px;border-bottom:1px solid rgba(255,255,255,.03)">
+          <span style="color:var(--text2)">${new Date(h.time).toLocaleString('th-TH')}</span>
+          <span style="color:var(--green);font-size:11px">✓ ${h.size} · ${h.projCount||0} โปรเจกต์</span>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+// ── EXPORT BACKUP ──
+function exportBackup(){
+  try {
+    const data = {
+      version: 'guin-studio-v3',
+      exportedAt: new Date().toISOString(),
+      exportedBy: currentUser?.email || 'unknown',
+      data: {
+        projects:         getProjects(),
+        staff:            getStaffData(),
+        paymentAccounts:  getPaymentAccounts(),
+        docs_invoices:    getDocsStore('invoices'),
+        docs_quotations:  getDocsStore('quotations'),
+        docs_vouchers:    getDocsStore('vouchers'),
+        warnings:         ls('warnings_v1') || [],
+        appreciations:    ls('appreciations_v1') || [],
+        calc_drafts:      ls('calc_drafts_v1') || [],
+        trkCards:         ls('trk_cards_v3') || [],
+        admin_signature:  ls('admin_signature') || '',
+      }
+    };
+    const json = JSON.stringify(data, null, 2);
+    const sizeKB = (new Blob([json]).size / 1024).toFixed(1);
+    const today = new Date();
+    const stamp = today.getFullYear() + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0') + '-' + String(today.getHours()).padStart(2,'0') + String(today.getMinutes()).padStart(2,'0');
+    const filename = `guin-backup-${stamp}.json`;
+
+    // Download
+    const blob = new Blob([json], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+
+    // Remember
+    ls('last_backup_time', new Date().toISOString());
+    const hist = ls('backup_history') || [];
+    hist.push({ time: new Date().toISOString(), size: sizeKB+' KB', filename, projCount: data.data.projects.length });
+    if(hist.length > 20) hist.splice(0, hist.length-20);
+    ls('backup_history', hist);
+
+    // Show success modal
+    const modal = document.createElement('div');
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+    modal.innerHTML = `<div style="background:var(--card);border:1px solid rgba(0,223,160,.4);border-radius:16px;padding:28px;width:440px;max-width:98vw">
+      <div style="font-size:48px;text-align:center;margin-bottom:8px">💾</div>
+      <div style="font-size:18px;font-weight:800;text-align:center;margin-bottom:8px;color:var(--green)">สำรองข้อมูลเสร็จแล้ว!</div>
+      <div style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:16px;line-height:1.6">
+        ไฟล์: <strong style="color:var(--text);font-family:monospace;font-size:12px">${filename}</strong><br>
+        ขนาด: <strong style="color:var(--text)">${sizeKB} KB</strong>
+      </div>
+      <div style="background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.2);border-radius:9px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:var(--text);line-height:1.6">
+        📥 <strong>ไฟล์ถูกดาวน์โหลดแล้ว</strong><br>
+        💡 แนะนำให้อัพโหลดไฟล์นี้ไป Google Drive/OneDrive ด้วย เพื่อไม่ให้หายถ้าเครื่องเสีย
+      </div>
+      <button onclick="this.closest('[style*=fixed]').remove();renderSettings();" style="width:100%;padding:10px;background:var(--green);border:none;border-radius:9px;color:#fff;font-family:Kanit;font-weight:700;cursor:pointer;font-size:14px">เข้าใจแล้ว</button>
+    </div>`;
+    document.body.appendChild(modal);
+    toast(`💾 สำรองข้อมูลเสร็จ: ${filename}`,'success');
+  } catch(e) {
+    console.error('[exportBackup]', e);
+    toast('❌ สำรองข้อมูลไม่สำเร็จ: '+e.message,'error');
+  }
+}
+
+// ── RESTORE BACKUP ──
+function openRestoreModal(){
+  const modal = document.createElement('div');
+  modal.id = 'restore-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML = `<div style="background:var(--card);border:1px solid var(--orange);border-radius:16px;padding:28px;width:480px;max-width:98vw">
+    <div style="font-size:42px;text-align:center;margin-bottom:8px">🔄</div>
+    <div style="font-size:18px;font-weight:800;text-align:center;margin-bottom:6px;color:var(--orange)">กู้คืนข้อมูลจากไฟล์สำรอง</div>
+    <div style="background:rgba(255,158,0,.1);border:1px solid rgba(255,158,0,.3);border-radius:10px;padding:12px 14px;margin:14px 0;font-size:12px;color:var(--text);line-height:1.7">
+      ⚠️ <strong style="color:var(--orange)">คำเตือน:</strong><br>
+      การกู้คืนจะ<strong style="color:var(--red)">เขียนทับข้อมูลปัจจุบันทั้งหมด</strong><br>
+      แนะนำให้กด <strong style="color:var(--green)">"สำรองตอนนี้"</strong> ก่อนกู้คืน
+    </div>
+    <label style="display:block;cursor:pointer;border:2px dashed var(--border2);border-radius:10px;padding:20px;text-align:center;margin-bottom:14px">
+      <input type="file" accept=".json,application/json" onchange="handleRestoreFile(event)" style="display:none">
+      <div style="font-size:32px;margin-bottom:6px">📁</div>
+      <div style="font-size:13px;font-weight:700;color:var(--accent2)">คลิกเพื่อเลือกไฟล์ .json</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:3px">ไฟล์ที่สำรองไว้ก่อนหน้า (guin-backup-*.json)</div>
+    </label>
+    <div id="restore-preview"></div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button onclick="this.closest('[style*=fixed]').remove()" style="flex:1;padding:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;color:var(--text);font-family:Kanit;cursor:pointer">ยกเลิก</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function handleRestoreFile(ev){
+  const file = ev.target.files?.[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if(!data.version || !data.data){ throw new Error('ไฟล์ไม่ใช่ backup ของระบบนี้'); }
+
+      const d = data.data;
+      const previewEl = document.getElementById('restore-preview');
+      if(previewEl){
+        previewEl.innerHTML = `
+          <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;margin-top:10px">
+            <div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:700">📋 ไฟล์ backup นี้มีข้อมูล:</div>
+            <div style="font-size:12px;line-height:1.8">
+              🕒 สำรองเมื่อ: <strong>${new Date(data.exportedAt).toLocaleString('th-TH')}</strong><br>
+              👤 โดย: <strong>${data.exportedBy||'—'}</strong><br>
+              📁 โปรเจกต์: <strong>${(d.projects||[]).length}</strong> รายการ<br>
+              👥 ทีมงาน: <strong>${(d.staff||[]).length}</strong> คน<br>
+              🧾 ใบแจ้งหนี้: <strong>${(d.docs_invoices||[]).length}</strong> ฉบับ<br>
+              📋 ใบเสนอราคา: <strong>${(d.docs_quotations||[]).length}</strong> ฉบับ<br>
+              💸 ใบสำคัญจ่าย: <strong>${(d.docs_vouchers||[]).length}</strong> ฉบับ
+            </div>
+          </div>
+          <button class="btn btn-red" style="width:100%;margin-top:10px" onclick="confirmRestore(${JSON.stringify(data).replace(/"/g,'&quot;').replace(/'/g,"\\'")})">
+            ⚠️ ยืนยันกู้คืน (จะเขียนทับข้อมูลปัจจุบัน)
+          </button>
+        `;
+        // Store for confirmRestore
+        window._pendingRestore = data;
+        // Replace the button handler since inline JSON is fragile
+        previewEl.querySelector('button.btn-red').onclick = () => confirmRestore();
+      }
+    } catch(err) {
+      const previewEl = document.getElementById('restore-preview');
+      if(previewEl) previewEl.innerHTML = `<div style="background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.3);border-radius:9px;padding:12px;margin-top:10px;color:var(--red);font-size:12px">❌ ไฟล์ไม่ถูกต้อง: ${err.message}</div>`;
+    }
+  };
+  reader.readAsText(file);
+}
+
+async function confirmRestore(){
+  const data = window._pendingRestore;
+  if(!data){ toast('ไม่มีไฟล์ที่เลือก','error'); return; }
+
+  // Double-confirm with typed keyword
+  const typed = prompt('⚠️ ยืนยันขั้นสุดท้าย\n\nข้อมูลปัจจุบันทั้งหมดจะถูก "เขียนทับ"\n\nพิมพ์คำว่า  กู้คืน  เพื่อยืนยัน:');
+  if((typed||'').trim() !== 'กู้คืน'){ toast('ยกเลิกการกู้คืน','info'); return; }
+
+  try {
+    const d = data.data;
+    // Restore to localStorage
+    if(d.projects)        ls('projects_v3', d.projects);
+    if(d.staff)           ls('staff_v3', d.staff);
+    if(d.paymentAccounts) ls('payment_accounts_v1', d.paymentAccounts);
+    if(d.docs_invoices)   ls('docs_invoices', d.docs_invoices);
+    if(d.docs_quotations) ls('docs_quotations', d.docs_quotations);
+    if(d.docs_vouchers)   ls('docs_vouchers', d.docs_vouchers);
+    if(d.warnings)        ls('warnings_v1', d.warnings);
+    if(d.appreciations)   ls('appreciations_v1', d.appreciations);
+    if(d.calc_drafts)     ls('calc_drafts_v1', d.calc_drafts);
+    if(d.trkCards)        ls('trk_cards_v3', d.trkCards);
+    if(d.admin_signature) ls('admin_signature', d.admin_signature);
+
+    // Push to Firebase if connected
+    if(_fbDatabase){
+      try{
+        toast('กำลัง sync ข้อมูลกลับ Firebase...','info');
+        // Projects — set each one
+        if(d.projects) for(const p of d.projects){ if(p.id) await _fbDatabase.ref('projects/'+p.id).set(p); }
+        // Other stores — set whole branch
+        if(d.paymentAccounts) await _fbDatabase.ref('paymentAccounts').set(d.paymentAccounts);
+        if(d.docs_invoices)   await _fbDatabase.ref('docs/invoices').set(d.docs_invoices);
+        if(d.docs_quotations) await _fbDatabase.ref('docs/quotations').set(d.docs_quotations);
+        if(d.docs_vouchers)   await _fbDatabase.ref('docs/vouchers').set(d.docs_vouchers);
+      }catch(e){ console.error('Firebase restore partial fail:',e); }
+    }
+
+    document.getElementById('restore-modal')?.remove();
+    toast('✅ กู้คืนข้อมูลสำเร็จ! กำลังรีโหลดหน้า...','success');
+    setTimeout(()=>window.location.reload(), 1500);
+  } catch(e) {
+    console.error('[confirmRestore]', e);
+    toast('❌ กู้คืนไม่สำเร็จ: '+e.message,'error');
+  }
+}
+
+// ── SAFE MODE (hide money) ──
+function toggleSafeMode(enabled){
+  ls('safe_mode', enabled ? '1' : '0');
+  document.body.classList.toggle('safe-mode', enabled);
+  toast(enabled ? '🙈 Safe Mode เปิด — ตัวเลขถูกซ่อน (hover เพื่อดู)' : '👁️ Safe Mode ปิด','info');
+}
+// Auto-apply safe mode on every page load
+(function initSafeMode(){
+  try{ if(ls('safe_mode')==='1') document.body.classList.add('safe-mode'); }catch(e){}
+})();
+
+
 
 const PRESET_BANKS = [
   {code:'kbank',     name:'ธนาคารกสิกรไทย (KBank)',         color:'#138f2d', abbr:'K'},
