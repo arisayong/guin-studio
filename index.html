@@ -761,6 +761,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div id="docs-client">
     <div class="section-card">
      <div class="section-title">📋 สร้างใบเสนอราคา</div>
+     <!-- DocNo preview bar -->
+     <div id="qt-docno-bar" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;margin-bottom:10px;flex-wrap:wrap"></div>
      <!-- Admin signature widget -->
      <div id="sig-widget" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;margin-bottom:14px">
       <span style="font-size:12px;color:var(--text2);white-space:nowrap;font-weight:600">✍️ ลายเซ็นผู้เสนอราคา:</span>
@@ -824,6 +826,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div id="docs-invoice" class="hidden">
     <div class="section-card">
      <div class="section-title" style="color:var(--accent2)">🧾 สร้างใบแจ้งหนี้</div>
+     <!-- DocNo preview bar -->
+     <div id="inv-docno-bar" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;margin-bottom:10px;flex-wrap:wrap"></div>
      <!-- Payment Account selector (for invoice) -->
      <div style="margin-bottom:14px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
@@ -1664,6 +1668,74 @@ function generateDocNo(prefix){
   const existing = getDocsStore(storeKey)||[];
   const todayCount = existing.filter(d => (d.docNo||'').startsWith(todayPrefix)).length;
   return todayPrefix + String(todayCount+1).padStart(3,'0');
+}
+
+// ── DocNo preview bars on forms ──
+function renderInvDocNoBar(){
+  const el = document.getElementById('inv-docno-bar'); if(!el) return;
+  if(_invEditingDocNo){
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(255,158,0,.18);border:1px solid rgba(255,158,0,.5);color:var(--orange);font-weight:700;letter-spacing:.5px">✏️ กำลังแก้ไข</span>
+        <span style="font-family:monospace;font-size:15px;font-weight:800;color:var(--orange);letter-spacing:1px">${_invEditingDocNo}</span>
+      </div>
+      <button class="btn btn-xs btn-outline" onclick="cancelInvEdit()" title="ยกเลิกการแก้ไข + เริ่มใบใหม่">✕ ยกเลิกแก้ไข (สร้างใบใหม่แทน)</button>`;
+    el.style.borderColor = 'rgba(255,158,0,.4)';
+    el.style.background = 'rgba(255,158,0,.06)';
+  } else {
+    const next = generateDocNo('INV');
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--text2);letter-spacing:.5px;font-weight:600">🆕 เลขใบแจ้งหนี้ถัดไป:</span>
+        <span style="font-family:monospace;font-size:15px;font-weight:800;color:var(--accent2);letter-spacing:1px">${next}</span>
+      </div>
+      <span style="font-size:10px;color:var(--text2);opacity:.75">บันทึกแล้วจะใช้เลขนี้</span>`;
+    el.style.borderColor = 'var(--border2)';
+    el.style.background = 'var(--bg2)';
+  }
+}
+function renderQtDocNoBar(){
+  const el = document.getElementById('qt-docno-bar'); if(!el) return;
+  if(_qtEditingDocNo){
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(255,158,0,.18);border:1px solid rgba(255,158,0,.5);color:var(--orange);font-weight:700;letter-spacing:.5px">✏️ กำลังแก้ไข</span>
+        <span style="font-family:monospace;font-size:15px;font-weight:800;color:var(--orange);letter-spacing:1px">${_qtEditingDocNo}</span>
+      </div>
+      <button class="btn btn-xs btn-outline" onclick="cancelQtEdit()" title="ยกเลิกการแก้ไข + เริ่มใบใหม่">✕ ยกเลิกแก้ไข (สร้างใบใหม่แทน)</button>`;
+    el.style.borderColor = 'rgba(255,158,0,.4)';
+    el.style.background = 'rgba(255,158,0,.06)';
+  } else {
+    const next = generateDocNo('QT');
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--text2);letter-spacing:.5px;font-weight:600">🆕 เลขใบเสนอราคาถัดไป:</span>
+        <span style="font-family:monospace;font-size:15px;font-weight:800;color:var(--accent2);letter-spacing:1px">${next}</span>
+      </div>
+      <span style="font-size:10px;color:var(--text2);opacity:.75">บันทึกแล้วจะใช้เลขนี้</span>`;
+    el.style.borderColor = 'var(--border2)';
+    el.style.background = 'var(--bg2)';
+  }
+}
+
+function cancelInvEdit(){
+  if(!confirm('ยกเลิกการแก้ไข + ล้างฟอร์ม สร้างใบใหม่?')) return;
+  _invEditingDocNo = null;
+  invItems = [];
+  _invPayAccountIds = [];
+  ['inv-client','inv-email','inv-date','inv-duedate','inv-vat','inv-note'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=(id==='inv-vat'?'0':''); });
+  const dt = document.getElementById('inv-date'); if(dt) dt.value = isoToThai(new Date().toISOString().split('T')[0]);
+  initInvItems(); initInvPayChips(); renderInvDocNoBar();
+  toast('ล้างฟอร์มแล้ว — พร้อมสร้างใบใหม่','info');
+}
+function cancelQtEdit(){
+  if(!confirm('ยกเลิกการแก้ไข + ล้างฟอร์ม สร้างใบใหม่?')) return;
+  _qtEditingDocNo = null;
+  qtItems = [];
+  ['qt-client','qt-email','qt-date','qt-vat','qt-note'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=(id==='qt-vat'?'0':''); });
+  const dt = document.getElementById('qt-date'); if(dt) dt.value = isoToThai(new Date().toISOString().split('T')[0]);
+  initQtItems(); renderQtDocNoBar();
+  toast('ล้างฟอร์มแล้ว — พร้อมสร้างใบใหม่','info');
 }
 
 // ══════════════════════════════════════════════
@@ -4603,6 +4675,7 @@ function renderDocs() {
   switchDocsMain(activeName || 'client', activeTab);
   populateDocsProjSelects();
   initQtItems();
+  try{renderQtDocNoBar();renderInvDocNoBar();}catch(e){}
 }
 function switchDocsMain(tab, el) {
   ['client','invoice','worker','history'].forEach(t => {
@@ -4612,7 +4685,8 @@ function switchDocsMain(tab, el) {
   document.querySelectorAll('#docs-main-tabs .tab').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
   if (tab === 'history') renderDocsHistory();
-  if (tab === 'invoice') { initInvItems(); renderAdminSigWidget(); initInvPayChips(); const _id=document.getElementById('inv-date'); if(_id&&!_id.value) _id.value=isoToThai(new Date().toISOString().split('T')[0]); }
+  if (tab === 'client') { try{renderQtDocNoBar();}catch(e){} }
+  if (tab === 'invoice') { initInvItems(); renderAdminSigWidget(); initInvPayChips(); try{renderInvDocNoBar();}catch(e){} const _id=document.getElementById('inv-date'); if(_id&&!_id.value) _id.value=isoToThai(new Date().toISOString().split('T')[0]); }
 }
 function populateDocsProjSelects() {
   // qt-proj and inv-proj dropdowns removed — both now use multi-select pickers
@@ -4932,6 +5006,7 @@ function saveQuotationDraft() {
   const all = (getDocsStore('quotations')||[]).filter(x => x.docNo !== data.docNo);
   all.push(saved); saveDocsStore('quotations', all);
   _qtEditingDocNo = null;
+  try{renderQtDocNoBar();}catch(e){}
   toast('📝 บันทึกเป็นดราฟแล้ว ('+data.docNo+')','success');
   renderDocsHistory();
 }
@@ -4945,7 +5020,7 @@ function saveAndSendQuotation() {
   const all = (getDocsStore('quotations')||[]).filter(x => x.docNo !== data.docNo);
   all.push(saved); saveDocsStore('quotations', all);
   _qtEditingDocNo = null;
-
+  try{renderQtDocNoBar();}catch(e){}
   // เปิด popup แสดง From/To + อัปโหลดไฟล์
   const old = document.getElementById('slip-upload-modal');
   if(old) old.remove();
@@ -5356,6 +5431,7 @@ function editInvoice(docNo){
     renderInvItems();
     renderInvPayChips();
     calcInvTotal();
+    try{renderInvDocNoBar();}catch(e){}
     toast('✏️ โหลดเอกสาร '+docNo+' มาแก้ไข — แก้แล้วกดบันทึกใหม่ (เลขเดิม)','info');
   }, 100);
 }
@@ -5375,6 +5451,7 @@ function editQuotation(docNo){
     _qtEditingDocNo = docNo;
     renderQtItems();
     calcQtTotal();
+    try{renderQtDocNoBar();}catch(e){}
     toast('✏️ โหลดเอกสาร '+docNo+' มาแก้ไข — แก้แล้วกดบันทึกใหม่ (เลขเดิม)','info');
   }, 100);
 }
@@ -7725,7 +7802,7 @@ function saveInvoiceDraft(){
   const all = (getDocsStore('invoices')||[]).filter(x => x.docNo !== data.docNo);
   all.push(saved);
   saveDocsStore('invoices', all);
-  _invEditingDocNo = null; // clear edit mode
+  _invEditingDocNo = null; try{renderInvDocNoBar();}catch(e){}
   toast('📝 บันทึกเป็นดราฟแล้ว ('+data.docNo+') — ไปดูที่ "ประวัติเอกสาร"','success');
   renderDocsHistory();
 }
@@ -7740,7 +7817,7 @@ function saveAndSendInvoice(){
   const all = (getDocsStore('invoices')||[]).filter(x => x.docNo !== data.docNo);
   all.push(saved);
   saveDocsStore('invoices', all);
-  _invEditingDocNo = null; // clear edit mode
+  _invEditingDocNo = null; try{renderInvDocNoBar();}catch(e){}
 
   const old = document.getElementById('slip-upload-modal');
   if(old) old.remove();
