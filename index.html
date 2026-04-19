@@ -2858,7 +2858,13 @@ async function sendVerificationEmail(){
   if(statusEl) statusEl.innerHTML = '<div style="color:var(--text2);font-size:12px;padding:8px">⏳ กำลังส่งลิงก์ยืนยัน...</div>';
 
   try {
-    await user.sendEmailVerification();
+    // Use actionCodeSettings so the verify link redirects back to OUR site
+    // (not firebaseapp.com which may have API key restrictions)
+    const actionCodeSettings = {
+      url: window.location.origin + window.location.pathname + '?verified=1',
+      handleCodeInApp: false  // false = let Firebase handle verification, then redirect back
+    };
+    await user.sendEmailVerification(actionCodeSettings);
     sessionStorage.setItem('verify_sent_' + user.uid, '1');
     if(statusEl) statusEl.innerHTML = `<div style="background:rgba(0,223,160,.12);border:1px solid rgba(0,223,160,.35);border-radius:9px;padding:10px 14px;font-size:12px;color:var(--green);text-align:left;line-height:1.6">
       ✅ <strong>ส่งลิงก์ยืนยันเรียบร้อย!</strong><br>
