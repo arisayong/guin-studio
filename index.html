@@ -147,6 +147,18 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .btn-sm{padding:6px 12px;font-size:12px}
 .btn-xs{padding:4px 9px;font-size:11px}
 
+/* Quick Action buttons — Dashboard */
+.qa-btn{display:flex;align-items:center;gap:10px;padding:14px 16px;border-radius:12px;color:var(--text);font-family:Kanit;font-size:14px;font-weight:600;cursor:pointer;text-align:left;transition:background .15s, transform .15s, box-shadow .15s}
+.qa-btn:hover{transform:translateY(-1px)}
+.qa-blue{background:linear-gradient(135deg,rgba(0,180,255,.12),rgba(0,180,255,.05));border:1px solid rgba(0,180,255,.3)}
+.qa-blue:hover{background:linear-gradient(135deg,rgba(0,180,255,.22),rgba(0,180,255,.12));box-shadow:0 6px 16px rgba(0,180,255,.15)}
+.qa-orange{background:linear-gradient(135deg,rgba(255,158,0,.12),rgba(255,158,0,.05));border:1px solid rgba(255,158,0,.3)}
+.qa-orange:hover{background:linear-gradient(135deg,rgba(255,158,0,.22),rgba(255,158,0,.12));box-shadow:0 6px 16px rgba(255,158,0,.15)}
+.qa-green{background:linear-gradient(135deg,rgba(0,223,160,.12),rgba(0,223,160,.05));border:1px solid rgba(0,223,160,.3)}
+.qa-green:hover{background:linear-gradient(135deg,rgba(0,223,160,.22),rgba(0,223,160,.12));box-shadow:0 6px 16px rgba(0,223,160,.15)}
+.qa-purple{background:linear-gradient(135deg,rgba(155,111,255,.12),rgba(155,111,255,.05));border:1px solid rgba(155,111,255,.3)}
+.qa-purple:hover{background:linear-gradient(135deg,rgba(155,111,255,.22),rgba(155,111,255,.12));box-shadow:0 6px 16px rgba(155,111,255,.15)}
+
 /* TABLE */
 .reg-role-active{opacity:1!important;filter:brightness(1.2);box-shadow:0 0 0 2px currentColor!important}
 #reg-role-checks label input[type=checkbox]:checked + span{opacity:1}
@@ -576,28 +588,28 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    </div>
    <!-- Quick Actions Bar — ทำบ่อย ๆ คลิกเดียวถึง -->
    <div id="quick-actions" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:18px">
-    <button onclick="openProjectModal()" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(135deg,rgba(0,180,255,.12),rgba(0,180,255,.05));border:1px solid rgba(0,180,255,.3);border-radius:12px;color:var(--text);font-family:Kanit;font-size:14px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.background='rgba(0,180,255,.18)';this.style.transform='translateY(-1px)'" onmouseout="this.style.background='';this.style.transform=''">
+    <button class="qa-btn qa-blue" onclick="openProjectModal()">
      <span style="font-size:24px">➕</span>
      <div style="flex:1">
       <div style="font-weight:700;color:var(--accent2)">สร้างโปรเจกต์</div>
       <div style="font-size:11px;color:var(--text2);font-weight:400">เพิ่มงานใหม่เข้าระบบ</div>
      </div>
     </button>
-    <button onclick="nav('queue')" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(135deg,rgba(255,158,0,.12),rgba(255,158,0,.05));border:1px solid rgba(255,158,0,.3);border-radius:12px;color:var(--text);font-family:Kanit;font-size:14px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.background='rgba(255,158,0,.18)';this.style.transform='translateY(-1px)'" onmouseout="this.style.background='';this.style.transform=''">
+    <button class="qa-btn qa-orange" onclick="nav('queue')">
      <span style="font-size:24px">💸</span>
      <div style="flex:1">
       <div style="font-weight:700;color:var(--orange)">ออกใบสำคัญจ่าย</div>
       <div style="font-size:11px;color:var(--text2);font-weight:400">จ่ายเงินทีมงาน</div>
      </div>
     </button>
-    <button onclick="nav('docs');setTimeout(()=>{const t=document.querySelector('#docs-main-tabs .tab[onclick*=invoice]');if(t)switchDocsMain('invoice',t);},100)" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(135deg,rgba(0,223,160,.12),rgba(0,223,160,.05));border:1px solid rgba(0,223,160,.3);border-radius:12px;color:var(--text);font-family:Kanit;font-size:14px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.background='rgba(0,223,160,.18)';this.style.transform='translateY(-1px)'" onmouseout="this.style.background='';this.style.transform=''">
+    <button class="qa-btn qa-green" onclick="nav('docs');setTimeout(()=>{const t=document.querySelector('#docs-main-tabs .tab[onclick*=invoice]');if(t)switchDocsMain('invoice',t);},100)">
      <span style="font-size:24px">🧾</span>
      <div style="flex:1">
       <div style="font-weight:700;color:var(--green)">สร้างใบแจ้งหนี้</div>
       <div style="font-size:11px;color:var(--text2);font-weight:400">เรียกเก็บเงินลูกค้า</div>
      </div>
     </button>
-    <button onclick="nav('staff');setTimeout(()=>openStaffModal(),100)" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(135deg,rgba(155,111,255,.12),rgba(155,111,255,.05));border:1px solid rgba(155,111,255,.3);border-radius:12px;color:var(--text);font-family:Kanit;font-size:14px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.background='rgba(155,111,255,.18)';this.style.transform='translateY(-1px)'" onmouseout="this.style.background='';this.style.transform=''">
+    <button class="qa-btn qa-purple" onclick="nav('staff');setTimeout(()=>openStaffModal(),100)">
      <span style="font-size:24px">👤</span>
      <div style="flex:1">
       <div style="font-weight:700;color:#9B6FFF">เพิ่มทีมงาน</div>
