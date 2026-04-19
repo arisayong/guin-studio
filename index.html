@@ -3326,7 +3326,16 @@ async function copyProject(id){
     try{
       console.log('📋 Copying project:', p.name, '→ id:', copy.id);
       await _fbDatabase.ref('projects/'+copy.id).set(copy);
+      // Force-update local cache immediately (don't wait for listener)
+      const cache = getProjects();
+      if(!cache.find(x => x.id === copy.id)) {
+        cache.push(copy);
+        ls('projects_v3', cache);
+      }
       _notifyProjectChange();
+      // Force re-render current page (listener may have lag)
+      try { if(typeof renderProjects === 'function') renderProjects(); } catch(e){}
+      try { if(typeof refreshCurrentPage === 'function') refreshCurrentPage(); } catch(e){}
       toast('📋 คัดลอกโปรเจกต์แล้ว','success');
     }catch(e){
       toast('⚠️ บันทึกไม่สำเร็จ: '+e.message,'error');
