@@ -1635,18 +1635,36 @@ function ls(k,v){
 }
 let voucherSeq=parseInt(ls('voucher_seq')||'0');
 async function nextVoucherNoAsync(){
+  const _today = _todayDDMM();
   if(_fbDatabase){
     try{
       const ref=_fbDatabase.ref('docs/voucherSeq');
       const snap=await ref.get();
       const n=(snap.exists()?snap.val():0)+1;
       await ref.set(n);ls('voucher_seq',n);
-      return 'GS-'+new Date().getFullYear()+'-'+String(n).padStart(4,'0');
+      const y=new Date().getFullYear()+543;
+      return 'GS-'+y+'-'+_today+'-'+String(n).padStart(4,'0');
     }catch(e){}
   }
   return nextVoucherNo();
 }
-function nextVoucherNo(){voucherSeq++;ls('voucher_seq',String(voucherSeq));const y=new Date().getFullYear()+543;return`GS-${y}-${String(voucherSeq).padStart(4,'0')}`}
+function nextVoucherNo(){voucherSeq++;ls('voucher_seq',String(voucherSeq));const y=new Date().getFullYear()+543;return`GS-${y}-${_todayDDMM()}-${String(voucherSeq).padStart(4,'0')}`}
+
+// Helpers for date-embedded document numbers: PREFIX-YYYYbuddhist-DDMM-NNN
+function _todayDDMM(){
+  const d = new Date();
+  return String(d.getDate()).padStart(2,'0') + String(d.getMonth()+1).padStart(2,'0');
+}
+function generateDocNo(prefix){
+  // prefix: 'INV' | 'QT' — counts existing same-prefix docs made today, returns next sequence
+  const yy = new Date().getFullYear()+543;
+  const ddmm = _todayDDMM();
+  const storeKey = prefix==='INV'?'invoices' : prefix==='QT'?'quotations' : 'vouchers';
+  const todayPrefix = prefix+'-'+yy+'-'+ddmm+'-';
+  const existing = getDocsStore(storeKey)||[];
+  const todayCount = existing.filter(d => (d.docNo||'').startsWith(todayPrefix)).length;
+  return todayPrefix + String(todayCount+1).padStart(3,'0');
+}
 
 // ══════════════════════════════════════════════
 // STAFF DATA
@@ -4885,7 +4903,7 @@ function buildQuotationHTML(data) {
 function getQuotationData() {
   const projIdsFromItems = [...new Set(qtItems.map(x=>x.projId).filter(Boolean))];
   return {
-    docNo: _qtEditingDocNo || ('QT-' + (new Date().getFullYear()+543) + '-' + String((getDocsStore('quotations')||[]).length+1).padStart(3,'0')),
+    docNo: _qtEditingDocNo || generateDocNo('QT'),
     client: document.getElementById('qt-client')?.value.trim()||'',
     email:  document.getElementById('qt-email')?.value.trim()||'',
     projId: projIdsFromItems[0] || '',  // backward compat for buildQuotationHTML
@@ -7575,7 +7593,7 @@ function autoFillInvoice(){} // legacy - unused
 function getInvoiceData(){
   const projIdsFromItems = [...new Set(invItems.map(x=>x.projId).filter(Boolean))];
   return {
-    docNo: _invEditingDocNo || ('INV-' + (new Date().getFullYear()+543) + '-' + String((getDocsStore('invoices')||[]).length+1).padStart(3,'0')),
+    docNo: _invEditingDocNo || generateDocNo('INV'),
     client: document.getElementById('inv-client')?.value.trim()||'',
     email:  document.getElementById('inv-email')?.value.trim()||'',
     projIds: projIdsFromItems,
