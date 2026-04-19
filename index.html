@@ -534,18 +534,19 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    <div class="ssub">Payment System v3</div>
   </div>
   <nav class="sidebar-nav" id="admin-nav">
-   <div class="nav-section">หลัก</div>
-   <div class="nav-item active" onclick="nav('dashboard')"><span class="nav-icon">🏠</span><span>Dashboard</span></div>
-   <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span><span class="nav-badge hidden" id="track-badge">0</span></div>
-   <div class="nav-item" onclick="nav('proj-cal')"><span class="nav-icon">🗓️</span><span>ปฏิทินโปรเจกต์</span></div>
-   <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คิดคำนวน</span></div>
+   <div class="nav-section">ภาพรวม</div>
+   <div class="nav-item active" onclick="nav('dashboard')"><span class="nav-icon">🏠</span><span>หน้าหลัก</span></div>
+   <div class="nav-section">งาน</div>
    <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span><span class="nav-badge hidden" id="deadline-badge">0</span></div>
+   <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span><span class="nav-badge hidden" id="track-badge">0</span></div>
+   <div class="nav-item" onclick="nav('proj-cal')"><span class="nav-icon">🗓️</span><span>ปฏิทิน</span></div>
+   <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-section">การเงิน</div>
    <div class="nav-item" onclick="nav('queue')"><span class="nav-icon">💸</span><span>คิวจ่ายเงิน</span><span class="nav-badge hidden" id="queue-badge">0</span></div>
-   <div class="nav-item" onclick="nav('profit')"><span class="nav-icon">📊</span><span>Profit</span></div>
+   <div class="nav-item" onclick="nav('profit')"><span class="nav-icon">📊</span><span>กำไร-ขาดทุน</span></div>
    <div class="nav-item" onclick="nav('docs')"><span class="nav-icon">🗂️</span><span>เอกสาร</span></div>
    <div class="nav-item" onclick="nav('payment')"><span class="nav-icon">💳</span><span>บัญชีรับเงิน</span></div>
-   <div class="nav-section">ทีม</div>
+   <div class="nav-section">ทีมงาน</div>
    <div class="nav-item" onclick="nav('staff')"><span class="nav-icon">👥</span><span>จัดการทีม</span></div>
    <div class="nav-section">ระบบ</div>
    <div class="nav-item" onclick="nav('settings')"><span class="nav-icon">🛠️</span><span>ตั้งค่า & สำรองข้อมูล</span></div>
@@ -574,7 +575,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
     <div style="flex:1"><div class="user-name" id="sidebar-name">—</div><div class="user-role" id="sidebar-role">—</div></div>
     <span style="font-size:14px;opacity:.5;margin-left:4px">✏️</span>
    </div>
-   <button class="btn-logout" onclick="doLogout()">🚪 ออกจากระบบ</button>
+   <div style="display:flex;gap:6px;margin-bottom:8px">
+    <button class="btn-logout" onclick="doLogout()" style="flex:1">🚪 ออกจากระบบ</button>
+    <button onclick="showKeyboardHelp()" title="ทางลัดแป้นพิมพ์ (กด ?)" style="padding:9px 12px;background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.2);border-radius:8px;color:var(--accent2);font-family:Kanit;font-size:12px;cursor:pointer;font-weight:600">⌨️ ?</button>
+   </div>
   </div>
  </aside>
 
@@ -753,6 +757,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
      <div style="font-size:14px;font-weight:700">ข้อมูลระบบ</div>
     </div>
     <div id="system-info" style="font-size:12px;color:var(--text2);line-height:1.8"></div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border2);display:flex;flex-wrap:wrap;gap:8px">
+     <button class="btn btn-sm btn-outline" onclick="showKeyboardHelp()" title="ดูทางลัดแป้นพิมพ์">⌨️ ทางลัดแป้นพิมพ์</button>
+     <button class="btn btn-sm btn-outline" onclick="resetFirstTimeTour()" title="รีเซ็ต tour — จะเจอตอน login ครั้งหน้า">🎓 ดู Tour อีกครั้ง (login หน้า)</button>
+    </div>
    </div>
   </div>
 
@@ -862,7 +870,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
 
   <!-- ── PROFIT ── -->
   <div id="page-profit" class="page hidden">
-   <div class="page-header"><div class="page-title">📊 Profit Dashboard</div><div class="page-subtitle">สรุปรายรับ-รายจ่ายสตูดิโอ</div>
+   <div class="page-header"><div class="page-title">📊 กำไร-ขาดทุน</div><div class="page-subtitle">สรุปรายรับ-รายจ่ายสตูดิโอ</div>
     <div class="page-actions"><button class="btn btn-outline btn-sm" onclick="exportPaymentCSV()">⬇️ Export CSV</button></div>
    </div>
    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)" id="profit-stats"></div>
@@ -1700,8 +1708,8 @@ let selectedQYear = 'all';
 let selectedMonth = 'all';
 
 const CATS = {
-  dubbing:    {label:'🎤 Dubbing',     color:'var(--orange)'},
   adaptation: {label:'✍️ Adaptation', color:'var(--cyan)'},
+  dubbing:    {label:'🎤 Dubbing',     color:'var(--orange)'},
   mix:        {label:'🎧 Mix',         color:'var(--green)'},
   qc:         {label:'✅ QC',          color:'var(--purple)'},
   subVideo:   {label:'🎬 Sub & Video', color:'var(--red)'},
@@ -3035,6 +3043,10 @@ auth.onAuthStateChanged(async(fbUser)=>{
     // ═══ FORCE PASSWORD SETUP AFTER MAGIC LINK ═══
     // If the user just logged in via magic link, prompt them to set a password
     try { await promptForNewPasswordAfterMagicLink(); } catch(e) { console.error('Password setup error:', e); }
+
+    // ═══ FIRST-TIME TOUR ═══
+    // Show walkthrough for new users (admin or staff)
+    try { checkFirstTimeTour(); } catch(e) { console.error('Tour error:', e); }
   } catch(e) {
     console.error('❌ enterApp error:', e);
     showLoader(false);
@@ -8637,8 +8649,182 @@ function downloadInvoice(){
 }
 
 // ══════════════════════════════════════════════
-// 🛠️ SETTINGS & BACKUP SYSTEM
+// ⌨️ GLOBAL KEYBOARD SHORTCUTS (I4)
 // ══════════════════════════════════════════════
+document.addEventListener('keydown', function(e){
+  // Skip if user typing in input/textarea
+  const tag = (e.target.tagName||'').toLowerCase();
+  const isInput = tag === 'input' || tag === 'textarea' || e.target.isContentEditable;
+
+  // Ctrl/Cmd + K — open help/search modal
+  if((e.ctrlKey||e.metaKey) && e.key === 'k'){
+    e.preventDefault();
+    showKeyboardHelp();
+    return;
+  }
+  // Ctrl/Cmd + S — prevent browser save + toast
+  if((e.ctrlKey||e.metaKey) && e.key === 's'){
+    e.preventDefault();
+    toast('💾 ระบบ auto-save ทุกการเปลี่ยนแปลงแล้ว','info');
+    return;
+  }
+  // ? (without modifier, not in input) — show help
+  if(!isInput && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === '?'){
+    e.preventDefault();
+    showKeyboardHelp();
+    return;
+  }
+  // Ctrl/Cmd + B — backup
+  if((e.ctrlKey||e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'b'){
+    e.preventDefault();
+    if(typeof exportBackup === 'function') exportBackup();
+    return;
+  }
+  // Esc — close topmost modal (helpful)
+  if(e.key === 'Escape'){
+    const topModal = Array.from(document.querySelectorAll('[style*="position:fixed"][style*="z-index"]'))
+      .filter(el => el.offsetParent !== null).pop();
+    if(topModal && topModal.id !== 'app-layout' && topModal.id !== 'app-splash'){
+      const closeBtn = topModal.querySelector('button[onclick*="remove"]');
+      if(closeBtn) closeBtn.click();
+    }
+  }
+});
+
+function showKeyboardHelp(){
+  document.getElementById('kbd-help-modal')?.remove();
+  const m = document.createElement('div');
+  m.id = 'kbd-help-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:8000;display:flex;align-items:center;justify-content:center;padding:16px';
+  m.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:26px;width:520px;max-width:98vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:17px;font-weight:800;color:var(--accent2)">⌨️ ทางลัดแป้นพิมพ์</div>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="background:transparent;border:none;color:var(--text2);font-size:22px;cursor:pointer;padding:0 6px">×</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+      ${[
+        ['Ctrl + K', 'หรือ ?', 'เปิดคู่มือทางลัดนี้'],
+        ['Ctrl + Shift + B', '', '💾 สำรองข้อมูลเดี๋ยวนี้'],
+        ['Esc', '', 'ปิด modal ปัจจุบัน'],
+        ['Ctrl + S', '', '(ระบบ auto-save ให้แล้ว)'],
+      ].map(([k1,k2,desc]) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px">
+          <div style="display:flex;gap:4px;align-items:center">
+            <kbd style="padding:3px 9px;background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.3);border-radius:5px;color:var(--accent2);font-family:monospace;font-size:11px;font-weight:700">${k1}</kbd>
+            ${k2?`<span style="color:var(--text2);font-size:11px">${k2}</span>`:''}
+          </div>
+          <div style="color:var(--text);font-size:12px">${desc}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div style="margin-top:14px;padding:10px 14px;background:rgba(0,180,255,.06);border:1px solid rgba(0,180,255,.2);border-radius:9px;font-size:11px;color:var(--text2);line-height:1.6">
+      💡 <strong>Tip:</strong> กด <kbd style="padding:1px 6px;background:rgba(0,0,0,.3);border-radius:3px;font-family:monospace">?</kbd> ที่ไหนก็ได้เพื่อเปิดคู่มือนี้
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+// ══════════════════════════════════════════════
+// 🎓 FIRST-TIME TOUR (P10 + I6)
+// ══════════════════════════════════════════════
+function checkFirstTimeTour(){
+  if(!currentUser) return;
+  const seenKey = 'tour_seen_' + (currentUser.role||'staff') + '_v1';
+  if(localStorage.getItem(seenKey)) return;
+  // Small delay so other UI renders first
+  setTimeout(() => showFirstTimeTour(), 800);
+}
+
+function showFirstTimeTour(){
+  if(!currentUser) return;
+  const role = currentUser.role || 'staff';
+  const seenKey = 'tour_seen_' + role + '_v1';
+
+  const steps = role === 'admin' ? [
+    {
+      emoji: '👋',
+      title: 'ยินดีต้อนรับสู่ Guin Studio!',
+      body: 'ระบบจัดการทีมพากย์ของคุณ — ให้ผมพาชม 5 จุดสำคัญเร็ว ๆ เพื่อใช้งานได้คล่อง'
+    },
+    {
+      emoji: '📁',
+      title: 'เริ่มที่ "โปรเจกต์"',
+      body: 'เพิ่มงานใหม่จากลูกค้า → ใส่ Budget → เลือกทีมงานที่จะทำ → ระบบจะคำนวนยอดจ่ายอัตโนมัติ'
+    },
+    {
+      emoji: '💸',
+      title: 'คิวจ่ายเงิน — หัวใจของระบบ',
+      body: 'เมื่อทีมทำเสร็จ → กด "🔵 อนุมัติ" → ถ้ารอลูกค้าต่างประเทศจ่าย กด "🟡 รอลูกค้าจ่าย" → ลูกค้าจ่ายแล้วค่อยกด "💸 จ่ายเงิน" → ระบบออกใบสำคัญ PDF ให้'
+    },
+    {
+      emoji: '📊',
+      title: 'ดูกำไร-ขาดทุน',
+      body: 'หน้า "กำไร-ขาดทุน" สรุปรายรับ (จากลูกค้า) ลบรายจ่าย (ให้ทีม) = กำไรสุทธิ ต่อเดือน/ไตรมาส'
+    },
+    {
+      emoji: '🛡️',
+      title: 'อย่าลืม: สำรองข้อมูล!',
+      body: 'ทุกสัปดาห์ไปที่ "🛠️ ตั้งค่า" → กด "💾 สำรองเดี๋ยวนี้" ป้องกันข้อมูลหาย (กด Ctrl+Shift+B ก็ได้)'
+    },
+  ] : [
+    {
+      emoji: '👋',
+      title: 'ยินดีต้อนรับ!',
+      body: 'นี่คือระบบติดตามงานและยอดของทีม Guin Studio — ดูเร็ว ๆ 3 จุดสำคัญ'
+    },
+    {
+      emoji: '📅',
+      title: 'ปฏิทินงาน',
+      body: 'ดู deadline ของงานที่รับผิดชอบ — งานไหนใกล้ส่ง / ใกล้เกินเวลา'
+    },
+    {
+      emoji: '💰',
+      title: 'งานของฉัน',
+      body: 'เช็คยอดรับแล้ว/รอรับ → มี filter กรองตามสถานะ+ประเภท+เวลา → Export PDF ไปใช้ยื่นภาษีได้'
+    },
+  ];
+
+  showTourStep(steps, 0, seenKey);
+}
+
+function showTourStep(steps, idx, seenKey){
+  document.getElementById('tour-modal')?.remove();
+  if(idx >= steps.length){
+    localStorage.setItem(seenKey, Date.now().toString());
+    toast('🎉 พร้อมใช้งานแล้ว! กด ? เพื่อดูทางลัด','success');
+    return;
+  }
+  const s = steps[idx];
+  const m = document.createElement('div');
+  m.id = 'tour-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:8500;display:flex;align-items:center;justify-content:center;padding:16px';
+  m.innerHTML = `<div style="background:var(--card);border:2px solid var(--accent2);border-radius:18px;padding:32px 28px;width:440px;max-width:98vw;text-align:center;box-shadow:0 20px 60px rgba(21,101,255,.2)">
+    <div style="font-size:52px;margin-bottom:10px">${s.emoji}</div>
+    <div style="font-size:19px;font-weight:800;color:var(--accent2);margin-bottom:10px">${s.title}</div>
+    <div style="font-size:13px;color:var(--text);line-height:1.7;margin-bottom:20px">${s.body}</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:18px">
+      ${steps.map((_,i)=>`<span style="width:${i===idx?'18px':'7px'};height:7px;border-radius:4px;background:${i===idx?'var(--accent2)':'rgba(255,255,255,.15)'};transition:all .2s"></span>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center">
+      ${idx > 0 ? `<button onclick="showTourStep(${JSON.stringify(steps).replace(/"/g,'&quot;')},${idx-1},'${seenKey}')" style="padding:10px 20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:9px;color:var(--text);font-family:Kanit;cursor:pointer;font-size:13px">← ก่อนหน้า</button>` : ''}
+      <button onclick="localStorage.setItem('${seenKey}',Date.now().toString());document.getElementById('tour-modal').remove()" style="padding:10px 16px;background:transparent;border:1px solid var(--border2);border-radius:9px;color:var(--text2);font-family:Kanit;cursor:pointer;font-size:12px">ข้าม</button>
+      <button id="tour-next-btn" style="padding:10px 22px;background:var(--accent2);border:none;border-radius:9px;color:#fff;font-family:Kanit;font-weight:700;cursor:pointer;font-size:13px">${idx === steps.length-1 ? '✅ เริ่มใช้งาน' : 'ถัดไป →'}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+  document.getElementById('tour-next-btn').onclick = () => {
+    document.getElementById('tour-modal').remove();
+    showTourStep(steps, idx+1, seenKey);
+  };
+}
+
+// Reset tour — callable from Settings page
+function resetFirstTimeTour(){
+  Object.keys(localStorage).filter(k => k.startsWith('tour_seen_')).forEach(k => localStorage.removeItem(k));
+  toast('🔄 Reset tour แล้ว — จะเจอตอน login ครั้งหน้า','info');
+}
+
+
 
 function renderSettings(){
   // Sync safe mode toggle with saved state
