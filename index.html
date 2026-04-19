@@ -1409,7 +1409,6 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
 <div class="undo-bar" id="undo-bar" style="display:none">
  <button id="undo-btn" class="btn btn-outline btn-sm" onclick="undo()" title="Undo" style="opacity:.4;padding:4px 8px;font-size:14px">↩️</button>
  <button id="redo-btn" class="btn btn-outline btn-sm" onclick="redo()" title="Redo" style="opacity:.4;padding:4px 8px;font-size:14px">↪️</button>
- <button class="btn btn-outline btn-sm" onclick="shuffleDemo()" title="สลับข้อมูลเดโม่" style="padding:4px 10px;font-size:12px;color:var(--purple);border-color:rgba(155,111,255,.3)">🎲 เดโม่</button>
 </div>
 
 <script>
@@ -2852,78 +2851,8 @@ async function seedDemo(){
 // ══════════════════════════════════════════════
 // DEMO SHUFFLE (admin only)
 // ══════════════════════════════════════════════
-const _DEMO_SETS = [
-  {
-    label:'เซ็ต A — ต้นเดือน',
-    projs:[
-      {id:'P001',name:'JW8_วิวาห์รักป่วนหัวใจ',client:'Hope Bis',type:'ซีรีย์',budget:12000,duration:135,date:'2026-02-10',startDate:'2026-02-08',deadline:'2026-02-15',cycle:'ต้นเดือน (1-15)',note:'',createdAt:new Date(),
-        workers:[{id:'D001',slot:'dub-main',amount:2085,unit:'นาที',status:'paid',voucherNo:'GS-2569-0001'},{id:'D002',slot:'dub-sub',amount:1350,unit:'เหมา',status:'paid',voucherNo:'GS-2569-0002'},{id:'M001',slot:'mix-only',amount:2700,unit:'เหมา',status:'paid',voucherNo:'GS-2569-0003'}],
-        tax:{dub:3,adp:0,mix:3,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
-      {id:'P002',name:'JW10_บ่วงรัก',client:'Hope Bis',type:'ซีรีย์',budget:12000,duration:139,date:'2026-03-05',startDate:'2026-03-03',deadline:'2026-03-10',cycle:'ต้นเดือน (1-15)',note:'',createdAt:new Date(),
-        workers:[{id:'D003',slot:'dub-main',amount:2085,unit:'นาที',status:'paid',voucherNo:'GS-2569-0004'},{id:'D001',slot:'dub-sub',amount:1390,unit:'เหมา',status:'approved'},{id:'M002',slot:'mix-only',amount:2780,unit:'เหมา',status:'pending'}],
-        tax:{dub:3,adp:0,mix:3,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
-      {id:'P003',name:'JW13_ตำนานบทใหม่',client:'Hope Bis',type:'ซีรีย์',budget:12000,duration:145,date:'2026-04-01',startDate:'2026-04-01',deadline:'2026-04-20',cycle:'ปลายเดือน (16-31)',note:'',createdAt:new Date(),
-        workers:[{id:'D004',slot:'dub-main',amount:2175,unit:'นาที',status:'pending'},{id:'A001',slot:'adp-only',amount:1500,unit:'เหมา',status:'pending'},{id:'M001',slot:'mix-only',amount:2900,unit:'เหมา',status:'pending'}],
-        tax:{dub:3,adp:0,mix:3,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
-    ]
-  },
-  {
-    label:'เซ็ต B — ปลายเดือน',
-    projs:[
-      {id:'P101',name:'ดาวหฤทัย Season 2',client:'Rabbit Film',type:'ซีรีย์',budget:18000,duration:158,date:'2026-02-16',startDate:'2026-02-16',deadline:'2026-02-28',cycle:'ปลายเดือน (16-31)',note:'',createdAt:new Date(),
-        workers:[{id:'D005',slot:'dub-main',amount:3476,unit:'เหมา',status:'paid',voucherNo:'GS-2569-0010'},{id:'Q001',slot:'qc-only',amount:1500,unit:'เหมา',status:'paid',voucherNo:'GS-2569-0011'},{id:'M003',slot:'mix-only',amount:3200,unit:'เหมา',status:'approved'}],
-        tax:{dub:0,adp:0,mix:0,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
-      {id:'P102',name:'สายลมและแสงดาว',client:'Mango Studio',type:'ภาพยนตร์',budget:25000,duration:102,date:'2026-03-16',startDate:'2026-03-16',deadline:'2026-03-31',cycle:'ปลายเดือน (16-31)',note:'เร่งด่วน',createdAt:new Date(),
-        workers:[{id:'D001',slot:'dub-main',amount:4080,unit:'เหมา',status:'pending'},{id:'A002',slot:'adp-only',amount:2000,unit:'เหมา',status:'pending'},{id:'M001',slot:'mix-only',amount:4500,unit:'เหมา',status:'pending'}],
-        tax:{dub:3,adp:0,mix:3,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
-      {id:'P103',name:'มหัศจรรย์สองโลก',client:'Rabbit Film',type:'ซีรีย์',budget:15000,duration:120,date:'2026-04-16',startDate:'2026-04-16',deadline:'2026-04-30',cycle:'ปลายเดือน (16-31)',note:'',createdAt:new Date(),
-        workers:[{id:'D002',slot:'dub-main',amount:2400,unit:'เหมา',status:'pending'},{id:'M002',slot:'mix-only',amount:2800,unit:'เหมา',status:'pending'}],
-        tax:{dub:0,adp:0,mix:0,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
-    ]
-  },
-  {
-    label:'เซ็ต C — คละสถานะ',
-    projs:[
-      {id:'P201',name:'เสียงกระซิบแห่งฟากฟ้า',client:'Hope Bis',type:'ซีรีย์',budget:17550,duration:117,date:'2026-03-01',startDate:'2026-03-01',deadline:'2026-03-20',cycle:'ต้นเดือน (1-15)',note:'',createdAt:new Date(),
-        workers:[{id:'D003',slot:'dub-main',amount:2340,unit:'เหมา',status:'paid',voucherNo:'GS-2569-0020'},{id:'S001',slot:'sub-only',amount:1170,unit:'เหมา',status:'paid',voucherNo:'GS-2569-0021'},{id:'M003',slot:'mix-only',amount:2340,unit:'เหมา',status:'approved'}],
-        tax:{dub:0,adp:0,mix:0,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
-      {id:'P202',name:'ปาฏิหาริย์แห่งรัก',client:'Daisy Film',type:'ภาพยนตร์',budget:20000,duration:128,date:'2026-04-01',startDate:'2026-04-01',deadline:'2026-04-15',cycle:'ต้นเดือน (1-15)',note:'สำคัญมาก',createdAt:new Date(),
-        workers:[{id:'D001',slot:'dub-main',amount:5120,unit:'เหมา',status:'pending'},{id:'D004',slot:'dub-sub',amount:2560,unit:'เหมา',status:'pending'},{id:'A001',slot:'adp-only',amount:2000,unit:'เหมา',status:'pending'},{id:'M001',slot:'mix-only',amount:4500,unit:'เหมา',status:'pending'}],
-        tax:{dub:3,adp:0,mix:3,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
-      {id:'P203',name:'ลมหายใจสุดท้าย',client:'Mango Studio',type:'ซีรีย์',budget:9800,duration:98,date:'2026-04-10',startDate:'2026-04-10',deadline:'2026-04-25',cycle:'ปลายเดือน (16-31)',note:'',createdAt:new Date(),
-        workers:[{id:'D005',slot:'dub-main',amount:1960,unit:'เหมา',status:'approved'},{id:'Q001',slot:'qc-only',amount:980,unit:'เหมา',status:'pending'}],
-        tax:{dub:0,adp:0,mix:0,qc:0,sub:0,mgr:0},evidenceLogs:[],snapshot:null},
-    ]
-  }
-];
+// Demo data system has been permanently removed for data safety.
 
-let _demoSetIdx = 0;
-async function shuffleDemo(){
-  if(currentUser?.role !== 'admin'){toast('เฉพาะแอดมินเท่านั้น 🔒','error');return;}
-  if(!confirm('สลับข้อมูลเดโม่? โปรเจกต์ปัจจุบันทั้งหมดจะถูกลบและแทนด้วยชุดข้อมูลใหม่'))return;
-  showLoader(true);
-  try {
-    // Clear existing projects
-    const existing = getProjects();
-    for(const p of existing){
-      try{
-        if(_fbDatabase) await _fbDatabase.ref('projects/'+p.id).remove();
-      }catch(e){}
-    }
-    projectsCache=[];ls('projects_v3',[]);
-    // Cycle to next set
-    _demoSetIdx = (_demoSetIdx + 1) % _DEMO_SETS.length;
-    const set = _DEMO_SETS[_demoSetIdx];
-    for(const p of set.projs) await saveProjectDB(p);
-    await loadProjects();
-    renderDash();
-    toast(`✅ สลับเป็น "${set.label}" แล้ว`,'success');
-  } catch(e){
-    toast('เกิดข้อผิดพลาด: '+e.message,'error');
-  } finally {
-    showLoader(false);
-  }
-}
 
 // ══════════════════════════════════════════════
 // NAVIGATION
@@ -6534,12 +6463,68 @@ async function adminResetStaffPassword(email, nickname) {
   try {
     if (!_fbAuth) { toast('Firebase ไม่ได้เชื่อมต่อ', 'error'); return; }
     await _fbAuth.sendPasswordResetEmail(email);
-    toast(`✅ ส่งลิงก์รีเซ็ตไปที่ ${email} แล้ว — แจ้งให้ ${nickname} เช็คเมลได้เลย`, 'success');
+    // Show detailed success modal with troubleshooting tips
+    const okModal = document.createElement('div');
+    okModal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:5001;display:flex;align-items:center;justify-content:center;padding:16px';
+    okModal.innerHTML = `<div style="background:var(--card);border:1px solid rgba(0,223,160,.4);border-radius:16px;padding:24px;width:460px;max-width:98vw">
+      <div style="font-size:40px;text-align:center;margin-bottom:8px">✅</div>
+      <div style="font-size:17px;font-weight:800;text-align:center;margin-bottom:4px;color:var(--green)">ส่งลิงก์รีเซ็ตไปแล้ว</div>
+      <div style="font-size:13px;text-align:center;color:var(--text2);margin-bottom:18px">ไปที่ <strong style="color:var(--text)">${email}</strong></div>
+      <div style="background:rgba(255,158,0,.1);border:1px solid rgba(255,158,0,.3);border-radius:9px;padding:12px 14px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--orange);margin-bottom:6px">⚠️ ถ้า ${nickname} ไม่ได้รับอีเมล ให้บอกเขาตรวจตามนี้:</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7">
+          1. เช็ค <strong style="color:var(--text)">Spam / Junk / โปรโมชั่น</strong> (สำคัญ!) <br>
+          2. ค้นหาคำว่า <strong style="color:var(--accent2)">"Firebase"</strong> หรือ <strong style="color:var(--accent2)">"guinhomestudio"</strong> ในเมล<br>
+          3. ผู้ส่งจะเป็น <strong style="color:var(--text)">noreply@guinhomestudio.firebaseapp.com</strong><br>
+          4. รออีก 5-15 นาที Firebase บางทีดีเลย์<br>
+          5. ลิงก์หมดอายุใน 1 ชั่วโมง — ถ้าเกินนี้ต้องส่งใหม่
+        </div>
+      </div>
+      <div style="text-align:center;display:flex;gap:8px;justify-content:center">
+        <button onclick="this.closest('[style*=fixed]').remove();adminResetStaffPassword('${email.replace(/'/g,"\\'")}','${nickname.replace(/'/g,"\\'")}')" style="padding:9px 16px;background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.35);border-radius:9px;color:var(--orange);font-family:Kanit;font-size:12px;font-weight:700;cursor:pointer">🔄 ส่งซ้ำอีกครั้ง</button>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="padding:9px 22px;background:var(--accent2);border:none;border-radius:9px;color:#fff;font-family:Kanit;font-weight:700;cursor:pointer">เข้าใจแล้ว</button>
+      </div>
+    </div>`;
+    document.body.appendChild(okModal);
   } catch(e) {
-    const msg = e.code?.includes('user-not-found') ? `ไม่พบ Email ${email} ใน Firebase Auth — ต้องสร้าง account ให้ก่อน`
-              : e.code?.includes('invalid-email')   ? 'Email ไม่ถูกต้อง'
-              : 'เกิดข้อผิดพลาด: ' + (e.code || e.message);
-    toast(msg, 'error');
+    console.error('[adminResetStaffPassword] Firebase error:', e);
+    // Detailed error messages for different failure modes
+    let title, body, hint;
+    const code = e.code || '';
+    if (code.includes('user-not-found')) {
+      title = '❌ ไม่พบ Email ในระบบ';
+      body = `Email <strong>${email}</strong> ยังไม่เคย login เข้าเว็บ<br>จึงยังไม่มี account ใน Firebase ให้รีเซ็ต`;
+      hint = 'ให้ <strong>'+nickname+'</strong> ไปที่หน้า login → กด "สมัครใหม่" → ใช้ Email นี้สมัครก่อน จึงจะรีเซ็ตได้ในอนาคต';
+    } else if (code.includes('invalid-email')) {
+      title = '❌ Email รูปแบบไม่ถูกต้อง';
+      body = `"${email}" สะกดผิด หรือไม่ใช่ Email`;
+      hint = 'เข้าไปแก้ Email ในหน้า "จัดการทีม" แล้วลองใหม่';
+    } else if (code.includes('too-many-requests')) {
+      title = '⏰ ส่งบ่อยเกินไป';
+      body = `Firebase block การส่งเมลชั่วคราว (ปกติ 15-60 นาที)`;
+      hint = 'รอสักพักแล้วลองใหม่ หรือให้ '+nickname+' ไปกด "ลืมรหัสผ่าน?" เองที่หน้า login';
+    } else if (code.includes('network-request-failed')) {
+      title = '🌐 เน็ตหลุด';
+      body = 'การเชื่อมต่ออินเทอร์เน็ตมีปัญหา';
+      hint = 'เช็คเน็ตแล้วลองใหม่';
+    } else {
+      title = '⚠️ เกิดข้อผิดพลาด';
+      body = `Error code: <code style="background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px">${code||'unknown'}</code><br>${e.message||''}`;
+      hint = 'ถ้าเจอบ่อย ให้เช็คที่ Firebase Console → Authentication → Templates → Password reset ว่าเปิดใช้งานอยู่ไหม';
+    }
+    const errModal = document.createElement('div');
+    errModal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:5001;display:flex;align-items:center;justify-content:center;padding:16px';
+    errModal.innerHTML = `<div style="background:var(--card);border:1px solid rgba(255,64,64,.4);border-radius:16px;padding:24px;width:420px;max-width:98vw">
+      <div style="font-size:17px;font-weight:800;text-align:center;margin-bottom:10px;color:var(--red)">${title}</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.6;margin-bottom:14px;text-align:center">${body}</div>
+      <div style="background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.2);border-radius:9px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--text2);line-height:1.6">
+        <strong style="color:var(--accent2)">💡 วิธีแก้:</strong> ${hint}
+      </div>
+      <div style="text-align:center">
+        <button onclick="this.closest('[style*=fixed]').remove()" style="padding:9px 22px;background:var(--accent2);border:none;border-radius:9px;color:#fff;font-family:Kanit;font-weight:700;cursor:pointer">เข้าใจแล้ว</button>
+      </div>
+    </div>`;
+    document.body.appendChild(errModal);
   }
 }
 
@@ -6728,10 +6713,13 @@ async function adminCleanDuplicates(){
   const snap=await _fbDatabase.ref('projects').get();
   if(!snap.exists()){toast('ไม่มีข้อมูล','info');return;}
   const all=Object.values(snap.val()).filter(p=>p&&p.id);
-  const names=all.map((p,i)=>`${i+1}. ${p.name}`).join('\n');
-  // ลบทุกอัน [คัดลอก] ไม่ว่ากี่ชั้น
   const copies=all.filter(p=>(p.name||'').includes('[คัดลอก]'));
-  if(!confirm(`Firebase มี ${all.length} โปรเจกต์:\n${names}\n\nจะลบ [คัดลอก] ${copies.length} รายการ`)) return;
+  if(copies.length===0){ toast('ไม่มีโปรเจกต์ที่ชื่อ [คัดลอก] — ไม่มีอะไรให้ลบ','info'); return; }
+  const copyNames = copies.map((p,i)=>`  ${i+1}. ${p.name}`).join('\n');
+  // Double confirmation — must type "ลบ" to proceed
+  if(!confirm(`⚠️ จะลบ ${copies.length} โปรเจกต์ที่ชื่อมี [คัดลอก]:\n\n${copyNames}\n\nยืนยันขั้นที่ 1/2 — ต่อไปจะให้พิมพ์คำยืนยัน`)) return;
+  const typed = prompt(`⚠️ ยืนยันขั้นที่ 2/2\n\nพิมพ์คำว่า  ลบ  เพื่อยืนยัน (action นี้กู้คืนไม่ได้)`);
+  if((typed||'').trim() !== 'ลบ'){ toast('ยกเลิกการลบแล้ว','info'); return; }
   for(const p of copies){
     await _fbDatabase.ref('projects/'+p.id).remove();
   }
