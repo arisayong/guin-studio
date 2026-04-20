@@ -474,8 +474,11 @@ body.safe-mode [data-money]:hover{filter:blur(0) !important}
 .staff-card-actions{display:flex;gap:6px;margin-top:11px}
 
 /* UNDO BAR */
-.undo-bar{position:fixed;top:14px;right:18px;display:flex;gap:4px;z-index:600;background:var(--card);
+.undo-bar{position:fixed;top:calc(56px + 12px);right:18px;display:flex;gap:4px;z-index:140;background:var(--card);
   border:1px solid var(--border);border-radius:10px;padding:4px 8px;box-shadow:0 4px 18px rgba(0,0,0,.5)}
+@media (max-width: 768px){
+  .undo-bar{top:auto;bottom:14px;right:14px}
+}
 
 /* CALENDAR CARD */
 .trk-calendar-card{background:#fff;border:1px solid #dce8f6;border-radius:var(--r);padding:22px;margin-bottom:14px;box-shadow:0 4px 22px rgba(0,0,0,.16)}
