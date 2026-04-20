@@ -19,6 +19,12 @@
   try{
     var t = localStorage.getItem('app_theme_v1') || 'dark';
     if(t==='light') document.documentElement.setAttribute('data-theme','light');
+    // Restore sidebar collapsed state (desktop only, < 768px ใช้ drawer แทน)
+    var sc = localStorage.getItem('app_sidebar_collapsed');
+    if(sc === '1' && window.innerWidth > 768){
+      // ใช้ attribute-based marker เพราะ body ยังไม่มีตอน script รัน
+      document.documentElement.setAttribute('data-sidebar-collapsed','1');
+    }
   }catch(e){}
 })();
 </script>
@@ -591,10 +597,23 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
 }
 .mobile-menu-btn:active{transform:scale(0.94)}
 .mobile-backdrop{
-  display:none;position:fixed;inset:0;z-index:99;
+  display:none;position:fixed;left:0;right:0;bottom:0;top:56px;z-index:99;
   background:rgba(0,0,0,.55);backdrop-filter:blur(2px);
 }
 body.mobile-menu-open .mobile-backdrop{display:block}
+
+/* ── Sidebar collapsed state (desktop only — YouTube-style toggle) ── */
+body.sidebar-collapsed .sidebar{
+  transform:translateX(-100%);
+  transition:transform .24s cubic-bezier(.4,0,.2,1);
+}
+body.sidebar-collapsed .main-content{
+  margin-left:0;
+  max-width:100vw;
+  transition:margin-left .24s cubic-bezier(.4,0,.2,1),max-width .24s cubic-bezier(.4,0,.2,1);
+}
+.sidebar{transition:transform .24s cubic-bezier(.4,0,.2,1)}
+.main-content{transition:margin-left .24s cubic-bezier(.4,0,.2,1),max-width .24s cubic-bezier(.4,0,.2,1)}
 
 @media (max-width: 768px){
   /* Hamburger standalone ซ่อน (ย้ายไปอยู่ใน top-bar แล้ว) */
@@ -2233,12 +2252,27 @@ function toggleTheme(){
 // MOBILE MENU (Hamburger drawer)
 // ══════════════════════════════════════════════
 function toggleMobileMenu(){
-  document.body.classList.toggle('mobile-menu-open');
+  // Mobile (≤768px): เปิด/ปิด drawer พร้อม backdrop
+  // Desktop (>768px): ยุบ/ขยาย sidebar แบบ YouTube (main expand)
+  if(window.innerWidth <= 768){
+    document.body.classList.toggle('mobile-menu-open');
+  } else {
+    document.body.classList.toggle('sidebar-collapsed');
+    try{ localStorage.setItem('app_sidebar_collapsed', document.body.classList.contains('sidebar-collapsed') ? '1' : '0'); }catch(e){}
+  }
 }
 function openMobileMenu(){ document.body.classList.add('mobile-menu-open'); }
 function closeMobileMenu(){ document.body.classList.remove('mobile-menu-open'); }
 
 // ── Profile dropdown menu (v4 YouTube-style top-bar) ──
+// Apply sidebar-collapsed state that was saved (FOUC-proof via documentElement attr)
+(function(){
+  try{
+    if(document.documentElement.getAttribute('data-sidebar-collapsed') === '1' && window.innerWidth > 768){
+      document.body.classList.add('sidebar-collapsed');
+    }
+  }catch(e){}
+})();
 function toggleProfileMenu(ev){
   if(ev) ev.stopPropagation();
   const m = document.getElementById('profile-menu');
@@ -4133,14 +4167,44 @@ function trkCalNext(){trkCalMonth++;if(trkCalMonth>11){trkCalMonth=0;trkCalYear+
 function renderTrkBoard(){
   const el=document.getElementById('trk-board');if(!el)return;
   let cards=getTrkCards();
+  // ── Auto-ensure: สร้าง card ให้ทุกโปรเจกต์ active ที่ยังไม่มี card ──
+  // (ไม่สร้างถ้า user เคยลบ card ของโปรเจกต์นั้นแล้ว — dismiss flag)
+  try{
+    const allProjs = getProjects() || [];
+    const existingProjIds = new Set(cards.filter(c=>c.projId).map(c=>c.projId));
+    let createdCount = 0;
+    allProjs.forEach(p=>{
+      if(!p || !p.id) return;
+      // ข้ามโปรเจกต์ที่เสร็จ/ยกเลิก
+      if(p.projStatus === 'done' || p.projStatus === 'cancelled') return;
+      // มี card แล้ว
+      if(existingProjIds.has(p.id)) return;
+      // User เคยลบ card ของโปรเจกต์นี้แล้ว → ไม่สร้างใหม่
+      if(ls('_dismissed_trk_'+p.id)) return;
+      // สร้าง card ให้
+      const newCard = {
+        id: 'TC'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+        projId: p.id,
+        phases: p.phases ? JSON.parse(JSON.stringify(p.phases)) : {},
+        createdAt: new Date().toISOString(),
+        _autoCreated: true
+      };
+      cards.push(newCard);
+      createdCount++;
+    });
+    if(createdCount > 0){
+      saveTrkCards(cards);
+      console.log('✅ Auto-created '+createdCount+' track cards for existing projects');
+    }
+  }catch(e){ console.warn('auto-ensure trk cards error:', e); }
+
   if(!cards.length){
-    el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">ยังไม่มีการ์ด<div style="font-size:11px;margin-top:8px;opacity:.7">ตั้งแต่ v4 การ์ดจะสร้างให้อัตโนมัติเมื่อคุณสร้างโปรเจกต์และกำหนดวันเริ่ม/deadline ของทีม</div></div>';
-    // Show legacy toggle (แสดงปุ่มเก่าให้ admin กดได้ถ้าจำเป็น)
+    el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">ยังไม่มีการ์ด<div style="font-size:11px;margin-top:8px;opacity:.7">การ์ดจะสร้างอัตโนมัติเมื่อมีโปรเจกต์ active<br>หรือถ้าคุณเคยลบไปแล้ว — <a href="#" onclick="event.preventDefault();resetDismissedTrkCards()" style="color:var(--accent2);text-decoration:underline">กู้คืนการ์ดที่ลบ</a></div></div>';
     const lt = document.getElementById('trk-legacy-toggle');
     if(lt) lt.style.display = 'inline';
     return;
   }
-  // ถ้ามี card ที่ยังไม่ link projId → แสดง legacy toggle (เพื่อให้ user เห็นปุ่ม "เพิ่มการ์ดเปล่า" ถ้าจำเป็น)
+  // ถ้ามี card ที่ยังไม่ link projId → แสดง legacy toggle
   const hasUnlinked = cards.some(c=>!c.projId);
   const lt = document.getElementById('trk-legacy-toggle');
   if(lt) lt.style.display = hasUnlinked ? 'inline' : 'none';
@@ -4154,7 +4218,17 @@ function renderTrkBoard(){
     const oldPhases=card.phases||{};
     const newPhases={};
     // เพิ่ม phase ที่ขาด, เก็บ phase เดิมที่มีข้อมูลไว้
-    activePhases.forEach(phKey=>{newPhases[phKey]=oldPhases[phKey]||{startDate:'',deadline:'',status:'none'}});
+    activePhases.forEach(phKey=>{
+      newPhases[phKey] = oldPhases[phKey]
+        || (p.phases && p.phases[phKey]
+          ? {
+              startDate: p.phases[phKey].startDate||'',
+              deadline: p.phases[phKey].deadline||'',
+              submitTime: p.phases[phKey].submitTime||'',
+              status: p.phases[phKey].status||'none'
+            }
+          : {startDate:'',deadline:'',status:'none'});
+    });
     const oldKeys=Object.keys(oldPhases).sort().join(',');
     const newKeys=Object.keys(newPhases).sort().join(',');
     if(oldKeys!==newKeys){changed=true;return{...card,phases:newPhases};}
@@ -4162,6 +4236,17 @@ function renderTrkBoard(){
   });
   if(changed)saveTrkCards(cards);
   el.innerHTML=cards.map(card=>renderTrkCardHTML(card)).join('');
+}
+
+// Helper: ลบ dismiss flags ทั้งหมด (กู้คืนการ์ดที่ user เคยลบ)
+function resetDismissedTrkCards(){
+  try{
+    const keys = Object.keys(localStorage).filter(k=>k.startsWith('_dismissed_trk_'));
+    keys.forEach(k=>localStorage.removeItem(k));
+    renderTrkBoard();
+    renderTrkCalendar();
+    toast('✅ กู้คืนการ์ดแล้ว '+keys.length+' โปรเจกต์','success');
+  }catch(e){ console.warn(e); }
 }
 function renderTrkCardHTML(card){
   const projOpts=getProjects().map(pp=>`<option value="${pp.id}"${card.projId===pp.id?' selected':''}>${pp.name}</option>`).join('');
@@ -4255,7 +4340,13 @@ function toggleTrkCheck(cardId){
   renderTrkBoard();renderTrkCalendar();
 }
 function removeTrkCard(cardId){
-  const updated=getTrkCards().filter(c=>c.id!==cardId);
+  const cards = getTrkCards();
+  const card = cards.find(c=>c.id===cardId);
+  // ถ้า card นี้ link กับ project อยู่ → mark ว่า user ลบแล้ว ไม่ต้อง auto-create กลับ
+  if(card && card.projId){
+    try{ ls('_dismissed_trk_'+card.projId, '1'); }catch(e){}
+  }
+  const updated = cards.filter(c=>c.id!==cardId);
   ls('trk_cards_v3',updated);
   trkCheckedCards.delete(cardId);
   renderTrkBoard();
