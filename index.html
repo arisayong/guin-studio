@@ -147,6 +147,16 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .btn-sm{padding:6px 12px;font-size:12px}
 .btn-xs{padding:4px 9px;font-size:11px}
 
+/* Prevent mouse wheel from changing number input values */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 /* Quick Action buttons — Dashboard */
 .qa-btn{display:flex;align-items:center;gap:10px;padding:14px 16px;border-radius:12px;color:var(--text);font-family:Kanit;font-size:14px;font-weight:600;cursor:pointer;text-align:left;transition:background .15s, transform .15s, box-shadow .15s}
 .qa-btn:hover{transform:translateY(-1px)}
@@ -1264,11 +1274,11 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
        <option value="flat">เหมา</option>
        <option value="per-minute">นาที</option>
       </select>
-      <input class="form-input" id="pj-budget" type="number" placeholder="0" oninput="calcProjSummary()" style="flex:1;min-width:0">
+      <input class="form-input" id="pj-budget" type="number" placeholder="0" min="0" step="any" onwheel="this.blur()" oninput="calcProjSummary()" style="flex:1;min-width:0">
      </div>
      <div id="pj-budget-calc" style="font-size:11px;color:var(--text2);margin-top:4px;display:none"></div>
     </div>
-    <div class="form-group" style="margin:0"><label class="form-label">ความยาว (นาที)</label><input class="form-input" id="pj-duration" type="number" placeholder="ถ้ามี" oninput="calcProjSummary();renderAllWorkerLists()"></div>
+    <div class="form-group" style="margin:0"><label class="form-label">ความยาว (นาที)</label><input class="form-input" id="pj-duration" type="number" placeholder="ถ้ามี" min="0" step="any" onwheel="this.blur()" oninput="calcProjSummary();renderAllWorkerLists()"></div>
    </div>
    <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">ชื่อ / URL ลูกค้า</label><input class="form-input" id="pj-client" placeholder="ชื่อลูกค้า หรือ link"></div>
@@ -3834,8 +3844,9 @@ function renderWorkerList(cat,slot){
     const hasComment = !!(w.comment||'').trim();
     return`<div class="worker-rate-row" style="flex-wrap:wrap">
       <span class="worker-name-badge" style="color:${catColors[cat]||'var(--text)'};cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px" onclick="openReplaceWorker('${cat}','${slot}',${i},event)" title="คลิกเพื่อเปลี่ยนคน">${s.nickname} <span style="font-size:9px;opacity:.55">🔄</span></span>
-      <input type="number" value="${w.amount||''}" placeholder="ราคา" min="0"
+      <input type="number" value="${w.amount||''}" placeholder="ราคา" min="0" step="any"
         style="flex:1;min-width:80px;padding:6px 9px;background:rgba(0,0,0,.35);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px"
+        onwheel="this.blur()"
         oninput="updateSlotAmount('${cat}','${slot}',${i},this.value)">
       <span style="color:var(--text2);font-size:12px">/</span>
       <select style="padding:5px 8px;background:rgba(0,0,0,.35);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:12px" onchange="updateSlotUnit('${cat}','${slot}',${i},this.value)">
