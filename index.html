@@ -142,6 +142,13 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .btn-primary:active{transform:translateY(0)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 
+#view-project-toc .toc-item:hover{background:var(--dim)!important}
+@media (max-width: 768px){
+  #modal-view-project .modal{width:100vw!important;max-width:100vw!important;height:100vh;max-height:100vh;border-radius:0}
+  #modal-view-project [style*="display:flex;gap:0"]{flex-direction:column}
+  #view-project-toc{width:100%!important;min-width:unset!important;max-height:160px;border-right:none;border-bottom:1px solid var(--border2)}
+  #view-project-body{padding:14px!important;max-height:unset!important}
+}
 /* ══════ LAYOUT ══════ */
 #app-layout{display:flex;min-height:100vh;position:relative;z-index:1}
 /* ── TOP BAR (v4.1 YouTube-style layout) ── */
@@ -1628,13 +1635,21 @@ body.sidebar-collapsed .main-content{
 <!-- PROJECT MODAL -->
 <!-- View-only modal (opens via 👁️ button) -->
 <div id="modal-view-project" class="modal-overlay hidden">
- <div class="modal" style="width:780px;max-width:96vw">
-  <div class="modal-head">
-   <div class="modal-title" id="view-project-title">👁️ ดูโปรเจกต์</div>
+ <div class="modal" style="width:1100px;max-width:97vw">
+  <div class="modal-head" style="display:flex;align-items:center;gap:12px">
+   <div class="modal-title" id="view-project-title" style="flex:1">👁️ ดูโปรเจกต์</div>
+   <button id="view-prev-btn" onclick="navViewProject(-1)" title="โปรเจกต์ก่อนหน้า (←)" style="width:34px;height:34px;border:1px solid var(--border2);background:transparent;border-radius:8px;color:var(--text);cursor:pointer;font-size:16px">◀</button>
+   <button id="view-next-btn" onclick="navViewProject(1)" title="โปรเจกต์ถัดไป (→)" style="width:34px;height:34px;border:1px solid var(--border2);background:transparent;border-radius:8px;color:var(--text);cursor:pointer;font-size:16px">▶</button>
    <button class="btn-close" onclick="closeModal('modal-view-project');releasePresence()">✕</button>
   </div>
-  <div class="modal-body" id="view-project-body" style="max-height:70vh;overflow-y:auto"></div>
-  <div class="modal-foot" style="display:flex;gap:10px;justify-content:flex-end">
+  <div style="display:flex;gap:0;max-height:72vh;overflow:hidden">
+   <!-- Sidebar: สารบัญ -->
+   <aside id="view-project-toc" style="width:240px;min-width:240px;border-right:1px solid var(--border2);overflow-y:auto;padding:10px;background:var(--bg2)"></aside>
+   <!-- Body -->
+   <div class="modal-body" id="view-project-body" style="flex:1;max-height:72vh;overflow-y:auto;padding:20px"></div>
+  </div>
+  <div class="modal-foot" style="display:flex;gap:10px;justify-content:flex-end;align-items:center">
+   <div style="flex:1;font-size:11px;color:var(--text2)" id="view-project-pos">—</div>
    <button class="btn btn-outline" onclick="closeModal('modal-view-project');releasePresence()">ปิด</button>
    <button class="btn btn-blue" onclick="closeViewAndEdit()">✏️ แก้ไขโปรเจกต์นี้</button>
   </div>
@@ -5297,10 +5312,92 @@ async function openViewProject(id){
   // Save current projId เพื่อให้ปุ่ม "แก้ไข" ใน modal นี้ทำงานได้
   window._viewingProjId = id;
   document.getElementById('view-project-title').textContent = '👁️ ดูโปรเจกต์: '+(p.name||'');
+  // Render sidebar TOC + update nav position
+  try{ renderViewProjectTOC(id); }catch(e){ console.warn('TOC error:', e); }
   openModal('modal-view-project');
   // Claim presence แบบ viewing (ไม่ใช่ editing → ไม่ทริกเกอร์ warning banner)
   try{ claimPresence(id, 'viewing'); }catch(e){}
+  // Scroll body ไปด้านบน (กรณีเพิ่งสลับโปรเจกต์)
+  try{ document.getElementById('view-project-body').scrollTop = 0; }catch(e){}
 }
+
+// ── Sidebar TOC + Navigation สำหรับ view modal ──
+function _getSortedProjectsForView(){
+  // เรียงใหม่ → เก่า (ตาม startDate/createdAt)
+  return (getProjects()||[]).slice().sort((a,b)=>{
+    const aD = a.startDate || a.date || a.createdAt || '';
+    const bD = b.startDate || b.date || b.createdAt || '';
+    return bD.localeCompare(aD);
+  });
+}
+
+function renderViewProjectTOC(currentId){
+  const toc = document.getElementById('view-project-toc');
+  if(!toc) return;
+  const projs = _getSortedProjectsForView();
+  const idx = projs.findIndex(p=>p.id===currentId);
+  // ปุ่ม ←/→ enable/disable
+  const prev = document.getElementById('view-prev-btn');
+  const next = document.getElementById('view-next-btn');
+  if(prev){
+    prev.disabled = (idx <= 0);
+    prev.style.opacity = (idx <= 0) ? '.35' : '1';
+    prev.style.cursor = (idx <= 0) ? 'not-allowed' : 'pointer';
+  }
+  if(next){
+    next.disabled = (idx < 0 || idx >= projs.length-1);
+    next.style.opacity = next.disabled ? '.35' : '1';
+    next.style.cursor = next.disabled ? 'not-allowed' : 'pointer';
+  }
+  // Position label
+  const pos = document.getElementById('view-project-pos');
+  if(pos) pos.textContent = (idx+1) + ' / ' + projs.length;
+  // Sidebar list
+  toc.innerHTML = projs.map((p,i)=>{
+    const active = (p.id === currentId);
+    const sd = p.startDate || p.date;
+    const sdTxt = sd ? new Date(sd).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '';
+    const statusLbl = p.projStatus==='done' ? '✓' : p.projStatus==='cancelled' ? '✕' : '';
+    return `<div onclick="navViewProjectTo('${p.id}')" class="toc-item" style="padding:8px 10px;border-radius:7px;cursor:pointer;margin-bottom:3px;background:${active?'rgba(0,180,255,.12)':'transparent'};border-left:3px solid ${active?'var(--accent2)':'transparent'};transition:background .1s">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:12px;font-weight:${active?'800':'600'};color:${active?'var(--accent2)':'var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1" title="${p.name||''}">${p.name||'—'}</span>
+        ${statusLbl?`<span style="font-size:10px;color:var(--text2);opacity:.6">${statusLbl}</span>`:''}
+      </div>
+      ${sdTxt?`<div style="font-size:10px;color:var(--text2);margin-top:2px">📅 ${sdTxt}</div>`:''}
+    </div>`;
+  }).join('') || '<div style="color:var(--text2);font-size:12px;padding:14px 8px">ไม่มีโปรเจกต์</div>';
+  // Scroll active item into view
+  setTimeout(()=>{
+    const act = toc.querySelector('.toc-item[style*="var(--accent2)"]');
+    if(act) act.scrollIntoView({block:'nearest', behavior:'smooth'});
+  }, 50);
+}
+
+function navViewProject(dir){
+  const projs = _getSortedProjectsForView();
+  const idx = projs.findIndex(p=>p.id===window._viewingProjId);
+  const nextIdx = idx + dir;
+  if(nextIdx < 0 || nextIdx >= projs.length) return;
+  try{ releasePresence(); }catch(e){}
+  openViewProject(projs[nextIdx].id);
+}
+
+function navViewProjectTo(id){
+  if(id === window._viewingProjId) return;
+  try{ releasePresence(); }catch(e){}
+  openViewProject(id);
+}
+
+// Keyboard shortcut: ←/→ to navigate (เฉพาะตอน view modal เปิดอยู่)
+document.addEventListener('keydown', function(e){
+  const m = document.getElementById('modal-view-project');
+  if(!m || m.classList.contains('hidden')) return;
+  // skip ถ้ากำลังพิมพ์ใน input
+  if(e.target.matches && e.target.matches('input,textarea,select')) return;
+  if(e.key === 'ArrowLeft'){ navViewProject(-1); e.preventDefault(); }
+  else if(e.key === 'ArrowRight'){ navViewProject(1); e.preventDefault(); }
+  else if(e.key === 'Escape'){ closeModal('modal-view-project'); try{releasePresence()}catch(ee){} }
+});
 
 function closeViewAndEdit(){
   const id = window._viewingProjId;
@@ -6493,9 +6590,28 @@ function renderMyDash(){
   }
   const ft = document.getElementById('my-filter-time');
   if(ft){
+    // รวบรวมเดือน-ปีทั้งหมดจาก projects ที่เห็นได้
+    const monthSet = new Set();
+    allItems.forEach(it=>{
+      if(!it.projDate) return;
+      const d = new Date(it.projDate);
+      if(isNaN(d.getTime())) return;
+      monthSet.add(d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0'));
+    });
+    const months = [...monthSet].sort().reverse(); // ใหม่ → เก่า
+    const thMonthNames = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const opts = months.map(mk=>{
+      const [y, m] = mk.split('-').map(Number);
+      return `<option value="month:${mk}"${f.time==='month:'+mk?' selected':''}>${thMonthNames[m]} ${y+543}</option>`;
+    }).join('');
     ft.innerHTML = [
-      ['all','ทั้งหมด'],['thismonth','เดือนนี้'],['lastmonth','เดือนก่อน'],['3months','3 เดือน']
-    ].map(([k,l]) => chipHtml(f.time===k, {group:'time',key:k}, l)).join('');
+      chipHtml(f.time==='all', {group:'time',key:'all'}, 'ทั้งหมด'),
+      chipHtml(f.time==='thismonth', {group:'time',key:'thismonth'}, 'เดือนนี้'),
+      `<select onchange="myFilterSet('time',this.value)" style="padding:5px 11px;background:${f.time&&f.time.startsWith('month:')?'rgba(0,180,255,.15)':'var(--bg2)'};color:${f.time&&f.time.startsWith('month:')?'var(--accent2)':'var(--text2)'};border:1px solid ${f.time&&f.time.startsWith('month:')?'var(--accent2)':'var(--border2)'};border-radius:14px;font-family:Kanit;font-size:11px;font-weight:600;cursor:pointer;min-width:130px">
+        <option value="all" ${f.time==='all'?'selected':''}>— เลือกเดือน —</option>
+        ${opts || '<option disabled>ไม่มีข้อมูล</option>'}
+      </select>`
+    ].join('');
   }
 
   // Apply filters
@@ -6514,12 +6630,9 @@ function renderMyDash(){
       if(isNaN(d.getTime())) return true;
       if(f.time === 'thismonth'){
         if(!(d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth())) return false;
-      } else if(f.time === 'lastmonth'){
-        const last = new Date(now.getFullYear(), now.getMonth()-1, 1);
-        if(!(d.getFullYear()===last.getFullYear() && d.getMonth()===last.getMonth())) return false;
-      } else if(f.time === '3months'){
-        const cutoff = new Date(now.getFullYear(), now.getMonth()-3, 1);
-        if(d < cutoff) return false;
+      } else if(f.time && f.time.startsWith('month:')){
+        const [y, m] = f.time.slice(6).split('-').map(Number);
+        if(!(d.getFullYear()===y && d.getMonth()===m)) return false;
       }
     }
     return true;
