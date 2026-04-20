@@ -592,7 +592,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
    </div>
    <!-- Quick Actions Bar — ทำบ่อย ๆ คลิกเดียวถึง -->
    <div id="quick-actions" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:18px">
-    <button class="qa-btn qa-blue" onclick="openProjectModal()">
+    <button class="qa-btn qa-blue" onclick="nav('projects');setTimeout(()=>openNewProject(),100)">
      <span style="font-size:24px">➕</span>
      <div style="flex:1">
       <div style="font-weight:700;color:var(--accent2)">สร้างโปรเจกต์</div>
@@ -613,7 +613,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
       <div style="font-size:11px;color:var(--text2);font-weight:400">เรียกเก็บเงินลูกค้า</div>
      </div>
     </button>
-    <button class="qa-btn qa-purple" onclick="nav('staff');setTimeout(()=>openStaffModal(),100)">
+    <button class="qa-btn qa-purple" onclick="nav('staff');setTimeout(()=>openAddStaff(),100)">
      <span style="font-size:24px">👤</span>
      <div style="flex:1">
       <div style="font-weight:700;color:#9B6FFF">เพิ่มทีมงาน</div>
@@ -3366,7 +3366,7 @@ function renderDash(){
      <div class="stat-value" style="color:var(--accent2)">${fmtB(revenue)}</div>
      <div class="stat-delta up">จากลูกค้าทั้งหมด</div>
     </div>
-    <div class="stat-card onclick="nav('queue')">
+    <div class="stat-card" onclick="nav('queue')">
      <span class="stat-icon">⏳</span>
      <div class="stat-label">รอจ่ายเงิน</div>
      <div class="stat-value" style="color:${pendingWorkers.length?'var(--orange)':'var(--green)'}">${fmtB(pending)}</div>
@@ -4489,8 +4489,20 @@ function renderQueue() {
           <div style="color:var(--text2)">${s.account}</div>
           ${s.promptpay ? `<div style="color:var(--text2);font-size:10px">📱 ${s.promptpay}</div>` : ''}
         </div>
-
-
+        <!-- Status badge (center) -->
+        <div style="flex:1;display:flex;align-items:center;justify-content:center">
+          ${(()=>{
+            if(w.status==='pending') return '<span style="padding:4px 10px;border-radius:20px;background:rgba(120,120,140,.15);color:var(--text2);font-size:11px;font-weight:700">⏳ รอดำเนินการ</span>';
+            if(w.status==='approved') return '<span style="padding:4px 10px;border-radius:20px;background:rgba(0,180,255,.15);color:var(--accent2);font-size:11px;font-weight:700">🔵 อนุมัติแล้ว</span>';
+            if(w.status==='waiting_client') return '<span style="padding:4px 10px;border-radius:20px;background:rgba(255,215,0,.12);color:#FFD700;font-size:11px;font-weight:700;border:1px solid rgba(255,215,0,.35)">🟡 รอลูกค้าจ่าย</span>';
+            if(w.status==='paid') return '<span style="padding:4px 10px;border-radius:20px;background:rgba(0,223,160,.15);color:var(--green);font-size:11px;font-weight:700">✅ จ่ายแล้ว</span>';
+            return '';
+          })()}
+        </div>
+        <!-- Action buttons -->
+        <div style="min-width:280px;display:flex;justify-content:flex-end">
+          ${actionBtns(p.id, w.id, w.slot, w.status)}
+        </div>
       </div>`;
     }).join('');
 
@@ -4534,8 +4546,8 @@ function renderQueue() {
           <div style="min-width:170px;font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">ชื่อ-ตำแหน่ง</div>
           <div style="min-width:110px;font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">ยอด</div>
           <div style="min-width:140px;font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">ธนาคาร</div>
-
-
+          <div style="flex:1;font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;text-align:center">สถานะ</div>
+          <div style="min-width:280px;font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;text-align:right">Actions</div>
         </div>
         ${workerRows}
       </div>
