@@ -981,12 +981,27 @@ body.sidebar-collapsed .main-content{
     <div class="page-title">📅 ติดตามงาน</div>
     <div class="page-subtitle">ภาพรวม timeline ของแต่ละโปรเจกต์ · เปลี่ยนสถานะงานได้ที่นี่</div>
     <div style="background:rgba(0,180,255,.06);border:1px solid rgba(0,180,255,.25);border-radius:10px;padding:10px 14px;margin-top:12px;font-size:12px;color:var(--text2);line-height:1.6">
-     💡 <strong style="color:var(--accent2)">Tip:</strong> ตั้งแต่ v4 การ์ดติดตามถูกสร้างให้อัตโนมัติจากฟอร์มโปรเจกต์แล้ว — หน้านี้ใช้ดูภาพรวมและเปลี่ยน<strong style="color:var(--text)">สถานะ</strong> (บรีฟ / กำลังทำ / ส่งแล้ว) ส่วน<strong style="color:var(--text)">วันเริ่ม/deadline</strong> แก้ที่หน้าโปรเจกต์เพื่อให้ข้อมูลตรงกัน
+     💡 <strong style="color:var(--accent2)">กฎการขึ้น:</strong> โปรเจกต์ที่ยังไม่กด <strong style="color:var(--text)">"✅ เสร็จแล้ว"</strong> (หรือ "❌ ยกเลิก") ในหน้าโปรเจกต์ จะถูกสร้างการ์ดให้อัตโนมัติทั้งหมด · แก้วันเริ่ม/deadline ที่หน้าโปรเจกต์ · หน้านี้เปลี่ยน<strong style="color:var(--text)">สถานะ</strong>งานเท่านั้น (บรีฟ/ทำ/ส่งแล้ว)
      <span id="trk-legacy-toggle" style="display:none;margin-left:8px"><a href="#" onclick="event.preventDefault();document.getElementById('trk-legacy-actions').style.display='';this.parentElement.style.display='none'" style="color:var(--text2);text-decoration:underline;font-size:11px">แสดงปุ่มเก่า</a></span>
     </div>
     <div class="page-actions" id="trk-legacy-actions" style="display:none"><button class="btn btn-outline" onclick="addTrkCard()" title="สร้างการ์ดว่างแบบเดิม (ไม่แนะนำใน v4)">➕ เพิ่มการ์ดเปล่า (legacy)</button></div>
    </div>
    <div id="trk-calendar" style="margin-bottom:14px"></div>
+   <!-- Search + filter bar -->
+   <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+     <input id="trk-search" placeholder="🔍 ค้นหาชื่อโปรเจกต์..." oninput="renderTrkBoard()" style="flex:1;min-width:180px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;outline:none">
+     <span id="trk-count" style="font-size:11px;color:var(--text2);padding:0 10px"></span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px">
+     <span style="font-size:10px;color:var(--text2);letter-spacing:.5px;font-weight:700;min-width:50px">สถานะ:</span>
+     <div id="trk-filter-status" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+     <span style="font-size:10px;color:var(--text2);letter-spacing:.5px;font-weight:700;min-width:50px">Deadline:</span>
+     <div id="trk-filter-deadline" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+    </div>
+   </div>
    <div id="trk-board"></div>
   </div>
 
@@ -4240,24 +4255,28 @@ function renderTrkCalendar() {
 
 function trkCalPrev(){trkCalMonth--;if(trkCalMonth<0){trkCalMonth=11;trkCalYear--}renderTrkCalendar()}
 function trkCalNext(){trkCalMonth++;if(trkCalMonth>11){trkCalMonth=0;trkCalYear++}renderTrkCalendar()}
+// State: trk filters
+window._trkFilter = window._trkFilter || { status: 'active', deadline: 'all' };
+
+function trkFilterSet(group, val){
+  if(!window._trkFilter) window._trkFilter = { status:'active', deadline:'all' };
+  window._trkFilter[group] = val;
+  renderTrkBoard();
+}
+
 function renderTrkBoard(){
   const el=document.getElementById('trk-board');if(!el)return;
   let cards=getTrkCards();
-  // ── Auto-ensure: สร้าง card ให้ทุกโปรเจกต์ active ที่ยังไม่มี card ──
-  // (ไม่สร้างถ้า user เคยลบ card ของโปรเจกต์นั้นแล้ว — dismiss flag)
+  // ── Auto-ensure: สร้าง card ให้ทุกโปรเจกต์ที่ยังไม่ทำเครื่องหมาย "เสร็จ/ยกเลิก" ──
   try{
     const allProjs = getProjects() || [];
     const existingProjIds = new Set(cards.filter(c=>c.projId).map(c=>c.projId));
     let createdCount = 0;
     allProjs.forEach(p=>{
       if(!p || !p.id) return;
-      // ข้ามโปรเจกต์ที่เสร็จ/ยกเลิก
       if(p.projStatus === 'done' || p.projStatus === 'cancelled') return;
-      // มี card แล้ว
       if(existingProjIds.has(p.id)) return;
-      // User เคยลบ card ของโปรเจกต์นี้แล้ว → ไม่สร้างใหม่
       if(ls('_dismissed_trk_'+p.id)) return;
-      // สร้าง card ให้
       const newCard = {
         id: 'TC'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
         projId: p.id,
@@ -4274,26 +4293,82 @@ function renderTrkBoard(){
     }
   }catch(e){ console.warn('auto-ensure trk cards error:', e); }
 
+  // ── Render filter chips ──
+  const f = window._trkFilter || { status:'active', deadline:'all' };
+  function chipHtml(active, group, key, label){
+    return `<button onclick="trkFilterSet('${group}','${key}')" style="padding:4px 11px;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer;font-family:Kanit;border:1px solid ${active?'var(--accent2)':'var(--border2)'};background:${active?'rgba(0,180,255,.15)':'transparent'};color:${active?'var(--accent2)':'var(--text2)'};transition:all .12s">${label}</button>`;
+  }
+  const fs = document.getElementById('trk-filter-status');
+  if(fs){
+    fs.innerHTML = [
+      ['all','ทั้งหมด'],['active','🟢 ทำอยู่'],['done','✅ เสร็จแล้ว'],['cancelled','❌ ยกเลิก']
+    ].map(([k,l])=>chipHtml(f.status===k,'status',k,l)).join('');
+  }
+  const fd = document.getElementById('trk-filter-deadline');
+  if(fd){
+    fd.innerHTML = [
+      ['all','ทั้งหมด'],['overdue','🔴 เลยแล้ว'],['today','⚠️ วันนี้'],['week','🔥 ใน 7 วัน'],['month','📅 เดือนนี้']
+    ].map(([k,l])=>chipHtml(f.deadline===k,'deadline',k,l)).join('');
+  }
+
+  // ── Filter cards ด้วย search + status + deadline ──
+  const q = (document.getElementById('trk-search')?.value||'').toLowerCase().trim();
+  const now = new Date(); const todayStr = now.toISOString().slice(0,10);
+  const projMap = {};
+  (getProjects()||[]).forEach(p=>{ if(p.id) projMap[p.id]=p; });
+  cards = cards.filter(card=>{
+    const p = card.projId ? projMap[card.projId] : null;
+    // Search ตามชื่อโปรเจกต์
+    if(q){
+      const name = (p?.name || '').toLowerCase();
+      if(!name.includes(q)) return false;
+    }
+    // Status filter
+    if(f.status !== 'all'){
+      const ps = p?.projStatus || 'active';
+      const effective = (ps === 'done') ? 'done' : (ps === 'cancelled') ? 'cancelled' : 'active';
+      if(f.status !== effective) return false;
+    }
+    // Deadline filter — หา deadline ต่ำสุดของ phases
+    if(f.deadline !== 'all'){
+      const allDeadlines = Object.values(card.phases||{}).map(ph=>ph?.deadline).filter(Boolean);
+      if(!allDeadlines.length) return false;
+      const earliestDL = allDeadlines.sort()[0];
+      const dlDate = new Date(earliestDL);
+      const diffDays = Math.floor((dlDate - now)/(1000*60*60*24));
+      if(f.deadline === 'overdue' && diffDays >= 0) return false;
+      if(f.deadline === 'today' && earliestDL !== todayStr) return false;
+      if(f.deadline === 'week' && (diffDays < 0 || diffDays > 7)) return false;
+      if(f.deadline === 'month'){
+        if(dlDate.getMonth() !== now.getMonth() || dlDate.getFullYear() !== now.getFullYear()) return false;
+      }
+    }
+    return true;
+  });
+
+  // Update count label
+  const cnt = document.getElementById('trk-count');
+  if(cnt) cnt.textContent = cards.length + ' โปรเจกต์';
+
   if(!cards.length){
-    el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">ยังไม่มีการ์ด<div style="font-size:11px;margin-top:8px;opacity:.7">การ์ดจะสร้างอัตโนมัติเมื่อมีโปรเจกต์ active<br>หรือถ้าคุณเคยลบไปแล้ว — <a href="#" onclick="event.preventDefault();resetDismissedTrkCards()" style="color:var(--accent2);text-decoration:underline">กู้คืนการ์ดที่ลบ</a></div></div>';
+    const hasQuery = q || f.status!=='all' || f.deadline!=='all';
+    el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">'+(hasQuery?'ไม่พบโปรเจกต์ตามเงื่อนไข':'ยังไม่มีการ์ด')+'<div style="font-size:11px;margin-top:8px;opacity:.7">'+(hasQuery?'ลองเปลี่ยน filter หรือค้นหาใหม่':'การ์ดจะสร้างอัตโนมัติเมื่อมีโปรเจกต์ active<br>หรือถ้าคุณเคยลบไปแล้ว — <a href=\'#\' onclick=\'event.preventDefault();resetDismissedTrkCards()\' style=\'color:var(--accent2);text-decoration:underline\'>กู้คืนการ์ดที่ลบ</a>')+'</div></div>';
     const lt = document.getElementById('trk-legacy-toggle');
     if(lt) lt.style.display = 'inline';
     return;
   }
-  // ถ้ามี card ที่ยังไม่ link projId → แสดง legacy toggle
   const hasUnlinked = cards.some(c=>!c.projId);
   const lt = document.getElementById('trk-legacy-toggle');
   if(lt) lt.style.display = hasUnlinked ? 'inline' : 'none';
-  // Auto-sync phases ให้ตรงกับ workers ในโปรเจกต์ล่าสุดเสมอ
+  // Auto-sync phases
   let changed=false;
   cards=cards.map(card=>{
     if(!card.projId)return card;
-    const p=getProjects().find(x=>x.id===card.projId);
+    const p=projMap[card.projId];
     if(!p)return card;
     const activePhases=getActivePhasesForProj(p);
     const oldPhases=card.phases||{};
     const newPhases={};
-    // เพิ่ม phase ที่ขาด, เก็บ phase เดิมที่มีข้อมูลไว้
     activePhases.forEach(phKey=>{
       newPhases[phKey] = oldPhases[phKey]
         || (p.phases && p.phases[phKey]
@@ -6116,6 +6191,8 @@ async function qApproveAll(projId) {
   const pendingWorkers = (p.workers||[]).filter(w => w.status === 'pending');
   if(pendingWorkers.length === 0){ toast('ไม่มีคนที่รอดำเนินการ','info'); return; }
   if(!confirm(`⚡ อนุมัติทีมทั้งหมด ${pendingWorkers.length} คน ในโปรเจกต์ "${p.name}"?\n\n(ทุกคนจะเปลี่ยนเป็น "อนุมัติแล้ว")`)) return;
+  // จำรายชื่อที่เราเพิ่งอนุมัติ เพื่อ undo ได้เฉพาะกลุ่มนี้
+  const approvedIds = pendingWorkers.map(w => w.id+'|'+w.slot);
   const result = await saveProjectMerge(projId, (fresh)=>{
     (fresh.workers||[]).forEach(w => { if(w.status==='pending') w.status = 'approved'; });
   });
@@ -6123,7 +6200,52 @@ async function qApproveAll(projId) {
   updateQueueBadge();
   renderQueue();
   const clientPaid = ls('client_paid_'+projId);
-  toast(`✅ อนุมัติ ${pendingWorkers.length} คนแล้ว` + (clientPaid ? ' — พร้อมจ่ายทีม' : ' — รอลูกค้าจ่าย'), 'success');
+  // Undo toast — คงไว้ 8 วิ + ปุ่ม "↩️ ยกเลิก"
+  const wrap = document.getElementById('toastWrap');
+  if(wrap){
+    const el = document.createElement('div');
+    el.className = 'toast success';
+    el.style.cssText = 'min-width:320px;flex-direction:column;gap:8px;align-items:flex-start';
+    el.innerHTML = `<div>✅ อนุมัติ ${pendingWorkers.length} คนแล้ว${clientPaid?' — พร้อมจ่ายทีม':' — รอลูกค้าจ่าย'}</div>`
+      +`<div style="display:flex;gap:8px;width:100%">
+        <button data-undo-btn style="flex:1;padding:6px 10px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:7px;font-family:Kanit;font-size:12px;cursor:pointer">↩️ ยกเลิกการอนุมัติ</button>
+        <button data-ok-btn style="padding:6px 14px;background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:7px;font-family:Kanit;font-size:12px;cursor:pointer">ตกลง</button>
+      </div>`;
+    wrap.appendChild(el);
+    const undoBtn = el.querySelector('[data-undo-btn]');
+    const okBtn = el.querySelector('[data-ok-btn]');
+    const closeBx = ()=>{ try{el.remove()}catch(e){} };
+    undoBtn.onclick = async ()=>{
+      closeBx();
+      await qUndoApproveAll(projId, approvedIds);
+    };
+    okBtn.onclick = closeBx;
+    setTimeout(closeBx, 15000); // เพิ่ม grace period เป็น 15 วิ
+  } else {
+    toast(`✅ อนุมัติ ${pendingWorkers.length} คนแล้ว`, 'success');
+  }
+}
+
+/* ↩️ UNDO: rollback bulk approve */
+async function qUndoApproveAll(projId, approvedIds){
+  const p = getProjects().find(x => x.id === projId); if(!p){ toast('ไม่พบโปรเจกต์','error'); return; }
+  const idSet = new Set(approvedIds || []);
+  const result = await saveProjectMerge(projId, (fresh)=>{
+    let n = 0;
+    (fresh.workers||[]).forEach(w => {
+      const key = w.id+'|'+w.slot;
+      // rollback เฉพาะคนที่เพิ่งอนุมัติไปและยังไม่ได้จ่าย
+      if(idSet.has(key) && w.status === 'approved'){
+        w.status = 'pending';
+        n++;
+      }
+    });
+    fresh._undoCount = n;
+  });
+  if(!result.ok){ toast('ยกเลิกไม่สำเร็จ: '+(result.error?.message||''),'error'); return; }
+  updateQueueBadge();
+  renderQueue();
+  toast('↩️ ยกเลิกการอนุมัติ '+(result.project?._undoCount||0)+' คน · กลับเป็น "รอตรวจสอบ"','info');
 }
 
 /* ⚡ BULK: จ่ายทีมทั้งโปรเจกต์ (เฉพาะคนที่ approved + client paid) */
