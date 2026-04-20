@@ -4565,10 +4565,10 @@ function renderQueue() {
         </div>
         ${clientPaidBtn}
         <div style="margin-left:4px">${headerStatus}</div>
-        <div style="font-size:12px;color:var(--text2);margin-left:6px" id="${groupId}-chevron">▼</div>
+        <div style="font-size:12px;color:var(--text2);margin-left:6px;transition:transform .2s" id="${groupId}-chevron">▶</div>
       </div>
-      <!-- Worker rows (collapsible) -->
-      <div id="${groupId}" style="display:block">
+      <!-- Worker rows (collapsible — default hidden, expand on click) -->
+      <div id="${groupId}" style="display:none">
         <!-- sub-header -->
         <div style="display:flex;align-items:center;gap:14px;padding:7px 18px;background:rgba(0,0,0,.15);border-top:1px solid var(--border2)">
           <div style="min-width:170px;font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">ชื่อ-ตำแหน่ง</div>
