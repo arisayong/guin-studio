@@ -6048,9 +6048,8 @@ function renderQueue() {
       } else {
         return `
           <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
-            <button class="btn btn-xs" style="background:rgba(120,120,140,.08);border:1px dashed rgba(255,215,0,.35);color:var(--text2);cursor:help" disabled title="รอลูกค้าจ่ายก่อน (กด 'รับเงินแล้ว' ที่ header โปรเจกต์)">⏳ รอลูกค้าจ่าย</button>
+            <button class="btn btn-xs" style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.35);color:#FFD700;cursor:pointer;font-weight:700" onclick="askRevertWaiting('${pid}','${wid}','${slot}')" title="กดเพื่อย้อนกลับเป็น 'รอตรวจสอบ'">⏳ รอลูกค้าจ่าย</button>
             <button class="btn btn-xs btn-green" onclick="qPay('${pid}','${wid}','${slot}')" title="ข้ามขั้น — จ่ายทีมก่อนลูกค้าจ่าย (ถ้าจำเป็น)">💸 จ่ายก่อน</button>
-            <button class="btn btn-xs btn-outline" onclick="qRevert('${pid}','${wid}','${slot}')" title="ย้อนกลับ">↩️</button>
           </div>`;
       }
     }
@@ -6347,6 +6346,25 @@ async function qPayAll(projId) {
   }
   toast(`✅ จ่ายทีม ${successCount}/${readyWorkers.length} คนสำเร็จ`, 'success');
   renderQueue();
+}
+
+/* ถามก่อน revert จากสถานะ 'รอลูกค้าจ่าย' → 'รอตรวจสอบ' */
+function askRevertWaiting(projId, workerId, slot){
+  const wrap = document.getElementById('toastWrap');
+  if(!wrap){ qRevert(projId, workerId, slot); return; }
+  const el = document.createElement('div');
+  el.className = 'toast warn';
+  el.style.cssText = 'min-width:300px;flex-direction:column;gap:8px;align-items:flex-start';
+  el.innerHTML = `<div style="font-weight:700">↩️ ย้อนกลับเป็น "รอตรวจสอบ"?</div>
+    <div style="font-size:11px;opacity:.85">สถานะจะกลับเป็น pending · ต้องอนุมัติใหม่อีกครั้ง</div>
+    <div style="display:flex;gap:8px;width:100%">
+      <button class="btn btn-red btn-sm" style="flex:1" data-confirm>✕ ยืนยัน</button>
+      <button class="btn btn-outline btn-sm" style="flex:1" data-cancel>ยกเลิก</button>
+    </div>`;
+  wrap.appendChild(el);
+  el.querySelector('[data-confirm]').onclick = ()=>{ el.remove(); qRevert(projId, workerId, slot); };
+  el.querySelector('[data-cancel]').onclick = ()=>{ el.remove(); };
+  setTimeout(()=>{ if(el.parentNode) el.remove(); }, 8000);
 }
 
 /* approved → waiting_client (รอลูกค้าจ่าย) */
