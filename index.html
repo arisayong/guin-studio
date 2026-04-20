@@ -868,6 +868,9 @@ body.sidebar-collapsed .main-content{
   <div class="profile-menu-item" onclick="closeProfileMenu();openProfileModal()">
    <span class="profile-menu-icon">✏️</span><span>แก้ไขโปรไฟล์</span>
   </div>
+  <div class="profile-menu-item" onclick="closeProfileMenu();openChangePasswordDialog()">
+   <span class="profile-menu-icon">🔑</span><span>เปลี่ยนรหัสผ่าน</span>
+  </div>
   <div class="profile-menu-item" onclick="closeProfileMenu();toggleTheme()">
    <span class="profile-menu-icon">🌓</span><span>สลับธีม</span>
   </div>
@@ -1012,6 +1015,34 @@ body.sidebar-collapsed .main-content{
    <div class="page-header">
     <div class="page-title">🛠️ ตั้งค่า & สำรองข้อมูล</div>
     <div class="page-subtitle">จัดการความปลอดภัยของข้อมูล · ปุ่มอันตรายและทำงานไม่สามารถกู้คืนได้</div>
+   </div>
+
+   <!-- Admin Contact + Staff Edit Form Links -->
+   <div class="section-card" style="border-left:4px solid var(--cyan);margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">🔗</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:var(--cyan)">ลิงก์ติดต่อ & แก้ไขข้อมูล</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">ใส่ลิงก์ที่จะแสดงในหน้าโปรไฟล์ของสต๊าฟ เมื่อสต๊าฟต้องการเปลี่ยนบัญชีธนาคาร</div>
+     </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">✏️ ลิงก์แก้ไขแบบฟอร์ม</label>
+      <input id="setting-form-url" type="url" placeholder="https://forms.gle/..." style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;box-sizing:border-box" oninput="saveContactSetting('staff_edit_form_url',this.value)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">💬 ลิงก์ LINE (URL หรือ LINE ID)</label>
+      <input id="setting-line-url" type="text" placeholder="https://line.me/ti/p/... หรือ @guinhome" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;box-sizing:border-box" oninput="saveContactSetting('admin_contact_line',this.value)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">📧 อีเมลติดต่อ</label>
+      <input id="setting-email-url" type="email" placeholder="admin@example.com" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;box-sizing:border-box" oninput="saveContactSetting('admin_contact_email',this.value)">
+     </div>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-top:8px;background:rgba(0,223,160,.05);border:1px solid rgba(0,223,160,.15);border-radius:8px;padding:8px 12px;line-height:1.6">
+     ✅ บันทึกอัตโนมัติทุกครั้งที่พิมพ์ · สต๊าฟจะเห็นลิงก์เหล่านี้เมื่อเปิดหน้าโปรไฟล์
+    </div>
    </div>
 
    <!-- Emergency: รีเซ็ตสถานะจ่ายของโปรเจกต์ -->
@@ -1347,7 +1378,7 @@ body.sidebar-collapsed .main-content{
 
    <div class="table-wrap">
     <div class="table-header"><div class="table-title">📋 รายการงาน (<span id="my-proj-count">0</span>)</div></div>
-    <table><thead><tr><th>โปรเจกต์</th><th>วันที่</th><th>หน้าที่</th><th>ยอด</th><th>ธนาคาร</th><th>สถานะ</th></tr></thead><tbody id="my-proj-table"></tbody></table>
+    <table><thead><tr><th>โปรเจกต์</th><th>Deadline ฉัน</th><th>หน้าที่</th><th>ยอด</th><th>ธนาคาร</th><th>สถานะ</th></tr></thead><tbody id="my-proj-table"></tbody></table>
    </div>
   </div>
 
@@ -1649,6 +1680,20 @@ body.sidebar-collapsed .main-content{
 
 <!-- PROJECT MODAL -->
 <!-- View-only modal (opens via 👁️ button) -->
+<!-- Staff: ดูรายละเอียดโปรเจกต์ของฉัน (deadline, payment timeline, slip) -->
+<div id="modal-my-proj-detail" class="modal-overlay hidden" onclick="if(event.target===this)closeModal('modal-my-proj-detail')">
+ <div class="modal" style="width:620px;max-width:96vw">
+  <div class="modal-head">
+   <div class="modal-title" id="my-detail-title">📋 รายละเอียดงาน</div>
+   <button class="btn-close" onclick="closeModal('modal-my-proj-detail')">✕</button>
+  </div>
+  <div class="modal-body" id="my-detail-body" style="max-height:72vh;overflow-y:auto"></div>
+  <div class="modal-foot" style="display:flex;gap:10px;justify-content:flex-end">
+   <button class="btn btn-outline" onclick="closeModal('modal-my-proj-detail')">ปิด</button>
+  </div>
+ </div>
+</div>
+
 <div id="modal-view-project" class="modal-overlay hidden">
  <div class="modal" style="width:1100px;max-width:97vw">
   <div class="modal-head" style="display:flex;align-items:center;gap:12px">
@@ -2964,6 +3009,28 @@ function openProfileModal(){
   const rl = document.getElementById('profile-role-show'); if(rl) rl.textContent = currentUser?.role==='admin' ? '👑 Administrator' : '🎙️ ทีมงาน';
   const actions = document.getElementById('profile-photo-actions'); if(actions) actions.style.display = photo ? 'block' : 'none';
   window._profilePendingPhoto = null; // reset pending upload
+  // Bank fields (สต๊าฟ — read-only · เพื่อดูเลขบัญชีตัวเอง)
+  if(currentUser?.staffId){
+    const s = getStaffById(currentUser.staffId);
+    const nameEl = document.getElementById('profile-bank-name-show'); if(nameEl) nameEl.textContent = s?.name || '—';
+    const bankEl = document.getElementById('profile-bank-show'); if(bankEl) bankEl.textContent = s?.bank || '—';
+    const accEl = document.getElementById('profile-account-show'); if(accEl) accEl.textContent = s?.account || '—';
+    // Build help links
+    const helpEl = document.getElementById('profile-bank-help-links');
+    if(helpEl){
+      const formUrl = ls('staff_edit_form_url') || 'https://forms.gle/kyM7Qx1PpXt64EfK9';
+      const lineUrl = ls('admin_contact_line') || '';
+      const emailUrl = ls('admin_contact_email') || '';
+      const parts = [];
+      if(formUrl) parts.push(`✏️ <a href="${formUrl}" target="_blank" style="color:var(--accent2);text-decoration:underline">แก้ไขข้อมูลผ่านแบบฟอร์ม</a>`);
+      if(lineUrl) parts.push(`💬 <a href="${lineUrl.startsWith('http')?lineUrl:('https://line.me/ti/p/~'+lineUrl)}" target="_blank" style="color:var(--green);text-decoration:underline">แจ้งแอดมิน (LINE)</a>`);
+      if(emailUrl) parts.push(`📧 <a href="mailto:${emailUrl}" style="color:var(--orange);text-decoration:underline">${emailUrl}</a>`);
+      helpEl.innerHTML = parts.length ? parts.join('<br>') : '<span style="color:var(--text2)">กรุณาติดต่อแอดมิน</span>';
+    }
+    const bankSection = document.getElementById('profile-bank-section'); if(bankSection) bankSection.style.display = 'block';
+  } else {
+    const bankSection = document.getElementById('profile-bank-section'); if(bankSection) bankSection.style.display = 'none';
+  }
   m.classList.remove('hidden');
 }
 function closeProfileModal(){
@@ -3029,6 +3096,7 @@ async function saveMyProfile(){
       _pmn.textContent = nick + ' · ' + r;
     }
     const _wl = document.getElementById('my-welcome'); if(_wl) _wl.textContent = `สวัสดี ${nick} 👋`;
+
     toast('✅ บันทึกโปรไฟล์แล้ว','success');
     closeProfileModal();
   } catch(e) {
@@ -3913,6 +3981,7 @@ async function enterApp(){
   else if(currentUser.role==='manager'){nav('mgr-projects');}
   else nav('my-dashboard');
   try{ updateTopBarAdminIcons(); }catch(e){}
+  try{ loadContactsFromFirebase(); }catch(e){}
   updateQueueBadge();
   // Real-time Firebase sync
   startFirebaseSync();
@@ -4451,6 +4520,35 @@ function populateResetProjDropdown(){
     const n = (p.workers||[]).filter(w=>w.status==='paid').length;
     return `<option value="${p.id}"${cur===p.id?' selected':''}>${p.name} ${n>0?'('+n+' paid)':''}</option>`;
   }).join('');
+}
+
+// ── Contact settings (admin ตั้งลิงก์ให้สต๊าฟเห็น) ──
+function loadContactSettings(){
+  const f = document.getElementById('setting-form-url');
+  const l = document.getElementById('setting-line-url');
+  const e = document.getElementById('setting-email-url');
+  if(f) f.value = ls('staff_edit_form_url') || 'https://forms.gle/kyM7Qx1PpXt64EfK9';
+  if(l) l.value = ls('admin_contact_line') || '';
+  if(e) e.value = ls('admin_contact_email') || '';
+}
+function saveContactSetting(key, val){
+  val = (val||'').trim();
+  ls(key, val);
+  // Sync ไป Firebase (ทุก admin จะเห็นเหมือนกัน)
+  if(_fbDatabase){
+    _fbDatabase.ref('misc/contacts/'+key).set(val||null).catch(()=>{});
+  }
+}
+async function loadContactsFromFirebase(){
+  if(!_fbDatabase) return;
+  try{
+    const snap = await _fbDatabase.ref('misc/contacts').get();
+    if(!snap.exists()) return;
+    const v = snap.val() || {};
+    ['staff_edit_form_url','admin_contact_line','admin_contact_email'].forEach(k=>{
+      if(v[k]) ls(k, v[k]);
+    });
+  }catch(e){}
 }
 function renderTrkCardHTML(card){
   const projOpts=getProjects().map(pp=>`<option value="${pp.id}"${card.projId===pp.id?' selected':''}>${pp.name}</option>`).join('');
@@ -5991,16 +6089,23 @@ function renderQueue() {
     const pillPaid     = paidCount     ? `<span style="padding:2px 8px;border-radius:10px;background:rgba(0,223,160,.15);color:var(--green);font-size:10px;font-weight:700">✅ ${paidCount}</span>` : '';
 
     // Group header status / action button
-    // Priority: paid all → show "จ่ายครบ" · ready (approved+client paid) → show "จ่ายทีม" button · pending → show "อนุมัติ" button · else show rodamnin
+    // Priority: paid all → "จ่ายครบ"
+    // ready (approved + client paid) → ปุ่ม "จ่ายทีม"
+    // pending > 0 → ปุ่ม "อนุมัติทั้งกลุ่ม"
+    // approved ครบแล้ว (รอลูกค้าจ่าย) → ปุ่ม "↩️ ยกเลิกอนุมัติทั้งกลุ่ม" (toggle)
     let headerStatus;
     if (allPaid) {
       headerStatus = `<span style="font-size:11px;font-weight:700;color:var(--green);padding:6px 12px">✅ จ่ายครบ</span>`;
     } else if (readyCount > 0) {
-      headerStatus = `<button onclick="event.stopPropagation();qPayAll('${p.id}')" style="padding:7px 14px;background:rgba(0,223,160,.15);border:1px solid rgba(0,223,160,.4);border-radius:8px;color:var(--green);font-family:Kanit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap" title="จ่ายทีมทั้งโปรเจกต์ (${readyCount} คน)">💸 จ่ายทีมทั้งกลุ่ม (${readyCount})</button>`;
+      // approved + client paid → จ่ายทีมได้ + ยังเปิดโอกาสให้ยกเลิกอนุมัติ (ถ้ามี approved ที่ยังไม่ได้จ่าย)
+      const undoBtn = approvedCount > 0
+        ? `<button onclick="event.stopPropagation();qRevertApproveAll('${p.id}')" style="padding:7px 10px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.3);border-radius:8px;color:#FFD700;font-family:Kanit;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" title="ยกเลิกอนุมัติ (กลับเป็น 'รอตรวจสอบ')">↩️</button>`
+        : '';
+      headerStatus = `<div style="display:flex;gap:5px">${undoBtn}<button onclick="event.stopPropagation();qPayAll('${p.id}')" style="padding:7px 14px;background:rgba(0,223,160,.15);border:1px solid rgba(0,223,160,.4);border-radius:8px;color:var(--green);font-family:Kanit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap" title="จ่ายทีมทั้งโปรเจกต์ (${readyCount} คน)">💸 จ่ายทีมทั้งกลุ่ม (${readyCount})</button></div>`;
     } else if (pendingCount > 0) {
-      headerStatus = `<button onclick="event.stopPropagation();qApproveAll('${p.id}')" style="padding:7px 14px;background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.4);border-radius:8px;color:var(--accent2);font-family:Kanit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap" title="อนุมัติทีมทั้งโปรเจกต์ (${pendingCount} คน)">🔵 อนุมัติทั้งกลุ่ม (${pendingCount})</button>`;
+      headerStatus = `<button onclick="event.stopPropagation();qApproveAll('${p.id}')" style="padding:7px 14px;background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.4);border-radius:8px;color:var(--accent2);font-family:Kanit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap" title="อนุมัติทีมทั้งโปรเจกต์ (${pendingCount} คน) · กดซ้ำเพื่อยกเลิก">🔵 อนุมัติทั้งกลุ่ม (${pendingCount})</button>`;
     } else if (anyApproved) {
-      headerStatus = `<span style="font-size:11px;font-weight:700;color:#FFD700;padding:6px 12px">🟡 รอลูกค้าจ่าย</span>`;
+      headerStatus = `<button onclick="event.stopPropagation();qApproveAll('${p.id}')" style="padding:7px 14px;background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.4);border-radius:8px;color:#FFD700;font-family:Kanit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap" title="กลับไป 'รอตรวจสอบ' (${approvedCount} คน) · กดเพื่อยกเลิกอนุมัติ">↩️ ยกเลิกอนุมัติทั้งกลุ่ม (${approvedCount})</button>`;
     } else {
       headerStatus = `<span style="font-size:11px;font-weight:700;color:var(--orange);padding:6px 12px">⏳ รอดำเนินการ</span>`;
     }
@@ -6189,10 +6294,15 @@ async function qApprove(projId, workerId, slot) {
 async function qApproveAll(projId) {
   const p = getProjects().find(x => x.id === projId); if (!p) return;
   const pendingWorkers = (p.workers||[]).filter(w => w.status === 'pending');
+  const approvedWorkers = (p.workers||[]).filter(w => w.status === 'approved');
+
+  // TOGGLE: ถ้าไม่มี pending แล้ว และมี approved อยู่ → ยกเลิกทั้งกลุ่ม (เหมือนปุ่ม "ยังไม่ได้รับ")
+  if(pendingWorkers.length === 0 && approvedWorkers.length > 0){
+    return qRevertApproveAll(projId);
+  }
+
   if(pendingWorkers.length === 0){ toast('ไม่มีคนที่รอดำเนินการ','info'); return; }
-  if(!confirm(`⚡ อนุมัติทีมทั้งหมด ${pendingWorkers.length} คน ในโปรเจกต์ "${p.name}"?\n\n(ทุกคนจะเปลี่ยนเป็น "อนุมัติแล้ว")`)) return;
-  // จำรายชื่อที่เราเพิ่งอนุมัติ เพื่อ undo ได้เฉพาะกลุ่มนี้
-  const approvedIds = pendingWorkers.map(w => w.id+'|'+w.slot);
+  if(!confirm(`⚡ อนุมัติทีมทั้งหมด ${pendingWorkers.length} คน ในโปรเจกต์ "${p.name}"?\n\n(ทุกคนจะเปลี่ยนเป็น "อนุมัติแล้ว" · กดปุ่มเดิมอีกครั้งเพื่อยกเลิก)`)) return;
   const result = await saveProjectMerge(projId, (fresh)=>{
     (fresh.workers||[]).forEach(w => { if(w.status==='pending') w.status = 'approved'; });
   });
@@ -6200,52 +6310,22 @@ async function qApproveAll(projId) {
   updateQueueBadge();
   renderQueue();
   const clientPaid = ls('client_paid_'+projId);
-  // Undo toast — คงไว้ 8 วิ + ปุ่ม "↩️ ยกเลิก"
-  const wrap = document.getElementById('toastWrap');
-  if(wrap){
-    const el = document.createElement('div');
-    el.className = 'toast success';
-    el.style.cssText = 'min-width:320px;flex-direction:column;gap:8px;align-items:flex-start';
-    el.innerHTML = `<div>✅ อนุมัติ ${pendingWorkers.length} คนแล้ว${clientPaid?' — พร้อมจ่ายทีม':' — รอลูกค้าจ่าย'}</div>`
-      +`<div style="display:flex;gap:8px;width:100%">
-        <button data-undo-btn style="flex:1;padding:6px 10px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:7px;font-family:Kanit;font-size:12px;cursor:pointer">↩️ ยกเลิกการอนุมัติ</button>
-        <button data-ok-btn style="padding:6px 14px;background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:7px;font-family:Kanit;font-size:12px;cursor:pointer">ตกลง</button>
-      </div>`;
-    wrap.appendChild(el);
-    const undoBtn = el.querySelector('[data-undo-btn]');
-    const okBtn = el.querySelector('[data-ok-btn]');
-    const closeBx = ()=>{ try{el.remove()}catch(e){} };
-    undoBtn.onclick = async ()=>{
-      closeBx();
-      await qUndoApproveAll(projId, approvedIds);
-    };
-    okBtn.onclick = closeBx;
-    setTimeout(closeBx, 15000); // เพิ่ม grace period เป็น 15 วิ
-  } else {
-    toast(`✅ อนุมัติ ${pendingWorkers.length} คนแล้ว`, 'success');
-  }
+  toast(`✅ อนุมัติ ${pendingWorkers.length} คนแล้ว` + (clientPaid ? ' — พร้อมจ่ายทีม' : ' — รอลูกค้าจ่าย') + ' · กดปุ่มเดิมอีกครั้งเพื่อยกเลิก', 'success');
 }
 
-/* ↩️ UNDO: rollback bulk approve */
-async function qUndoApproveAll(projId, approvedIds){
-  const p = getProjects().find(x => x.id === projId); if(!p){ toast('ไม่พบโปรเจกต์','error'); return; }
-  const idSet = new Set(approvedIds || []);
+/* ↩️ Toggle: ยกเลิกอนุมัติทั้งกลุ่ม (approved → pending) */
+async function qRevertApproveAll(projId) {
+  const p = getProjects().find(x => x.id === projId); if (!p) return;
+  const approvedWorkers = (p.workers||[]).filter(w => w.status === 'approved');
+  if(approvedWorkers.length === 0){ toast('ไม่มีคนที่อนุมัติรอยกเลิก','info'); return; }
+  if(!confirm(`↩️ ยกเลิกอนุมัติทั้งกลุ่ม ${approvedWorkers.length} คน ในโปรเจกต์ "${p.name}"?\n\n(ทุกคนจะกลับเป็น "รอตรวจสอบ")`)) return;
   const result = await saveProjectMerge(projId, (fresh)=>{
-    let n = 0;
-    (fresh.workers||[]).forEach(w => {
-      const key = w.id+'|'+w.slot;
-      // rollback เฉพาะคนที่เพิ่งอนุมัติไปและยังไม่ได้จ่าย
-      if(idSet.has(key) && w.status === 'approved'){
-        w.status = 'pending';
-        n++;
-      }
-    });
-    fresh._undoCount = n;
+    (fresh.workers||[]).forEach(w => { if(w.status==='approved') w.status = 'pending'; });
   });
-  if(!result.ok){ toast('ยกเลิกไม่สำเร็จ: '+(result.error?.message||''),'error'); return; }
+  if(!result.ok){ toast('⚠️ ยกเลิกไม่สำเร็จ: '+(result.error?.message||''),'error'); return; }
   updateQueueBadge();
   renderQueue();
-  toast('↩️ ยกเลิกการอนุมัติ '+(result.project?._undoCount||0)+' คน · กลับเป็น "รอตรวจสอบ"','info');
+  toast(`↩️ ยกเลิกอนุมัติ ${approvedWorkers.length} คนแล้ว · กลับเป็น "รอตรวจสอบ"`,'info');
 }
 
 /* ⚡ BULK: จ่ายทีมทั้งโปรเจกต์ (เฉพาะคนที่ approved + client paid) */
@@ -6630,16 +6710,25 @@ function renderMyDash(){
       const _pre = (w.slot||'').split('-')[0];
       const _suf = (w.slot||'').includes('main') ? ' · หลัก' : (w.slot||'').includes('-sub') ? ' · รอง' : '';
       const _lbl = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+      // หา deadline ของ phase ที่สต๊าฟรับผิดชอบ
+      const _phKey = {dub:'dubbing',adp:'adaptation',mix:'mix',qc:'qc',sub:'subVideo',mgr:'manager'}[_pre];
+      const _ph = (p.phases && _phKey) ? (p.phases[_phKey]||{}) : {};
       allItems.push({
         projId: p.id,
         projName: p.name,
         projDate: p.date,
         date: fmtDate(p.date),
+        myDeadline: _ph.deadline || '',
+        myDeadlineFmt: _ph.deadline ? fmtDate(_ph.deadline) : '',
+        mySubmitTime: _ph.submitTime || '',
+        myStart: _ph.startDate || '',
         roleKey: _pre,
         role: (_lbl[_pre] || CATS[s.category]?.label || '') + _suf,
+        slot: w.slot,
         amount: realAmt,
         bank: s.bank + ' ' + s.account,
-        status: w.status
+        status: w.status,
+        _phaseKey: _phKey,
       });
     });
   });
@@ -6775,37 +6864,251 @@ function renderMyDash(){
   }
   if(isMobile){
     tb.closest('table').style.minWidth = 'unset';
-    tb.innerHTML = filtered.map(it => `
+    tb.innerHTML = filtered.map(it => {
+      const dl = _fmtMyDeadline(it);
+      return `
       <tr><td colspan="6" style="padding:8px 4px;border:none">
-        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px">
+        <div onclick="openMyProjDetail('${it.projId}','${it.slot||''}')" style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;cursor:pointer" title="กดเพื่อดูรายละเอียด">
           <div style="font-weight:700;font-size:14px;margin-bottom:6px">${it.projName}</div>
           <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
             <div style="font-size:12px;color:var(--cyan);font-weight:600">${it.role}</div>
             <div style="font-size:15px;font-weight:800;color:var(--accent2)">${it.amount?fmtB(it.amount):'TBD'}</div>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap;gap:4px">
-            <div style="font-size:11px;color:var(--text2)">${it.date} · ${it.bank}</div>
+            <div style="font-size:11px;color:var(--text2)">${dl.html} · ${it.bank}</div>
             <div>${staffStatusBadge(it.status, it.projId, it._reasonKey)}</div>
           </div>
         </div>
-      </td></tr>`).join('');
+      </td></tr>`;
+    }).join('');
   } else {
     tb.closest('table').style.minWidth = '';
-    tb.innerHTML = filtered.map(it => `<tr>
+    tb.innerHTML = filtered.map(it => {
+      const dl = _fmtMyDeadline(it);
+      return `<tr onclick="openMyProjDetail('${it.projId}','${it.slot||''}')" style="cursor:pointer" title="กดเพื่อดูรายละเอียด">
       <td><strong>${it.projName}</strong></td>
-      <td>${it.date}</td>
+      <td>${dl.html}</td>
       <td style="color:var(--cyan);font-weight:700">${it.role}</td>
       <td style="color:var(--accent2);font-weight:700">${it.amount?fmtB(it.amount):'TBD'}</td>
       <td style="font-size:12px;color:var(--text2)">${it.bank}</td>
       <td>${staffStatusBadge(it.status, it.projId, it._reasonKey)}</td>
-    </tr>`).join('');
+    </tr>`;
+    }).join('');
   }
+}
+
+// Format deadline ของสต๊าฟ + เหลือกี่วัน
+function _fmtMyDeadline(it){
+  if(!it.myDeadline){
+    return { html: `<span style="color:var(--text2)">—</span>`, days: null };
+  }
+  const now = new Date(); now.setHours(0,0,0,0);
+  const dl = new Date(it.myDeadline); dl.setHours(0,0,0,0);
+  const diff = Math.floor((dl - now)/(1000*60*60*24));
+  const timeStr = it.mySubmitTime ? ' · '+it.mySubmitTime : '';
+  // Status — paid แล้วก็ไม่ต้องเตือน
+  if(it.status === 'paid'){
+    return { html: `<span style="font-size:11px;color:var(--text2)">${it.myDeadlineFmt}${timeStr}</span>`, days: diff };
+  }
+  let badge = '';
+  if(diff < 0){
+    badge = `<span style="font-size:10px;color:var(--red);font-weight:700;margin-left:4px">🔴 เลย ${Math.abs(diff)} วัน</span>`;
+  } else if(diff === 0){
+    badge = `<span style="font-size:10px;color:var(--orange);font-weight:700;margin-left:4px">⚠️ วันนี้</span>`;
+  } else if(diff <= 3){
+    badge = `<span style="font-size:10px;color:var(--orange);font-weight:700;margin-left:4px">🔥 ${diff} วัน</span>`;
+  } else if(diff <= 7){
+    badge = `<span style="font-size:10px;color:var(--accent2);font-weight:700;margin-left:4px">${diff} วัน</span>`;
+  }
+  return {
+    html: `<strong style="font-size:12px">${it.myDeadlineFmt}</strong>${timeStr?'<span style="color:var(--text2);font-size:10px">'+timeStr+'</span>':''}${badge}`,
+    days: diff
+  };
 }
 
 function myFilterSet(group, key){
   if(!window._myFilter) window._myFilter = { status:'all', role:'all', time:'all' };
   window._myFilter[group] = key;
   renderMyDash();
+}
+
+// ══════════════════════════════════════════════════════════
+// STAFF: รายละเอียดงานของฉัน (deadline · payment timeline · slip)
+// ══════════════════════════════════════════════════════════
+function openMyProjDetail(projId, slot){
+  if(!currentUser?.staffId){ toast('ไม่พบข้อมูลสต๊าฟ','error'); return; }
+  const p = getProjects().find(x=>x.id===projId);
+  if(!p){ toast('ไม่พบโปรเจกต์','error'); return; }
+  const s = getStaffById(currentUser.staffId);
+  // หา worker row ของสต๊าฟในโปรเจกต์นี้
+  const myWorkers = (p.workers||[]).filter(w => w.id===currentUser.staffId && (!slot || w.slot===slot));
+  if(!myWorkers.length){ toast('ไม่พบงานของคุณในโปรเจกต์นี้','error'); return; }
+  const myW = myWorkers[0];
+  const preSlot = (myW.slot||'').split('-')[0];
+  const phaseKeyMap = {dub:'dubbing',adp:'adaptation',mix:'mix',qc:'qc',sub:'subVideo',mgr:'manager'};
+  const phKey = phaseKeyMap[preSlot];
+  const lblMap = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+  const ph = (p.phases && phKey) ? (p.phases[phKey]||{}) : {};
+  const suf = (myW.slot||'').includes('main') ? ' · หลัก' : (myW.slot||'').includes('-sub') ? ' · รอง' : '';
+  const roleLbl = (lblMap[preSlot]||'') + suf;
+  // Deadline formatting
+  const now = new Date(); now.setHours(0,0,0,0);
+  let dlHtml = '<span style="color:var(--text2)">— ยังไม่กำหนด —</span>';
+  if(ph.deadline){
+    const dl = new Date(ph.deadline); dl.setHours(0,0,0,0);
+    const diff = Math.floor((dl - now)/(1000*60*60*24));
+    const timeStr = ph.submitTime ? ' · '+ph.submitTime+(formatThaiTimeLabel?(' ('+formatThaiTimeLabel(ph.submitTime)+')'):'') : '';
+    let status = '';
+    if(myW.status === 'paid'){
+      status = '<span style="color:var(--green);font-weight:700;margin-left:6px">✅ ส่งแล้ว + จ่ายแล้ว</span>';
+    } else if(diff < 0){
+      status = `<span style="color:var(--red);font-weight:700;margin-left:6px">🔴 เลยมา ${Math.abs(diff)} วัน</span>`;
+    } else if(diff === 0){
+      status = `<span style="color:var(--orange);font-weight:700;margin-left:6px">⚠️ วันนี้!</span>`;
+    } else if(diff <= 3){
+      status = `<span style="color:var(--orange);font-weight:700;margin-left:6px">🔥 เหลือ ${diff} วัน</span>`;
+    } else {
+      status = `<span style="color:var(--accent2);margin-left:6px">เหลือ ${diff} วัน</span>`;
+    }
+    dlHtml = `<strong style="font-size:16px">${fmtDate(ph.deadline)}</strong><span style="color:var(--text2);font-size:12px">${timeStr}</span>${status}`;
+  }
+  // Payment timeline (ขั้นตอนการจ่าย)
+  const clientPaid = ls('client_paid_'+projId);
+  const clientPaidDate = ls('client_paid_date_'+projId);
+  const step = (label, done, current, extra)=>{
+    const ic = done ? '✅' : current ? '🟢' : '⚪';
+    const col = done ? 'var(--green)' : current ? 'var(--accent2)' : 'var(--text2)';
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px dashed var(--border2)">
+      <div style="font-size:18px;margin-top:1px">${ic}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:${current||done?'700':'500'};color:${col}">${label}</div>
+        ${extra?'<div style="font-size:11px;color:var(--text2);margin-top:3px;line-height:1.6">'+extra+'</div>':''}
+      </div>
+    </div>`;
+  };
+  let timeline = '';
+  // Step 1: ส่งงาน
+  const submitted = myW.status !== 'pending' || (ph.status && ph.status !== 'none' && ph.status !== 'brief');
+  timeline += step(
+    'ส่งงาน',
+    submitted,
+    !submitted,
+    submitted ? 'คุณส่งงานเรียบร้อย' : ph.deadline ? 'กำหนดส่ง '+fmtDate(ph.deadline) : ''
+  );
+  // Step 2: แอดมินตรวจ
+  const approved = ['approved','waiting_client','paid'].includes(myW.status);
+  timeline += step(
+    'แอดมินตรวจ/อนุมัติ',
+    approved,
+    submitted && !approved,
+    approved ? 'อนุมัติแล้ว ✓' : submitted ? 'รออนุมัติ · ปกติ 1-2 วัน' : 'รอส่งงานก่อน'
+  );
+  // Step 3: ลูกค้าจ่าย
+  timeline += step(
+    'ลูกค้าจ่ายเงินโปรเจกต์',
+    !!clientPaid,
+    approved && !clientPaid,
+    clientPaid ? 'ลูกค้าจ่ายแล้ว'+(clientPaidDate?' · '+clientPaidDate:'') : approved ? 'รอลูกค้าโอนเงินเข้าสตูดิโอ · ปกติ 7-30 วันหลังส่งงาน' : 'รอขั้นตอนก่อนหน้าเสร็จก่อน'
+  );
+  // Step 4: แอดมินโอนให้สต๊าฟ
+  const paidToStaff = myW.status === 'paid';
+  timeline += step(
+    'แอดมินโอนเงินให้คุณ',
+    paidToStaff,
+    clientPaid && !paidToStaff,
+    paidToStaff ? ('จ่ายแล้ว ✓'+(myW.paidAt?' · '+new Date(myW.paidAt).toLocaleDateString('th-TH'):'')) : clientPaid ? 'พร้อมโอน · รอแอดมินดำเนินการ' : 'รอลูกค้าจ่ายก่อน'
+  );
+  // Slip (ถ้ามี — ค้นทุก cycle/month/year ของสต๊าฟ)
+  let slipHtml = '';
+  try{
+    const slipKeys = Object.keys(localStorage).filter(k => k.startsWith('guin3_billing_slip_'+currentUser.staffId+'_'));
+    const slips = slipKeys.map(k=>{
+      try{
+        const val = JSON.parse(localStorage.getItem(k)||'null');
+        if(!val) return null;
+        const parts = k.replace('guin3_billing_slip_'+currentUser.staffId+'_','').split('_');
+        return { y:parts[0], m:parts[1], c:parts[2], data: val, key: k };
+      }catch(e){ return null; }
+    }).filter(Boolean).sort((a,b)=>(b.y+b.m+b.c).localeCompare(a.y+a.m+a.c));
+    if(slips.length){
+      slipHtml = '<div style="margin-top:16px"><div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:8px">📎 สลิปโอนเงินย้อนหลัง</div>';
+      slipHtml += slips.slice(0,6).map(sl=>{
+        const thMonths = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+        const monLbl = thMonths[parseInt(sl.m)] || sl.m;
+        const yearLbl = parseInt(sl.y) + 543;
+        const cycleLbl = sl.c === '1' ? 'งวด 1' : sl.c === '2' ? 'งวด 2' : sl.c;
+        const url = sl.data.dataUrl || sl.data.url || '';
+        const isImage = url && (url.startsWith('data:image/') || /\.(png|jpg|jpeg|gif|webp)/i.test(sl.data.name||''));
+        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg2);border-radius:8px;margin-bottom:4px">
+          <span style="font-size:22px">${isImage?'🖼️':'📄'}</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">${monLbl} ${yearLbl} · ${cycleLbl}</div>
+            <div style="font-size:10px;color:var(--text2)">${sl.data.name||'สลิป'}</div>
+          </div>
+          ${url?`<button onclick="viewStaffSlip('${sl.key}')" style="padding:5px 11px;background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.3);border-radius:7px;color:var(--accent2);font-family:Kanit;font-size:11px;font-weight:600;cursor:pointer">👁️ ดู</button>`:''}
+        </div>`;
+      }).join('');
+      slipHtml += '</div>';
+    }
+  }catch(e){ console.warn('slip lookup:', e); }
+  // Render body
+  document.getElementById('my-detail-title').textContent = '📋 '+(p.name||'รายละเอียดงาน');
+  const body = document.getElementById('my-detail-body');
+  if(body){
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="background:var(--bg2);border-radius:10px;padding:12px 14px">
+          <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700">หน้าที่ของฉัน</div>
+          <div style="font-size:14px;font-weight:700;color:var(--cyan);margin-top:4px">${roleLbl}</div>
+        </div>
+        <div style="background:var(--bg2);border-radius:10px;padding:12px 14px">
+          <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700">ค่าตอบแทน</div>
+          <div style="font-size:16px;font-weight:800;color:var(--accent2);margin-top:4px">${fmtB(myW.amount||0)}</div>
+        </div>
+      </div>
+
+      <div style="background:${myW.status==='paid'?'rgba(0,223,160,.08)':'rgba(255,158,0,.06)'};border:1px solid ${myW.status==='paid'?'rgba(0,223,160,.25)':'rgba(255,158,0,.25)'};border-radius:10px;padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:11px;color:var(--text2);letter-spacing:1px;font-weight:700;margin-bottom:6px">📅 DEADLINE ของคุณ</div>
+        <div>${dlHtml}</div>
+      </div>
+
+      ${p.note?`<div style="background:rgba(0,180,255,.05);border:1px solid rgba(0,180,255,.2);border-radius:10px;padding:10px 14px;margin-bottom:14px">
+        <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700;margin-bottom:4px">📝 หมายเหตุจากแอดมิน</div>
+        <div style="font-size:13px">${p.note}</div>
+      </div>`:''}
+
+      <div style="margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:var(--accent2);margin-bottom:8px">💰 เส้นทางการจ่ายเงิน</div>
+        <div style="background:var(--bg2);border-radius:10px;padding:6px 14px">
+          ${timeline}
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.7">
+          💡 ถ้าคุณเห็นสถานะ <strong style="color:var(--orange)">"รอลูกค้าจ่าย"</strong> เป็นเวลานาน = ลูกค้ายังไม่โอนเงินเข้าสตูดิโอ · สตูดิโอจะโอนให้คุณทันทีที่ลูกค้าจ่าย · ถ้าเกิน 30 วันติดต่อแอดมินได้
+        </div>
+      </div>
+
+      ${slipHtml}
+    `;
+  }
+  openModal('modal-my-proj-detail');
+}
+
+// ดูสลิป (open data URL in new tab, fallback เป็น modal)
+function viewStaffSlip(slipKey){
+  try{
+    const val = JSON.parse(localStorage.getItem(slipKey)||'null');
+    if(!val){ toast('ไม่พบสลิป','error'); return; }
+    const url = val.dataUrl || val.url;
+    if(!url){ toast('สลิปไม่มีข้อมูล','error'); return; }
+    // เปิด new tab
+    const w = window.open('', '_blank');
+    if(!w){ toast('popup ถูกบล็อก','warn'); return; }
+    w.document.write(`<html><head><title>สลิป ${val.name||''}</title></head><body style="margin:0;padding:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh">
+      ${url.startsWith('data:image/') || /\.(png|jpg|jpeg|gif|webp)/i.test(val.name||'')
+        ? '<img src="'+url+'" style="max-width:100%;max-height:100vh">'
+        : '<iframe src="'+url+'" style="border:none;width:100vw;height:100vh"></iframe>'}
+    </body></html>`);
+  }catch(e){ toast('เปิดสลิปไม่สำเร็จ: '+e.message, 'error'); }
 }
 
 // Legacy alias — nav('my-history') was in backward compat but now just redirects to dashboard
@@ -10132,12 +10435,13 @@ function renderMyCalendar(){
   const PHASE_COLORS = {adaptation:'var(--cyan)',dubbing:'var(--orange)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
   const PHASE_LABELS = {adaptation:'✍️ Adaptation',dubbing:'🎤 Dubbing',mix:'🎧 Mix',qc:'✅ QC',subVideo:'🎬 Sub & Video',manager:'🗂️ Manager'};
 
-  // สร้าง events จาก trkCards
+  // สร้าง events จาก projects ทั้งหมด (รวม done/cancelled ด้วย เพื่อให้เห็นประวัติ)
+  //   Prefer project.phases (v4) · fallback ไป trkCard phases ถ้า project ไม่มี
   const events = [];
-  getTrkCards().forEach(card => {
-    const p = card.projId ? getProjects().find(x=>x.id===card.projId) : null;
-    if(!p) return;
-    // ตรวจว่า staff นี้อยู่ใน project ไหน และ slot ไหน
+  const trkCardMap = {};
+  (getTrkCards()||[]).forEach(c=>{ if(c.projId) trkCardMap[c.projId] = c; });
+  (getProjects()||[]).forEach(p=>{
+    if(!p || !p.id) return;
     const myWorkers = (p.workers||[]).filter(w=>w.id===staffId);
     if(!myWorkers.length) return;
     // หา phase ที่ staff รับผิดชอบ
@@ -10146,15 +10450,25 @@ function renderMyCalendar(){
       const pre=(w.slot||'').split('-')[0];
       if(SLOT_PHASE[pre]) myPhases.add(SLOT_PHASE[pre]);
     });
-    // ดึง deadline จาก phases ที่ staff รับผิดชอบเท่านั้น
+    // แหล่งข้อมูล phases: project.phases > trkCard.phases
+    const phasesSource = (p.phases && Object.keys(p.phases).length)
+      ? p.phases
+      : (trkCardMap[p.id]?.phases || {});
     PHASES.forEach(ph=>{
       if(!myPhases.has(ph.key)) return;
-      const pd = (card.phases||{})[ph.key]||{};
-      if(!pd.startDate||!pd.deadline) return;
-      const [sy,sm,sd]=pd.startDate.split('-').map(Number);
-      const [ey,em,ed]=pd.deadline.split('-').map(Number);
+      const pd = phasesSource[ph.key]||{};
+      if(!pd.startDate && !pd.deadline) return;
+      // ถ้ามีแค่ deadline ใช้เป็น start+end; ถ้ามีแค่ start ใช้เป็น end ด้วย
+      const sStr = pd.startDate || pd.deadline;
+      const eStr = pd.deadline || pd.startDate;
+      if(!sStr || !eStr) return;
+      const [sy,sm,sd]=sStr.split('-').map(Number);
+      const [ey,em,ed]=eStr.split('-').map(Number);
+      // หา worker ของ phase นี้เพื่อเช็ค paid status
+      const myW = myWorkers.find(w=>(w.slot||'').split('-')[0] === (Object.entries(SLOT_PHASE).find(([,v])=>v===ph.key)?.[0]));
       events.push({
         projName: p.name,
+        projId: p.id,
         phaseKey: ph.key,
         label: PHASE_LABELS[ph.key]||ph.label,
         color: PHASE_COLORS[ph.key]||ph.color,
@@ -10162,6 +10476,8 @@ function renderMyCalendar(){
         end: new Date(ey,em-1,ed),
         submitTime: pd.submitTime||'',
         status: pd.status||'none',
+        workerStatus: myW?.status || 'pending',
+        isPast: new Date(ey,em-1,ed) < today,
       });
     });
   });
@@ -11402,6 +11718,8 @@ function renderSettings(){
   if(sm) document.body.classList.add('safe-mode');
   // Populate reset-paid-proj dropdown
   try{ populateResetProjDropdown(); }catch(e){}
+  // Load contact settings (form/LINE/email links)
+  try{ loadContactSettings(); }catch(e){}
 
   // Highlight ปุ่ม theme ปัจจุบัน
   const curTheme = getStoredTheme();
@@ -12703,6 +13021,28 @@ const _origSaveStaff = window.saveStaff;
       </div>
       <div id="profile-photo-actions" style="display:none">
         <button class="btn btn-outline btn-sm" style="width:100%;color:#FF6060;border-color:rgba(255,64,64,.3)" onclick="removeProfilePhoto()">🗑️ ลบรูปโปรไฟล์</button>
+      </div>
+      <!-- Bank account section (สำหรับสต๊าฟ — read-only) -->
+      <div id="profile-bank-section" style="display:none;padding-top:16px;border-top:1px solid var(--border2)">
+        <div style="font-size:13px;font-weight:700;color:var(--accent2);margin-bottom:10px">🏦 บัญชีรับเงิน</div>
+        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;margin-bottom:10px">
+          <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700">ชื่อ-สกุล</div>
+          <div id="profile-bank-name-show" style="font-size:14px;font-weight:600;margin-top:3px">—</div>
+          <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap">
+            <div style="flex:1;min-width:100px">
+              <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700">ธนาคาร</div>
+              <div id="profile-bank-show" style="font-size:14px;font-weight:600;margin-top:3px">—</div>
+            </div>
+            <div style="flex:2;min-width:140px">
+              <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700">เลขบัญชี</div>
+              <div id="profile-account-show" style="font-size:14px;font-weight:600;margin-top:3px;font-family:monospace">—</div>
+            </div>
+          </div>
+        </div>
+        <div style="background:rgba(0,180,255,.06);border:1px solid rgba(0,180,255,.2);border-radius:9px;padding:10px 12px;font-size:11px;color:var(--text2);line-height:1.7">
+          ℹ️ <strong>ต้องการเปลี่ยนบัญชี?</strong><br>
+          <span id="profile-bank-help-links"></span>
+        </div>
       </div>
       <!-- Password change section -->
       <div style="padding-top:16px;border-top:1px solid var(--border2)">
