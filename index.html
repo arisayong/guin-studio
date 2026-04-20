@@ -4414,27 +4414,41 @@ function renderQueue() {
     const s = cfg[status] || cfg.pending;
     return `<span style="padding:3px 10px;border-radius:12px;background:${s.bg};color:${s.color};border:1px solid ${s.border};font-size:11px;font-weight:700;white-space:nowrap">${s.label}</span>`;
   }
-  function actionBtns(pid, wid, slot, status) {
+  function actionBtns(pid, wid, slot, status, clientPaid) {
     if (status === 'pending') return `
-      <div style="display:flex;gap:5px;flex-wrap:wrap">
-        <button class="btn btn-xs btn-cyan" onclick="qApprove('${pid}','${wid}','${slot}')" title="รอทำ → อนุมัติ (ทีมทำเสร็จแล้ว)">🔵 อนุมัติ</button>
-        <button class="btn btn-xs btn-green" onclick="qPay('${pid}','${wid}','${slot}')" title="ข้ามขั้นตอน — จ่ายทันที">💸 จ่ายเลย</button>
-        <button class="btn btn-xs btn-outline" onclick="openPayAmt('${pid}','${wid}','${slot}')">💰 แก้ยอด</button>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+        <button class="btn btn-xs btn-cyan" onclick="qApprove('${pid}','${wid}','${slot}')" title="ทีมทำงานเสร็จแล้ว">🔵 อนุมัติ</button>
+        <button class="btn btn-xs btn-outline" onclick="openPayAmt('${pid}','${wid}','${slot}')" title="แก้ยอดเงิน">💰</button>
       </div>`;
-    if (status === 'approved') return `
-      <div style="display:flex;gap:5px;flex-wrap:wrap">
-        <button class="btn btn-xs" style="background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.35);color:#FFD700" onclick="qWaitingClient('${pid}','${wid}','${slot}')" title="อนุมัติ → รอลูกค้าจ่าย (ส่งงานแล้ว)">🟡 รอลูกค้าจ่าย</button>
-        <button class="btn btn-xs btn-green" style="font-weight:800" onclick="qPay('${pid}','${wid}','${slot}')" title="ลูกค้าจ่ายแล้ว — จ่ายทีมเลย">💸 จ่ายเงิน</button>
-        <button class="btn btn-xs btn-outline" onclick="openPayAmt('${pid}','${wid}','${slot}')">💰 แก้ยอด</button>
-        <button class="btn btn-xs btn-outline" onclick="qRevert('${pid}','${wid}','${slot}')" title="ย้อนกลับ (ถ้ากดผิด)">↩️</button>
+    if (status === 'approved') {
+      // Client paid → button is prominent green "จ่ายทีม"
+      // Client not paid yet → button is disabled look (grey) with tooltip
+      if (clientPaid) {
+        return `
+          <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+            <button class="btn btn-xs btn-green" style="font-weight:800" onclick="qPay('${pid}','${wid}','${slot}')" title="ลูกค้าจ่ายแล้ว — จ่ายทีมเลย">💸 จ่ายทีม</button>
+            <button class="btn btn-xs btn-outline" onclick="openPayAmt('${pid}','${wid}','${slot}')" title="แก้ยอด">💰</button>
+            <button class="btn btn-xs btn-outline" onclick="qRevert('${pid}','${wid}','${slot}')" title="ย้อนกลับ (ถ้ากดผิด)">↩️</button>
+          </div>`;
+      } else {
+        return `
+          <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+            <button class="btn btn-xs" style="background:rgba(120,120,140,.08);border:1px dashed rgba(255,215,0,.35);color:var(--text2);cursor:help" disabled title="รอลูกค้าจ่ายก่อน (กด 'รับเงินแล้ว' ที่ header โปรเจกต์)">⏳ รอลูกค้าจ่าย</button>
+            <button class="btn btn-xs btn-green" onclick="qPay('${pid}','${wid}','${slot}')" title="ข้ามขั้น — จ่ายทีมก่อนลูกค้าจ่าย (ถ้าจำเป็น)">💸 จ่ายก่อน</button>
+            <button class="btn btn-xs btn-outline" onclick="qRevert('${pid}','${wid}','${slot}')" title="ย้อนกลับ">↩️</button>
+          </div>`;
+      }
+    }
+    if (status === 'paid') return `
+      <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
+        <span style="font-size:11px;color:var(--green);font-weight:700">✅ โอนแล้ว</span>
       </div>`;
+    // legacy: waiting_client (if any exists from old data)
     if (status === 'waiting_client') return `
-      <div style="display:flex;gap:5px;flex-wrap:wrap">
-        <button class="btn btn-xs btn-green" style="font-weight:800" onclick="qPay('${pid}','${wid}','${slot}')" title="ลูกค้าจ่ายแล้ว — จ่ายทีมได้">💸 ลูกค้าจ่ายแล้ว — จ่ายทีม</button>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+        <button class="btn btn-xs btn-green" style="font-weight:800" onclick="qPay('${pid}','${wid}','${slot}')" title="จ่ายทีม">💸 จ่ายทีม</button>
         <button class="btn btn-xs btn-outline" onclick="qRevert('${pid}','${wid}','${slot}')" title="ย้อนกลับ">↩️</button>
       </div>`;
-    if (status === 'paid') return `
-      <span style="font-size:11px;color:var(--green);font-weight:700">✅ โอนแล้ว</span>`;
     return '';
   }
 
@@ -4463,13 +4477,16 @@ function renderQueue() {
     const pillPaid     = paidCount     ? `<span style="padding:2px 8px;border-radius:10px;background:rgba(0,223,160,.15);color:var(--green);font-size:10px;font-weight:700">✅ ${paidCount}</span>` : '';
 
     // Worker rows
+    const clientPaid = ls('client_paid_'+p.id);
     const workerRows = g.workers.map(w => {
       const s = getStaffById(w.id); if (!s) return '';
       const color = CATS[s.category]?.color || 'var(--text2)';
       const isPending  = w.status === 'pending';
       const isApproved = w.status === 'approved';
       const isPaid     = w.status === 'paid';
-      return `<div style="display:flex;align-items:center;gap:14px;padding:13px 18px;border-top:1px solid rgba(255,255,255,.04);background:${isPaid?'rgba(0,223,160,.02)':isApproved?'rgba(0,180,255,.03)':''}">
+      // Smart derived status: approved + client paid = ready to pay team
+      const readyToPayTeam = isApproved && clientPaid;
+      return `<div style="display:flex;align-items:center;gap:14px;padding:13px 18px;border-top:1px solid rgba(255,255,255,.04);background:${isPaid?'rgba(0,223,160,.02)':readyToPayTeam?'rgba(0,223,160,.05)':isApproved?'rgba(255,215,0,.04)':''}">
         <!-- Avatar + name -->
         <div style="display:flex;align-items:center;gap:10px;min-width:170px">
           <div style="width:34px;height:34px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">${s.nickname[0]}</div>
@@ -4489,25 +4506,25 @@ function renderQueue() {
           <div style="color:var(--text2)">${s.account}</div>
           ${s.promptpay ? `<div style="color:var(--text2);font-size:10px">📱 ${s.promptpay}</div>` : ''}
         </div>
-        <!-- Status badge (center) -->
+        <!-- Status badge (auto-derived) -->
         <div style="flex:1;display:flex;align-items:center;justify-content:center">
           ${(()=>{
-            if(w.status==='pending') return '<span style="padding:4px 10px;border-radius:20px;background:rgba(120,120,140,.15);color:var(--text2);font-size:11px;font-weight:700">⏳ รอดำเนินการ</span>';
-            if(w.status==='approved') return '<span style="padding:4px 10px;border-radius:20px;background:rgba(0,180,255,.15);color:var(--accent2);font-size:11px;font-weight:700">🔵 อนุมัติแล้ว</span>';
-            if(w.status==='waiting_client') return '<span style="padding:4px 10px;border-radius:20px;background:rgba(255,215,0,.12);color:#FFD700;font-size:11px;font-weight:700;border:1px solid rgba(255,215,0,.35)">🟡 รอลูกค้าจ่าย</span>';
-            if(w.status==='paid') return '<span style="padding:4px 10px;border-radius:20px;background:rgba(0,223,160,.15);color:var(--green);font-size:11px;font-weight:700">✅ จ่ายแล้ว</span>';
+            if(w.status==='paid') return '<span style="padding:5px 12px;border-radius:20px;background:rgba(0,223,160,.15);color:var(--green);font-size:11px;font-weight:700">✅ จ่ายแล้ว</span>';
+            if(w.status==='pending') return '<span style="padding:5px 12px;border-radius:20px;background:rgba(120,120,140,.15);color:var(--text2);font-size:11px;font-weight:700">⏳ รอดำเนินการ</span>';
+            // approved → check client payment
+            if(w.status==='approved' && !clientPaid) return '<span style="padding:5px 12px;border-radius:20px;background:rgba(255,215,0,.12);color:#FFD700;font-size:11px;font-weight:700;border:1px solid rgba(255,215,0,.35)">🟡 รอลูกค้าจ่าย</span>';
+            if(w.status==='approved' && clientPaid) return '<span style="padding:5px 12px;border-radius:20px;background:rgba(0,223,160,.15);color:var(--green);font-size:11px;font-weight:700;border:1px solid rgba(0,223,160,.35)">🟢 พร้อมจ่ายทีม</span>';
             return '';
           })()}
         </div>
         <!-- Action buttons -->
         <div style="min-width:280px;display:flex;justify-content:flex-end">
-          ${actionBtns(p.id, w.id, w.slot, w.status)}
+          ${actionBtns(p.id, w.id, w.slot, w.status, clientPaid)}
         </div>
       </div>`;
     }).join('');
 
-    // Client payment status (stored in localStorage per project)
-    const clientPaid = ls('client_paid_'+p.id);
+    // Client payment status (already defined above)
     const clientPaidDate = ls('client_paid_date_'+p.id);
     const clientPaidBtn = `<div onclick="event.stopPropagation();toggleClientPaid('${p.id}')" style="cursor:pointer;padding:6px 12px;border-radius:8px;border:1px solid ${clientPaid?'rgba(0,223,160,.4)':'rgba(255,255,255,.15)'};background:${clientPaid?'rgba(0,223,160,.12)':'rgba(255,255,255,.04)'};display:flex;flex-direction:column;align-items:center;gap:2px;transition:all .2s;min-width:90px" title="กดเพื่อสลับสถานะ">
       <span style="font-size:12px;font-weight:800;color:${clientPaid?'var(--green)':'var(--text2)'}">${clientPaid?'✅ รับเงินแล้ว':'⏳ ยังไม่ได้รับ'}</span>
@@ -4541,6 +4558,18 @@ function renderQueue() {
       </div>
       <!-- Worker rows (collapsible) -->
       <div id="${groupId}" style="display:block">
+        <!-- Bulk actions bar -->
+        ${(()=>{
+          const pendingCount = g.workers.filter(w => w.status === 'pending').length;
+          const approvedCount = g.workers.filter(w => w.status === 'approved').length;
+          const readyCount = g.workers.filter(w => w.status === 'approved' && clientPaid).length;
+          if(pendingCount === 0 && readyCount === 0) return '';
+          return `<div style="display:flex;align-items:center;gap:10px;padding:10px 18px;background:rgba(0,180,255,.03);border-top:1px solid var(--border2);flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--text2);font-weight:600">⚡ ทำทั้งกลุ่ม:</span>
+            ${pendingCount > 0 ? `<button class="btn btn-xs btn-cyan" onclick="qApproveAll('${p.id}')" title="อนุมัติทีมทั้งโปรเจกต์นี้ (${pendingCount} คน)">🔵 อนุมัติทั้งโปรเจกต์ (${pendingCount} คน)</button>` : ''}
+            ${readyCount > 0 ? `<button class="btn btn-xs btn-green" style="font-weight:800" onclick="qPayAll('${p.id}')" title="จ่ายทีมทั้งโปรเจกต์นี้ (${readyCount} คน)">💸 จ่ายทีมทั้งโปรเจกต์ (${readyCount} คน)</button>` : ''}
+          </div>`;
+        })()}
         <!-- sub-header -->
         <div style="display:flex;align-items:center;gap:14px;padding:7px 18px;background:rgba(0,0,0,.15);border-top:1px solid var(--border2)">
           <div style="min-width:170px;font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">ชื่อ-ตำแหน่ง</div>
@@ -4611,7 +4640,47 @@ async function qApprove(projId, workerId, slot) {
   await saveProjectDB(p);
   updateQueueBadge();
   renderQueue();
-  toast('🔵 อนุมัติแล้ว — กด "🟡 ส่งให้ลูกค้า" เมื่อรอลูกค้าจ่าย หรือ "💸 จ่ายเงิน" ถ้าพร้อมจ่ายเลย', 'success');
+  const clientPaid = ls('client_paid_'+projId);
+  toast(clientPaid ? '🟢 พร้อมจ่ายทีม — กด "💸 จ่ายทีม" ได้เลย' : '🔵 อนุมัติแล้ว — รอลูกค้าจ่าย (ลูกค้ายังไม่ได้จ่าย)', 'success');
+}
+
+/* ⚡ BULK: อนุมัติทั้งโปรเจกต์ */
+async function qApproveAll(projId) {
+  const p = getProjects().find(x => x.id === projId); if (!p) return;
+  const pendingWorkers = (p.workers||[]).filter(w => w.status === 'pending');
+  if(pendingWorkers.length === 0){ toast('ไม่มีคนที่รอดำเนินการ','info'); return; }
+  if(!confirm(`⚡ อนุมัติทีมทั้งหมด ${pendingWorkers.length} คน ในโปรเจกต์ "${p.name}"?\n\n(ทุกคนจะเปลี่ยนเป็น "อนุมัติแล้ว")`)) return;
+  pendingWorkers.forEach(w => { w.status = 'approved'; });
+  try {
+    await saveProjectDB(p);
+    updateQueueBadge();
+    renderQueue();
+    const clientPaid = ls('client_paid_'+projId);
+    toast(`✅ อนุมัติ ${pendingWorkers.length} คนแล้ว` + (clientPaid ? ' — พร้อมจ่ายทีม' : ' — รอลูกค้าจ่าย'), 'success');
+  } catch(e){
+    toast('⚠️ บันทึกไม่สำเร็จ: '+e.message,'error');
+  }
+}
+
+/* ⚡ BULK: จ่ายทีมทั้งโปรเจกต์ (เฉพาะคนที่ approved + client paid) */
+async function qPayAll(projId) {
+  const p = getProjects().find(x => x.id === projId); if (!p) return;
+  const clientPaid = ls('client_paid_'+projId);
+  if(!clientPaid){
+    if(!confirm(`⚠️ ลูกค้ายังไม่ได้จ่ายเงินโปรเจกต์นี้\n\nแน่ใจจะจ่ายทีมก่อนไหม?`)) return;
+  }
+  const readyWorkers = (p.workers||[]).filter(w => w.status === 'approved');
+  if(readyWorkers.length === 0){ toast('ไม่มีคนที่พร้อมจ่าย','info'); return; }
+  if(!confirm(`💸 จ่ายเงินทีมทั้งหมด ${readyWorkers.length} คน ในโปรเจกต์ "${p.name}"?\n\nยอดรวม: ${fmtB(readyWorkers.reduce((a,w)=>a+(w.amount||0),0))}\n\n(ระบบจะออกใบสำคัญจ่ายให้แต่ละคน)`)) return;
+  let successCount = 0;
+  for (const w of readyWorkers) {
+    try {
+      await qPay(projId, w.id, w.slot);
+      successCount++;
+    } catch(e){ console.error('Pay error for', w.id, e); }
+  }
+  toast(`✅ จ่ายทีม ${successCount}/${readyWorkers.length} คนสำเร็จ`, 'success');
+  renderQueue();
 }
 
 /* approved → waiting_client (รอลูกค้าจ่าย) */
