@@ -267,8 +267,20 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 /* CATEGORY BLOCKS */
 .cat-block{border-radius:11px;margin-bottom:12px;overflow:hidden}
-.cat-block-head{padding:11px 15px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;cursor:pointer}
+.cat-block-head{padding:11px 15px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;cursor:pointer;flex-wrap:wrap;gap:8px}
 .cat-block-body{padding:13px;border:1px solid;border-top:none;border-radius:0 0 11px 11px}
+.cat-block-phase{padding:8px 15px;background:rgba(0,0,0,.2);border:1px solid;border-top:none;border-bottom:none;display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:11px}
+[data-theme="light"] .cat-block-phase{background:rgba(15,30,58,.04)}
+.cat-block-phase .ph-lbl{color:var(--text2);font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.cat-block-phase input[type="date"]{background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px;padding:4px 8px;width:140px}
+.cat-block-phase input[type="text"]{background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px;padding:4px 8px;width:64px;text-align:center;letter-spacing:1px}
+.cat-block-phase input:focus{outline:none;border-color:var(--accent2)}
+.cat-dub .cat-block-phase{border-color:rgba(255,158,0,.2);background:rgba(255,158,0,.05)}
+.cat-adp .cat-block-phase{border-color:rgba(0,180,255,.2);background:rgba(0,180,255,.05)}
+.cat-mix .cat-block-phase{border-color:rgba(0,223,160,.2);background:rgba(0,223,160,.05)}
+.cat-qc  .cat-block-phase{border-color:rgba(155,111,255,.2);background:rgba(155,111,255,.05)}
+.cat-sub .cat-block-phase{border-color:rgba(255,64,64,.2);background:rgba(255,64,64,.05)}
+.cat-mgr .cat-block-phase{border-color:rgba(21,101,255,.2);background:rgba(21,101,255,.05)}
 .cat-dub .cat-block-head{background:rgba(255,158,0,.12);color:var(--orange)}
 .cat-dub .cat-block-body{border-color:rgba(255,158,0,.2);background:rgba(255,158,0,.03)}
 .cat-adp .cat-block-head{background:rgba(0,180,255,.12);color:var(--cyan)}
@@ -764,9 +776,9 @@ body.mobile-menu-open .mobile-backdrop{display:block}
     <span style="font-size:14px;opacity:.5;margin-left:4px">✏️</span>
    </div>
    <div style="display:flex;gap:6px;margin-bottom:8px">
-    <button class="btn-logout" onclick="doLogout()" title="ออกจากระบบ (Logout)" style="padding:9px 12px;font-size:16px">🚪</button>
-    <button onclick="toggleTheme()" data-theme-toggle title="สลับธีมมืด/สว่าง" style="padding:9px 12px;background:rgba(155,111,255,.08);border:1px solid rgba(155,111,255,.2);border-radius:8px;color:var(--purple);font-family:Kanit;font-size:16px;cursor:pointer;font-weight:600">🌓</button>
-    <button onclick="showKeyboardHelp()" title="ทางลัดแป้นพิมพ์ (กด ?)" style="padding:9px 12px;background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.2);border-radius:8px;color:var(--accent2);font-family:Kanit;font-size:14px;cursor:pointer;font-weight:600">⌨️</button>
+    <button class="btn-logout" onclick="doLogout()" title="ออกจากระบบ (Logout)" style="flex:1;padding:6px 10px;font-size:14px;height:32px">🚪</button>
+    <button onclick="toggleTheme()" data-theme-toggle title="สลับธีมมืด/สว่าง" style="flex:1;padding:6px 10px;background:rgba(155,111,255,.08);border:1px solid rgba(155,111,255,.2);border-radius:9px;color:var(--purple);font-family:Kanit;font-size:14px;cursor:pointer;font-weight:600;height:32px">🌓</button>
+    <button onclick="showKeyboardHelp()" title="ทางลัดแป้นพิมพ์ (กด ?)" style="flex:1;padding:6px 10px;background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.2);border-radius:9px;color:var(--accent2);font-family:Kanit;font-size:13px;cursor:pointer;font-weight:600;height:32px">⌨️</button>
    </div>
   </div>
  </aside>
@@ -1510,19 +1522,19 @@ body.mobile-menu-open .mobile-backdrop{display:block}
     <div class="form-group" style="margin:0"><label class="form-label">วันเริ่มงาน</label>
       <div style="position:relative;display:flex;align-items:center">
        <input class="form-input" id="pj-start" type="text" placeholder="วว/ดด/ปปปป" maxlength="10" style="padding-right:36px"
-         onchange="validateDateThai(this,iso=>{document.getElementById('pj-start-pk').value=iso;syncDeadlineFromStart('pj-start','pj-deadline')})"
+         onchange="validateDateThai(this,iso=>{document.getElementById('pj-start-pk').value=iso;syncDeadlineFromStart('pj-start','pj-deadline');syncProjectDatesToPhases()})"
          oninput="let v=this.value.replace(/[^0-9/]/g,'');if(v.length==2&&!v.includes('/'))v+='/';else if(v.length==5&&v.split('/').length==2)v+='/';this.value=v">
        <input type="date" id="pj-start-pk" tabindex="-1" style="position:absolute;right:0;width:32px;height:100%;opacity:0;cursor:pointer"
-         onchange="document.getElementById('pj-start').value=isoToThai(this.value);document.getElementById('pj-start').style.borderColor='rgba(0,223,160,.4)';syncDeadlineFromStart('pj-start','pj-deadline')">
+         onchange="document.getElementById('pj-start').value=isoToThai(this.value);document.getElementById('pj-start').style.borderColor='rgba(0,223,160,.4)';syncDeadlineFromStart('pj-start','pj-deadline');syncProjectDatesToPhases()">
        <span onclick="const p=document.getElementById('pj-start-pk');p.showPicker?p.showPicker():p.click()" style="position:absolute;right:8px;cursor:pointer;font-size:15px;user-select:none">📅</span>
       </div></div>
     <div class="form-group" style="margin:0"><label class="form-label">Deadline</label>
       <div style="position:relative;display:flex;align-items:center">
        <input class="form-input" id="pj-deadline" type="text" placeholder="วว/ดด/ปปปป" maxlength="10" style="padding-right:36px"
-         onchange="validateDateThai(this,iso=>{document.getElementById('pj-deadline-pk').value=iso})"
+         onchange="validateDateThai(this,iso=>{document.getElementById('pj-deadline-pk').value=iso;syncProjectDatesToPhases()})"
          oninput="let v=this.value.replace(/[^0-9/]/g,'');if(v.length==2&&!v.includes('/'))v+='/';else if(v.length==5&&v.split('/').length==2)v+='/';this.value=v">
        <input type="date" id="pj-deadline-pk" tabindex="-1" style="position:absolute;right:0;width:32px;height:100%;opacity:0;cursor:pointer"
-         onchange="document.getElementById('pj-deadline').value=isoToThai(this.value);document.getElementById('pj-deadline').style.borderColor='rgba(0,223,160,.4)'">
+         onchange="document.getElementById('pj-deadline').value=isoToThai(this.value);document.getElementById('pj-deadline').style.borderColor='rgba(0,223,160,.4)';syncProjectDatesToPhases()">
        <span onclick="const p=document.getElementById('pj-deadline-pk');p.showPicker?p.showPicker():p.click()" style="position:absolute;right:8px;cursor:pointer;font-size:15px;user-select:none">📅</span>
       </div></div>
    </div>
@@ -1557,6 +1569,14 @@ body.mobile-menu-open .mobile-backdrop{display:block}
       <span id="adp-subtotal" style="font-size:13px;font-weight:700;color:var(--cyan)">฿0</span>
      </div>
     </div>
+    <div class="cat-block-phase">
+     <span class="ph-lbl">📅 เริ่ม</span>
+     <input type="date" id="ph-adp-start" onchange="onPhaseDateChange('adp','start',this.value)">
+     <span class="ph-lbl">🏁 ส่ง</span>
+     <input type="date" id="ph-adp-deadline" onchange="onPhaseDateChange('adp','deadline',this.value)">
+     <span class="ph-lbl">🕒 เวลา</span>
+     <input type="text" id="ph-adp-time" placeholder="19:00" maxlength="5" oninput="this.value=this.value.replace(/[^0-9:]/g,'')" onchange="onPhaseDateChange('adp','time',this.value)">
+    </div>
     <div class="cat-block-body"><div id="adp-list"></div><div class="worker-dropdown-wrap">
   <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('adp-select')">
     <span>➕ เพิ่มสมาชิก</span><span>▾</span>
@@ -1577,6 +1597,14 @@ body.mobile-menu-open .mobile-backdrop{display:block}
       <span style="font-size:12px;font-weight:400">หัก % <input type="number" id="dub-tax" placeholder="0" min="0" max="100" style="width:56px;padding:3px 7px;background:rgba(0,0,0,.35);border:1px solid rgba(255,158,0,.3);border-radius:6px;color:#fff;font-family:Kanit;font-size:12px;margin-left:4px" oninput="calcProjSummary()"></span>
       <span id="dub-subtotal" style="font-size:13px;font-weight:700;color:var(--orange)">฿0</span>
      </div>
+    </div>
+    <div class="cat-block-phase">
+     <span class="ph-lbl">📅 เริ่ม</span>
+     <input type="date" id="ph-dub-start" onchange="onPhaseDateChange('dub','start',this.value)">
+     <span class="ph-lbl">🏁 ส่ง</span>
+     <input type="date" id="ph-dub-deadline" onchange="onPhaseDateChange('dub','deadline',this.value)">
+     <span class="ph-lbl">🕒 เวลา</span>
+     <input type="text" id="ph-dub-time" placeholder="19:00" maxlength="5" oninput="this.value=this.value.replace(/[^0-9:]/g,'')" onchange="onPhaseDateChange('dub','time',this.value)">
     </div>
     <div class="cat-block-body">
      <div style="font-size:11px;color:var(--text2);margin-bottom:7px;font-weight:700;letter-spacing:1px">🌟 นักพากย์หลัก</div>
@@ -1614,6 +1642,14 @@ body.mobile-menu-open .mobile-backdrop{display:block}
       <span id="mix-subtotal" style="font-size:13px;font-weight:700;color:var(--green)">฿0</span>
      </div>
     </div>
+    <div class="cat-block-phase">
+     <span class="ph-lbl">📅 เริ่ม</span>
+     <input type="date" id="ph-mix-start" onchange="onPhaseDateChange('mix','start',this.value)">
+     <span class="ph-lbl">🏁 ส่ง</span>
+     <input type="date" id="ph-mix-deadline" onchange="onPhaseDateChange('mix','deadline',this.value)">
+     <span class="ph-lbl">🕒 เวลา</span>
+     <input type="text" id="ph-mix-time" placeholder="19:00" maxlength="5" oninput="this.value=this.value.replace(/[^0-9:]/g,'')" onchange="onPhaseDateChange('mix','time',this.value)">
+    </div>
     <div class="cat-block-body"><div id="mix-list"></div><div class="worker-dropdown-wrap">
   <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('mix-select')">
     <span>➕ เพิ่มสมาชิก</span><span>▾</span>
@@ -1633,6 +1669,14 @@ body.mobile-menu-open .mobile-backdrop{display:block}
       <span style="font-size:12px;font-weight:400">หัก % <input type="number" id="qc-tax" placeholder="0" style="width:56px;padding:3px 7px;background:rgba(0,0,0,.35);border:1px solid rgba(155,111,255,.3);border-radius:6px;color:#fff;font-family:Kanit;font-size:12px;margin-left:4px" oninput="calcProjSummary()"></span>
       <span id="qc-subtotal" style="font-size:13px;font-weight:700;color:var(--purple)">฿0</span>
      </div>
+    </div>
+    <div class="cat-block-phase">
+     <span class="ph-lbl">📅 เริ่ม</span>
+     <input type="date" id="ph-qc-start" onchange="onPhaseDateChange('qc','start',this.value)">
+     <span class="ph-lbl">🏁 ส่ง</span>
+     <input type="date" id="ph-qc-deadline" onchange="onPhaseDateChange('qc','deadline',this.value)">
+     <span class="ph-lbl">🕒 เวลา</span>
+     <input type="text" id="ph-qc-time" placeholder="19:00" maxlength="5" oninput="this.value=this.value.replace(/[^0-9:]/g,'')" onchange="onPhaseDateChange('qc','time',this.value)">
     </div>
     <div class="cat-block-body"><div id="qc-list"></div><div class="worker-dropdown-wrap">
   <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('qc-select')">
@@ -1654,6 +1698,14 @@ body.mobile-menu-open .mobile-backdrop{display:block}
       <span id="sub-subtotal" style="font-size:13px;font-weight:700;color:var(--red)">฿0</span>
      </div>
     </div>
+    <div class="cat-block-phase">
+     <span class="ph-lbl">📅 เริ่ม</span>
+     <input type="date" id="ph-sub-start" onchange="onPhaseDateChange('sub','start',this.value)">
+     <span class="ph-lbl">🏁 ส่ง</span>
+     <input type="date" id="ph-sub-deadline" onchange="onPhaseDateChange('sub','deadline',this.value)">
+     <span class="ph-lbl">🕒 เวลา</span>
+     <input type="text" id="ph-sub-time" placeholder="19:00" maxlength="5" oninput="this.value=this.value.replace(/[^0-9:]/g,'')" onchange="onPhaseDateChange('sub','time',this.value)">
+    </div>
     <div class="cat-block-body"><div id="sub-list"></div><div class="worker-dropdown-wrap">
   <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('sub-select')">
     <span>➕ เพิ่มสมาชิก</span><span>▾</span>
@@ -1673,6 +1725,14 @@ body.mobile-menu-open .mobile-backdrop{display:block}
       <span style="font-size:12px;font-weight:400">หัก % <input type="number" id="mgr-tax" placeholder="0" style="width:56px;padding:3px 7px;background:rgba(0,0,0,.35);border:1px solid rgba(21,101,255,.3);border-radius:6px;color:#fff;font-family:Kanit;font-size:12px;margin-left:4px" oninput="calcProjSummary()"></span>
       <span id="mgr-subtotal" style="font-size:13px;font-weight:700;color:var(--accent2)">฿0</span>
      </div>
+    </div>
+    <div class="cat-block-phase">
+     <span class="ph-lbl">📅 เริ่ม</span>
+     <input type="date" id="ph-mgr-start" onchange="onPhaseDateChange('mgr','start',this.value)">
+     <span class="ph-lbl">🏁 ส่ง</span>
+     <input type="date" id="ph-mgr-deadline" onchange="onPhaseDateChange('mgr','deadline',this.value)">
+     <span class="ph-lbl">🕒 เวลา</span>
+     <input type="text" id="ph-mgr-time" placeholder="19:00" maxlength="5" oninput="this.value=this.value.replace(/[^0-9:]/g,'')" onchange="onPhaseDateChange('mgr','time',this.value)">
     </div>
     <div class="cat-block-body"><div id="mgr-list"></div><div class="worker-dropdown-wrap">
   <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('mgr-select')">
@@ -1945,6 +2005,7 @@ let currentProjId = null;
 let formDirty = false;
 let editingProjId = null;
 let activeCats = new Set();
+let formPhases = {}; // { adp: {startDate, deadline, submitTime, status}, dub: {...}, ... }
 let evidenceLogs = [];
 let payAmtTarget = null;
 let noEmail = false;
@@ -3764,6 +3825,37 @@ function renderDash(){
 // ══════════════════════════════════════════════
 function getTrkCards(){return ls('trk_cards_v3')||[]}
 function saveTrkCards(arr){ls('trk_cards_v3',arr);if(_fbDatabase)_fbDatabase.ref('trkCards').set(arr).catch(()=>{}); }
+
+// Bridge: sync project.phases กลับไปยัง trkCard ที่ link projId เดียวกัน
+// เพื่อให้หน้า Track/Calendar เดิมยังแสดงข้อมูลตรงกัน ระหว่างที่ยังใช้ schema เก่าไปพลางก่อน
+function syncPhasesToTrkCard(projId, phases){
+  if(!projId || !phases) return;
+  try{
+    const cards = getTrkCards();
+    let card = cards.find(c => c.projId === projId);
+    if(!card){
+      // ยังไม่มี card — สร้างให้
+      card = { id: 'TC'+Date.now(), projId: projId, phases: {}, createdAt: new Date().toISOString() };
+      cards.push(card);
+    }
+    // เก็บ status เดิมของ card ไว้ถ้ามี (เพราะผู้ใช้อาจเปลี่ยนที่หน้า Track)
+    const oldPhases = card.phases || {};
+    const newPhases = {};
+    Object.entries(phases).forEach(([k, ph])=>{
+      if(!ph) return;
+      const old = oldPhases[k] || {};
+      newPhases[k] = {
+        startDate: ph.startDate || '',
+        deadline: ph.deadline || '',
+        submitTime: ph.submitTime || '',
+        // status ใช้ของ card เดิมถ้ามี (หน้า Track อาจเปลี่ยนแล้ว) — ฟอร์มไม่มี status input
+        status: old.status || ph.status || 'none'
+      };
+    });
+    card.phases = newPhases;
+    saveTrkCards(cards);
+  }catch(e){ console.warn('syncPhasesToTrkCard error:', e); }
+}
 function renderTrack(){renderTrkCalendar();renderTrkBoard()}
 function renderTrkCalendar() {
   const el = document.getElementById('trk-calendar'); if (!el) return;
@@ -4113,12 +4205,170 @@ function renderProjList(){
 // PROJECT FORM
 // ══════════════════════════════════════════════
 function initFormSlots(){formSlots={dub:{main:[],sub:[]},adp:{only:[]},mix:{only:[]},qc:{only:[]},sub:{only:[]},mgr:{only:[]}};activeCats=new Set()}
+
+// ══════════════════════════════════════════════════════════
+// PHASES (กำหนดส่งของแต่ละทีมในฟอร์มโปรเจกต์)
+//   Short cat keys: adp, dub, mix, qc, sub, mgr
+//   Full phase keys (ใน data): adaptation, dubbing, mix, qc, subVideo, manager
+// ══════════════════════════════════════════════════════════
+const PHASE_KEY_FROM_SHORT = { adp:'adaptation', dub:'dubbing', mix:'mix', qc:'qc', sub:'subVideo', mgr:'manager' };
+const SHORT_FROM_PHASE_KEY = { adaptation:'adp', dubbing:'dub', mix:'mix', qc:'qc', subVideo:'sub', manager:'mgr' };
+
+function initFormPhases(){
+  formPhases = {};
+  ['adp','dub','mix','qc','sub','mgr'].forEach(c=>{
+    formPhases[c] = { startDate:'', deadline:'', submitTime:'19:00', status:'none' };
+  });
+}
+
+// Default times: ใช้ startDate/deadline ของโปรเจกต์ เติมให้ทุก phase ที่ยังไม่ได้กำหนด
+function applyProjectDatesToEmptyPhases(){
+  const projStart = document.getElementById('pj-start-pk')?.value || thaiToIso(document.getElementById('pj-start')?.value||'');
+  const projDl = document.getElementById('pj-deadline-pk')?.value || thaiToIso(document.getElementById('pj-deadline')?.value||'');
+  if(!projStart && !projDl) return;
+  ['adp','dub','mix','qc','sub','mgr'].forEach(c=>{
+    if(!formPhases[c]) formPhases[c] = { startDate:'', deadline:'', submitTime:'19:00', status:'none' };
+    if(!formPhases[c].startDate && projStart) formPhases[c].startDate = projStart;
+    if(!formPhases[c].deadline && projDl) formPhases[c].deadline = projDl;
+  });
+}
+
+// Populate UI inputs ของ phase (เรียกหลัง openEditProject หรือ openNewProject)
+function populateFormPhasesUI(){
+  ['adp','dub','mix','qc','sub','mgr'].forEach(c=>{
+    const ph = formPhases[c] || {};
+    const sEl = document.getElementById('ph-'+c+'-start');
+    const dEl = document.getElementById('ph-'+c+'-deadline');
+    const tEl = document.getElementById('ph-'+c+'-time');
+    if(sEl) sEl.value = ph.startDate || '';
+    if(dEl) dEl.value = ph.deadline || '';
+    if(tEl) tEl.value = ph.submitTime || '';
+  });
+}
+
+// Handler ตอน user เปลี่ยนวันของ phase
+function onPhaseDateChange(cat, field, value){
+  if(!formPhases[cat]) formPhases[cat] = { startDate:'', deadline:'', submitTime:'19:00', status:'none' };
+  if(field === 'start'){
+    formPhases[cat].startDate = value;
+    // Auto-fill deadline ถ้าว่าง
+    if(value && !formPhases[cat].deadline){
+      formPhases[cat].deadline = value;
+      const dEl = document.getElementById('ph-'+cat+'-deadline');
+      if(dEl) dEl.value = value;
+    }
+  } else if(field === 'deadline'){
+    formPhases[cat].deadline = value;
+  } else if(field === 'time'){
+    formPhases[cat].submitTime = value;
+  }
+}
+
+// ดึง phases ปัจจุบันออกมาเป็น object สำหรับบันทึก
+// คืน object key แบบยาว (adaptation/dubbing/...) เพื่อ compatibility กับระบบ track เดิม
+function collectFormPhasesForSave(){
+  const out = {};
+  ['adp','dub','mix','qc','sub','mgr'].forEach(c=>{
+    // บันทึกเฉพาะหมวดที่ user เปิด active ไว้
+    if(!activeCats.has(c)) return;
+    const ph = formPhases[c];
+    if(!ph) return;
+    if(!ph.startDate && !ph.deadline && !ph.submitTime && !ph.status) return;
+    out[PHASE_KEY_FROM_SHORT[c]] = {
+      startDate: ph.startDate || '',
+      deadline: ph.deadline || '',
+      submitTime: ph.submitTime || '',
+      status: ph.status || 'none'
+    };
+  });
+  return out;
+}
+
+// โหลด phases จาก project → formPhases (ใช้ key แบบยาว แปลงเป็น short)
+function loadPhasesFromProject(p){
+  initFormPhases();
+  if(!p || !p.phases) return;
+  Object.entries(p.phases).forEach(([longKey, ph])=>{
+    const short = SHORT_FROM_PHASE_KEY[longKey];
+    if(!short) return;
+    formPhases[short] = {
+      startDate: ph.startDate || '',
+      deadline: ph.deadline || '',
+      submitTime: ph.submitTime || '',
+      status: ph.status || 'none'
+    };
+  });
+}
+
+// Hook: ตอน user เปลี่ยนวันเริ่ม/deadline ของโปรเจกต์ → sync ไป phases ที่ยังว่าง
+function syncProjectDatesToPhases(){
+  applyProjectDatesToEmptyPhases();
+  populateFormPhasesUI();
+}
+
+// ══════════════════════════════════════════════════════════
+// ONE-TIME MIGRATION: trkCards → projects.phases
+//   ทำงานครั้งเดียวต่อเบราว์เซอร์ (localStorage flag)
+//   - Merge phases ของ trkCard ที่ link projId เข้าไปใน project.phases
+//   - ไม่ลบ trkCards (ยังเก็บไว้ใช้กับหน้า Track เดิม)
+//   - ไม่ overwrite ถ้า project มี phases อยู่แล้ว
+// ══════════════════════════════════════════════════════════
+async function migrateTrkCardsToPhases(){
+  try{
+    if(!_fbDatabase) return;
+    if(!currentUser || currentUser.role!=='admin') return;
+    // ตรวจ flag — ทำแค่ครั้งเดียว
+    if(ls('_migrated_v2_phases') === '1') return;
+    const cards = getTrkCards() || [];
+    const projects = getProjects() || [];
+    if(!cards.length || !projects.length){
+      // ไม่มีอะไรจะย้าย — mark flag แล้วจบ
+      ls('_migrated_v2_phases', '1');
+      return;
+    }
+    const projMap = {};
+    projects.forEach(p=>{ if(p && p.id) projMap[p.id] = p; });
+    let migrated = 0;
+    for(const card of cards){
+      if(!card || !card.projId || !card.phases) continue;
+      const proj = projMap[card.projId];
+      if(!proj) continue;
+      // ถ้า project มี phases อยู่แล้ว → ข้าม (ไม่ overwrite)
+      if(proj.phases && Object.keys(proj.phases).length) continue;
+      const newPhases = {};
+      Object.entries(card.phases).forEach(([longKey, ph])=>{
+        if(!ph) return;
+        if(!SHORT_FROM_PHASE_KEY[longKey]) return; // invalid key
+        newPhases[longKey] = {
+          startDate: ph.startDate||'',
+          deadline: ph.deadline||'',
+          submitTime: ph.submitTime||'',
+          status: ph.status||'none'
+        };
+      });
+      if(Object.keys(newPhases).length === 0) continue;
+      proj.phases = newPhases;
+      try{
+        await _fbDatabase.ref('projects/'+proj.id+'/phases').set(newPhases);
+        migrated++;
+      }catch(e){ console.warn('migrate failed for', proj.id, e); }
+    }
+    ls('_migrated_v2_phases', '1');
+    if(migrated > 0){
+      console.log('✅ Migrated '+migrated+' projects with phases from trkCards');
+      try{ toast('🔄 ย้ายข้อมูล deadline ของทีม '+migrated+' โปรเจกต์เรียบร้อย','success'); }catch(e){}
+    } else {
+      console.log('ℹ️ No projects needed phase migration');
+    }
+  }catch(e){ console.warn('migrateTrkCardsToPhases error:', e); }
+}
 async function openNewProject(){
   try {
   editingProjId=null;
   _editingBaseVersion = null;
   _editingBaseSnapshot = null;
   initFormSlots();
+  initFormPhases();
   document.getElementById('proj-modal-title').textContent='➕ สร้างโปรเจกต์ใหม่';
   ['pj-name','pj-client','pj-budget','pj-duration','pj-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const _ms=document.getElementById('pj-manager');if(_ms){const _mm=getAllManagerUsers();_ms.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+_mm.map(m=>`<option value="${m.uid}">${m.nickname||m.email}</option>`).join('');}
@@ -4131,6 +4381,9 @@ async function openNewProject(){
   document.querySelectorAll('.cat-toggle-btn').forEach(b=>b.classList.remove('on'));
   ['dub','adp','mix','qc','sub','mgr'].forEach(k=>{const el=document.getElementById('catblock-'+k);if(el)el.classList.add('hidden');});
   ['dub','adp','mix','qc','sub','mgr'].forEach(k=>{const el=document.getElementById(k+'-tax');if(el)el.value='';});
+  // Default phase dates = project today
+  applyProjectDatesToEmptyPhases();
+  populateFormPhasesUI();
   populateWorkerSelects();clearAllWorkerLists();calcProjSummary();
   openModal('modal-project');
   // ─ prompt draft restore (กรณีสร้างใหม่แล้ว refresh) ─
@@ -4412,7 +4665,8 @@ async function saveProject(){
     cycle:'',
     note:document.getElementById('pj-note')?.value||'',
     managerId:document.getElementById('pj-manager')?.value||'',
-    workers,tax,evidenceLogs:[],snapshot:null,createdAt:new Date()
+    workers,tax,evidenceLogs:[],snapshot:null,createdAt:new Date(),
+    phases: collectFormPhasesForSave()
   };
   if(editingProjId){
     const existing=getProjects().find(p=>p.id===editingProjId);
@@ -4421,6 +4675,14 @@ async function saveProject(){
     // Fix: preserve projStatus so editing doesn't reset "เสร็จแล้ว" back to "ยังไม่เริ่ม"
     if(existing && existing.projStatus) proj.projStatus = existing.projStatus;
     if(existing && existing.createdAt) proj.createdAt = existing.createdAt;
+    // Preserve phase status (บรีฟ/ทำ/ส่ง) ที่หน้าติดตามอาจอัปเดต เพื่อไม่ให้รีเซ็ตเมื่อบันทึกฟอร์ม
+    if(existing && existing.phases){
+      Object.entries(existing.phases).forEach(([k, exPh])=>{
+        if(proj.phases[k] && exPh && exPh.status){
+          proj.phases[k].status = exPh.status;
+        }
+      });
+    }
   }
   // ─ บันทึกผ่าน saveProjectSafe (transaction + version check) ─
   const result = await saveProjectSafe(proj, { baseVersion: _editingBaseVersion });
@@ -4460,6 +4722,8 @@ async function saveProject(){
   clearDraft(editingProjId);
   _editingBaseVersion = null;
   _editingBaseSnapshot = null;
+  // Bridge phases → trkCard เพื่อให้หน้า Track/Calendar เดิมเห็นข้อมูลตรงกัน
+  try{ syncPhasesToTrkCard(proj.id, proj.phases); }catch(e){}
   closeModal('modal-project');
   releasePresence();
   renderProjects();renderDash();
@@ -4537,6 +4801,30 @@ async function openEditProject(id){
     if(!activeCats.has(cat)){activeCats.add(cat);const btn=document.getElementById('toggle-'+cat);const block=document.getElementById('catblock-'+cat);if(btn)btn.classList.add('on');if(block)block.classList.remove('hidden')}
     if(formSlots[cat]&&formSlots[cat][slot]!==undefined)formSlots[cat][slot].push({staffId:w.id,amount:w.ratePerUnit||w.amount||0,unit:w.unit||'นาที',comment:w.comment||''});
   });
+  // ─ Load phases (กำหนดส่งของแต่ละทีม) จาก project หรือจาก trkCard เก่าเป็น fallback ─
+  loadPhasesFromProject(p);
+  // Fallback: ถ้า project ยังไม่มี phases (ไฟล์เก่า) แต่มี trkCard ที่ link โปรเจกต์นี้ → merge มาให้
+  if(!p.phases || !Object.keys(p.phases).length){
+    try{
+      const trkCards = getTrkCards();
+      const linkedCard = (trkCards||[]).find(c=>c.projId===p.id);
+      if(linkedCard && linkedCard.phases){
+        Object.entries(linkedCard.phases).forEach(([longKey, ph])=>{
+          const short = SHORT_FROM_PHASE_KEY[longKey];
+          if(!short || !ph) return;
+          formPhases[short] = {
+            startDate: ph.startDate||'',
+            deadline: ph.deadline||'',
+            submitTime: ph.submitTime||'19:00',
+            status: ph.status||'none'
+          };
+        });
+      }
+    }catch(e){}
+  }
+  // เติมวันโปรเจกต์ให้ phase ที่ยังว่าง
+  applyProjectDatesToEmptyPhases();
+  populateFormPhasesUI();
   populateWorkerSelects();renderAllWorkerLists();calcProjSummary();
   openModal('modal-project');
   // ─ Claim presence + auto-draft ─
@@ -8152,6 +8440,9 @@ function startFirebaseSync() {
   console.log('🔄 Firebase real-time sync started');
   // เริ่ม presence listener — รู้ว่ามี admin คนอื่นอยู่ที่ project ไหนบ้าง
   try{ startPresenceListener(); }catch(e){ console.warn('presence listener error:', e); }
+  // ─ One-time migration: ย้าย trkCards phases → projects.phases ─
+  // รันครั้งเดียวต่อเบราว์เซอร์ (เช็คด้วย flag ใน localStorage)
+  try{ setTimeout(migrateTrkCardsToPhases, 3000); }catch(e){}
   // ผูก save button ด้วย addEventListener แทน onclick
   const btnSave = document.getElementById('btn-save-project');
   if(btnSave) {
@@ -8504,6 +8795,7 @@ function _getCurrentFormSnapshot(){
       },
       formSlots: JSON.parse(JSON.stringify(formSlots)),
       activeCats: [...activeCats],
+      formPhases: JSON.parse(JSON.stringify(formPhases||{})),
       savedAt: Date.now()
     };
   }catch(e){ return null; }
@@ -8571,6 +8863,10 @@ function _applyDraft(snap){
       if(btn) btn.classList.add('on');
       if(block) block.classList.remove('hidden');
     });
+  }
+  if(snap.formPhases){
+    formPhases = snap.formPhases;
+    try{ populateFormPhasesUI(); }catch(e){}
   }
   try{ populateWorkerSelects(); renderAllWorkerLists(); calcProjSummary(); }catch(e){}
 }
