@@ -163,8 +163,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .sidebar-user{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .user-name{font-size:12px;font-weight:700}
 .user-role{font-size:10px;color:var(--text2);margin-top:2px}
-.btn-logout{width:100%;padding:9px;background:transparent;border:1px solid var(--border2);
-  border-radius:9px;color:var(--text2);font-family:'Kanit',sans-serif;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-logout{padding:9px;background:transparent;border:1px solid var(--border2);
+  border-radius:9px;color:var(--text2);font-family:'Kanit',sans-serif;font-size:14px;cursor:pointer;transition:all .2s}
 .btn-logout:hover{border-color:var(--red);color:var(--red)}
 .main-content{margin-left:var(--sidebar-w);flex:1;padding:30px;max-width:calc(100vw - var(--sidebar-w));overflow-x:hidden}
 .page-header{margin-bottom:26px}
@@ -764,9 +764,9 @@ body.mobile-menu-open .mobile-backdrop{display:block}
     <span style="font-size:14px;opacity:.5;margin-left:4px">✏️</span>
    </div>
    <div style="display:flex;gap:6px;margin-bottom:8px">
-    <button class="btn-logout" onclick="doLogout()" style="flex:1">🚪 ออกจากระบบ</button>
-    <button onclick="toggleTheme()" data-theme-toggle title="สลับธีมมืด/สว่าง" style="padding:9px 12px;background:rgba(155,111,255,.08);border:1px solid rgba(155,111,255,.2);border-radius:8px;color:var(--purple);font-family:Kanit;font-size:12px;cursor:pointer;font-weight:600">🌓</button>
-    <button onclick="showKeyboardHelp()" title="ทางลัดแป้นพิมพ์ (กด ?)" style="padding:9px 12px;background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.2);border-radius:8px;color:var(--accent2);font-family:Kanit;font-size:12px;cursor:pointer;font-weight:600">⌨️ ?</button>
+    <button class="btn-logout" onclick="doLogout()" title="ออกจากระบบ (Logout)" style="padding:9px 12px;font-size:16px">🚪</button>
+    <button onclick="toggleTheme()" data-theme-toggle title="สลับธีมมืด/สว่าง" style="padding:9px 12px;background:rgba(155,111,255,.08);border:1px solid rgba(155,111,255,.2);border-radius:8px;color:var(--purple);font-family:Kanit;font-size:16px;cursor:pointer;font-weight:600">🌓</button>
+    <button onclick="showKeyboardHelp()" title="ทางลัดแป้นพิมพ์ (กด ?)" style="padding:9px 12px;background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.2);border-radius:8px;color:var(--accent2);font-family:Kanit;font-size:14px;cursor:pointer;font-weight:600">⌨️</button>
    </div>
   </div>
  </aside>
@@ -1510,10 +1510,10 @@ body.mobile-menu-open .mobile-backdrop{display:block}
     <div class="form-group" style="margin:0"><label class="form-label">วันเริ่มงาน</label>
       <div style="position:relative;display:flex;align-items:center">
        <input class="form-input" id="pj-start" type="text" placeholder="วว/ดด/ปปปป" maxlength="10" style="padding-right:36px"
-         onchange="validateDateThai(this,iso=>{document.getElementById('pj-start-pk').value=iso})"
+         onchange="validateDateThai(this,iso=>{document.getElementById('pj-start-pk').value=iso;syncDeadlineFromStart('pj-start','pj-deadline')})"
          oninput="let v=this.value.replace(/[^0-9/]/g,'');if(v.length==2&&!v.includes('/'))v+='/';else if(v.length==5&&v.split('/').length==2)v+='/';this.value=v">
        <input type="date" id="pj-start-pk" tabindex="-1" style="position:absolute;right:0;width:32px;height:100%;opacity:0;cursor:pointer"
-         onchange="document.getElementById('pj-start').value=isoToThai(this.value);document.getElementById('pj-start').style.borderColor='rgba(0,223,160,.4)'">
+         onchange="document.getElementById('pj-start').value=isoToThai(this.value);document.getElementById('pj-start').style.borderColor='rgba(0,223,160,.4)';syncDeadlineFromStart('pj-start','pj-deadline')">
        <span onclick="const p=document.getElementById('pj-start-pk');p.showPicker?p.showPicker():p.click()" style="position:absolute;right:8px;cursor:pointer;font-size:15px;user-select:none">📅</span>
       </div></div>
     <div class="form-group" style="margin:0"><label class="form-label">Deadline</label>
@@ -1540,13 +1540,33 @@ body.mobile-menu-open .mobile-backdrop{display:block}
    <div style="margin-bottom:14px">
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px;letter-spacing:1px;text-transform:uppercase">👥 ทีมงาน — เลือกหมวดที่มีในโปรเจกต์นี้</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px" id="cat-toggles">
-     <div class="cat-toggle-btn" id="toggle-dub" onclick="toggleCat('dub')" style="border-color:rgba(255,158,0,.4);color:var(--orange)">🎤 Dubbing</div>
      <div class="cat-toggle-btn" id="toggle-adp" onclick="toggleCat('adp')" style="border-color:rgba(0,180,255,.4);color:var(--cyan)">✍️ Adaptation</div>
+     <div class="cat-toggle-btn" id="toggle-dub" onclick="toggleCat('dub')" style="border-color:rgba(255,158,0,.4);color:var(--orange)">🎤 Dubbing</div>
      <div class="cat-toggle-btn" id="toggle-mix" onclick="toggleCat('mix')" style="border-color:rgba(0,223,160,.4);color:var(--green)">🎧 Mix</div>
      <div class="cat-toggle-btn" id="toggle-qc" onclick="toggleCat('qc')" style="border-color:rgba(155,111,255,.4);color:var(--purple)">✅ QC</div>
      <div class="cat-toggle-btn" id="toggle-sub" onclick="toggleCat('sub')" style="border-color:rgba(255,64,64,.4);color:var(--red)">🎬 Sub & Video</div>
      <div class="cat-toggle-btn" id="toggle-mgr" onclick="toggleCat('mgr')" style="border-color:rgba(21,101,255,.4);color:var(--accent2)">🗂️ Manager</div>
     </div>
+   </div>
+
+   <!-- ADAPTATION -->
+   <div class="cat-block cat-adp hidden" id="catblock-adp">
+    <div class="cat-block-head"><span>✍️ Adaptation</span>
+     <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:12px;font-weight:400">หัก % <input type="number" id="adp-tax" placeholder="0" style="width:56px;padding:3px 7px;background:rgba(0,0,0,.35);border:1px solid rgba(0,180,255,.3);border-radius:6px;color:#fff;font-family:Kanit;font-size:12px;margin-left:4px" oninput="calcProjSummary()"></span>
+      <span id="adp-subtotal" style="font-size:13px;font-weight:700;color:var(--cyan)">฿0</span>
+     </div>
+    </div>
+    <div class="cat-block-body"><div id="adp-list"></div><div class="worker-dropdown-wrap">
+  <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('adp-select')">
+    <span>➕ เพิ่มสมาชิก</span><span>▾</span>
+  </button>
+  <div id="adp-select-popup" class="worker-dropdown-popup">
+    <input class="worker-dropdown-search" type="text" placeholder="🔍 ค้นหาชื่อ..." oninput="filterWorkerDropdown('adp-select', this.value)" autocomplete="off">
+    <div id="adp-select-list" class="worker-dropdown-list"></div>
+  </div>
+  <select id="adp-select" style="display:none" onchange="addWorkerToSlot('adp','only')"></select>
+</div></div>
    </div>
 
    <!-- DUBBING -->
@@ -1584,26 +1604,6 @@ body.mobile-menu-open .mobile-backdrop{display:block}
   <select id="dub-sub-select" style="display:none" onchange="addWorkerToSlot('dub','sub')"></select>
 </div>
     </div>
-   </div>
-
-   <!-- ADAPTATION -->
-   <div class="cat-block cat-adp hidden" id="catblock-adp">
-    <div class="cat-block-head"><span>✍️ Adaptation</span>
-     <div style="display:flex;align-items:center;gap:12px">
-      <span style="font-size:12px;font-weight:400">หัก % <input type="number" id="adp-tax" placeholder="0" style="width:56px;padding:3px 7px;background:rgba(0,0,0,.35);border:1px solid rgba(0,180,255,.3);border-radius:6px;color:#fff;font-family:Kanit;font-size:12px;margin-left:4px" oninput="calcProjSummary()"></span>
-      <span id="adp-subtotal" style="font-size:13px;font-weight:700;color:var(--cyan)">฿0</span>
-     </div>
-    </div>
-    <div class="cat-block-body"><div id="adp-list"></div><div class="worker-dropdown-wrap">
-  <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('adp-select')">
-    <span>➕ เพิ่มสมาชิก</span><span>▾</span>
-  </button>
-  <div id="adp-select-popup" class="worker-dropdown-popup">
-    <input class="worker-dropdown-search" type="text" placeholder="🔍 ค้นหาชื่อ..." oninput="filterWorkerDropdown('adp-select', this.value)" autocomplete="off">
-    <div id="adp-select-list" class="worker-dropdown-list"></div>
-  </div>
-  <select id="adp-select" style="display:none" onchange="addWorkerToSlot('adp','only')"></select>
-</div></div>
    </div>
 
    <!-- MIX -->
@@ -1870,6 +1870,28 @@ function mkDatePicker(id, isoVal, onchangeCode) {
   </div>`;
 }
 
+// ── Date sync helper: เมื่อเลือกวันเริ่ม → ถ้า deadline ว่าง เติมให้เป็นวันเดียวกัน ──
+// ใช้ได้ทุก form: เรียก syncDeadlineFromStart('pj-start','pj-deadline')
+// โดยที่ start/deadline มีทั้ง text input (id) + picker (id+'-pk' หรือ id+'-picker')
+function syncDeadlineFromStart(startId, deadlineId){
+  try{
+    // หา picker element: รองรับทั้ง -pk และ -picker suffix
+    const startPk = document.getElementById(startId+'-pk') || document.getElementById(startId+'-picker');
+    const deadlinePk = document.getElementById(deadlineId+'-pk') || document.getElementById(deadlineId+'-picker');
+    const deadlineTxt = document.getElementById(deadlineId);
+    if(!startPk || !deadlinePk || !deadlineTxt) return;
+    const startIso = startPk.value || thaiToIso(document.getElementById(startId)?.value || '');
+    if(!startIso) return;
+    // ถ้า deadline ยังว่าง → เติมเป็นวันเดียวกัน
+    const deadlineEmpty = !deadlinePk.value && !(deadlineTxt.value||'').trim();
+    if(deadlineEmpty){
+      deadlinePk.value = startIso;
+      deadlineTxt.value = isoToThai(startIso);
+      deadlineTxt.style.borderColor = 'rgba(0,223,160,.4)';
+    }
+  }catch(e){}
+}
+
   // ══════════════════════════════════════════════════
   // FIREBASE CONFIG — แทนค่าด้วย config จริงจาก Firebase Console
   // https://console.firebase.google.com → Project Settings → Your apps → SDK setup
@@ -2023,7 +2045,7 @@ function setTheme(theme){
 function toggleTheme(){
   const cur = getStoredTheme();
   setTheme(cur==='light' ? 'dark' : 'light');
-  if(typeof toast==='function') toast((cur==='light'?'🌙':'☀️') + ' สลับเป็นโหมด ' + (cur==='light'?'มืด':'สว่าง'), 'info');
+  // toast เกิดจาก setTheme ครั้งเดียว — ไม่ต้องซ้ำที่นี่
 }
 
 // apply theme ทันทีตอน script load (ก่อน DOM ready เพื่อไม่ให้เกิด flash)
@@ -3949,7 +3971,14 @@ function toggleTrkCardCalendar(cardId){
 function updateCardPhase(cardId,phaseKey,field,value){
   const cards=getTrkCards();const card=cards.find(c=>c.id===cardId);if(!card)return;
   if(!card.phases)card.phases={};if(!card.phases[phaseKey])card.phases[phaseKey]={startDate:'',deadline:'',status:'none'};
-  card.phases[phaseKey][field]=value;saveTrkCards(cards);renderTrkCalendar();
+  card.phases[phaseKey][field]=value;
+  // Auto-fill deadline = startDate ถ้า user เลือกวันเริ่มและ deadline ยังว่าง
+  if(field==='startDate' && value && !card.phases[phaseKey].deadline){
+    card.phases[phaseKey].deadline = value;
+  }
+  saveTrkCards(cards);renderTrkCalendar();
+  // Re-render card เพื่อสะท้อน deadline ใหม่ (ถ้ามี auto-fill)
+  if(field==='startDate') try{ renderTrkBoard(); }catch(e){}
 }
 function addTrkCard(){const cards=getTrkCards();cards.push({id:'card_'+Date.now(),projId:'',phases:{}});saveTrkCards(cards);renderTrkBoard();renderTrkCalendar();toast('เพิ่มการ์ดใหม่แล้ว','success')}
 function copyTrkCard(cardId){const cards=getTrkCards();const src=cards.find(c=>c.id===cardId);if(!src)return;const copy={id:'card_'+Date.now(),projId:src.projId,phases:JSON.parse(JSON.stringify(src.phases||{}))};cards.splice(cards.indexOf(src)+1,0,copy);saveTrkCards(cards);renderTrkBoard();renderTrkCalendar();toast('📋 คัดลอกแล้ว','success')}
@@ -5091,6 +5120,11 @@ function confirmClientUnpaid(projId, toastEl) {
   toastEl?.remove();
   localStorage.removeItem('guin3_client_paid_'+projId);
   localStorage.removeItem('guin3_client_paid_date_'+projId);
+  // ─ ลบใน Firebase ด้วย — ไม่งั้น listener จะดึงกลับมาหลัง reload ─
+  if(_fbDatabase){
+    _fbDatabase.ref('misc/cpaid_'+projId).remove().catch(()=>{});
+    _fbDatabase.ref('misc/cpaid_date_'+projId).remove().catch(()=>{});
+  }
   toast('↩️ เปลี่ยนเป็น "ยังไม่ได้รับ" แล้ว', 'info');
   renderQueue();
 }
@@ -5882,33 +5916,119 @@ function openQtItemProjPicker(btn, ev){
       <span style="cursor:pointer;font-size:14px;opacity:.7;padding:0 4px" onclick="document.getElementById('qt-proj-picker')?.remove()" title="ปิด">✕</span>
     </div>
     <input type="text" id="qtpp-search" placeholder="🔍 ค้นหาชื่อโปรเจกต์หรือลูกค้า..." style="width:100%;padding:9px 12px;background:var(--bg2);border:none;border-bottom:1px solid var(--border2);color:var(--text);font-family:Kanit;font-size:13px;outline:none;flex-shrink:0">
+    <div id="qtpp-filters" style="padding:8px 10px;border-bottom:1px solid var(--border2);background:var(--bg2);display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0;align-items:center">
+      <span data-qtpp-range="all" onclick="setQtPPRange('all')" class="qtpp-chip" style="padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid var(--border2);color:var(--text);background:var(--accent);font-weight:700">ทั้งหมด</span>
+      <span data-qtpp-range="7d" onclick="setQtPPRange('7d')" class="qtpp-chip" style="padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid var(--border2);color:var(--text2)">7 วันล่าสุด</span>
+      <span data-qtpp-range="30d" onclick="setQtPPRange('30d')" class="qtpp-chip" style="padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid var(--border2);color:var(--text2)">30 วันล่าสุด</span>
+      <span data-qtpp-range="thismonth" onclick="setQtPPRange('thismonth')" class="qtpp-chip" style="padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid var(--border2);color:var(--text2)">เดือนนี้</span>
+      <select id="qtpp-month-sel" onchange="setQtPPRange('month:'+this.value)" style="padding:3px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:Kanit;font-size:11px;cursor:pointer">
+        <option value="">— เลือกเดือน —</option>
+      </select>
+    </div>
     <div id="qtpp-list" style="flex:1;overflow-y:auto;padding:4px;min-height:120px"></div>
     <div id="qtpp-footer" style="flex-shrink:0;padding:8px 12px;border-top:1px solid var(--border2);background:var(--bg2);display:flex;align-items:center;justify-content:space-between;gap:8px">
       <span id="qtpp-count" style="font-size:11px;color:var(--text2)">ยังไม่ได้ติ๊กเลือก</span>
       <button id="qtpp-add-btn" class="btn btn-blue btn-sm" onclick="confirmQtPPAdd()" disabled style="opacity:.5;cursor:not-allowed">➕ เพิ่ม</button>
     </div>`;
   document.body.appendChild(pop);
+  // populate month dropdown
+  try{
+    const projs = getProjects();
+    const mSet = new Set();
+    projs.forEach(p=>{
+      const d = p.startDate || p.date || p.createdAt;
+      if(!d) return;
+      const dt = new Date(d);
+      if(isNaN(dt)) return;
+      const key = dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');
+      mSet.add(key);
+    });
+    const msel = document.getElementById('qtpp-month-sel');
+    if(msel){
+      const TM=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+      [...mSet].sort((a,b)=>b.localeCompare(a)).forEach(k=>{
+        const [y,m] = k.split('-');
+        const opt = document.createElement('option');
+        opt.value = k;
+        opt.textContent = TM[parseInt(m)-1]+' '+(parseInt(y)+543);
+        msel.appendChild(opt);
+      });
+    }
+  }catch(e){}
+  window._qtppRange = 'all';
   renderQtPPList('');
   setTimeout(()=>document.getElementById('qtpp-search')?.focus(),50);
   const inp=document.getElementById('qtpp-search');
   if(inp) inp.oninput = ()=>renderQtPPList(inp.value);
 }
+function setQtPPRange(range){
+  window._qtppRange = range || 'all';
+  // อัพเดท chip UI
+  document.querySelectorAll('.qtpp-chip').forEach(el=>{
+    const r = el.getAttribute('data-qtpp-range');
+    if(r === range){
+      el.style.background = 'var(--accent)'; el.style.color = 'var(--text)'; el.style.fontWeight = '700';
+    } else {
+      el.style.background = 'transparent'; el.style.color = 'var(--text2)'; el.style.fontWeight = '400';
+    }
+  });
+  // ถ้าเลือก month dropdown → reset chips
+  if(range && range.startsWith('month:')){
+    document.querySelectorAll('.qtpp-chip').forEach(el=>{
+      el.style.background = 'transparent'; el.style.color = 'var(--text2)'; el.style.fontWeight = '400';
+    });
+  } else {
+    const sel = document.getElementById('qtpp-month-sel');
+    if(sel) sel.value = '';
+  }
+  const inp = document.getElementById('qtpp-search');
+  renderQtPPList(inp ? inp.value : '');
+}
+
+function _qtppPassRangeFilter(projDate, range){
+  if(!range || range==='all') return true;
+  if(!projDate) return false;
+  const d = new Date(projDate);
+  if(isNaN(d)) return false;
+  const now = new Date();
+  if(range === '7d'){
+    return (now - d) <= 7*24*3600*1000 && d <= now;
+  }
+  if(range === '30d'){
+    return (now - d) <= 30*24*3600*1000 && d <= now;
+  }
+  if(range === 'thismonth'){
+    return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+  }
+  if(range.startsWith('month:')){
+    const key = range.slice(6); // "YYYY-MM"
+    const [y,m] = key.split('-');
+    return d.getFullYear()===parseInt(y) && d.getMonth()===(parseInt(m)-1);
+  }
+  return true;
+}
+
 function renderQtPPList(q){
   const listEl=document.getElementById('qtpp-list'); if(!listEl) return;
   const projs = getProjects();
   const qq = (q||'').toLowerCase().trim();
+  const range = window._qtppRange || 'all';
   const alreadyIds = qtItems.filter(x=>x.projId).map(x=>x.projId);
   let filtered = projs.filter(p => {
     if(alreadyIds.includes(p.id)) return false;
-    if(!qq) return true;
-    return (p.name||'').toLowerCase().includes(qq) || (p.client||'').toLowerCase().includes(qq);
+    // text search
+    if(qq && !((p.name||'').toLowerCase().includes(qq) || (p.client||'').toLowerCase().includes(qq))) return false;
+    // range filter (based on startDate หรือ date)
+    const _sd = p.startDate || p.date || p.createdAt;
+    if(!_qtppPassRangeFilter(_sd, range)) return false;
+    return true;
   });
   filtered.sort((a,b)=>{
     const aD = a.startDate || a.date || a.createdAt || '';
     const bD = b.startDate || b.date || b.createdAt || '';
     return bD.localeCompare(aD);
   });
-  if(!filtered.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">'+(qq?'ไม่พบโปรเจกต์':'ไม่มีโปรเจกต์อื่นที่ยังไม่ได้เพิ่ม')+'</div>';return;}
+  if(!filtered.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">'+(qq||range!=='all'?'ไม่พบโปรเจกต์ตามเงื่อนไข':'ไม่มีโปรเจกต์อื่นที่ยังไม่ได้เพิ่ม')+'</div>';return;}
   const selected = window._qtPickSelected || new Set();
   listEl.innerHTML = filtered.map(p=>{
     const isSelected = selected.has(p.id);
@@ -9477,27 +9597,85 @@ function openInvItemProjPicker(btn, ev){
       <span style="cursor:pointer;font-size:14px;opacity:.7;padding:0 4px" onclick="document.getElementById('inv-proj-picker')?.remove()" title="ปิด">✕</span>
     </div>
     <input type="text" id="invpp-search" placeholder="🔍 ค้นหาชื่อโปรเจกต์หรือลูกค้า..." style="width:100%;padding:9px 12px;background:var(--bg2);border:none;border-bottom:1px solid var(--border2);color:var(--text);font-family:Kanit;font-size:13px;outline:none;flex-shrink:0">
+    <div id="invpp-filters" style="padding:8px 10px;border-bottom:1px solid var(--border2);background:var(--bg2);display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0;align-items:center">
+      <span data-invpp-range="all" onclick="setInvPPRange('all')" class="invpp-chip" style="padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid var(--border2);color:var(--text);background:var(--accent);font-weight:700">ทั้งหมด</span>
+      <span data-invpp-range="7d" onclick="setInvPPRange('7d')" class="invpp-chip" style="padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid var(--border2);color:var(--text2)">7 วันล่าสุด</span>
+      <span data-invpp-range="30d" onclick="setInvPPRange('30d')" class="invpp-chip" style="padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid var(--border2);color:var(--text2)">30 วันล่าสุด</span>
+      <span data-invpp-range="thismonth" onclick="setInvPPRange('thismonth')" class="invpp-chip" style="padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid var(--border2);color:var(--text2)">เดือนนี้</span>
+      <select id="invpp-month-sel" onchange="setInvPPRange('month:'+this.value)" style="padding:3px 8px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:Kanit;font-size:11px;cursor:pointer">
+        <option value="">— เลือกเดือน —</option>
+      </select>
+    </div>
     <div id="invpp-list" style="flex:1;overflow-y:auto;padding:4px;min-height:120px"></div>
     <div id="invpp-footer" style="flex-shrink:0;padding:8px 12px;border-top:1px solid var(--border2);background:var(--bg2);display:flex;align-items:center;justify-content:space-between;gap:8px">
       <span id="invpp-count" style="font-size:11px;color:var(--text2)">ยังไม่ได้ติ๊กเลือก</span>
       <button id="invpp-add-btn" class="btn btn-blue btn-sm" onclick="confirmInvPPAdd()" disabled style="opacity:.5;cursor:not-allowed">➕ เพิ่ม</button>
     </div>`;
   document.body.appendChild(pop);
+  // populate month dropdown
+  try{
+    const projs = getProjects();
+    const mSet = new Set();
+    projs.forEach(p=>{
+      const d = p.startDate || p.date || p.createdAt;
+      if(!d) return;
+      const dt = new Date(d);
+      if(isNaN(dt)) return;
+      mSet.add(dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0'));
+    });
+    const msel = document.getElementById('invpp-month-sel');
+    if(msel){
+      const TM=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+      [...mSet].sort((a,b)=>b.localeCompare(a)).forEach(k=>{
+        const [y,m] = k.split('-');
+        const opt = document.createElement('option');
+        opt.value = k;
+        opt.textContent = TM[parseInt(m)-1]+' '+(parseInt(y)+543);
+        msel.appendChild(opt);
+      });
+    }
+  }catch(e){}
+  window._invppRange = 'all';
   renderInvPPList('');
   setTimeout(()=>document.getElementById('invpp-search')?.focus(),50);
   const inp=document.getElementById('invpp-search');
   if(inp) inp.oninput = ()=>renderInvPPList(inp.value);
   // No auto-close on outside click — user must confirm or press ✕
 }
+function setInvPPRange(range){
+  window._invppRange = range || 'all';
+  document.querySelectorAll('.invpp-chip').forEach(el=>{
+    const r = el.getAttribute('data-invpp-range');
+    if(r === range){
+      el.style.background = 'var(--accent)'; el.style.color = 'var(--text)'; el.style.fontWeight = '700';
+    } else {
+      el.style.background = 'transparent'; el.style.color = 'var(--text2)'; el.style.fontWeight = '400';
+    }
+  });
+  if(range && range.startsWith('month:')){
+    document.querySelectorAll('.invpp-chip').forEach(el=>{
+      el.style.background = 'transparent'; el.style.color = 'var(--text2)'; el.style.fontWeight = '400';
+    });
+  } else {
+    const sel = document.getElementById('invpp-month-sel');
+    if(sel) sel.value = '';
+  }
+  const inp = document.getElementById('invpp-search');
+  renderInvPPList(inp ? inp.value : '');
+}
+
 function renderInvPPList(q){
   const listEl=document.getElementById('invpp-list'); if(!listEl) return;
   const projs = getProjects();
   const qq = (q||'').toLowerCase().trim();
+  const range = window._invppRange || 'all';
   const alreadyIds = invItems.filter(x=>x.projId).map(x=>x.projId);
   let filtered = projs.filter(p => {
     if(alreadyIds.includes(p.id)) return false;
-    if(!qq) return true;
-    return (p.name||'').toLowerCase().includes(qq) || (p.client||'').toLowerCase().includes(qq);
+    if(qq && !((p.name||'').toLowerCase().includes(qq) || (p.client||'').toLowerCase().includes(qq))) return false;
+    const _sd = p.startDate || p.date || p.createdAt;
+    if(!_qtppPassRangeFilter(_sd, range)) return false;
+    return true;
   });
   // Sort by startDate DESC (newest first) - so user can see recent projects at top
   filtered.sort((a,b)=>{
@@ -9505,7 +9683,7 @@ function renderInvPPList(q){
     const bD = b.startDate || b.date || b.createdAt || '';
     return bD.localeCompare(aD);
   });
-  if(!filtered.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">'+(qq?'ไม่พบโปรเจกต์':'ไม่มีโปรเจกต์อื่นที่ยังไม่ได้เพิ่ม')+'</div>';return;}
+  if(!filtered.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">'+(qq||range!=='all'?'ไม่พบโปรเจกต์ตามเงื่อนไข':'ไม่มีโปรเจกต์อื่นที่ยังไม่ได้เพิ่ม')+'</div>';return;}
   const selected = window._invPickSelected || new Set();
   listEl.innerHTML = filtered.map(p=>{
     const isSelected = selected.has(p.id);
