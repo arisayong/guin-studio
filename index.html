@@ -4462,6 +4462,9 @@ function renderQueue() {
     const anyPending = g.workers.some(w => w.status === 'pending');
     const anyApproved = g.workers.some(w => w.status === 'approved');
 
+    // Client payment status (used in multiple places below — declare early)
+    const clientPaid = ls('client_paid_'+p.id);
+
     const pendingCount = g.workers.filter(w=>w.status==='pending').length;
     const approvedCount = g.workers.filter(w=>w.status==='approved').length;
     const paidCount = g.workers.filter(w=>w.status==='paid').length;
@@ -4486,7 +4489,6 @@ function renderQueue() {
     }
 
     // Worker rows
-    const clientPaid = ls('client_paid_'+p.id);
     const workerRows = g.workers.map(w => {
       const s = getStaffById(w.id); if (!s) return '';
       const color = CATS[s.category]?.color || 'var(--text2)';
