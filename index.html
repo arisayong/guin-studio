@@ -10498,6 +10498,7 @@ function renderMyCalendar(){
       events.push({
         projName: p.name,
         projId: p.id,
+        projStatus: p.projStatus || 'active',
         phaseKey: ph.key,
         label: PHASE_LABELS[ph.key]||ph.label,
         color: PHASE_COLORS[ph.key]||ph.color,
@@ -10564,10 +10565,37 @@ function renderMyCalendar(){
       const span=colE-colS+1; if(span<=0) return '';
       const isLast=ev.end<=wE;
       const daysLeft=Math.ceil((ev.end-today)/(864e5));
+
+      // ─ คำนวณสี+ไอคอนตามสถานะงาน (แทนที่จะใช้สีหมวด) ─
+      let barBg, barIcon, barTitle, textCol = '#000';
+      const isDone = ev.projStatus === 'done' || ev.workerStatus === 'paid';
+      const isCancelled = ev.projStatus === 'cancelled';
+      const isOverdue = daysLeft < 0 && !isDone && !isCancelled;
+      if(isDone){
+        barBg = 'linear-gradient(135deg, #00DFA0, #00B080)'; // เขียว
+        barIcon = '✅';
+        barTitle = 'เสร็จแล้ว';
+        textCol = '#002D1F';
+      } else if(isCancelled){
+        barBg = 'linear-gradient(135deg, #808080, #606060)'; // เทา
+        barIcon = '❌';
+        barTitle = 'ยกเลิก';
+        textCol = '#fff';
+      } else if(isOverdue){
+        barBg = 'linear-gradient(135deg, #FF4040, #C52020)'; // แดง
+        barIcon = '⚠️';
+        barTitle = 'เลย deadline';
+        textCol = '#fff';
+      } else {
+        barBg = 'linear-gradient(135deg, #FFA500, #FF7700)'; // เหลือง-ส้ม (งานใหม่/กำลังทำ)
+        barIcon = daysLeft === 0 ? '🔥' : '⏳';
+        barTitle = daysLeft === 0 ? 'วันนี้!' : (daysLeft > 0 ? 'อีก '+daysLeft+' วัน' : '');
+        textCol = '#1A1200';
+      }
+
       const timeLabel=ev.submitTime?' ⏰'+ev.submitTime:'';
-      const dlLabel=isLast?(daysLeft<0?'⚠️':daysLeft===0?'🔴':''):'';
-      return '<div style="position:absolute;top:'+(rowIdx*28+2)+'px;left:calc('+colS+'*(100%/7) + 2px);width:calc('+span+'*(100%/7) - 4px);height:24px;border-radius:5px;background:'+ev.color+';display:flex;align-items:center;padding:0 6px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.2)" title="'+ev.projName+' · '+ev.label+'">'+
-        '<span style="font-size:12px;font-weight:800;color:#000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+dlLabel+' '+ev.projName+timeLabel+'</span>'+
+      return '<div style="position:absolute;top:'+(rowIdx*28+2)+'px;left:calc('+colS+'*(100%/7) + 2px);width:calc('+span+'*(100%/7) - 4px);height:24px;border-radius:5px;background:'+barBg+';display:flex;align-items:center;padding:0 6px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.2);opacity:'+(isCancelled?0.6:1)+'" title="'+ev.projName+' · '+ev.label+' · '+barTitle+'">'+
+        '<span style="font-size:12px;font-weight:800;color:'+textCol+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+barIcon+' '+ev.projName+timeLabel+'</span>'+
         '</div>';
     }).join('');
 
@@ -10577,12 +10605,14 @@ function renderMyCalendar(){
   });
   html+='</div>';
 
-  // Legend
-  const usedPhases=[...new Set(events.map(e=>e.phaseKey))];
-  const legend = usedPhases.length ? '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+
-    usedPhases.map(ph=>'<div style="display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:8px;background:'+PHASE_COLORS[ph]+'22;border:1px solid '+PHASE_COLORS[ph]+'44">'+
-      '<div style="width:10px;height:10px;border-radius:2px;background:'+PHASE_COLORS[ph]+'"></div>'+
-      '<span style="font-size:12px;color:'+PHASE_COLORS[ph]+';font-weight:700">'+PHASE_LABELS[ph]+'</span></div>').join('')+
+  // Legend — แสดงสถานะแทนหมวดงาน
+  const legend = events.length ? '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+
+    '<div style="display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:8px;background:rgba(0,223,160,.12);border:1px solid rgba(0,223,160,.35)">'+
+      '<span style="font-size:13px">✅</span><span style="font-size:12px;color:var(--green);font-weight:700">เสร็จแล้ว</span></div>'+
+    '<div style="display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:8px;background:rgba(255,165,0,.12);border:1px solid rgba(255,165,0,.35)">'+
+      '<span style="font-size:13px">⏳</span><span style="font-size:12px;color:#FF9E00;font-weight:700">กำลังทำ / ใกล้ถึง</span></div>'+
+    '<div style="display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:8px;background:rgba(255,64,64,.12);border:1px solid rgba(255,64,64,.35)">'+
+      '<span style="font-size:13px">⚠️</span><span style="font-size:12px;color:var(--red);font-weight:700">เลย deadline</span></div>'+
     '</div>' : '';
 
   el.innerHTML = legend + html;
