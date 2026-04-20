@@ -6735,6 +6735,7 @@ function renderMyDash(){
         projId: p.id,
         projName: p.name,
         projDate: p.date,
+        projStatus: p.projStatus || 'active',
         date: fmtDate(p.date),
         myDeadline: _ph.deadline || '',
         myDeadlineFmt: _ph.deadline ? fmtDate(_ph.deadline) : '',
@@ -6924,7 +6925,17 @@ function _fmtMyDeadline(it){
   const dl = new Date(it.myDeadline); dl.setHours(0,0,0,0);
   const diff = Math.floor((dl - now)/(1000*60*60*24));
   const timeStr = it.mySubmitTime ? ' · '+it.mySubmitTime : '';
-  // Status — paid แล้วก็ไม่ต้องเตือน
+
+  // ─ ถ้าโปรเจกต์ถูก mark "เสร็จแล้ว" หรือ "ยกเลิก" → ไม่แสดง badge เตือน ─
+  //   (ป้องกันสต๊าฟสับสนว่าเลย deadline ทั้งที่งานปิดแล้ว)
+  if(it.projStatus === 'done'){
+    return { html: `<span style="font-size:11px;color:var(--text2)">${it.myDeadlineFmt}${timeStr}</span><span style="font-size:10px;color:var(--green);font-weight:700;margin-left:4px">✅ งานเสร็จแล้ว</span>`, days: diff };
+  }
+  if(it.projStatus === 'cancelled'){
+    return { html: `<span style="font-size:11px;color:var(--text2);text-decoration:line-through">${it.myDeadlineFmt}</span><span style="font-size:10px;color:var(--red);font-weight:700;margin-left:4px">❌ ยกเลิก</span>`, days: diff };
+  }
+
+  // ถ้า paid แล้วก็ไม่ต้องเตือน deadline
   if(it.status === 'paid'){
     return { html: `<span style="font-size:11px;color:var(--text2)">${it.myDeadlineFmt}${timeStr}</span>`, days: diff };
   }
