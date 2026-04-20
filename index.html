@@ -493,6 +493,127 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
 .worker-dropdown-item{padding:7px 12px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--text)}
 .worker-dropdown-item:hover{background:var(--dim);color:var(--accent2)}
 .worker-dropdown-empty{padding:12px;text-align:center;color:var(--text2);font-size:12px}
+
+/* ═══════════════════════════════════════════════════════
+   📱 MOBILE OPTIMIZATION (≤ 768px)
+   ═══════════════════════════════════════════════════════ */
+
+/* Mobile hamburger button — แสดงเฉพาะบนมือถือ */
+.mobile-menu-btn{
+  display:none;position:fixed;top:12px;left:12px;z-index:200;
+  width:44px;height:44px;border-radius:12px;
+  background:var(--card);border:1px solid var(--border);
+  color:var(--text);font-size:20px;cursor:pointer;
+  box-shadow:0 4px 14px rgba(0,0,0,.3);
+  align-items:center;justify-content:center;
+  transition:transform .15s;
+}
+.mobile-menu-btn:active{transform:scale(0.94)}
+.mobile-backdrop{
+  display:none;position:fixed;inset:0;z-index:99;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(2px);
+}
+body.mobile-menu-open .mobile-backdrop{display:block}
+
+@media (max-width: 768px){
+  /* Hamburger ปรากฏ */
+  .mobile-menu-btn{display:flex}
+  /* Sidebar เป็น drawer เลื่อนออกจากซ้าย */
+  .sidebar{
+    transform:translateX(-100%);
+    transition:transform .28s cubic-bezier(.4,0,.2,1);
+    box-shadow:0 0 40px rgba(0,0,0,.5);
+    width:min(280px, 84vw);
+  }
+  body.mobile-menu-open .sidebar{transform:translateX(0)}
+  .main-content{
+    margin-left:0;
+    max-width:100vw;
+    padding:64px 14px 24px;  /* top padding เผื่อ hamburger */
+  }
+  /* Page headers เล็กลง */
+  .page-title{font-size:18px}
+  .page-subtitle{font-size:11px}
+  .page-header{margin-bottom:18px}
+  /* Stats grid: 2 columns */
+  .stats-grid{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+  .stat-card{padding:14px}
+  /* Quick actions — 2 columns */
+  #quick-actions{grid-template-columns:1fr 1fr!important;gap:8px}
+  .qa-btn{padding:12px 8px!important;font-size:12px!important}
+  /* Section cards padding ลด */
+  .section-card{padding:14px!important}
+  .section-title{font-size:14px!important}
+  /* Tables — scroll แนวนอน + font ลด */
+  table{font-size:11px!important}
+  .section-card > table, .section-card > div > table{
+    display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  }
+  th,td{padding:6px 4px!important;white-space:nowrap}
+  /* Buttons touch-friendly */
+  .btn{min-height:38px;padding:8px 12px;font-size:12px}
+  .btn-sm{min-height:32px;padding:6px 10px;font-size:11px}
+  .btn-xs{min-height:28px;padding:4px 8px;font-size:10px}
+  /* Forms */
+  .form-input{padding:11px 12px;font-size:13px}
+  .form-label{font-size:12px}
+  /* Modal — เกือบเต็มจอ */
+  .modal-overlay{padding:0!important}
+  .modal{
+    width:100vw!important;max-width:100vw!important;
+    min-height:100vh;max-height:100vh;border-radius:0!important;
+    display:flex;flex-direction:column;
+  }
+  .modal-head{padding:14px 14px 12px!important;position:sticky;top:0;
+    background:var(--card);z-index:2;border-bottom:1px solid var(--border2)}
+  .modal-title{font-size:15px!important}
+  .modal-body{padding:14px!important;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+  /* Filter chips scroll แนวนอน */
+  .filter-chip-row, #type-filter{
+    display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    padding-bottom:4px;gap:6px;flex-wrap:nowrap!important;
+  }
+  .filter-chip{white-space:nowrap;flex-shrink:0;font-size:11px;padding:5px 10px}
+  /* Toast */
+  .toast{font-size:12px;min-width:0;max-width:90vw}
+  #toastWrap{right:12px!important;left:12px!important;top:auto!important;bottom:12px!important}
+  /* Search bar */
+  .search-bar input{font-size:13px;padding:10px 12px}
+  /* Chart containers — ความสูงลดเพื่อไม่ยาวเกิน */
+  canvas{max-height:240px!important}
+  /* Login box */
+  .login-box{padding:28px 24px;width:100%;max-width:100vw;border-radius:0;min-height:100vh;display:flex;flex-direction:column;justify-content:center}
+  /* Cat blocks in project form — รวมกันเต็มความกว้าง */
+  .cat-block{padding:12px!important}
+  .cat-block-head{font-size:12px!important}
+  /* Presence banner เล็กลง */
+  #edit-presence-banner{font-size:11px;padding:8px 10px}
+  /* Worker rows ใน project detail */
+  [onclick*="openPayAmt"], [onclick*="openSlipModal"]{font-size:11px;padding:5px 8px}
+}
+
+/* จอเล็กมาก — Portrait phone */
+@media (max-width: 400px){
+  .stats-grid{grid-template-columns:1fr}
+  #quick-actions{grid-template-columns:1fr!important}
+  .page-title{font-size:16px}
+  .btn{font-size:11px}
+}
+
+/* iOS Safari notch/safe-area */
+@supports(padding:env(safe-area-inset-top)){
+  @media (max-width: 768px){
+    .mobile-menu-btn{top:calc(12px + env(safe-area-inset-top))}
+    .main-content{padding-top:calc(64px + env(safe-area-inset-top))}
+  }
+}
+
+/* Light theme mobile adjustments */
+[data-theme="light"] .mobile-menu-btn{
+  background:#FFFFFF;
+  box-shadow:0 4px 14px rgba(15,30,58,0.12);
+}
+[data-theme="light"] .mobile-backdrop{background:rgba(15,30,58,0.35)}
 </style>
   <!-- Firebase SDK (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -592,6 +713,9 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
 
 <!-- ════════════ APP ════════════ -->
 <div id="app-layout" class="hidden">
+ <!-- Mobile hamburger + backdrop -->
+ <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="เมนู">☰</button>
+ <div class="mobile-backdrop" onclick="closeMobileMenu()"></div>
  <aside class="sidebar">
   <div class="sidebar-logo">
    <div class="sname">🎙️ GUIN HOME</div>
@@ -752,6 +876,22 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
        <div style="font-size:10px;opacity:.7;font-weight:400">อ่านง่ายตอนกลางวัน</div>
       </div>
      </button>
+    </div>
+   </div>
+
+   <!-- Notifications section -->
+   <div class="section-card" style="border-left:4px solid var(--orange);margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">🔔</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:var(--orange)">การแจ้งเตือน</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">เตือนเมื่อแอดมินคนอื่นสร้าง/แก้ไขโปรเจกต์</div>
+     </div>
+    </div>
+    <div id="notif-status" style="background:var(--bg2);border-radius:10px;padding:12px;margin-bottom:10px;font-size:12px;color:var(--text2);line-height:1.7"></div>
+    <button id="btn-notif-request" class="btn btn-outline" onclick="requestNotifPermission()" style="display:flex;align-items:center;gap:8px">🔔 ขออนุญาตแจ้งเตือน</button>
+    <div style="font-size:11px;color:var(--text2);margin-top:10px;line-height:1.6">
+     💡 ในแอปจะเด้ง toast อัตโนมัติ · ถ้าอนุญาต browser notification จะได้รับเมื่อ tab อยู่ background ด้วย
     </div>
    </div>
 
@@ -1860,8 +2000,11 @@ function applyTheme(theme){
   // re-sync toggle UI ถ้ามีในหน้า
   document.querySelectorAll('[data-theme-toggle]').forEach(el=>{
     el.setAttribute('data-current-theme', t);
-    if(el.tagName==='BUTTON'){
+    // ปุ่มแบบ icon-only (sidebar) → แค่เปลี่ยน tooltip ไม่แตะ innerHTML
+    if(el.hasAttribute('data-theme-toggle-full')){
       el.innerHTML = t==='light' ? '🌙 โหมดมืด' : '☀️ โหมดสว่าง';
+    } else {
+      el.title = t==='light' ? 'สลับเป็นโหมดมืด' : 'สลับเป็นโหมดสว่าง';
     }
   });
 }
@@ -1887,6 +2030,28 @@ function toggleTheme(){
 (function initThemeEarly(){
   try{ applyTheme(getStoredTheme()); }catch(e){}
 })();
+
+// ══════════════════════════════════════════════
+// MOBILE MENU (Hamburger drawer)
+// ══════════════════════════════════════════════
+function toggleMobileMenu(){
+  document.body.classList.toggle('mobile-menu-open');
+}
+function openMobileMenu(){ document.body.classList.add('mobile-menu-open'); }
+function closeMobileMenu(){ document.body.classList.remove('mobile-menu-open'); }
+// ปิด drawer อัตโนมัติเมื่อคลิก nav-item บนมือถือ
+document.addEventListener('click', function(e){
+  if(window.innerWidth > 768) return;
+  if(!document.body.classList.contains('mobile-menu-open')) return;
+  const t = e.target.closest('.nav-item, .nav-sub-item');
+  if(t && !t.classList.contains('expanded')){
+    setTimeout(closeMobileMenu, 120);
+  }
+});
+// ปิดเมื่อหน้าจอใหญ่ขึ้น (rotate landscape / resize)
+window.addEventListener('resize', ()=>{
+  if(window.innerWidth > 768) closeMobileMenu();
+});
 
 // Initialize Firebase with real config
 (function initFirebase() {
@@ -7834,10 +7999,13 @@ function startFirebaseSync() {
       const snap = await _fbDatabase.ref('projects').get();
       const val = snap.exists() ? snap.val() : {};
       const seen = new Set();
-      projectsCache = Object.values(val).filter(p => {
+      const newProjects = Object.values(val).filter(p => {
         if(!p||!p.id||seen.has(p.id)) return false;
         seen.add(p.id); return true;
       }).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+      // ─ ตรวจหาการเปลี่ยนแปลงจากแอดมินคนอื่น → แจ้งเตือน ─
+      try{ _detectRemoteChanges(projectsCache, newProjects); }catch(e){}
+      projectsCache = newProjects;
       ls('projects_cache', projectsCache);
       try{updateQueueBadge();}catch(e){}
       const pg = document.getElementById('page-projects');
@@ -7976,6 +8144,100 @@ async function adminCleanDuplicates(){
 
 function _notifyProjectChange(){
   if(_fbDatabase) _fbDatabase.ref('meta/projTS').set(Date.now()).catch(()=>{});
+}
+
+// ══════════════════════════════════════════════════════════
+// 🔔 REMOTE CHANGE NOTIFICATIONS
+//  - เทียบ updatedAt + _lastSavedBy เพื่อตรวจการเปลี่ยนจากแอดมินอื่น
+//  - แจ้งเตือนผ่าน toast + (ถ้าอนุญาต) Web Notification ถ้า tab background
+// ══════════════════════════════════════════════════════════
+let _firstSyncDone = false;
+let _notifFirstLoadAt = Date.now();
+
+function _detectRemoteChanges(oldList, newList){
+  // ข้ามการแจ้งเตือนตอน first sync (โหลดแรกเข้า app)
+  if(!_firstSyncDone){ _firstSyncDone = true; return; }
+  if(!currentUser || currentUser.role!=='admin') return;
+  const me = _meForPresence();
+  const myNick = me ? me.nickname : '';
+  const myEmail = me ? me.email : '';
+  const oldMap = {};
+  (oldList||[]).forEach(p=>{ if(p && p.id) oldMap[p.id] = p; });
+  const changed = [];
+  const added = [];
+  (newList||[]).forEach(p=>{
+    if(!p || !p.id) return;
+    // ข้าม save ของตัวเอง (เทียบทั้ง nickname + email เผื่อ duplicate nicknames)
+    const savedBy = p._lastSavedBy || '';
+    const savedByEmail = p._lastSavedByEmail || '';
+    if(savedBy === myNick && (!myEmail || savedByEmail === myEmail)) return;
+    if(!savedBy) return; // ไม่รู้ว่าใคร save ก็ไม่เตือน
+    const old = oldMap[p.id];
+    if(!old){
+      // project ใหม่ที่ไม่เคยมี
+      if(p.createdAt && (Date.now() - new Date(p.createdAt).getTime()) < 60000){
+        added.push({name:p.name, savedBy});
+      }
+      return;
+    }
+    if(p.updatedAt && p.updatedAt !== old.updatedAt){
+      changed.push({name:p.name, savedBy, id:p.id});
+    }
+  });
+  // จำกัดจำนวนที่แจ้ง (ไม่สแปม)
+  const total = added.length + changed.length;
+  if(total === 0) return;
+  if(total > 3){
+    _showRemoteNotif('✏️ แอดมินอื่นแก้ไข '+total+' โปรเจกต์', 'มีการอัปเดต projects หลายรายการ');
+  } else {
+    added.forEach(a=>{
+      _showRemoteNotif('➕ '+a.savedBy+' สร้างโปรเจกต์ใหม่', a.name);
+    });
+    changed.forEach(c=>{
+      _showRemoteNotif('✏️ '+c.savedBy+' แก้ไข', c.name);
+    });
+  }
+}
+
+function _showRemoteNotif(title, body){
+  // Toast ในแอป
+  try{ toast(title + (body?' · '+body:''), 'info'); }catch(e){}
+  // Web Notification (ถ้าอนุญาต + tab ไม่ focus)
+  try{
+    if('Notification' in window && Notification.permission === 'granted' && document.visibilityState === 'hidden'){
+      const n = new Notification(title, {
+        body: body || '',
+        icon: '🎙️',
+        tag: 'guin-activity',
+        silent: false
+      });
+      // ลบอัตโนมัติหลัง 8 วิ
+      setTimeout(()=>{ try{ n.close(); }catch(e){} }, 8000);
+      n.onclick = ()=>{ window.focus(); n.close(); };
+    }
+  }catch(e){}
+}
+
+function requestNotifPermission(){
+  if(!('Notification' in window)){
+    toast('เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน','warn'); return;
+  }
+  if(Notification.permission === 'granted'){
+    toast('✅ อนุญาตการแจ้งเตือนอยู่แล้ว','success');
+    return;
+  }
+  if(Notification.permission === 'denied'){
+    toast('🔒 ถูกบล็อกไว้ — ไปที่ตั้งค่าเบราว์เซอร์เพื่อปลดล็อก','warn'); return;
+  }
+  Notification.requestPermission().then(p=>{
+    if(p === 'granted'){
+      toast('🔔 เปิดการแจ้งเตือนเรียบร้อย','success');
+      new Notification('🎙️ Guin Home Studio', { body: 'การแจ้งเตือนพร้อมใช้งาน' });
+    } else {
+      toast('ยกเลิกการขออนุญาต','info');
+    }
+    try{ renderSettings(); }catch(e){}
+  });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -9739,6 +10001,28 @@ function renderSettings(){
       btn.style.boxShadow = 'none';
     }
   });
+
+  // Notification status
+  const notifStatusEl = document.getElementById('notif-status');
+  const notifBtn = document.getElementById('btn-notif-request');
+  if(notifStatusEl){
+    if(!('Notification' in window)){
+      notifStatusEl.innerHTML = '<span style="color:var(--text2)">⚠️ เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน</span>';
+      if(notifBtn) notifBtn.style.display = 'none';
+    } else {
+      const p = Notification.permission;
+      if(p === 'granted'){
+        notifStatusEl.innerHTML = '<span style="color:var(--green);font-weight:700">✅ เปิดการแจ้งเตือนแล้ว</span><br><span style="color:var(--text2)">คุณจะได้รับแจ้งเมื่อแอดมินอีกคนสร้างหรือแก้ไขโปรเจกต์</span>';
+        if(notifBtn) notifBtn.style.display = 'none';
+      } else if(p === 'denied'){
+        notifStatusEl.innerHTML = '<span style="color:var(--red);font-weight:700">🔒 ถูกบล็อกไว้</span><br><span style="color:var(--text2)">ไปที่ไอคอนล็อก/ตั้งค่าในแถบ URL → เปลี่ยน "การแจ้งเตือน" เป็น "อนุญาต"</span>';
+        if(notifBtn) notifBtn.style.display = 'none';
+      } else {
+        notifStatusEl.innerHTML = '<span style="color:var(--text2)">ℹ️ ยังไม่ได้ขออนุญาต — ในแอปจะเด้ง toast อย่างเดียว</span>';
+        if(notifBtn) notifBtn.style.display = '';
+      }
+    }
+  }
 
   // Show system info
   const info = document.getElementById('system-info'); if(info){
