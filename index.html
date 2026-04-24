@@ -3887,7 +3887,7 @@ async function doRegister(){
     toast('❌ สมัครไม่สำเร็จ: '+e.message,'error');
   }finally{showLoader(false);}
 }
-function doLogout(){auth.signOut();currentUser=null;projectsCache=[]}
+function doLogout(){auth.signOut();currentUser=null;projectsCache=[];}
 async function enterApp(){
   try {
   showLoader(true);
@@ -3913,12 +3913,24 @@ async function enterApp(){
   if(_fbDatabase){
     try {
       // MIGRATION: push localStorage data to Firebase if Firebase is empty
-      const [snapS, snapT, snapD, snapM] = await Promise.all([
+      // ⭐ รวม projects ไว้ใน initial load — ป้องกัน race condition
+      const [snapS, snapT, snapD, snapM, snapP] = await Promise.all([
         _fbDatabase.ref('staff').get(),
         _fbDatabase.ref('trkCards').get(),
         _fbDatabase.ref('docs').get(),
         _fbDatabase.ref('misc').get(),
+        _fbDatabase.ref('projects').get(),
       ]);
+      // ⭐ Load projects เข้า cache ก่อน render page แรก (fix race condition)
+      if(snapP.exists()){
+        const val = snapP.val() || {};
+        const seen = new Set();
+        projectsCache = Object.values(val).filter(p=>{
+          if(!p||!p.id||seen.has(p.id)) return false;
+          seen.add(p.id); return true;
+        }).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+        ls('projects_cache', projectsCache);
+      }
       // If Firebase has staff → use it. If not but localStorage has → migrate up
       if(snapS.exists()){
         ls('staff_v3', snapS.val());
