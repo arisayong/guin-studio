@@ -4539,7 +4539,7 @@ function runProjectStaffAudit(){
   const staffsByName = {};
   const staffsByEmail = {};
   const staffsByNick = {};
-  const staffsRaw = getStaff();
+  const staffsRaw = getStaffData();
   Object.values(staffsRaw||{}).forEach(arr => {
     (arr||[]).forEach(s => {
       allStaff[s.id] = s;
