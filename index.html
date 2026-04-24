@@ -844,8 +844,8 @@ body.sidebar-collapsed .main-content{
    <button id="top-safe-btn" class="top-bar-icon-btn" onclick="toggleSafeModeQuick()" title="Safe Mode" style="display:none">🔓</button>
    <!-- Notifications permission (admin only) -->
    <button id="top-notif-btn" class="top-bar-icon-btn" onclick="requestNotifPermission()" title="เปิดการแจ้งเตือน Desktop" style="display:none">🔔</button>
-   <!-- Sync staff list (admin only) -->
-   <button id="top-sync-btn" class="top-bar-icon-btn" onclick="syncPublicStaffList()" title="ซิงค์รายชื่อสู่ Public List" style="display:none">🔄</button>
+   <!-- Sync staff from Google Sheet (admin only) -->
+   <button id="top-sync-btn" class="top-bar-icon-btn" onclick="syncFromSheet()" title="ซิงค์รายชื่อจาก Google Sheet" style="display:none">🔄</button>
    <!-- Admin Inbox Bell (ย้ายมาจาก sidebar-footer) -->
    <button id="top-inbox-btn" class="top-bar-icon-btn" onclick="openModal('modal-admin-inbox')" title="คำขอจาก Manager" style="display:none">
     📨<span id="top-inbox-count" class="icon-badge" style="display:none">0</span>
@@ -1042,6 +1042,41 @@ body.sidebar-collapsed .main-content{
     </div>
     <div style="font-size:11px;color:var(--text2);margin-top:8px;background:rgba(0,223,160,.05);border:1px solid rgba(0,223,160,.15);border-radius:8px;padding:8px 12px;line-height:1.6">
      ✅ บันทึกอัตโนมัติทุกครั้งที่พิมพ์ · สต๊าฟจะเห็นลิงก์เหล่านี้เมื่อเปิดหน้าโปรไฟล์
+    </div>
+   </div>
+
+   <!-- Google Sheet Sync — Apps Script Web App Config -->
+   <div class="section-card" style="border-left:4px solid var(--accent2);margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">🔄</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:var(--accent2)">ซิงค์รายชื่อจาก Google Sheet</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">ตั้งค่า URL + Secret ของ Apps Script เพื่อให้ปุ่ม 🔄 ขวาบนกดซิงค์ได้โดยไม่ต้องสลับไปที่ชีท</div>
+     </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">🌐 Apps Script Web App URL</label>
+      <input id="setting-ascript-url" type="url" placeholder="https://script.google.com/macros/s/AKfycb.../exec" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box" oninput="ls('apps_script_sync_url',this.value.trim())">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">🔑 Shared Secret <span style="color:var(--text2);font-weight:400">(รหัสลับที่ต้องตรงกับในสคริปต์)</span></label>
+      <input id="setting-ascript-secret" type="password" placeholder="ตั้งรหัสลับยาว ๆ สัก 20-30 ตัวอักษร" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box" oninput="ls('apps_script_sync_secret',this.value.trim())">
+     </div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-blue btn-sm" onclick="syncFromSheet()" style="padding:8px 14px">🔄 ทดสอบซิงค์</button>
+      <button class="btn btn-outline btn-sm" onclick="ls('apps_script_sync_url','');ls('apps_script_sync_secret','');document.getElementById('setting-ascript-url').value='';document.getElementById('setting-ascript-secret').value='';toast('🗑️ ล้างค่าแล้ว','info')" style="padding:8px 14px">🗑️ ล้างค่า</button>
+     </div>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-top:10px;background:rgba(0,180,255,.05);border:1px solid rgba(0,180,255,.15);border-radius:8px;padding:10px 12px;line-height:1.7">
+     💡 <strong>วิธีใช้งาน:</strong><br>
+     1. เปิดชีท → Extensions → Apps Script<br>
+     2. วางโค้ดใหม่ (ไฟล์ <code>AppsScript.gs</code> ที่ Claude ให้ไป) ทับของเดิม<br>
+     3. ตั้งค่า <code>WEB_APP_SECRET</code> ในโค้ดให้ตรงกับช่องข้างบน (รหัสลับเดียวกัน)<br>
+     4. กด <strong>Deploy → New Deployment → Web App</strong> → Execute as: Me, Anyone with link → กด Deploy<br>
+     5. Copy URL ที่ได้ (ลงท้ายด้วย <code>/exec</code>) มาใส่ช่องบน<br>
+     6. เปิดเมนูใน Apps Script → กด <strong>ตั้งค่า Auto-sync ตอนมีคนกรอกฟอร์ม</strong> ครั้งเดียว<br>
+     ✅ จากนั้นใครกรอกฟอร์มใหม่ → โผล่ในเว็บทันที พร้อม toast แจ้งเตือน
     </div>
    </div>
 
@@ -2027,6 +2062,11 @@ body.sidebar-collapsed .main-content{
  <div class="modal" style="width:560px">
   <div class="modal-head"><div class="modal-title">🧾 อัพสลิปจ่ายเงิน</div><button class="btn-close" onclick="closeModal('modal-slip')">✕</button></div>
   <div class="modal-body">
+   <!-- QR Code banner: ใหญ่ ๆ เพื่อให้ admin สแกนโอนได้ง่าย -->
+   <div id="slip-qr-banner" style="display:none;margin-bottom:14px;padding:14px;background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.25);border-radius:10px;text-align:center">
+    <div style="font-size:11px;color:var(--accent2);font-weight:700;letter-spacing:.5px;margin-bottom:8px">📱 QR โอนเงิน — สแกนด้วยแอปธนาคาร</div>
+    <div id="slip-qr-content"></div>
+   </div>
    <div class="form-row" style="margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">ผู้รับเงิน *</label><select class="form-input form-select" id="slip-worker" onchange="autoFillSlip()"></select></div>
     <div class="form-group" style="margin:0"><label class="form-label">ยอดเงิน (฿) *</label><input class="form-input" id="slip-amount" type="number" placeholder="0"></div>
@@ -2137,6 +2177,16 @@ body.sidebar-collapsed .main-content{
     <div class="form-group"><label class="form-label">เลขบัญชี</label><input class="form-input" id="st-account" placeholder="xxx-x-xxxxx-x"></div>
    </div>
    <div class="form-group"><label class="form-label">เบอร์ PromptPay <span style="color:var(--text2)">(ถ้ามี)</span></label><input class="form-input" id="st-promptpay" placeholder="0812345678"></div>
+   <div class="form-group">
+    <label class="form-label">📱 ลิงก์รูป QR โอนเงิน <span style="color:var(--text2)">(ถ้ามี — ใช้ Google Drive, Dropbox, หรือลิงก์รูปตรง ๆ)</span></label>
+    <div style="display:flex;gap:8px;align-items:stretch">
+     <input class="form-input" id="st-qr-url" placeholder="https://drive.google.com/file/d/... หรือ https://example.com/qr.png" style="flex:1" oninput="_previewStQr(this.value)">
+     <div id="st-qr-preview-wrap" style="display:none;flex-shrink:0"></div>
+    </div>
+    <div style="font-size:10px;color:var(--text2);margin-top:4px;line-height:1.5">
+     💡 Google Drive share link จะถูกแปลงเป็นลิงก์รูปตรง ๆ ให้อัตโนมัติ — แค่วาง URL แล้วระบบจัดการเอง
+    </div>
+   </div>
    <div id="st-role-toggle" style="display:none"></div>
   </div>
   <!-- Warning section - แสดงเฉพาะตอนแก้ไข -->
@@ -2752,7 +2802,9 @@ function saveStaffData(d){
       updates['staff/'+cat] = d[cat]||[];
     });
     // Mirror to public/staff_list — flat array for registration page (no auth needed to read)
-    // Only expose minimal fields (id, name, nickname, category) — no bank/email/sensitive data
+    // Only expose minimal fields (id, name, nickname, category)
+    // ⚠️ QR/bank/phone/email ห้ามใส่ — public path นี้ใครก็อ่านได้ แม้ยังไม่ login
+    //    QR อ่านได้เฉพาะ admin ผ่าน path staff/ หลัง verified email เท่านั้น
     const publicList = [];
     Object.entries(d||{}).forEach(([cat,arr])=>{
       (Array.isArray(arr)?arr:Object.values(arr||{})).filter(Boolean).forEach(s=>{
@@ -3033,6 +3085,18 @@ function openProfileModal(){
     const nameEl = document.getElementById('profile-bank-name-show'); if(nameEl) nameEl.textContent = s?.name || '—';
     const bankEl = document.getElementById('profile-bank-show'); if(bankEl) bankEl.textContent = s?.bank || '—';
     const accEl = document.getElementById('profile-account-show'); if(accEl) accEl.textContent = s?.account || '—';
+    // QR preview (own)
+    const qrWrap = document.getElementById('profile-qr-wrap');
+    const qrContent = document.getElementById('profile-qr-content');
+    if(qrWrap && qrContent){
+      if(s?.qrUrl){
+        qrWrap.style.display = 'block';
+        qrContent.innerHTML = _qrImgHtml(s.qrUrl,'medium',{staffName:s.nickname||s.name,clickToView:true});
+      } else {
+        qrWrap.style.display = 'none';
+        qrContent.innerHTML = '';
+      }
+    }
     // Build help links
     const helpEl = document.getElementById('profile-bank-help-links');
     if(helpEl){
@@ -5988,6 +6052,7 @@ function renderProjDetail(){
            <div style="font-weight:700">${s.name} <span style="color:var(--text2);font-size:12px">(${s.nickname}${slotLabel?' · '+slotLabel:''})</span></div>
            <div style="font-size:11px;color:var(--text2)">🏦 ${s.bank} ${s.account}${s.promptpay?' · 📱 '+s.promptpay:''}</div>
           </div>
+          ${s.qrUrl?`<div style="flex-shrink:0" title="QR โอนเงิน">${_qrImgHtml(s.qrUrl,'thumb',{staffName:s.nickname||s.name,clickToView:true})}</div>`:''}
           <div style="font-weight:800;font-size:15px;color:var(--accent2)">${w.amount?fmtB(w.amount):'<span style="color:var(--text2);font-size:13px">TBD</span>'}</div>
           <div style="display:flex;gap:6px;align-items:center">
            <button class="btn btn-sm btn-outline" onclick="openPayAmt('${p.id}','${w.id}','${w.slot}')">💰</button>
@@ -6050,6 +6115,19 @@ function openSlipModal(projId,workerId,slot){
   if(w)document.getElementById('slip-amount').value=w.amount||0;
   if(s)document.getElementById('slip-bank').value=`${s.bank} ${s.account}`;
   document.getElementById('slip-date').value=isoToThai(new Date().toISOString().split('T')[0]);
+  // QR banner
+  const qrBanner = document.getElementById('slip-qr-banner');
+  const qrContent = document.getElementById('slip-qr-content');
+  if(qrBanner && qrContent){
+    if(s && s.qrUrl){
+      qrBanner.style.display = 'block';
+      qrContent.innerHTML = _qrImgHtml(s.qrUrl,'large',{staffName:s.nickname||s.name,clickToView:true})
+        + `<div style="font-size:10px;color:var(--text2);margin-top:8px">กดที่รูปเพื่อขยาย</div>`;
+    } else {
+      qrBanner.style.display = 'none';
+      qrContent.innerHTML = '';
+    }
+  }
   openModal('modal-slip');
 }
 function autoFillSlip(){}
@@ -6685,6 +6763,19 @@ function qPay(projId, workerId, slot) {
   document.getElementById('slip-bank').value = `${s.bank} ${s.account}${s.promptpay ? ' / PromptPay: ' + s.promptpay : ''}`;
   document.getElementById('slip-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('slip-fname').textContent = '';
+  // Populate QR banner
+  const qrBanner = document.getElementById('slip-qr-banner');
+  const qrContent = document.getElementById('slip-qr-content');
+  if(qrBanner && qrContent){
+    if(s.qrUrl){
+      qrBanner.style.display = 'block';
+      qrContent.innerHTML = _qrImgHtml(s.qrUrl,'large',{staffName:s.nickname||s.name,clickToView:true})
+        + `<div style="font-size:10px;color:var(--text2);margin-top:8px">กดที่รูปเพื่อขยาย</div>`;
+    } else {
+      qrBanner.style.display = 'none';
+      qrContent.innerHTML = '';
+    }
+  }
   openModal('modal-slip');
 }
 
@@ -6839,6 +6930,13 @@ function renderStaffGrid(){
         }
         if(s.bank)html+='<div style="font-size:11px;color:var(--text2)">🏦 '+s.bank+' '+( s.account||'')+'</div>';
         if(s.promptpay)html+='<div style="font-size:11px;color:var(--text2)">💸 '+s.promptpay+'</div>';
+        // QR code thumbnail
+        if(s.qrUrl){
+          html+='<div style="display:flex;align-items:center;gap:6px;margin-top:5px">';
+          html+='<span style="font-size:10px;color:var(--text2);font-weight:600">📱 QR:</span>';
+          html+=_qrImgHtml(s.qrUrl,'thumb',{staffName:s.nickname||s.name,clickToView:true});
+          html+='</div>';
+        }
         // Email — ถ้ามีหลายอัน (เจอ , ; space หรือ newline) → warning
         if(s.email){
           const emailStr = String(s.email).trim();
@@ -6868,11 +6966,22 @@ function toggleStaffBody(id){
 }
 function openAddStaff(){
   editingStaffId=null;editingStaffCat=null;_iwStaffId='';_iaStaffId='';document.getElementById('addstaff-title').textContent='➕ เพิ่มสมาชิกใหม่';const _ws=document.getElementById('st-warn-section');if(_ws)_ws.classList.add('hidden');const _wa=document.getElementById('st-appr-section');if(_wa)_wa.classList.add('hidden');
-  ['st-name','st-nick','st-bank','st-account','st-promptpay','st-email'].forEach(id=>document.getElementById(id).value='');
+  ['st-name','st-nick','st-bank','st-account','st-promptpay','st-email','st-qr-url'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  _previewStQr('');
   document.getElementById('st-gender').selectedIndex=0;
   setStaffCatsChecked(['dubbing']); // default = Dubbing
   openModal('modal-addstaff');
   setTimeout(()=>document.getElementById('st-name')?.focus(),200);
+}
+
+// Preview QR thumbnail inside staff edit form
+function _previewStQr(url){
+  const wrap = document.getElementById('st-qr-preview-wrap');
+  if(!wrap) return;
+  const v = (url||'').trim();
+  if(!v){ wrap.style.display='none'; wrap.innerHTML=''; return; }
+  wrap.style.display = 'inline-flex';
+  wrap.innerHTML = _qrImgHtml(v, 'small', {clickToView: true, staffName: document.getElementById('st-nick')?.value || ''});
 }
 function openEditStaff(id,cat){
   editingStaffId=id;editingStaffCat=cat;const data=getStaffData();const s=(data[cat]||[]).find(x=>x.id===id);if(!s)return;
@@ -6894,6 +7003,7 @@ function openEditStaff(id,cat){
   document.getElementById('st-name').value=s.name||'';document.getElementById('st-nick').value=s.nickname||'';
   document.getElementById('st-bank').value=s.bank||'';document.getElementById('st-account').value=s.account||'';
   document.getElementById('st-promptpay').value=s.promptpay||'';document.getElementById('st-email').value=s.email||'';
+  const qrEl = document.getElementById('st-qr-url'); if(qrEl){ qrEl.value = s.qrUrl || ''; _previewStQr(qrEl.value); }
   const catSel=document.getElementById('st-cat-wrap');setStaffCatsChecked(s.categories||[cat]);
   const genderSel=document.getElementById('st-gender');[...genderSel.options].forEach((o,i)=>{if(o.text===s.gender)genderSel.selectedIndex=i});
   // Load appreciations
@@ -6950,6 +7060,7 @@ function saveStaff(){
   const baseStaff={id:editingStaffId||('S'+Date.now()),name,nickname:nick,gender:document.getElementById('st-gender').value,
     bank:document.getElementById('st-bank').value.trim(),account:document.getElementById('st-account').value.trim(),
     promptpay:document.getElementById('st-promptpay').value.trim(),email:document.getElementById('st-email').value.trim(),
+    qrUrl:(document.getElementById('st-qr-url')?.value||'').trim(),
     categories:cats};
   // Remove from all categories (editing OR same name to prevent duplicates)
   const dupCheck = name+'|'+nick;
@@ -6992,6 +7103,131 @@ function staffStatusBadge(status, projId, reasonKey){
     <span class="badge badge-unpaid" style="background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.3);color:var(--orange);padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;display:inline-block">⌛ ยังไม่ได้รับ</span>
     <span style="font-size:10px;color:var(--text2);padding-left:2px">${reason}</span>
   </div>`;
+}
+
+// ══════════════════════════════════════════════
+// 📱 QR CODE HELPERS (Personal payment QR per staff)
+// ══════════════════════════════════════════════
+// รับ URL ของรูป QR (เช่น Google Drive share link) → แปลงเป็น direct-image URL
+// QR image สำหรับ print docs — ใช้สี inline (ไม่ใช้ CSS var เพราะ print popup ไม่มี theme)
+function _qrImgHtmlForDoc(rawUrl, size){
+  if(!rawUrl) return '';
+  const direct = _normalizeQrUrl(rawUrl);
+  const sizePx = {thumb:48, small:72, medium:100, large:140}[size] || 100;
+  const safeDirect = direct.replace(/"/g,'&quot;');
+  const safeRaw = String(rawUrl).replace(/"/g,'&quot;');
+  return `<div style="display:inline-block;vertical-align:top">
+    <img src="${safeDirect}" alt="QR" style="width:${sizePx}px;height:${sizePx}px;object-fit:contain;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:3px;display:block"
+         onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='inline-block'">
+    <a href="${safeRaw}" target="_blank" rel="noopener"
+       style="display:none;padding:8px 12px;background:#E3F2FF;border:1px solid #1565FF;border-radius:6px;color:#1565FF;font-size:11px;text-decoration:none;font-weight:700">🔗 เปิด QR</a>
+  </div>`;
+}
+
+function _normalizeQrUrl(url){
+  if(!url) return '';
+  const u = String(url).trim();
+  if(!u) return '';
+  // Google Drive: https://drive.google.com/file/d/XXXXXX/view?usp=sharing
+  let m = u.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/);
+  if(m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+  // Google Drive: https://drive.google.com/open?id=XXXXXX
+  m = u.match(/drive\.google\.com\/open\?id=([^&]+)/);
+  if(m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+  // Google Drive: https://drive.google.com/uc?id=XXXXXX (เพิ่ม export=view ถ้าไม่มี)
+  m = u.match(/drive\.google\.com\/uc\?(?:export=\w+&)?id=([^&]+)/);
+  if(m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+  // Dropbox: แปลง ?dl=0 เป็น ?raw=1
+  if(u.includes('dropbox.com') && u.includes('?dl=0')) return u.replace('?dl=0','?raw=1');
+  // อื่น ๆ (imgur, direct image links ฯลฯ) — ใช้ตรง ๆ
+  return u;
+}
+
+// Render QR thumbnail with graceful fallback link if image fails
+// size: 'thumb' (40) | 'small' (72) | 'medium' (120) | 'large' (180)
+function _qrImgHtml(rawUrl, size, opts){
+  if(!rawUrl) return '';
+  opts = opts || {};
+  const staffName = opts.staffName || '';
+  const direct = _normalizeQrUrl(rawUrl);
+  const sizePx = {thumb:40, small:72, medium:120, large:180}[size] || 72;
+  const escOrig = String(rawUrl).replace(/'/g, "\\'").replace(/"/g,'&quot;');
+  const escName = staffName.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+  const safeDirect = direct.replace(/"/g,'&quot;');
+  const safeRaw = String(rawUrl).replace(/"/g,'&quot;');
+  const clickToView = opts.clickToView !== false;
+  const onclickAttr = clickToView ? ` onclick="openQrViewer('${escOrig}','${escName}');event.stopPropagation()"` : '';
+  const cursor = clickToView ? 'cursor:pointer' : '';
+  const tip = clickToView ? 'กดเพื่อดู QR ขนาดใหญ่' : 'QR โอนเงิน';
+  return `<span class="qr-wrap" style="display:inline-flex;align-items:center;vertical-align:middle">
+    <img src="${safeDirect}" alt="QR" loading="lazy" title="${tip}"
+         style="width:${sizePx}px;height:${sizePx}px;object-fit:contain;background:#fff;border-radius:6px;padding:3px;border:1px solid var(--border2);${cursor}"
+         ${onclickAttr}
+         onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">
+    <a href="${safeRaw}" target="_blank" rel="noopener"
+       style="display:none;align-items:center;gap:4px;padding:5px 9px;background:rgba(0,180,255,.1);border:1px solid var(--accent2);border-radius:6px;color:var(--accent2);font-size:10px;text-decoration:none;font-weight:700"
+       title="รูปโหลดไม่ได้ — คลิกเปิดลิงก์"
+       onclick="event.stopPropagation()">🔗 QR</a>
+  </span>`;
+}
+
+// Open fullscreen QR viewer (creates modal lazily on first use)
+function openQrViewer(rawUrl, staffName){
+  if(!rawUrl) return;
+  const direct = _normalizeQrUrl(rawUrl);
+  let modal = document.getElementById('modal-qr-viewer');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'modal-qr-viewer';
+    modal.className = 'modal-overlay hidden';
+    modal.innerHTML = `<div class="modal" style="width:auto;max-width:92vw">
+      <div class="modal-head">
+        <div class="modal-title" id="qr-viewer-title">📱 QR โอนเงิน</div>
+        <button class="btn-close" onclick="closeModal('modal-qr-viewer')">✕</button>
+      </div>
+      <div class="modal-body" style="text-align:center;padding:20px">
+        <img id="qr-viewer-img" src="" alt="QR"
+             style="max-width:min(82vw,420px);max-height:70vh;object-fit:contain;background:#fff;padding:14px;border-radius:12px;display:block;margin:0 auto"
+             onerror="document.getElementById('qr-viewer-img').style.display='none';document.getElementById('qr-viewer-fallback').style.display='block'">
+        <div id="qr-viewer-fallback" style="display:none;padding:30px">
+          <div style="font-size:40px;margin-bottom:10px">🔗</div>
+          <div style="font-size:13px;color:var(--text2);margin-bottom:14px">รูปโหลดไม่ได้ — อาจเป็นเพราะลิงก์ไม่ใช่รูปภาพโดยตรง<br>ลองเปิดในแท็บใหม่แทน</div>
+          <a id="qr-viewer-fallback-link" href="#" target="_blank" rel="noopener" class="btn btn-blue">เปิดลิงก์ QR</a>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <a id="qr-viewer-tab-link" href="#" target="_blank" rel="noopener" class="btn btn-outline btn-sm">🔗 เปิดในแท็บใหม่</a>
+          <button class="btn btn-outline btn-sm" onclick="_qrViewerCopyLink()">📋 คัดลอกลิงก์</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+  }
+  window._qrViewerCurrent = rawUrl;
+  const title = document.getElementById('qr-viewer-title');
+  if(title) title.textContent = `📱 QR โอนเงิน${staffName?' — '+staffName:''}`;
+  const img = document.getElementById('qr-viewer-img');
+  if(img){ img.style.display = 'block'; img.src = direct; }
+  const fb = document.getElementById('qr-viewer-fallback');
+  if(fb) fb.style.display = 'none';
+  const fbLink = document.getElementById('qr-viewer-fallback-link');
+  if(fbLink) fbLink.href = rawUrl;
+  const tab = document.getElementById('qr-viewer-tab-link');
+  if(tab) tab.href = rawUrl;
+  openModal('modal-qr-viewer');
+}
+
+function _qrViewerCopyLink(){
+  const url = window._qrViewerCurrent || '';
+  if(!url){ toast('ไม่มีลิงก์','warn'); return; }
+  try{
+    navigator.clipboard.writeText(url);
+    toast('✅ คัดลอกลิงก์ QR แล้ว','success');
+  }catch(e){
+    // fallback
+    const ta = document.createElement('textarea'); ta.value = url; document.body.appendChild(ta);
+    ta.select(); try{ document.execCommand('copy'); toast('✅ คัดลอกลิงก์ QR แล้ว','success'); }catch(e2){}
+    ta.remove();
+  }
 }
 
 // ───────────────────────────────────────────────────────
@@ -8231,10 +8467,11 @@ function onVcProjChange() {
          onmouseout="this.style.borderColor='var(--border2)'">
       <div id="vchk-${key.replace('|','-')}" style="width:20px;height:20px;border-radius:5px;border:2px solid var(--border);background:transparent;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s"></div>
       <div style="width:32px;height:32px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">${s.nickname[0]}</div>
-      <div style="flex:1">
+      <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:13px">${s.name} <span style="color:var(--text2);font-size:11px">(${s.nickname})</span></div>
         <div style="font-size:11px;color:${color}">${(()=>{const pre=(allSlots[0]||'').split('-')[0];const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return lbl[pre]||CATS[s.category]?.label||'';})()}</div>
       </div>
+      ${s.qrUrl?`<div style="flex-shrink:0" title="QR โอนเงิน">${_qrImgHtml(s.qrUrl,'thumb',{staffName:s.nickname||s.name,clickToView:true})}</div>`:''}
       <div style="text-align:right">
         <div style="font-weight:800;font-size:14px;color:var(--accent2)">${w.amount?fmtB(w.amount):'TBD'}</div>
         <div style="font-size:10px;color:var(--text2)">${s.bank}</div>
@@ -8317,9 +8554,14 @@ function buildVoucherHTML(projId, workerId, slot, vNo, issueDate, note) {
       </div>
       <div>
         <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ช่องทางรับเงิน</div>
-        <div style="font-size:14px;font-weight:700;color:#111827">${s.bank}</div>
-        <div style="font-size:13px;color:#374151;margin-top:2px">${s.account}</div>
-        ${s.promptpay?'<div style="font-size:12px;color:#6b7280;margin-top:2px">PromptPay: '+s.promptpay+'</div>':''}
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;color:#111827">${s.bank}</div>
+            <div style="font-size:13px;color:#374151;margin-top:2px">${s.account}</div>
+            ${s.promptpay?'<div style="font-size:12px;color:#6b7280;margin-top:2px">PromptPay: '+s.promptpay+'</div>':''}
+          </div>
+          ${s.qrUrl?_qrImgHtmlForDoc(s.qrUrl,'small'):''}
+        </div>
       </div>
     </div>
     <div style="height:1px;background:#f3f4f6;margin:18px 30px"></div>
@@ -9064,9 +9306,14 @@ function buildBillingVoucherHTML(staffId) {
       </div>
       <div>
         <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ช่องทางรับเงิน</div>
-        <div style="font-size:14px;font-weight:700;color:#111827">${s.bank}</div>
-        <div style="font-size:13px;color:#374151;margin-top:2px">${s.account}</div>
-        ${s.promptpay?'<div style="font-size:12px;color:#6b7280;margin-top:2px">PromptPay: '+s.promptpay+'</div>':''}
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;color:#111827">${s.bank}</div>
+            <div style="font-size:13px;color:#374151;margin-top:2px">${s.account}</div>
+            ${s.promptpay?'<div style="font-size:12px;color:#6b7280;margin-top:2px">PromptPay: '+s.promptpay+'</div>':''}
+          </div>
+          ${s.qrUrl?_qrImgHtmlForDoc(s.qrUrl,'small'):''}
+        </div>
       </div>
     </div>
     <div style="background:#E3F2FF;border-radius:6px;margin:16px 30px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
@@ -10130,6 +10377,36 @@ function startFirebaseSync() {
   });
 
   console.log('🔄 Firebase real-time sync started');
+
+  // ═══════════════════════════════════════════════════════
+  // 📬 ADMIN NOTIFICATIONS — แจ้งเตือนสต๊าฟใหม่จากฟอร์ม
+  // ═══════════════════════════════════════════════════════
+  if(currentUser?.role === 'admin'){
+    const seenNotifIds = new Set((ls('_seen_admin_notifs') || []));
+    let _notifFirstLoad = true;
+    _fbDatabase.ref('admin_notifications/new_staff')
+      .orderByChild('addedAt')
+      .limitToLast(20)
+      .on('child_added', snap => {
+        if(!snap.exists()) return;
+        const key = snap.key;
+        const data = snap.val() || {};
+        // รอบแรกโหลด → ข้ามทั้งหมด (ไม่แสดง toast ย้อนหลัง)
+        if(_notifFirstLoad){ seenNotifIds.add(key); return; }
+        if(seenNotifIds.has(key)) return;
+        seenNotifIds.add(key);
+        ls('_seen_admin_notifs', [...seenNotifIds].slice(-200)); // เก็บไว้แค่ 200 รายการล่าสุด
+        // ตั้งอายุของ notif — ถ้าเก่ากว่า 5 นาทีถือว่า stale (reload เว็บแล้วเจอของเก่า)
+        const addedAt = new Date(data.addedAt||0).getTime();
+        if(Date.now() - addedAt > 5*60*1000) return;
+        showNewStaffToast(data);
+      });
+    // หลังดึงข้อมูลชุดแรกเสร็จ → เปิด flag ให้รอบต่อไปโชว์ toast
+    _fbDatabase.ref('admin_notifications/new_staff').once('value', () => {
+      setTimeout(()=>{ _notifFirstLoad = false; }, 1500);
+    });
+  }
+
   // เริ่ม presence listener — รู้ว่ามี admin คนอื่นอยู่ที่ project ไหนบ้าง
   try{ startPresenceListener(); }catch(e){ console.warn('presence listener error:', e); }
   // ─ One-time migration: ย้าย trkCards phases → projects.phases ─
@@ -12231,6 +12508,14 @@ function renderSettings(){
   // Load contact settings (form/LINE/email links)
   try{ loadContactSettings(); }catch(e){}
 
+  // Load Apps Script sync config
+  try{
+    const urlEl = document.getElementById('setting-ascript-url');
+    const secEl = document.getElementById('setting-ascript-secret');
+    if(urlEl) urlEl.value = ls('apps_script_sync_url') || '';
+    if(secEl) secEl.value = ls('apps_script_sync_secret') || '';
+  }catch(e){}
+
   // Highlight ปุ่ม theme ปัจจุบัน
   const curTheme = getStoredTheme();
   document.querySelectorAll('[data-theme-opt]').forEach(btn=>{
@@ -12510,6 +12795,98 @@ function toggleSafeMode(enabled){
 // ── SYNC PUBLIC STAFF LIST ──
 // One-time migration + manual re-sync: copies staff list to public path
 // so the registration page can read it without anonymous auth
+// ═══════════════════════════════════════════════════════
+// 📬 TOAST แบบจดหมายแจ้งเตือน — สต๊าฟใหม่ (admin only)
+// ═══════════════════════════════════════════════════════
+function showNewStaffToast(data){
+  const wrap = document.getElementById('toastWrap');
+  if(!wrap) return;
+  const CAT_LABELS = {
+    dubbing:'🎤 Dubbing', adaptation:'✍️ Adaptation', mix:'🎧 Mix',
+    qc:'✅ QC', subVideo:'🎬 Sub & Video', manager:'🗂️ Manager'
+  };
+  const CAT_COLORS = {
+    dubbing:'#FF9E00', adaptation:'#00B4FF', mix:'#00DFA0',
+    qc:'#9B6FFF', subVideo:'#FF4040', manager:'#1565FF'
+  };
+  const cats = Array.isArray(data.categories) ? data.categories : [data.category || 'dubbing'];
+  const catChips = cats.map(c => {
+    const cl = CAT_COLORS[c] || '#888';
+    return `<span style="font-size:10px;padding:2px 9px;border-radius:10px;border:1px solid ${cl}55;color:${cl};background:${cl}15">${CAT_LABELS[c]||c}</span>`;
+  }).join(' ');
+  const el = document.createElement('div');
+  el.className = 'toast success';
+  el.style.cssText = 'max-width:340px;cursor:pointer;border-left:4px solid var(--green)';
+  el.innerHTML = `
+    <span style="font-size:22px;flex-shrink:0">📬</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:3px">สต๊าฟใหม่เข้าสู่ระบบ</div>
+      <div style="font-size:13px;font-weight:700;line-height:1.3">${data.name||'(ไม่ระบุชื่อ)'}${data.nickname?' <span style="color:var(--text2);font-weight:400">('+data.nickname+')</span>':''}</div>
+      <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">${catChips}</div>
+    </div>
+    <button onclick="this.closest('.toast').remove();event.stopPropagation()" style="background:none;border:none;color:var(--text2);font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0" title="ปิด">✕</button>
+  `;
+  // คลิก toast → ไปหน้าทีมงาน
+  el.addEventListener('click', e => {
+    if(e.target.tagName === 'BUTTON') return;
+    try{ nav('staff'); }catch(_){}
+    el.remove();
+  });
+  wrap.appendChild(el);
+  // อยู่นานขึ้น (8 วิ) สำหรับ notification สำคัญ
+  setTimeout(()=>{
+    el.style.opacity='0';
+    el.style.transform='translateX(20px)';
+    setTimeout(()=>el.remove(), 300);
+  }, 8000);
+}
+
+// ═══════════════════════════════════════════════════════
+// 🔄 SYNC FROM SHEET — เรียก Apps Script Web App
+// ═══════════════════════════════════════════════════════
+async function syncFromSheet(){
+  if(currentUser?.role !== 'admin'){
+    toast('❌ เฉพาะแอดมินเท่านั้น', 'error'); return;
+  }
+  const url = ls('apps_script_sync_url') || '';
+  const secret = ls('apps_script_sync_secret') || '';
+  if(!url || !secret){
+    const goSetup = confirm('ยังไม่ได้ตั้งค่า URL ของ Apps Script\n\nไปหน้า Settings เพื่อตั้งค่าเลยไหม?');
+    if(goSetup) nav('settings');
+    return;
+  }
+  const btn = document.getElementById('top-sync-btn');
+  const origHtml = btn ? btn.innerHTML : '';
+  if(btn){ btn.innerHTML = '⏳'; btn.disabled = true; }
+  toast('🔄 กำลังซิงค์จากชีท...', 'info');
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      // ใช้ text/plain + body เป็น JSON string เพื่อหลีกเลี่ยง CORS preflight
+      // (Apps Script Web App ไม่รองรับ preflight OPTIONS request)
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ secret, action: 'sync' })
+    });
+    const data = await res.json();
+    if(!data.ok){
+      toast('❌ ซิงค์ไม่สำเร็จ: ' + (data.error || 'unknown'), 'error');
+      return;
+    }
+    const msg =
+      `✅ ซิงค์สำเร็จ · ` +
+      `➕ ใหม่ ${data.added||0} · ` +
+      `⏭️ ข้าม ${data.skipped||0}` +
+      (data.backfilled ? ` · 📱 backfill QR ${data.backfilled}` : '');
+    toast(msg, 'success');
+    // รายชื่อคนใหม่ที่เพิ่มเข้ามาในรอบนี้จะมาจาก Firebase listener อัตโนมัติ (ไม่ต้อง handle ตรงนี้ซ้ำ)
+  } catch(e) {
+    console.error('[syncFromSheet]', e);
+    toast('❌ ติดต่อ Apps Script ไม่ได้: ' + (e.message||''), 'error');
+  } finally {
+    if(btn){ btn.innerHTML = origHtml; btn.disabled = false; }
+  }
+}
+
 async function syncPublicStaffList(){
   const statusEl = document.getElementById('public-sync-status');
   if(!_fbDatabase){
@@ -13547,6 +13924,11 @@ const _origSaveStaff = window.saveStaff;
               <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700">เลขบัญชี</div>
               <div id="profile-account-show" style="font-size:14px;font-weight:600;margin-top:3px;font-family:monospace">—</div>
             </div>
+          </div>
+          <!-- QR Code -->
+          <div id="profile-qr-wrap" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border2)">
+            <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700;margin-bottom:6px">📱 QR โอนเงิน</div>
+            <div id="profile-qr-content" style="text-align:center"></div>
           </div>
         </div>
         <div style="background:rgba(0,180,255,.06);border:1px solid rgba(0,180,255,.2);border-radius:9px;padding:10px 12px;font-size:11px;color:var(--text2);line-height:1.7">
