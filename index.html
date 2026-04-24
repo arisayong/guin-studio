@@ -3818,6 +3818,40 @@ auth.onAuthStateChanged(async(fbUser)=>{
       }
     } catch(e) { console.warn('Profile load skipped:', e.message); }
 
+    // ⭐ FALLBACK: ถ้า users/{uid} ไม่มี staffId (อาจเป็น account เก่า หรือยังไม่ได้ผูก)
+    // ลองโหลด public/staff_list แล้ว match email → resolve staffId
+    if(!profile.staffId && !isKnownAdmin && profile.role !== 'admin' && _fbDatabase){
+      try {
+        const snapPub = await _fbDatabase.ref('public/staff_list').get();
+        if(snapPub.exists()){
+          const publicList = snapPub.val() || [];
+          const list = Array.isArray(publicList) ? publicList : Object.values(publicList);
+          const emailLc = (fbUser.email||'').toLowerCase().trim();
+          // staff record ใน public list อาจไม่มี email (เพื่อความเป็นส่วนตัว)
+          // → cache ไว้ก่อน แล้วให้ renderMyDash fallback ไปหาจาก staff_v3 (ที่มี email จาก admin)
+          const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
+          list.forEach(s => {
+            if(!s || !s.id) return;
+            const cat = s.category || 'dubbing';
+            if(!structured[cat]) structured[cat] = [];
+            structured[cat].push(s);
+          });
+          ls('staff_v3', structured);
+          // ถ้า admin save email ไว้ใน staff record จริง — หา match
+          const matched = list.find(s => {
+            const se = (s.email||'').toLowerCase().trim();
+            return se && se.split(/[,;\s]+/).some(x => x.trim() === emailLc);
+          });
+          if(matched){
+            profile.staffId = matched.id;
+            console.log('✅ Resolved staffId via public/staff_list email match:', matched.id);
+            // Persist to users/{uid} for next time
+            try { await _fbDatabase.ref('users/'+fbUser.uid+'/staffId').set(matched.id); } catch(e){}
+          }
+        }
+      } catch(e) { console.warn('staffId fallback resolve:', e.message); }
+    }
+
     currentUser = {uid: fbUser.uid, ...profile};
     console.log('✅ currentUser:', currentUser.email, currentUser.role);
     await enterApp();
@@ -3914,15 +3948,16 @@ async function enterApp(){
     try {
       // MIGRATION: push localStorage data to Firebase if Firebase is empty
       // ⭐ รวม projects ไว้ใน initial load — ป้องกัน race condition
+      // ⭐ .catch(()=>null) ให้ path ใดโดน rules กั้นแล้วไม่ทำลาย batch ทั้งก้อน
       const [snapS, snapT, snapD, snapM, snapP] = await Promise.all([
-        _fbDatabase.ref('staff').get(),
-        _fbDatabase.ref('trkCards').get(),
-        _fbDatabase.ref('docs').get(),
-        _fbDatabase.ref('misc').get(),
-        _fbDatabase.ref('projects').get(),
+        _fbDatabase.ref('staff').get().catch(e=>{console.warn('staff/ read:',e.message);return null}),
+        _fbDatabase.ref('trkCards').get().catch(e=>{console.warn('trkCards/ read:',e.message);return null}),
+        _fbDatabase.ref('docs').get().catch(e=>{console.warn('docs/ read:',e.message);return null}),
+        _fbDatabase.ref('misc').get().catch(e=>{console.warn('misc/ read:',e.message);return null}),
+        _fbDatabase.ref('projects').get().catch(e=>{console.warn('projects/ read:',e.message);return null}),
       ]);
       // ⭐ Load projects เข้า cache ก่อน render page แรก (fix race condition)
-      if(snapP.exists()){
+      if(snapP && snapP.exists()){
         const val = snapP.val() || {};
         const seen = new Set();
         projectsCache = Object.values(val).filter(p=>{
@@ -3932,37 +3967,56 @@ async function enterApp(){
         ls('projects_cache', projectsCache);
       }
       // If Firebase has staff → use it. If not but localStorage has → migrate up
-      if(snapS.exists()){
+      if(snapS && snapS.exists()){
         ls('staff_v3', snapS.val());
-      } else {
+      } else if(currentUser?.role === 'admin'){
+        // Admin only — migrate from localStorage if available
         const localStaff = ls('staff_v3');
         if(localStaff && Object.keys(localStaff).length){
           await _fbDatabase.ref('staff').set(localStaff);
           console.log('📤 Migrated staff from localStorage to Firebase');
         }
+      } else {
+        // Non-admin (staff/manager): Firebase rules may block staff/ read →
+        // fall back to public/staff_list (readable for all)
+        try {
+          const snapPub = await _fbDatabase.ref('public/staff_list').get();
+          if(snapPub.exists()){
+            const publicList = snapPub.val() || [];
+            const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
+            (Array.isArray(publicList)?publicList:Object.values(publicList)).forEach(s => {
+              if(!s || !s.id) return;
+              const cat = s.category || 'dubbing';
+              if(!structured[cat]) structured[cat] = [];
+              structured[cat].push(s);
+            });
+            ls('staff_v3', structured);
+            console.log('✅ Loaded staff from public/staff_list (staff role)');
+          }
+        } catch(e){ console.warn('public/staff_list fallback failed:', e.message); }
       }
       // Same for trkCards
-      if(snapT.exists()){
+      if(snapT && snapT.exists()){
         ls('trk_cards_v3', snapT.val());
-      } else {
+      } else if(currentUser?.role === 'admin'){
         const localTrk = ls('trk_cards_v3');
         if(localTrk && localTrk.length){
           await _fbDatabase.ref('trkCards').set(localTrk);
           console.log('📤 Migrated trkCards from localStorage to Firebase');
         }
       }
-      if(snapD.exists()){
+      if(snapD && snapD.exists()){
         const d=snapD.val();
         if(d.quotations) ls('docs_quotations', d.quotations);
         if(d.voucherSeq) ls('voucher_seq', d.voucherSeq);
-      } else {
+      } else if(currentUser?.role === 'admin'){
         // Migrate docs
         const localQt = ls('docs_quotations');
         if(localQt && localQt.length) await _fbDatabase.ref('docs/quotations').set(localQt).catch(()=>{});
         const localVSeq = ls('voucher_seq');
         if(localVSeq) await _fbDatabase.ref('docs/voucherSeq').set(localVSeq).catch(()=>{});
       }
-      if(snapM.exists()){
+      if(snapM && snapM.exists()){
         // Restore client_paid and slip data
         Object.entries(snapM.val()||{}).forEach(([k,v])=>{
           if(k.startsWith('cpaid_')) ls('client_paid_'+k.slice(6), v);
@@ -4010,6 +4064,23 @@ async function enterApp(){
   if(currentUser.role==='admin'){nav('dashboard');renderAdminInboxBell();}
   else if(currentUser.role==='manager'){nav('mgr-projects');}
   else nav('my-dashboard');
+  // ═══ SAFETY RETRY: ถ้าเป็นสต๊าฟ + หน้า dashboard — retry อีกครั้งหลัง listener fire ═══
+  // ป้องกัน race: first render อาจเรียกก่อน staff_v3/projects พร้อม แม้จะ await แล้ว
+  if(currentUser.role==='staff' || currentUser.role==='manager'){
+    _myDashRetryCount = 0;  // reset — fresh login deserves fresh retries
+    setTimeout(() => {
+      try {
+        const pg = document.getElementById('page-my-dashboard');
+        if(pg && !pg.classList.contains('hidden')) renderMyDash();
+      } catch(e){ console.warn('safety retry err:', e); }
+    }, 800);
+    setTimeout(() => {
+      try {
+        const pg = document.getElementById('page-my-dashboard');
+        if(pg && !pg.classList.contains('hidden')) renderMyDash();
+      } catch(e){}
+    }, 2000);
+  }
   try{ updateTopBarAdminIcons(); }catch(e){}
   try{ loadContactsFromFirebase(); }catch(e){}
   updateQueueBadge();
@@ -6923,9 +6994,145 @@ function staffStatusBadge(status, projId, reasonKey){
   </div>`;
 }
 
+// ───────────────────────────────────────────────────────
+// STAFF DASHBOARD DEFENSIVE HELPERS (fix: blank page on fresh login)
+// ───────────────────────────────────────────────────────
+let _myDashRetryCount = 0;
+let _myDashLastRetryAt = 0;
+
+// หา staff จาก email ใน currentUser (fallback ถ้า users/{uid}.staffId หาย)
+function _findStaffByEmail(email){
+  const e = (email||'').trim().toLowerCase();
+  if(!e) return null;
+  const all = getAllStaff();
+  // exact match first
+  const exact = all.find(s => {
+    const se = (s.email||'').trim().toLowerCase();
+    if(!se) return false;
+    // staff.email อาจมีหลาย email คั่น comma/space
+    return se.split(/[,;\s]+/).some(x => x.trim() === e);
+  });
+  return exact || null;
+}
+
+// โหลด staff_v3 จาก public/staff_list — ใช้ได้ทุก role (path เปิด)
+async function _loadStaffFromPublic(){
+  if(!_fbDatabase) return false;
+  try {
+    const snap = await _fbDatabase.ref('public/staff_list').get();
+    if(!snap.exists()) return false;
+    const publicList = snap.val() || [];
+    const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
+    (Array.isArray(publicList)?publicList:Object.values(publicList)).forEach(s => {
+      if(!s || !s.id) return;
+      const cat = s.category || 'dubbing';
+      if(!structured[cat]) structured[cat] = [];
+      structured[cat].push(s);
+    });
+    ls('staff_v3', structured);
+    return true;
+  } catch(e){ console.warn('_loadStaffFromPublic:', e.message); return false; }
+}
+
+// Schedule retry of renderMyDash — exponential backoff, max 5 tries
+function _scheduleMyDashRetry(reason){
+  if(_myDashRetryCount >= 5){
+    console.warn('renderMyDash retry exhausted:', reason);
+    return;
+  }
+  _myDashRetryCount++;
+  const delay = 400 * _myDashRetryCount;  // 400, 800, 1200, 1600, 2000 ms
+  console.log(`⏳ renderMyDash retry #${_myDashRetryCount} in ${delay}ms (${reason})`);
+  setTimeout(async () => {
+    // พยายามโหลด staff จาก public list ระหว่างรอ (non-blocking)
+    if(!getAllStaff().length) await _loadStaffFromPublic();
+    const pg = document.getElementById('page-my-dashboard');
+    if(pg && !pg.classList.contains('hidden')) renderMyDash();
+  }, delay);
+}
+
+function _showMyDashLoading(){
+  const welcomeEl = document.getElementById('my-welcome');
+  if(welcomeEl && !welcomeEl.textContent.includes('สวัสดี')){
+    welcomeEl.textContent = 'สวัสดี 👋';
+  }
+  const tb = document.getElementById('my-proj-table');
+  if(tb && !tb.innerHTML.trim()){
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text2)"><div style="display:inline-flex;gap:6px;margin-bottom:10px"><div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div></div><div style="font-size:13px">⏳ กำลังโหลดข้อมูล...</div></td></tr>';
+  }
+}
+
+function _showMyDashNotLinked(email){
+  const welcomeEl = document.getElementById('my-welcome');
+  if(welcomeEl){
+    const nick = currentUser?.nickname || currentUser?.name || (email||'').split('@')[0] || '';
+    welcomeEl.textContent = `สวัสดี ${nick} 👋`;
+  }
+  const tb = document.getElementById('my-proj-table');
+  if(tb){
+    tb.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text2)">
+      <div style="font-size:32px;margin-bottom:10px">🔗</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text)">บัญชียังไม่ผูกกับข้อมูลทีม</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:8px;line-height:1.7">
+        กรุณาแจ้งแอดมินให้เชื่อมบัญชีกับรายชื่อทีม<br>
+        <span style="color:var(--accent2);font-weight:600">อีเมลของคุณ: ${email||'—'}</span>
+      </div>
+      <button class="btn btn-blue btn-sm" style="margin-top:16px" onclick="_myDashRetryCount=0;renderMyDash()">🔄 ลองโหลดใหม่</button>
+    </td></tr>`;
+  }
+}
+
 function renderMyDash(){
-  if(!currentUser?.staffId) return;
-  const s = getStaffById(currentUser.staffId); if(!s) return;
+  if(!currentUser){
+    _scheduleMyDashRetry('no currentUser');
+    return;
+  }
+
+  // ═══ ชั้นที่ 1: resolve staffId (ถ้าหาย ลอง match email) ═══
+  if(!currentUser.staffId && currentUser.email){
+    const byEmail = _findStaffByEmail(currentUser.email);
+    if(byEmail){
+      currentUser.staffId = byEmail.id;
+      console.log('✅ Resolved staffId by email:', byEmail.id);
+    }
+  }
+
+  // ═══ ชั้นที่ 2: ถ้ายังไม่มี staffId หลัง resolve → อาจเป็นเพราะ staff list ยังไม่โหลด ═══
+  if(!currentUser.staffId){
+    if(!getAllStaff().length){
+      // staff list ยังว่าง → โหลดจาก public แล้วลองใหม่
+      _showMyDashLoading();
+      _loadStaffFromPublic().then(ok => {
+        if(ok) setTimeout(renderMyDash, 50);
+        else _scheduleMyDashRetry('no staffId + public load failed');
+      });
+      return;
+    }
+    // staff list โหลดแล้วแต่ match email ไม่ได้ → แจ้งให้ผูกบัญชี
+    _showMyDashNotLinked(currentUser.email);
+    return;
+  }
+
+  // ═══ ชั้นที่ 3: หา staff record ═══
+  let s = getStaffById(currentUser.staffId);
+  if(!s){
+    // staff_v3 อาจจะยังไม่โหลด → โหลด public แล้วลองใหม่
+    if(!getAllStaff().length){
+      _showMyDashLoading();
+      _loadStaffFromPublic().then(ok => {
+        if(ok) setTimeout(renderMyDash, 50);
+        else _scheduleMyDashRetry('no staff data');
+      });
+      return;
+    }
+    // staff list โหลดแล้วแต่ไม่มี id นี้ — อาจเป็นแอดมินลบหรือเปลี่ยน id
+    console.warn('Staff id not found:', currentUser.staffId);
+    _showMyDashNotLinked(currentUser.email);
+    return;
+  }
+
+  // ═══ ผ่านทุกด่าน — render จริง ═══
+  _myDashRetryCount = 0;  // reset retry counter on success
   const welcomeEl = document.getElementById('my-welcome');
   if(welcomeEl) welcomeEl.textContent = `สวัสดี ${currentUser.nickname||s.nickname} 👋`;
   try{renderMyWarnBell();}catch(e){}
@@ -9858,6 +10065,31 @@ function startFirebaseSync() {
       const pg=document.getElementById('page-staff');
       if(pg&&!pg.classList.contains('hidden')) try{renderStaff();}catch(e){}
     } catch(e) { console.error('Staff RT error:', e); }
+  }, err => {
+    // Permission denied (ปกติสำหรับ staff role ที่ไม่ได้สิทธิ์อ่าน staff/ เต็ม ๆ)
+    // → ใช้ public/staff_list แทน + listener ของมัน
+    console.log('ℹ️ staff/ listener blocked → using public/staff_list');
+    if(currentUser && currentUser.role !== 'admin'){
+      _fbDatabase.ref('public/staff_list').on('value', snapPub => {
+        try {
+          if(!snapPub.exists()) return;
+          const publicList = snapPub.val() || [];
+          const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
+          (Array.isArray(publicList)?publicList:Object.values(publicList)).forEach(st => {
+            if(!st || !st.id) return;
+            const cat = st.category || 'dubbing';
+            if(!structured[cat]) structured[cat] = [];
+            structured[cat].push(st);
+          });
+          ls('staff_v3', structured);
+          // Re-render staff pages
+          if(currentUser && currentUser.role==='staff'){
+            const pgSD=document.getElementById('page-my-dashboard');
+            if(pgSD&&!pgSD.classList.contains('hidden')) try{renderMyDash();}catch(e){}
+          }
+        } catch(e) { console.warn('public staff listener err:', e); }
+      }, e2 => console.warn('public staff listener blocked too:', e2?.message));
+    }
   });
 
   // Sync projects via timestamp - ทุก admin fetch ใหม่เมื่อมีการเปลี่ยนแปลง
