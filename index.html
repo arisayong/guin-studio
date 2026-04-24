@@ -690,8 +690,8 @@ body.sidebar-collapsed .main-content{
   /* Toast */
   .toast{font-size:12px;min-width:0;max-width:90vw}
   #toastWrap{right:12px!important;left:12px!important;top:auto!important;bottom:12px!important}
-  /* Search bar */
-  .search-bar input{font-size:13px;padding:10px 12px}
+  /* Search bar — เว้นที่ให้ icon 🔍 (ไม่งั้นทับคำ) */
+  .search-bar input{font-size:13px;padding:10px 12px 10px 36px}
   /* Chart containers — ความสูงลดเพื่อไม่ยาวเกิน */
   canvas{max-height:240px!important}
   /* Login box */
@@ -711,6 +711,97 @@ body.sidebar-collapsed .main-content{
   #quick-actions{grid-template-columns:1fr!important}
   .page-title{font-size:16px}
   .btn{font-size:11px}
+}
+
+/* ═══════════════════════════════════════════════════════════
+   📱 MOBILE FIXES v2 — Queue/Dashboard/Profit/Quick Actions
+   (ไม่กระทบ desktop · ใช้ media query เท่านั้น)
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px){
+  /* ─── TABS → horizontal scroll (เดิม wrap เยอะ) ─── */
+  .tabs{
+    overflow-x:auto;-webkit-overflow-scrolling:touch;
+    flex-wrap:nowrap;scrollbar-width:none;max-width:100%;
+  }
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex-shrink:0;white-space:nowrap;font-size:12px;padding:6px 12px}
+
+  /* ─── QUEUE project card: flat row → 3-row stack ─── */
+  .qgroup-header{
+    flex-wrap:wrap!important;gap:8px!important;padding:12px!important;
+    align-items:stretch!important;
+  }
+  .qgroup-r1,.qgroup-r2,.qgroup-r3{
+    display:flex!important;width:100%;align-items:center;gap:10px;
+  }
+  .qgroup-title{min-width:0;flex:1}
+  .qgroup-title > div:first-child{
+    font-size:14px!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .qgroup-title > div:last-child{
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .qgroup-chevron{
+    position:absolute;right:12px;top:14px;margin:0!important;
+  }
+  .qgroup-pills{flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+  .qgroup-pills::-webkit-scrollbar{display:none}
+  .qgroup-total{min-width:0!important;flex-shrink:0}
+  .qgroup-total > div:first-child{font-size:15px!important}
+  .qgroup-r3{gap:6px!important}
+  .qgroup-client{flex:0 0 auto}
+  .qgroup-action{flex:1;margin-left:0!important;min-width:0}
+  .qgroup-action > button,
+  .qgroup-action > div > button,
+  .qgroup-action > span{
+    width:100%;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+
+  /* qgroup-card มี position relative เพื่อวาง chevron absolute ได้ */
+  .qgroup-card{position:relative}
+
+  /* ─── QUEUE summary bar: 4 cols → 2×2 ─── */
+  #queue-list ~ * .stat-card,
+  #queue-list + div .stat-card{}
+  div[style*="grid-template-columns:repeat(4,1fr)"]{
+    grid-template-columns:repeat(2,1fr)!important;
+  }
+
+  /* ─── QUEUE worker row sub-header: ซ่อน column label (ไม่มีพื้นที่พอ) ─── */
+  .qgroup-card > div[style*="padding:7px 18px"]{display:none!important}
+
+  /* ─── DASHBOARD "Deadline + รอจ่าย" 2-col → stack ─── */
+  #page-dashboard > div[style*="grid-template-columns:1fr 1fr"]{
+    grid-template-columns:1fr!important;gap:10px!important;
+  }
+
+  /* ─── PROFIT charts 2-col → stack (canvas ใหญ่แทน) ─── */
+  #page-profit > div[style*="grid-template-columns:1fr 1fr"]{
+    grid-template-columns:1fr!important;
+  }
+
+  /* ─── QUICK ACTIONS: button ให้ compact ─── */
+  .qa-btn{padding:10px!important;gap:8px!important;font-size:12px!important}
+  .qa-btn > span[style*="font-size:24px"]{font-size:18px!important}
+  .qa-btn > div > div:first-child{font-size:12px!important}
+  .qa-btn > div > div:last-child{font-size:10px!important}
+
+  /* ─── PAGE-ACTIONS wrap แท็บ/dropdown ให้เลื่อนซ้ายขวาได้ ─── */
+  .page-actions{gap:8px!important}
+  .page-actions > .tabs{margin:0!important}
+
+  /* ─── PROJECT DETAIL worker rows — ปุ่มไปบรรทัดใหม่ถ้าไม่พอ ─── */
+  #det-workers > div > div:not(.section-title){flex-wrap:wrap}
+  #det-workers [onclick*="openPayAmt"],
+  #det-workers [onclick*="openSlipModal"]{font-size:11px;padding:5px 10px}
+}
+
+/* จอเล็กมาก ≤ 400px */
+@media (max-width: 400px){
+  .qgroup-header{padding:10px!important}
+  .qgroup-title > div:first-child{font-size:13px!important}
+  .qgroup-total > div:first-child{font-size:14px!important}
+  .qgroup-chevron{top:12px!important}
 }
 
 /* iOS Safari notch/safe-area */
@@ -6528,28 +6619,34 @@ function renderQueue() {
 
     const borderColor = allPaid ? 'rgba(0,223,160,.3)' : anyApproved ? 'rgba(0,180,255,.3)' : 'var(--border2)';
 
-    return `<div style="background:var(--card);border:1px solid ${borderColor};border-radius:var(--r);margin-bottom:12px;overflow:hidden">
-      <!-- Group header -->
-      <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;cursor:pointer;transition:background .2s"
+    return `<div class="qgroup-card" style="background:var(--card);border:1px solid ${borderColor};border-radius:var(--r);margin-bottom:12px;overflow:hidden">
+      <!-- Group header (desktop: flat row · mobile: 3 stacked rows) -->
+      <div class="qgroup-header" style="display:flex;align-items:center;gap:14px;padding:14px 18px;cursor:pointer;transition:background .2s"
            onclick="toggleQueueGroup('${groupId}')"
            onmouseover="this.style.background='rgba(255,255,255,.02)'"
            onmouseout="this.style.background=''">
-        <div style="flex:1">
-          <div style="font-weight:800;font-size:15px">${p.name}</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:3px">
-            ${p.client||''}${p.type?' · '+p.type:''} ${p.deadline?'· Deadline: '+fmtDate(p.deadline):''}
+        <div class="qgroup-r1" style="display:contents">
+          <div class="qgroup-title" style="flex:1">
+            <div style="font-weight:800;font-size:15px">${p.name}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:3px">
+              ${p.client||''}${p.type?' · '+p.type:''} ${p.deadline?'· Deadline: '+fmtDate(p.deadline):''}
+            </div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          ${pillPending}${pillApproved}${pillPaid}
+        <div class="qgroup-r2" style="display:contents">
+          <div class="qgroup-pills" style="display:flex;align-items:center;gap:8px">
+            ${pillPending}${pillApproved}${pillPaid}
+          </div>
+          <div class="qgroup-total" style="text-align:right;min-width:100px">
+            <div style="font-weight:800;font-size:16px;color:var(--accent2)">${fmtB(totalAmt)}</div>
+            ${paidAmt>0&&!allPaid?`<div style="font-size:10px;color:var(--green)">จ่ายแล้ว ${fmtB(paidAmt)}</div>`:''}
+          </div>
         </div>
-        <div style="text-align:right;min-width:100px">
-          <div style="font-weight:800;font-size:16px;color:var(--accent2)">${fmtB(totalAmt)}</div>
-          ${paidAmt>0&&!allPaid?`<div style="font-size:10px;color:var(--green)">จ่ายแล้ว ${fmtB(paidAmt)}</div>`:''}
+        <div class="qgroup-r3" style="display:contents">
+          <div class="qgroup-client">${clientPaidBtn}</div>
+          <div class="qgroup-action" style="margin-left:4px">${headerStatus}</div>
         </div>
-        ${clientPaidBtn}
-        <div style="margin-left:4px">${headerStatus}</div>
-        <div style="font-size:12px;color:var(--text2);margin-left:6px;transition:transform .2s" id="${groupId}-chevron">▶</div>
+        <div class="qgroup-chevron" style="font-size:12px;color:var(--text2);margin-left:6px;transition:transform .2s" id="${groupId}-chevron">▶</div>
       </div>
       <!-- Worker rows (collapsible — default hidden, expand on click) -->
       <div id="${groupId}" style="display:none">
