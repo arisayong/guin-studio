@@ -1045,6 +1045,19 @@ body.sidebar-collapsed .main-content{
     </div>
    </div>
 
+   <!-- Debug Tool: ตรวจ worker ↔ staff mismatch -->
+   <div class="section-card" style="border-left:4px solid var(--red);margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">🔍</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:var(--red)">ตรวจข้อมูลโปรเจกต์ ↔ สต๊าฟ</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">สแกนหาโปรเจกต์ที่มี worker id ชี้ไปสต๊าฟที่ไม่มีอยู่ในระบบ · ปัญหานี้มักเกิดหลังกด Sync Sheet หลายครั้ง</div>
+     </div>
+     <button class="btn btn-outline" onclick="runProjectStaffAudit()" style="padding:10px 18px;border-color:var(--red);color:var(--red)">🔍 สแกนตรวจ</button>
+    </div>
+    <div id="audit-result" style="margin-top:10px"></div>
+   </div>
+
    <!-- Emergency: รีเซ็ตสถานะจ่ายของโปรเจกต์ -->
    <div class="section-card" style="border-left:4px solid var(--orange);margin-bottom:16px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
@@ -2098,6 +2111,12 @@ body.sidebar-collapsed .main-content{
     <div class="form-group"><label class="form-label">ชื่อ-นามสกุล *</label><input class="form-input" id="st-name"></div>
     <div class="form-group"><label class="form-label">ชื่อเล่น *</label><input class="form-input" id="st-nick"></div>
    </div>
+   <!-- 📧 Email — ย้ายขึ้นมาด้านบนเพื่อให้เห็นง่ายบน mobile -->
+   <div class="form-group" style="padding:12px 14px;background:rgba(0,180,255,.06);border:1px solid rgba(0,180,255,.25);border-radius:10px;margin:0 0 14px">
+    <label class="form-label" style="color:var(--accent2);font-weight:700">📧 Email (สำหรับ login + ส่งใบสำคัญ)</label>
+    <input class="form-input" id="st-email" type="email" placeholder="example@email.com" style="font-size:14px">
+    <div style="font-size:10px;color:var(--text2);margin-top:4px;line-height:1.5">⚠️ ใส่ได้ 1 อีเมลต่อคน · ถ้าสต๊าฟกรอกฟอร์มซ้ำมา 2 อัน ให้เลือกเอาอันที่ถูก · ลบเครื่องหมายคั่น (,) ออกด้วย</div>
+   </div>
    <div class="form-row">
     <div class="form-group"><label class="form-label">ตำแหน่ง * <span style="font-size:10px;color:var(--text2);font-weight:400">(เลือกได้หลายตำแหน่ง)</span></label>
      <div id="st-cat-wrap" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px">
@@ -2119,7 +2138,6 @@ body.sidebar-collapsed .main-content{
    </div>
    <div class="form-group"><label class="form-label">เบอร์ PromptPay <span style="color:var(--text2)">(ถ้ามี)</span></label><input class="form-input" id="st-promptpay" placeholder="0812345678"></div>
    <div id="st-role-toggle" style="display:none"></div>
-   <div class="form-group"><label class="form-label">📧 Email <span style="color:var(--text2)">(สำหรับส่งใบสำคัญ)</span></label><input class="form-input" id="st-email" type="email" placeholder="example@email.com"></div>
   </div>
   <!-- Warning section - แสดงเฉพาะตอนแก้ไข -->
   <div id="st-warn-section" class="hidden" style="margin:0 24px 14px;padding:12px 14px;background:rgba(255,40,40,.06);border:1px solid rgba(255,40,40,.2);border-radius:10px">
@@ -4510,6 +4528,186 @@ async function resetProjectPaymentStatus(){
   }
 }
 
+// ── Debug Tool: ตรวจ worker id vs staff id (orphan detection) ──
+function runProjectStaffAudit(){
+  const resultEl = document.getElementById('audit-result');
+  if(!resultEl) return;
+  resultEl.innerHTML = '<div style="padding:12px;color:var(--text2)">⏳ กำลังสแกน...</div>';
+
+  // รวบรวม staff ทั้งหมด (ทุกหมวด)
+  const allStaff = {};
+  const staffsByName = {};
+  const staffsByEmail = {};
+  const staffsByNick = {};
+  const staffsRaw = getStaff();
+  Object.values(staffsRaw||{}).forEach(arr => {
+    (arr||[]).forEach(s => {
+      allStaff[s.id] = s;
+      const nm = (s.name||'').trim().toLowerCase(); if(nm) staffsByName[nm] = s;
+      const nk = (s.nickname||'').trim().toLowerCase(); if(nk && !staffsByNick[nk]) staffsByNick[nk] = s;
+      const em = (s.email||'').trim().toLowerCase();
+      if(em){
+        em.split(/[,;\s]+/).filter(x=>x.includes('@')).forEach(e => {
+          staffsByEmail[e.replace(/[()].*$/,'').trim()] = s;
+        });
+      }
+    });
+  });
+
+  // สแกนโปรเจกต์ทั้งหมด
+  const projs = getProjects();
+  const orphans = []; // workers ที่ id ไม่เจอใน staff
+  const fixable = []; // orphans ที่เดาได้ว่าเป็นใคร (ชื่อ/เมล match)
+  const unfixable = []; // orphans ที่เดาไม่ออก
+
+  projs.forEach(p => {
+    (p.workers||[]).forEach(w => {
+      if(!w.id) return;
+      if(allStaff[w.id]) return; // มีใน staff → ข้าม
+      // Orphan: worker ID ไม่อยู่ใน staff records
+      const entry = {
+        projId: p.id,
+        projName: p.name,
+        workerId: w.id,
+        workerName: w.name || '(ไม่มีชื่อ)',
+        slot: w.slot,
+        amount: w.amount || 0,
+        status: w.status,
+      };
+      orphans.push(entry);
+
+      // Try match — ชื่อ → เมล → ชื่อเล่น
+      let match = null;
+      if(w.name){
+        const nm = w.name.trim().toLowerCase();
+        match = staffsByName[nm] || staffsByNick[nm];
+      }
+      if(!match && w.email){
+        const em = w.email.trim().toLowerCase().split(/[,;\s]+/)[0];
+        match = staffsByEmail[em];
+      }
+      if(match){
+        entry.matchedTo = { id: match.id, name: match.name, nickname: match.nickname };
+        fixable.push(entry);
+      } else {
+        unfixable.push(entry);
+      }
+    });
+  });
+
+  // Report
+  if(!orphans.length){
+    resultEl.innerHTML = `<div style="padding:14px;background:rgba(0,223,160,.08);border:1px solid rgba(0,223,160,.3);border-radius:10px;color:var(--green);font-weight:700">✅ ไม่พบปัญหา — workers ทุกคนใน ${projs.length} โปรเจกต์ มี staff record ตรงกันหมด</div>`;
+    return;
+  }
+
+  // Group fixable by matched staff name
+  const groupedFixable = {};
+  fixable.forEach(e => {
+    const key = e.matchedTo.id + '|' + (e.matchedTo.nickname||e.matchedTo.name);
+    (groupedFixable[key] = groupedFixable[key] || {staff: e.matchedTo, projects: []}).projects.push(e);
+  });
+
+  let html = `<div style="padding:14px;background:rgba(255,64,64,.06);border:1px solid rgba(255,64,64,.3);border-radius:10px;margin-bottom:12px">
+    <div style="font-weight:800;color:var(--red);font-size:14px;margin-bottom:4px">⚠️ พบ ${orphans.length} worker ที่ไม่มี staff record ตรงกัน</div>
+    <div style="font-size:11px;color:var(--text2)">สแกน ${projs.length} โปรเจกต์ · ${Object.keys(allStaff).length} สต๊าฟ</div>
+  </div>`;
+
+  if(fixable.length){
+    html += `<div style="padding:14px;background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.3);border-radius:10px;margin-bottom:12px">
+      <div style="font-weight:700;color:#FFC700;margin-bottom:8px">🔧 ${fixable.length} worker เดาได้ว่าเป็นใคร (match จากชื่อ/เมล)</div>`;
+    Object.values(groupedFixable).forEach(g => {
+      html += `<div style="margin:8px 0;padding:10px;background:var(--bg2);border-radius:8px">
+        <div style="font-weight:700;font-size:13px">👤 ${g.staff.nickname||g.staff.name} <span style="font-size:10px;color:var(--text2);font-weight:400">→ id ใหม่: ${g.staff.id}</span></div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">พบใน ${g.projects.length} โปรเจกต์: ${g.projects.map(x=>x.projName).join(', ')}</div>
+      </div>`;
+    });
+    html += `<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" style="background:var(--green);color:#fff;padding:10px 16px" onclick="fixAllOrphansWithBackup()">🔧 ซ่อมทั้งหมด (${fixable.length} worker) — มี backup</button>
+      <button class="btn btn-outline" style="padding:10px 16px" onclick="exportOrphanReport()">📄 Export รายงาน</button>
+    </div>
+    <div style="margin-top:8px;font-size:10px;color:var(--text2)">💾 Backup จะบันทึกใน localStorage ก่อน fix — ถ้าพลาด undo ได้</div>
+    </div>`;
+    // Save fixable list for later
+    window._auditFixable = fixable;
+  }
+
+  if(unfixable.length){
+    html += `<div style="padding:14px;background:rgba(128,128,128,.06);border:1px solid rgba(128,128,128,.3);border-radius:10px">
+      <div style="font-weight:700;color:var(--text2);margin-bottom:8px">❓ ${unfixable.length} worker เดาไม่ออก (ไม่มีชื่อ/เมล match)</div>`;
+    unfixable.slice(0, 20).forEach(e => {
+      html += `<div style="font-size:11px;color:var(--text2);padding:4px 0">
+        • ${e.projName} → "${e.workerName}" (id: ${e.workerId.substring(0,20)}...) · ${e.status}
+      </div>`;
+    });
+    if(unfixable.length > 20) html += `<div style="font-size:11px;color:var(--text2);margin-top:6px">... และอีก ${unfixable.length - 20} รายการ</div>`;
+    html += `<div style="margin-top:10px;font-size:11px;color:var(--text2)">กรณีนี้ต้องแก้มือ — ลบ worker ออกจากโปรเจกต์ หรือสร้าง staff record ใหม่</div>
+    </div>`;
+  }
+
+  resultEl.innerHTML = html;
+}
+
+// ซ่อม orphan workers ทั้งหมด (พร้อม backup)
+async function fixAllOrphansWithBackup(){
+  const fixable = window._auditFixable || [];
+  if(!fixable.length){ toast('ไม่มีรายการให้ซ่อม','info'); return; }
+  if(!confirm('ยืนยันซ่อม '+fixable.length+' worker? (ระบบจะสำรองข้อมูลก่อน)')) return;
+
+  try{
+    // Backup projects to localStorage
+    const backupKey = 'audit_backup_'+Date.now();
+    ls(backupKey, JSON.stringify(getProjects()));
+    // Keep only latest 3 backups
+    const allKeys = Object.keys(localStorage).filter(k=>k.startsWith('audit_backup_')).sort();
+    while(allKeys.length > 3){ localStorage.removeItem(allKeys.shift()); }
+
+    // Apply fixes
+    const projs = getProjects();
+    let fixCount = 0;
+    fixable.forEach(f => {
+      const p = projs.find(x => x.id === f.projId);
+      if(!p) return;
+      const w = (p.workers||[]).find(x => x.id === f.workerId && x.slot === f.slot);
+      if(!w) return;
+      w.id = f.matchedTo.id; // update worker id to current staff id
+      fixCount++;
+    });
+
+    saveProjects(projs);
+    // Push to Firebase if connected
+    if(_fbDatabase){
+      try{ await _fbDatabase.ref('projects').set(projs); }catch(e){}
+    }
+
+    toast('✅ ซ่อมเรียบร้อย '+fixCount+' worker · Backup: '+backupKey,'success');
+    // Re-run audit
+    setTimeout(()=>runProjectStaffAudit(), 500);
+  }catch(e){
+    toast('❌ ซ่อมไม่สำเร็จ: '+e.message,'error');
+  }
+}
+
+// Export รายงาน orphan (เพื่อให้ admin ดูก่อน fix)
+function exportOrphanReport(){
+  const fixable = window._auditFixable || [];
+  const lines = ['รายงาน: Orphan Workers ('+fixable.length+' รายการ)'];
+  lines.push('Date: '+new Date().toLocaleString('th-TH'));
+  lines.push('');
+  fixable.forEach(f => {
+    lines.push(`[${f.projName}] "${f.workerName}" (${f.slot}) ฿${f.amount} · ${f.status}`);
+    lines.push(`  → จะเปลี่ยน id: ${f.workerId.substring(0,15)}... → ${f.matchedTo.id}`);
+    lines.push(`  → ตรงกับสต๊าฟ: ${f.matchedTo.nickname||f.matchedTo.name}`);
+    lines.push('');
+  });
+  const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'orphan-report-'+Date.now()+'.txt'; a.click();
+  URL.revokeObjectURL(url);
+  toast('📄 ดาวน์โหลดรายงานแล้ว','success');
+}
+
 // Populate dropdown ของ reset tool (เรียกตอนเปิดหน้า settings)
 function populateResetProjDropdown(){
   const sel = document.getElementById('reset-paid-proj');
@@ -6558,7 +6756,16 @@ function renderStaffGrid(){
         }
         if(s.bank)html+='<div style="font-size:11px;color:var(--text2)">🏦 '+s.bank+' '+( s.account||'')+'</div>';
         if(s.promptpay)html+='<div style="font-size:11px;color:var(--text2)">💸 '+s.promptpay+'</div>';
-        if(s.email)html+='<div style="font-size:11px;color:var(--text2)">📧 '+s.email+'</div>';
+        // Email — ถ้ามีหลายอัน (เจอ , ; space หรือ newline) → warning
+        if(s.email){
+          const emailStr = String(s.email).trim();
+          const looksMulti = /[,;]/.test(emailStr) || emailStr.split(/\s+/).filter(x=>x.includes('@')).length > 1;
+          if(looksMulti){
+            html+='<div style="font-size:11px;color:var(--red);background:rgba(255,64,64,.08);border:1px solid rgba(255,64,64,.25);border-radius:6px;padding:4px 8px;margin-top:4px">⚠️ <strong>Email ซ้ำ:</strong> '+emailStr+'</div>';
+          } else {
+            html+='<div style="font-size:11px;color:var(--text2)">📧 '+emailStr+'</div>';
+          }
+        }
         html+='<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">';
         html+='<button onclick="openEditStaff(\''+s.id+'\',\''+key+'\')" style="padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:11px;cursor:pointer">✏️ แก้ไข</button>';
         html+=resetBtn;
