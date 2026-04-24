@@ -1057,15 +1057,15 @@ body.sidebar-collapsed .main-content{
     <div style="display:flex;flex-direction:column;gap:10px">
      <div>
       <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">🌐 Apps Script Web App URL</label>
-      <input id="setting-ascript-url" type="url" placeholder="https://script.google.com/macros/s/AKfycb.../exec" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box" oninput="ls('apps_script_sync_url',this.value.trim())">
+      <input id="setting-ascript-url" type="url" placeholder="https://script.google.com/macros/s/AKfycb.../exec" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box" oninput="saveSyncConfig('url',this.value.trim())">
      </div>
      <div>
       <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">🔑 Shared Secret <span style="color:var(--text2);font-weight:400">(รหัสลับที่ต้องตรงกับในสคริปต์)</span></label>
-      <input id="setting-ascript-secret" type="password" placeholder="ตั้งรหัสลับยาว ๆ สัก 20-30 ตัวอักษร" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box" oninput="ls('apps_script_sync_secret',this.value.trim())">
+      <input id="setting-ascript-secret" type="password" placeholder="ตั้งรหัสลับยาว ๆ สัก 20-30 ตัวอักษร" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box" oninput="saveSyncConfig('secret',this.value.trim())">
      </div>
      <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-blue btn-sm" onclick="syncFromSheet()" style="padding:8px 14px">🔄 ทดสอบซิงค์</button>
-      <button class="btn btn-outline btn-sm" onclick="ls('apps_script_sync_url','');ls('apps_script_sync_secret','');document.getElementById('setting-ascript-url').value='';document.getElementById('setting-ascript-secret').value='';toast('🗑️ ล้างค่าแล้ว','info')" style="padding:8px 14px">🗑️ ล้างค่า</button>
+      <button class="btn btn-outline btn-sm" onclick="clearSyncConfig()" style="padding:8px 14px">🗑️ ล้างค่า</button>
      </div>
     </div>
     <div style="font-size:11px;color:var(--text2);margin-top:10px;background:rgba(0,180,255,.05);border:1px solid rgba(0,180,255,.15);border-radius:8px;padding:10px 12px;line-height:1.7">
@@ -1077,6 +1077,10 @@ body.sidebar-collapsed .main-content{
      5. Copy URL ที่ได้ (ลงท้ายด้วย <code>/exec</code>) มาใส่ช่องบน<br>
      6. เปิดเมนูใน Apps Script → กด <strong>ตั้งค่า Auto-sync ตอนมีคนกรอกฟอร์ม</strong> ครั้งเดียว<br>
      ✅ จากนั้นใครกรอกฟอร์มใหม่ → โผล่ในเว็บทันที พร้อม toast แจ้งเตือน
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-top:8px;background:rgba(155,111,255,.06);border:1px solid rgba(155,111,255,.25);border-radius:8px;padding:10px 12px;line-height:1.7">
+     🔐 <strong>Business Continuity:</strong> ถ้า Firebase Rules ตั้งค่าให้ <code>admin_config</code> เปิดให้ admin อ่าน/เขียน → URL + Secret จะซิงค์ระหว่าง admin ทุกคนอัตโนมัติ · ไม่ต้องบอกรหัสซ้ำ · ตั้งครั้งเดียวที่เดียว admin คนอื่นใช้ได้ทันที<br>
+     <span style="color:var(--text2)">ยังไม่ได้ตั้ง Rules? ค่าจะเซฟเฉพาะเบราว์เซอร์นี้ (มี toast เตือน) — ยังใช้งานได้ปกติแต่ admin คนอื่นต้องตั้งเองที่เครื่องตัวเอง</span>
     </div>
    </div>
 
@@ -10379,6 +10383,28 @@ function startFirebaseSync() {
   console.log('🔄 Firebase real-time sync started');
 
   // ═══════════════════════════════════════════════════════
+  // 🔐 ADMIN SYNC CONFIG — shared URL + secret ระหว่าง admin
+  // ═══════════════════════════════════════════════════════
+  if(currentUser?.role === 'admin'){
+    _fbDatabase.ref('admin_config/sync').on('value', snap => {
+      try {
+        if(!snap.exists()) return;
+        const cfg = snap.val() || {};
+        if(cfg.url)    ls('apps_script_sync_url',    cfg.url);
+        if(cfg.secret) ls('apps_script_sync_secret', cfg.secret);
+        // อัปเดต UI ถ้าเปิดหน้า settings อยู่ (แต่ต้องไม่ทับตอน user กำลังพิมพ์)
+        const urlEl = document.getElementById('setting-ascript-url');
+        const secEl = document.getElementById('setting-ascript-secret');
+        if(urlEl && cfg.url && document.activeElement !== urlEl) urlEl.value = cfg.url;
+        if(secEl && cfg.secret && document.activeElement !== secEl) secEl.value = cfg.secret;
+      } catch(e){ console.warn('admin_config listener err:', e); }
+    }, err => {
+      // Rules ยังไม่ได้ตั้ง — ใช้ localStorage อย่างเดียว (ไม่ใช่ bug)
+      console.log('ℹ️ admin_config/sync blocked — Rules not set yet, using localStorage only');
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════
   // 📬 ADMIN NOTIFICATIONS — แจ้งเตือนสต๊าฟใหม่จากฟอร์ม
   // ═══════════════════════════════════════════════════════
   if(currentUser?.role === 'admin'){
@@ -12508,10 +12534,23 @@ function renderSettings(){
   // Load contact settings (form/LINE/email links)
   try{ loadContactSettings(); }catch(e){}
 
-  // Load Apps Script sync config
+  // Load Apps Script sync config — ลอง Firebase ก่อน (shared ระหว่าง admin)
+  // ถ้า Rules กั้นหรือไม่มี → fallback localStorage
   try{
     const urlEl = document.getElementById('setting-ascript-url');
     const secEl = document.getElementById('setting-ascript-secret');
+    if(_fbDatabase && currentUser?.role === 'admin'){
+      _fbDatabase.ref('admin_config/sync').once('value').then(snap => {
+        if(snap.exists()){
+          const cfg = snap.val() || {};
+          if(cfg.url)    ls('apps_script_sync_url',    cfg.url);
+          if(cfg.secret) ls('apps_script_sync_secret', cfg.secret);
+          if(urlEl && !urlEl.value) urlEl.value = cfg.url || '';
+          if(secEl && !secEl.value) secEl.value = cfg.secret || '';
+        }
+      }).catch(()=>{/* Rules blocked — silent fallback */});
+    }
+    // Initial fill from localStorage (instant, ไม่ต้องรอ Firebase)
     if(urlEl) urlEl.value = ls('apps_script_sync_url') || '';
     if(secEl) secEl.value = ls('apps_script_sync_secret') || '';
   }catch(e){}
@@ -12844,6 +12883,51 @@ function showNewStaffToast(data){
 // ═══════════════════════════════════════════════════════
 // 🔄 SYNC FROM SHEET — เรียก Apps Script Web App
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// 🔐 SYNC CONFIG — เซฟไปทั้ง localStorage และ Firebase
+// ═══════════════════════════════════════════════════════
+// เก็บใน Firebase path `admin_config/sync` เพื่อให้ admin ทุกคนใช้ได้
+// ถ้า Firebase Rules ยังไม่ได้ตั้ง → เซฟเฉพาะ localStorage (fallback)
+let _syncConfigDebounce = null;
+function saveSyncConfig(key, val){
+  const lsKey = key === 'url' ? 'apps_script_sync_url' : 'apps_script_sync_secret';
+  ls(lsKey, val);
+  // Debounce Firebase write — ระหว่างพิมพ์จะไม่เขียนทุก keystroke
+  clearTimeout(_syncConfigDebounce);
+  _syncConfigDebounce = setTimeout(async () => {
+    if(!_fbDatabase || currentUser?.role !== 'admin') return;
+    try {
+      const updates = {};
+      updates[key] = val;
+      updates.updatedAt = new Date().toISOString();
+      updates.updatedBy = currentUser.email || '';
+      await _fbDatabase.ref('admin_config/sync').update(updates);
+    } catch(e){
+      console.warn('[saveSyncConfig] Firebase write blocked — localStorage only:', e?.message||e?.code);
+      // แสดง warning ครั้งเดียวต่อ session
+      if(!window._syncConfigRulesWarned){
+        window._syncConfigRulesWarned = true;
+        toast('⚠️ บันทึกเฉพาะเครื่องนี้ — ยังไม่ได้ตั้ง Firebase Rules ให้ admin คนอื่นใช้ร่วมได้','warn');
+      }
+    }
+  }, 600);
+}
+
+async function clearSyncConfig(){
+  if(!confirm('ล้าง URL + Secret ทั้งเครื่องนี้และของ admin คนอื่นด้วย?\n(ทุกคนจะต้องตั้งค่าใหม่)')) return;
+  ls('apps_script_sync_url','');
+  ls('apps_script_sync_secret','');
+  const urlEl = document.getElementById('setting-ascript-url');
+  const secEl = document.getElementById('setting-ascript-secret');
+  if(urlEl) urlEl.value='';
+  if(secEl) secEl.value='';
+  if(_fbDatabase && currentUser?.role === 'admin'){
+    try { await _fbDatabase.ref('admin_config/sync').remove(); }
+    catch(e){ console.warn('clear firebase config failed:', e?.message); }
+  }
+  toast('🗑️ ล้างค่าแล้ว','info');
+}
+
 async function syncFromSheet(){
   if(currentUser?.role !== 'admin'){
     toast('❌ เฉพาะแอดมินเท่านั้น', 'error'); return;
