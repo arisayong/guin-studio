@@ -782,6 +782,10 @@ body.sidebar-collapsed .main-content{
   }
 
   /* ─── QUICK ACTIONS: button ให้ compact ─── */
+  /* บังคับ 2x2 grid (override auto-fit minmax 180px ที่ทำให้บนมือถือเหลือ 1 col) */
+  #quick-actions{
+    grid-template-columns:1fr 1fr!important;gap:8px!important;
+  }
   .qa-btn{padding:10px!important;gap:8px!important;font-size:12px!important}
   .qa-btn > span[style*="font-size:24px"]{font-size:18px!important}
   .qa-btn > div > div:first-child{font-size:12px!important}
@@ -1461,6 +1465,7 @@ body.sidebar-collapsed .main-content{
     <div class="page-subtitle">ลองคำนวนงบก่อนตัดสินใจรับงาน · แยกจากโปรเจกต์จริง · แปลงเป็นโปรเจกต์ได้ทีหลัง</div>
     <div class="page-actions">
      <button class="btn btn-blue" onclick="openCalcDraft()">➕ สร้างแบบร่างใหม่</button>
+     <button class="btn btn-outline" onclick="forceReloadCalcDrafts()" title="ดึงข้อมูลล่าสุดจาก cloud">🔄 ดึงใหม่</button>
     </div>
    </div>
    <div id="calc-list"></div>
@@ -3326,17 +3331,67 @@ function closeProfileModal(){
 }
 function handleProfilePhotoUpload(ev){
   const file = ev.target.files?.[0]; if(!file) return;
-  if(file.size > 2*1024*1024){ toast('❌ ไฟล์ใหญ่เกิน 2MB — ใช้ URL จากลิงก์แทนจะดีกว่า','error'); ev.target.value=''; return; }
-  const reader = new FileReader();
-  reader.onload = e => {
-    window._profilePendingPhoto = e.target.result; // base64 data URL
-    renderAvatarInto('profile-avatar-big', e.target.result, (currentUser?.nickname||'?')[0]);
+  // จำกัด 15MB (รูปจากกล้องมือถือมักประมาณ 3-8MB) — ไฟล์ใหญ่กว่านี้ไม่น่าจะ legitimate
+  if(file.size > 15*1024*1024){
+    toast('❌ ไฟล์ใหญ่เกิน 15MB · กรุณาใช้รูปขนาดเล็กกว่านี้','error');
+    ev.target.value='';
+    return;
+  }
+  if(!file.type.startsWith('image/')){
+    toast('❌ ต้องเป็นไฟล์รูปภาพเท่านั้น','error');
+    ev.target.value='';
+    return;
+  }
+  const isLarge = file.size > 500*1024;  // > 500KB ค่อย resize
+  if(isLarge) toast('🖼️ กำลังย่อรูป...','info');
+  _resizeProfileImage(file).then(dataUrl => {
+    window._profilePendingPhoto = dataUrl;
+    renderAvatarInto('profile-avatar-big', dataUrl, (currentUser?.nickname||'?')[0]);
     const urlInp = document.getElementById('profile-photo-url'); if(urlInp) urlInp.value = '';
     const actions = document.getElementById('profile-photo-actions'); if(actions) actions.style.display = 'block';
     toast('👁️ พรีวิวรูปแล้ว — กด "บันทึกโปรไฟล์" เพื่อยืนยัน','info');
-  };
-  reader.readAsDataURL(file);
+  }).catch(e => {
+    console.error('image resize failed:', e);
+    toast('❌ อ่านรูปไม่ได้: ' + (e.message||'unknown'),'error');
+  });
+  ev.target.value = '';  // allow re-pick same file
 }
+
+// Resize image client-side — square crop center · max 400×400 · JPEG quality 0.85
+// Output ~ 30-80KB ปลอดภัยกับ Firebase + ไม่ยุ่งกับ EXIF rotation issues
+function _resizeProfileImage(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('FileReader failed'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Image decode failed'));
+      img.onload = () => {
+        try {
+          const TARGET = 400;  // square 400×400
+          // Center-crop เป็นสี่เหลี่ยม
+          const sz = Math.min(img.width, img.height);
+          const sx = (img.width - sz) / 2;
+          const sy = (img.height - sz) / 2;
+          const canvas = document.createElement('canvas');
+          canvas.width = TARGET; canvas.height = TARGET;
+          const ctx = canvas.getContext('2d');
+          if(!ctx){ reject(new Error('No canvas context')); return; }
+          // pre-fill bg เผื่อ transparent PNG
+          ctx.fillStyle = '#0C1828';
+          ctx.fillRect(0, 0, TARGET, TARGET);
+          ctx.drawImage(img, sx, sy, sz, sz, 0, 0, TARGET, TARGET);
+          // ใช้ JPEG เสมอ (รองรับทุก browser + ไม่มี alpha = ขนาดเล็กกว่า PNG)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          resolve(dataUrl);
+        } catch(e){ reject(e); }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function applyProfilePhotoFromURL(){
   const url = (document.getElementById('profile-photo-url')?.value||'').trim();
   if(!url){ toast('กรุณาวาง URL รูป','error'); return; }
@@ -3359,6 +3414,17 @@ async function saveMyProfile(){
   const nick = (inp?.value||'').trim();
   if(!nick){ toast('กรุณากรอกชื่อเล่น','error'); return; }
   const pendingPhoto = window._profilePendingPhoto;
+
+  // ป้องกัน Firebase limit — แต่ละ value ใน Realtime DB ห้ามใหญ่เกิน 10MB
+  // base64 จะใหญ่กว่าไฟล์ดิบ ~33% · 400×400 JPEG@0.85 ~50KB ปลอดภัยมาก
+  if(pendingPhoto && pendingPhoto !== '__REMOVE__' && typeof pendingPhoto === 'string'){
+    const sizeKB = (pendingPhoto.length * 0.75) / 1024;  // base64 → bytes
+    if(sizeKB > 1500){  // > 1.5MB after decode = ผิดปกติ
+      toast(`❌ รูปยังใหญ่เกินไป (${Math.round(sizeKB)}KB) — ลองอันอื่น`,'error');
+      return;
+    }
+  }
+
   try {
     if(_fbDatabase && currentUser?.uid){
       await _fbDatabase.ref('users/'+currentUser.uid+'/nickname').set(nick);
@@ -3384,10 +3450,22 @@ async function saveMyProfile(){
     }
     const _wl = document.getElementById('my-welcome'); if(_wl) _wl.textContent = `สวัสดี ${nick} 👋`;
 
+    // เคลียร์ pending photo หลังบันทึกสำเร็จ
+    window._profilePendingPhoto = null;
     toast('✅ บันทึกโปรไฟล์แล้ว','success');
     closeProfileModal();
   } catch(e) {
-    toast('❌ บันทึกไม่สำเร็จ: '+e.message,'error');
+    console.error('saveMyProfile error:', e);
+    // Firebase error handling ที่ละเอียดกว่า
+    let msg = e.message || String(e);
+    if(/permission_denied|PERMISSION_DENIED/i.test(msg)){
+      msg = 'ไม่มีสิทธิ์เขียนข้อมูล (ตรวจสอบ Firebase Rules)';
+    } else if(/data is too large|index.html.*too.*large/i.test(msg)){
+      msg = 'รูปใหญ่เกินไปสำหรับ Firebase — ลองอันอื่น';
+    } else if(/network|offline|failed.*fetch/i.test(msg)){
+      msg = 'ไม่มีการเชื่อมต่อเน็ต — ลองใหม่';
+    }
+    toast('❌ บันทึกไม่สำเร็จ: '+msg,'error');
   }
 }
 
@@ -4068,7 +4146,7 @@ auth.onAuthStateChanged(async(fbUser)=>{
     showLoader(true);
     // Build profile from Firebase Auth user directly — no DB lookup needed for first version
     // Known admin emails - always admin regardless of saved profile
-    const KNOWN_ADMINS = ['penguinstudiovoice@gmail.com','haruyami231@gmail.com','haruyami231'];
+    const KNOWN_ADMINS = ['penguinstudiovoice@gmail.com','haruyami231@gmail.com'];
     const emailLower = (fbUser.email||'').toLowerCase().trim();
     const isKnownAdmin = KNOWN_ADMINS.some(e => emailLower.includes(e.toLowerCase().replace('@gmail.com','')) || e.toLowerCase() === emailLower);
     const profile = {
@@ -11922,7 +12000,14 @@ const CALC_CATS = [
 function getCalcDrafts(){ return ls('calc_drafts_v1') || []; }
 async function saveCalcDrafts(arr){
   ls('calc_drafts_v1', arr);
-  if(_fbDatabase){ try{ await _fbDatabase.ref('calcDrafts').set(arr); }catch(e){} }
+  if(_fbDatabase){
+    try{
+      await _fbDatabase.ref('calcDrafts').set(arr);
+    }catch(e){
+      console.error('[calcDrafts] save FAILED:', e);
+      toast('⚠️ บันทึกแบบร่างใน cloud ไม่สำเร็จ: ' + (e.message||e.code||'unknown') + ' · admin คนอื่นจะมองไม่เห็น','error');
+    }
+  }
 }
 async function loadCalcDraftsFromFirebase(){
   if(!_fbDatabase) return;
@@ -11932,7 +12017,10 @@ async function loadCalcDraftsFromFirebase(){
       const v = snap.val();
       ls('calc_drafts_v1', Array.isArray(v)?v:Object.values(v||{}));
     }
-  }catch(e){}
+  }catch(e){
+    console.error('[calcDrafts] load FAILED:', e);
+    // ไม่ขึ้น toast ตอน enterApp เพราะอาจรบกวน — แต่ log ให้เห็นใน console
+  }
 }
 function newCalcDraft(){
   return {
@@ -11941,12 +12029,69 @@ function newCalcDraft(){
     budgetType:'flat',
     budgetRate:0,
     duration:0,
-    cats:{}, // {dub:{rate:0,unit:'นาที',ppl:1,tax:0}, ...}
+    cats:{}, // {dub:{slots:[{label,rate,unit,ppl,tax}, ...]}, ...}
     note:'',
     createdAt:new Date().toISOString(),
     updatedAt:new Date().toISOString()
   };
 }
+
+// Migrate old calc data structure (main/sub or single object) → new (slots array)
+// รองรับ backward-compat: ข้อมูลเก่าจะถูกแปลงทันทีเมื่อโหลด
+function _migrateCalcCats(cats){
+  if(!cats || typeof cats !== 'object') return {};
+  const out = {};
+  Object.entries(cats).forEach(([k,c])=>{
+    if(!c) return;
+    // แล้ว format ใหม่อยู่แล้ว
+    if(Array.isArray(c.slots)){
+      out[k] = {slots: c.slots.map(s=>({
+        label: s.label || (k==='dub' ? '🎤 ทีมพากย์' : 'ค่าตอบแทน'),
+        rate: parseFloat(s.rate)||0,
+        unit: s.unit || 'per-minute',
+        ppl: parseInt(s.ppl)||1,
+        tax: parseFloat(s.tax)||0
+      }))};
+      return;
+    }
+    // Old format: dub มี main/sub
+    if(k==='dub' && (c.main || c.sub)){
+      const slots = [];
+      if(c.main) slots.push({label:'🌟 นักพากย์หลัก', ...c.main});
+      if(c.sub)  slots.push({label:'🎭 นักพากย์รอง', ...c.sub});
+      out[k] = {slots: slots.map(s=>({
+        label: s.label,
+        rate: parseFloat(s.rate)||0,
+        unit: s.unit || 'per-minute',
+        ppl: parseInt(s.ppl)||1,
+        tax: parseFloat(s.tax)||0
+      }))};
+      return;
+    }
+    // Old format: หมวดอื่นเป็น single slot
+    out[k] = {slots: [{
+      label: 'ค่าตอบแทน',
+      rate: parseFloat(c.rate)||0,
+      unit: c.unit || 'per-minute',
+      ppl: parseInt(c.ppl)||1,
+      tax: parseFloat(c.tax)||0
+    }]};
+  });
+  return out;
+}
+
+// Default slots สำหรับเริ่มใช้หมวดใหม่
+function _defaultSlotsFor(catKey){
+  if(catKey==='dub'){
+    return {slots:[
+      {label:'🌟 นักพากย์หลัก', rate:0, unit:'per-minute', ppl:1, tax:0},
+      {label:'🎭 นักพากย์รอง', rate:0, unit:'per-minute', ppl:1, tax:0}
+    ]};
+  }
+  return {slots:[{label:'ค่าตอบแทน', rate:0, unit:'per-minute', ppl:1, tax:0}]};
+}
+
+
 let _calcEditing = null;
 
 function renderCalcList(){
@@ -11987,26 +12132,18 @@ function calcDraftSummary(d){
   const budgetRaw = parseFloat(d.budgetRate)||0;
   const budget = (d.budgetType==='per-minute' && dur>0) ? budgetRaw*dur : budgetRaw;
   let expense = 0;
-  Object.entries(d.cats||{}).forEach(([k,c])=>{
-    if(k==='dub'){
-      // Sum main + sub
-      [c.main, c.sub].forEach(s=>{
-        if(!s) return;
-        const rate = parseFloat(s.rate)||0;
-        const ppl = parseInt(s.ppl)||1;
-        const tax = parseFloat(s.tax)||0;
-        const base = (s.unit==='per-minute' && dur>0) ? rate*dur : rate;
-        const total = base * ppl;
-        expense += total * (1 - tax/100);
-      });
-    } else {
-      const rate = parseFloat(c.rate)||0;
-      const ppl = parseInt(c.ppl)||1;
-      const tax = parseFloat(c.tax)||0;
-      const base = (c.unit==='per-minute' && dur>0) ? rate*dur : rate;
+  // รองรับทั้ง format ใหม่ (slots) และ format เก่า
+  const cats = _migrateCalcCats(d.cats||{});
+  Object.values(cats).forEach(cc => {
+    if(!cc || !Array.isArray(cc.slots)) return;
+    cc.slots.forEach(s => {
+      const rate = parseFloat(s.rate)||0;
+      const ppl = parseInt(s.ppl)||1;
+      const tax = parseFloat(s.tax)||0;
+      const base = (s.unit==='per-minute' && dur>0) ? rate*dur : rate;
       const total = base * ppl;
       expense += total * (1 - tax/100);
-    }
+    });
   });
   return { budget:Math.round(budget), expense:Math.round(expense), profit:Math.round(budget-expense) };
 }
@@ -12016,6 +12153,8 @@ function openCalcDraft(id){
     const d = getCalcDrafts().find(x=>x.id===id);
     if(!d){toast('ไม่พบแบบร่าง','error');return;}
     _calcEditing = JSON.parse(JSON.stringify(d));
+    // Migrate ข้อมูลเก่า → slots array
+    if(_calcEditing.cats) _calcEditing.cats = _migrateCalcCats(_calcEditing.cats);
   } else {
     _calcEditing = newCalcDraft();
   }
@@ -12068,14 +12207,7 @@ function renderCalcToggles(){
 function toggleCalcCat(key){
   if(_calcEditing.cats[key]) delete _calcEditing.cats[key];
   else {
-    if(key==='dub'){
-      _calcEditing.cats[key] = {
-        main: {rate:0, unit:'per-minute', ppl:1, tax:0},
-        sub:  {rate:0, unit:'per-minute', ppl:1, tax:0}
-      };
-    } else {
-      _calcEditing.cats[key] = {rate:0, unit:'per-minute', ppl:1, tax:0};
-    }
+    _calcEditing.cats[key] = _defaultSlotsFor(key);
   }
   renderCalcToggles(); renderCalcCats(); renderCalcSummary();
 }
@@ -12091,9 +12223,9 @@ function _calcSlotTotal(slot, dur){
   return { rate, ppl, tax, base:Math.round(base), total:Math.round(total), afterTax };
 }
 
-// Total for entire category (sums all slots - for dub it's main+sub)
+// Total for entire category (sums all slots)
 function _calcCatTotal(key, cc, dur){
-  const slots = key==='dub' ? [cc.main||{}, cc.sub||{}] : [cc];
+  const slots = (cc && Array.isArray(cc.slots)) ? cc.slots : [];
   let sum = 0, rawSum = 0;
   slots.forEach(s => {
     const t = _calcSlotTotal(s, dur);
@@ -12104,43 +12236,46 @@ function _calcCatTotal(key, cc, dur){
 }
 
 // Called by oninput — updates ONLY numbers shown, not re-creating inputs (preserves focus)
+// slotKey ตอนนี้ = index ของ slot (0,1,2,...) หรือ '__all'
 function updateCalcLive(catKey, slotKey){
   const dur = parseFloat(_calcEditing.duration)||0;
-  const cc = _calcEditing.cats[catKey]; if(!cc) return;
+  const cc = _calcEditing.cats[catKey]; if(!cc || !Array.isArray(cc.slots)) return;
   // Update this category's totals
   const catSum = _calcCatTotal(catKey, cc, dur);
   const headEl = document.getElementById('calc-head-'+catKey);
   if(headEl){
     const c = CALC_CATS.find(x=>x.key===catKey);
-    const tax = cc.tax||0;
-    if(catKey==='dub'){
-      headEl.innerHTML = '<span style="font-size:15px;font-weight:800;color:'+c.color+'">'+fmtB(catSum.afterTax)+'</span>';
-    } else {
-      headEl.innerHTML = tax>0
-        ? '<span style="font-size:15px;font-weight:800;color:'+c.color+'"><span style="font-size:11px;text-decoration:line-through;opacity:.5">'+fmtB(catSum.total)+'</span> → '+fmtB(catSum.afterTax)+'</span>'
-        : '<span style="font-size:15px;font-weight:800;color:'+c.color+'">'+fmtB(catSum.afterTax)+'</span>';
-    }
+    headEl.innerHTML = '<span style="font-size:15px;font-weight:800;color:'+c.color+'">'+fmtB(catSum.afterTax)+'</span>';
   }
-  // Update per-slot subtotal note
-  if(slotKey){
-    const sl = slotKey==='main'?cc.main : slotKey==='sub'?cc.sub : cc;
-    const t = _calcSlotTotal(sl||{}, dur);
-    const noteEl = document.getElementById('calc-slot-note-'+catKey+'-'+slotKey);
-    if(noteEl){
-      noteEl.innerHTML = t.ppl>1
-        ? t.ppl+' คน × '+fmtB(t.base)+'/คน = <strong style="color:'+(CALC_CATS.find(x=>x.key===catKey)?.color||'#fff')+'">'+fmtB(t.total)+'</strong>'+(t.tax>0?' (หัก '+t.tax+'% → '+fmtB(t.afterTax)+')':'')
-        : (t.rate>0 ? '= '+fmtB(t.afterTax) : '');
+  // Update per-slot subtotal notes
+  if(slotKey === '__all'){
+    cc.slots.forEach((s, i) => _updateSlotNote(catKey, i, s, dur));
+  } else if(slotKey != null){
+    const idx = parseInt(slotKey);
+    if(!isNaN(idx) && cc.slots[idx]){
+      _updateSlotNote(catKey, idx, cc.slots[idx], dur);
     }
   }
   renderCalcSummary();
 }
 
+function _updateSlotNote(catKey, idx, slot, dur){
+  const t = _calcSlotTotal(slot||{}, dur);
+  const noteEl = document.getElementById('calc-slot-note-'+catKey+'-'+idx);
+  if(!noteEl) return;
+  const color = CALC_CATS.find(x=>x.key===catKey)?.color||'#fff';
+  noteEl.innerHTML = t.ppl>1
+    ? t.ppl+' คน × '+fmtB(t.base)+'/คน = <strong style="color:'+color+'">'+fmtB(t.total)+'</strong>'+(t.tax>0?' (หัก '+t.tax+'% → '+fmtB(t.afterTax)+')':'')
+    : (t.rate>0 ? '= '+fmtB(t.afterTax) : '');
+}
+
 // When unit select changes — need to re-render that slot but preserve focus on select
 function updateCalcSlotUnit(catKey, slotKey, val){
-  const cc = _calcEditing.cats[catKey]; if(!cc) return;
-  if(catKey==='dub' && slotKey==='main') cc.main = cc.main||{}, cc.main.unit=val;
-  else if(catKey==='dub' && slotKey==='sub') cc.sub = cc.sub||{}, cc.sub.unit=val;
-  else cc.unit=val;
+  const cc = _calcEditing.cats[catKey]; if(!cc || !Array.isArray(cc.slots)) return;
+  const idx = parseInt(slotKey);
+  if(!isNaN(idx) && cc.slots[idx]){
+    cc.slots[idx].unit = val;
+  }
   updateCalcLive(catKey, slotKey);
 }
 
@@ -12171,55 +12306,79 @@ function _calcSlotInputsHTML(catKey, slotKey, slot, color, labelPrefix){
 }
 
 function _calcSetSlot(catKey, slotKey, field, val){
+  const cc = _calcEditing.cats[catKey]; if(!cc || !Array.isArray(cc.slots)) return;
+  const idx = parseInt(slotKey);
+  if(isNaN(idx) || !cc.slots[idx]) return;
+  cc.slots[idx][field] = (field==='ppl') ? (parseInt(val)||1) : (field==='label') ? String(val||'') : (parseFloat(val)||0);
+}
+
+// Add a new slot to a category (default values)
+function addCalcSlot(catKey){
   const cc = _calcEditing.cats[catKey]; if(!cc) return;
-  const target = (catKey==='dub' && slotKey==='main') ? (cc.main=cc.main||{}) :
-                 (catKey==='dub' && slotKey==='sub')  ? (cc.sub=cc.sub||{}) : cc;
-  target[field] = (field==='ppl') ? (parseInt(val)||1) : (parseFloat(val)||0);
+  if(!Array.isArray(cc.slots)) cc.slots = [];
+  cc.slots.push({label:'ค่าตอบแทน', rate:0, unit:'per-minute', ppl:1, tax:0});
+  renderCalcCats(); renderCalcSummary();
+}
+
+// Remove a slot from a category by index (with confirm if has data)
+function removeCalcSlot(catKey, idx){
+  const cc = _calcEditing.cats[catKey]; if(!cc || !Array.isArray(cc.slots)) return;
+  if(cc.slots.length <= 1){ toast('ต้องมีอย่างน้อย 1 ช่อง — ปิดหมวดถ้าไม่ใช้','info'); return; }
+  const s = cc.slots[idx];
+  // ถ้ามีข้อมูลกรอกไว้ ขอยืนยันก่อนลบ
+  if(s && (s.rate>0 || s.ppl>1 || s.tax>0)){
+    if(!confirm(`ลบช่อง "${s.label||'(ไม่มีชื่อ)'}" ออก? ข้อมูลที่กรอกไว้จะหายไปด้วย`)) return;
+  }
+  cc.slots.splice(idx, 1);
+  renderCalcCats(); renderCalcSummary();
 }
 
 function renderCalcCats(){
   const el = document.getElementById('calc-cat-blocks'); if(!el) return;
   const dur = parseFloat(_calcEditing.duration)||0;
+
+  // Migrate inline (เผื่อข้อมูลเก่า)
+  _calcEditing.cats = _migrateCalcCats(_calcEditing.cats||{});
+
   const blocks = CALC_CATS.filter(c=>_calcEditing.cats[c.key]).map(c=>{
     const cc = _calcEditing.cats[c.key];
+    if(!Array.isArray(cc.slots)) cc.slots = [];
+    if(!cc.slots.length) cc.slots.push({label:'ค่าตอบแทน', rate:0, unit:'per-minute', ppl:1, tax:0});
+
     const catSum = _calcCatTotal(c.key, cc, dur);
     const colBg = c.color.replace('var(--','rgba(').replace(')',',.05)');
     const colBorder = c.color.replace('var(--','rgba(').replace(')',',.3)');
-    // Special handling for dub: main + sub
-    if(c.key==='dub'){
-      if(!cc.main) cc.main = {rate:0,unit:'per-minute',ppl:1,tax:0};
-      if(!cc.sub)  cc.sub  = {rate:0,unit:'per-minute',ppl:1,tax:0};
-      return `<div class="cat-block" style="background:${colBg};border:1px solid ${colBorder};border-radius:11px;padding:13px 16px;margin-bottom:10px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <span style="font-weight:700;color:${c.color}">${c.label}</span>
-          <span id="calc-head-${c.key}"><span style="font-size:15px;font-weight:800;color:${c.color}">${fmtB(catSum.afterTax)}</span></span>
+    const slotInnerBorder = c.color.replace('var(--','rgba(').replace(')',',.25)');
+    const slotInnerBg     = c.color.replace('var(--','rgba(').replace(')',',.04)');
+
+    // Render each slot — admin เพิ่ม/ลด/แก้ label ได้
+    const slotsHTML = cc.slots.map((slot, idx) => {
+      const canRemove = cc.slots.length > 1;
+      const labelEsc = (slot.label||'').replace(/"/g,'&quot;');
+      return `<div style="border:1px solid ${slotInnerBorder};border-radius:9px;padding:10px;background:${slotInnerBg};margin-bottom:8px;position:relative">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+          <input type="text" value="${labelEsc}" placeholder="ชื่อช่อง (เช่น พากย์หลัก)" style="flex:1;font-size:11px;font-weight:700;color:${c.color};background:transparent;border:none;border-bottom:1px dashed ${slotInnerBorder};padding:2px 0;font-family:Kanit;outline:none" oninput="_calcSetSlot('${c.key}','${idx}','label',this.value)">
+          ${canRemove ? `<button type="button" onclick="removeCalcSlot('${c.key}',${idx})" title="ลบช่องนี้" style="background:rgba(255,64,64,.12);border:1px solid rgba(255,64,64,.3);color:var(--red);width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">🗑</button>` : ''}
         </div>
-        <div style="border:1px solid rgba(255,158,0,.25);border-radius:9px;padding:10px;background:rgba(255,158,0,.04);margin-bottom:8px">
-          <div style="font-size:11px;font-weight:700;color:${c.color};margin-bottom:7px">🌟 นักพากย์หลัก</div>
-          ${_calcSlotInputsHTML('dub','main',cc.main,c.color)}
-        </div>
-        <div style="border:1px solid rgba(255,158,0,.25);border-radius:9px;padding:10px;background:rgba(255,158,0,.04)">
-          <div style="font-size:11px;font-weight:700;color:${c.color};margin-bottom:7px">🎭 นักพากย์รอง</div>
-          ${_calcSlotInputsHTML('dub','sub',cc.sub,c.color)}
-        </div>
+        ${_calcSlotInputsHTML(c.key, String(idx), slot, c.color)}
       </div>`;
-    }
-    // Non-dub categories — single slot
+    }).join('');
+
     return `<div class="cat-block" style="background:${colBg};border:1px solid ${colBorder};border-radius:11px;padding:13px 16px;margin-bottom:10px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
         <span style="font-weight:700;color:${c.color}">${c.label}</span>
-        <span id="calc-head-${c.key}">${cc.tax>0
-            ? '<span style="font-size:15px;font-weight:800;color:'+c.color+'"><span style="font-size:11px;text-decoration:line-through;opacity:.5">'+fmtB(catSum.total)+'</span> → '+fmtB(catSum.afterTax)+'</span>'
-            : '<span style="font-size:15px;font-weight:800;color:'+c.color+'">'+fmtB(catSum.afterTax)+'</span>'}</span>
+        <span id="calc-head-${c.key}"><span style="font-size:15px;font-weight:800;color:${c.color}">${fmtB(catSum.afterTax)}</span></span>
       </div>
-      ${_calcSlotInputsHTML(c.key,'only',cc,c.color)}
+      ${slotsHTML}
+      <button type="button" onclick="addCalcSlot('${c.key}')" style="width:100%;padding:9px;background:transparent;border:1.5px dashed ${colBorder};color:${c.color};border-radius:9px;cursor:pointer;font-family:Kanit;font-size:12px;font-weight:700;margin-top:4px">➕ เพิ่มช่องราคาใน ${c.label}</button>
     </div>`;
   }).join('');
   el.innerHTML = blocks || '<div style="padding:16px;text-align:center;color:var(--text2);font-size:13px;background:rgba(0,0,0,.2);border-radius:10px">↑ กดเลือกหมวดด้านบนเพื่อเริ่มคิดราคา</div>';
   // Initialize slot notes after render
-  Object.keys(_calcEditing.cats||{}).forEach(k=>{
-    if(k==='dub'){ updateCalcLive(k,'main'); updateCalcLive(k,'sub'); }
-    else updateCalcLive(k,'only');
+  Object.entries(_calcEditing.cats||{}).forEach(([k,cc])=>{
+    if(cc && Array.isArray(cc.slots)){
+      cc.slots.forEach((_,i) => updateCalcLive(k, String(i)));
+    }
   });
 }
 
@@ -12315,6 +12474,30 @@ async function convertCalcToProject(id){
   setTimeout(()=>{nav('projects');openEditProject(proj.id);}, 400);
 }
 
+// Force reload calc drafts from Firebase (กรณี realtime listener fail หรือ cache เก่า)
+async function forceReloadCalcDrafts(){
+  if(!_fbDatabase){
+    toast('❌ Firebase ไม่พร้อมใช้งาน','error');
+    return;
+  }
+  toast('⏳ กำลังดึงข้อมูลล่าสุด...','info');
+  try{
+    const snap = await _fbDatabase.ref('calcDrafts').get();
+    const v = snap.exists() ? snap.val() : [];
+    const arr = Array.isArray(v)?v:Object.values(v||{});
+    ls('calc_drafts_v1', arr);
+    renderCalcList();
+    toast(`✅ ดึงสำเร็จ — พบ ${arr.length} แบบร่าง`,'success');
+  }catch(e){
+    console.error('[calcDrafts] force reload failed:', e);
+    let msg = e.message || e.code || 'unknown';
+    if(/permission_denied|PERMISSION_DENIED/i.test(msg)){
+      msg = 'ไม่มีสิทธิ์อ่าน calcDrafts (ตรวจ Firebase Rules — บัญชี admin ต้อง verified)';
+    }
+    toast('❌ ดึงไม่สำเร็จ: '+msg,'error');
+  }
+}
+
 // Real-time sync for calc drafts
 function startCalcDraftsSync(){
   if(!_fbDatabase) return;
@@ -12323,6 +12506,10 @@ function startCalcDraftsSync(){
     ls('calc_drafts_v1', Array.isArray(v)?v:Object.values(v||{}));
     const pg = document.getElementById('page-calc');
     if(pg && !pg.classList.contains('hidden')) try{renderCalcList();}catch(e){}
+  }, err => {
+    // Error callback (สำคัญ! Firebase listener ต้องมี error handler ไม่งั้นเงียบหาย)
+    console.error('[calcDrafts] realtime listener FAILED:', err);
+    toast('⚠️ ฟัง real-time แบบร่างไม่ได้: ' + (err.message||err.code||'unknown') + ' · ตรวจสอบ Firebase Rules','error');
   });
 }
 
