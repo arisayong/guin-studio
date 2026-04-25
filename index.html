@@ -718,7 +718,6 @@ body.sidebar-collapsed .main-content{
    (ไม่กระทบ desktop · ใช้ media query เท่านั้น)
    ═══════════════════════════════════════════════════════════ */
 @media (max-width: 768px){
-  /* ─── TABS → horizontal scroll (เดิม wrap เยอะ) ─── */
   .tabs{
     overflow-x:auto;-webkit-overflow-scrolling:touch;
     flex-wrap:nowrap;scrollbar-width:none;max-width:100%;
@@ -794,6 +793,66 @@ body.sidebar-collapsed .main-content{
   #det-workers > div > div:not(.section-title){flex-wrap:wrap}
   #det-workers [onclick*="openPayAmt"],
   #det-workers [onclick*="openSlipModal"]{font-size:11px;padding:5px 10px}
+
+  /* ═══════════════════════════════════════════════════════
+     👤 STAFF VIEW — my-dashboard / my-calendar
+     ═══════════════════════════════════════════════════════ */
+  /* Summary grid: auto-fit(180px) → บนมือถือ 1 col (2 cards ซ้อน) */
+  #my-summary-grid{grid-template-columns:1fr!important;gap:8px!important}
+  /* การ์ดสรุปเล็กลง — ลด padding + font */
+  #my-summary-grid > div{padding:12px 14px!important}
+  #my-summary-grid > div > div:nth-child(2){font-size:22px!important}
+  /* Filter chip rows — ยกเลิก min-width ของ label ให้ไม่บีบ */
+  #page-my-dashboard [id^="my-filter-"]{flex:1}
+  #page-my-dashboard [style*="min-width:50px"]{min-width:0!important}
+  /* Header bells ต้องไม่โดนตัด */
+  #page-my-dashboard .page-header{flex-wrap:wrap}
+  #my-appr-bell-wrap,#my-warn-bell-wrap{flex-shrink:0}
+  /* Search + Export PDF row → stack */
+  #my-search{width:100%;min-width:0!important}
+
+  /* ═══════════════════════════════════════════════════════
+     👨‍💼 MANAGER VIEW — mgr-projects / mgr-track / mgr-calendar / mgr-team
+     ═══════════════════════════════════════════════════════ */
+  /* Track card header — progress indicators stack ถ้าที่ไม่พอ */
+  #mgr-track-list > div > div:first-child{flex-wrap:wrap!important;gap:8px!important}
+  /* Title ต้องกินเต็มแถว · progress items ไปแถวใหม่ */
+  #mgr-track-list > div > div:first-child > div:first-child{flex:1 1 100%!important;min-width:0}
+  /* Calendar dropdown — ป้องกันหลุดขอบจอ */
+  #mgr-cal-dd-panel{
+    right:auto!important;left:50%!important;
+    transform:translateX(-50%);
+    max-width:calc(100vw - 24px)!important;
+    min-width:unset!important;width:calc(100vw - 24px)!important;
+  }
+  /* Page actions — เมื่อมี search + chips + dropdown ให้ wrap */
+  #page-mgr-track .page-actions{flex-wrap:wrap!important}
+  #page-mgr-track .page-actions > div:last-child{margin-left:0!important}
+  /* Team grid chips — compact */
+  #mgr-team-grid{padding:10px 12px!important;gap:6px!important}
+  #mgr-team-grid > div{font-size:11px!important;padding:4px 10px!important}
+
+  /* ═══════════════════════════════════════════════════════
+     📁 OTHER ADMIN PAGES — projects / track / docs / proj-cal / calc
+     ═══════════════════════════════════════════════════════ */
+  /* Projects page actions wrap */
+  #page-projects .page-actions,
+  #page-track .page-actions,
+  #page-docs .page-actions,
+  #page-proj-cal .page-actions,
+  #page-calc .page-actions{flex-wrap:wrap!important}
+  /* Calc summary ที่เป็น 4-col → ใช้กฎเดียวกับ queue summary (จับด้วย selector เดิม) */
+  /* (ครอบคลุมแล้วจาก rule grid-template-columns:repeat(4,1fr) ข้างบน) */
+  /* Project calendar controls — center */
+  #proj-cal-content .trk-cal-nav{flex-wrap:wrap;gap:8px}
+
+  /* ─── Generic: inline progress bars ที่ width fix → responsive ─── */
+  div[style*="width:72px;height:6px"]{width:60px!important}
+
+  /* ─── Dropdowns ที่ position:absolute right:0 → ไม่หลุดขอบ ─── */
+  div[style*="position:absolute"][style*="right:0"][style*="min-width"]{
+    max-width:calc(100vw - 24px)!important;
+  }
 }
 
 /* จอเล็กมาก ≤ 400px */
@@ -899,9 +958,16 @@ body.sidebar-collapsed .main-content{
      </select>
     </div>
    </div>
-   <div class="form-group">
-    <label class="form-label">อีเมล *</label>
-    <input class="form-input" id="reg-email" type="email" placeholder="your@email.com">
+   <div class="form-group" id="reg-email-display" style="display:none">
+    <label class="form-label">📧 อีเมล <span style="color:var(--text2);font-weight:400;font-size:11px">(จากฟอร์มสมัครทีม — แก้ไม่ได้)</span></label>
+    <div id="reg-email-shown" style="padding:10px 14px;background:rgba(0,180,255,.06);border:1px solid rgba(0,180,255,.25);border-radius:9px;font-family:monospace;font-size:13px;color:var(--accent2);word-break:break-all"></div>
+    <div style="font-size:11px;color:var(--text2);margin-top:4px">💡 ระบบจะใช้อีเมลที่คุณกรอกตอนสมัครทีม เพื่อป้องกันการกรอกผิด · ถ้าอีเมลไม่ถูก ให้ติดต่อแอดมิน</div>
+    <input type="hidden" id="reg-email">
+   </div>
+   <div class="form-group" id="reg-email-missing" style="display:none">
+    <div style="padding:10px 14px;background:rgba(255,64,64,.08);border:1px solid rgba(255,64,64,.3);border-radius:9px;font-size:12px;color:var(--red)">
+     ⚠️ <strong>ไม่พบอีเมลของคุณในระบบ</strong> — อาจเป็นเพราะแอดมินยังไม่ได้ซิงค์ข้อมูลล่าสุด · <strong>กรุณาติดต่อแอดมิน</strong>
+    </div>
    </div>
    <div class="form-group">
     <label class="form-label">รหัสผ่าน *</label>
@@ -1186,6 +1252,32 @@ body.sidebar-collapsed .main-content{
      <button class="btn btn-outline" onclick="runProjectStaffAudit()" style="padding:10px 18px;border-color:var(--red);color:var(--red)">🔍 สแกนตรวจ</button>
     </div>
     <div id="audit-result" style="margin-top:10px"></div>
+   </div>
+
+   <!-- Audit: Email mismatch (Login ↔ Staff record) -->
+   <div class="section-card" style="border-left:4px solid var(--orange);margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">📧</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:var(--orange)">ตรวจ Email ไม่ตรงกัน (Login ↔ ข้อมูลทีม)</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">สแกนบัญชีที่ email ที่ใช้ login ไม่ตรงกับ email ในข้อมูลทีม · เป็นสาเหตุที่สต๊าฟเห็น "บัญชียังไม่ผูกกับข้อมูลทีม"</div>
+     </div>
+     <button class="btn btn-outline" onclick="runEmailMismatchAudit()" style="padding:10px 18px;border-color:var(--orange);color:var(--orange)">🔍 สแกนตรวจ</button>
+    </div>
+    <div id="email-audit-result" style="margin-top:10px"></div>
+   </div>
+
+   <!-- Excluded Sync List — คนที่ admin ลบ (ห้าม sync กลับ) -->
+   <div class="section-card" style="border-left:4px solid var(--purple);margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">🚫</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:var(--purple)">รายชื่อบล็อก Sync</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">คนที่ admin ลบจากเว็บ — ระบบจะไม่ sync กลับจากชีทอีก · กดปุ่ม ↩️ คืน ถ้าต้องการให้กลับ</div>
+     </div>
+     <button class="btn btn-outline" onclick="loadExcludedList()" style="padding:10px 18px;border-color:var(--purple);color:var(--purple)">📋 โหลดรายชื่อ</button>
+    </div>
+    <div id="excluded-list-result" style="margin-top:10px"></div>
    </div>
 
    <!-- Emergency: รีเซ็ตสถานะจ่ายของโปรเจกต์ -->
@@ -2897,9 +2989,9 @@ function saveStaffData(d){
       updates['staff/'+cat] = d[cat]||[];
     });
     // Mirror to public/staff_list — flat array for registration page (no auth needed to read)
-    // Only expose minimal fields (id, name, nickname, category)
-    // ⚠️ QR/bank/phone/email ห้ามใส่ — public path นี้ใครก็อ่านได้ แม้ยังไม่ login
-    //    QR อ่านได้เฉพาะ admin ผ่าน path staff/ หลัง verified email เท่านั้น
+    // Only expose minimal fields (id, name, nickname, category, email)
+    // ⚠️ QR/bank/phone ห้ามใส่ — public path นี้ใครก็อ่านได้ แม้ยังไม่ login
+    //    email เปิดเพื่อให้หน้าสมัครบังคับใช้ email เดียวกับที่กรอกฟอร์ม (ป้องกัน mismatch)
     const publicList = [];
     Object.entries(d||{}).forEach(([cat,arr])=>{
       (Array.isArray(arr)?arr:Object.values(arr||{})).filter(Boolean).forEach(s=>{
@@ -2908,7 +3000,8 @@ function saveStaffData(d){
           id: s.id,
           name: s.name || '',
           nickname: s.nickname || '',
-          category: cat
+          category: cat,
+          email: s.email || ''
         });
       });
     });
@@ -3144,6 +3237,21 @@ function selectRegStaff(id, nickname, fullName){
       const lbl = cb.closest('label');
       if(lbl) lbl.classList.toggle('reg-role-active', cb.checked);
     });
+    // ── Auto-fill email จากฟอร์มสมัครทีม (บังคับใช้ = ไม่ให้กรอกผิด) ──
+    const emailDisplay = document.getElementById('reg-email-display');
+    const emailMissing = document.getElementById('reg-email-missing');
+    const emailShown   = document.getElementById('reg-email-shown');
+    const emailHidden  = document.getElementById('reg-email');
+    if(s.email && s.email.trim()){
+      if(emailDisplay) emailDisplay.style.display = '';
+      if(emailMissing) emailMissing.style.display = 'none';
+      if(emailShown)   emailShown.textContent = s.email.trim();
+      if(emailHidden)  emailHidden.value = s.email.trim();
+    } else {
+      if(emailDisplay) emailDisplay.style.display = 'none';
+      if(emailMissing) emailMissing.style.display = '';
+      if(emailHidden)  emailHidden.value = '';
+    }
   }
 }
 function autoFillRegRole(){} // legacy - unused
@@ -4058,10 +4166,10 @@ async function doRegister(){
   const gender = document.getElementById('reg-gender')?.value||'';
   const staffId = document.getElementById('reg-staff-id').value;
   const roles = [...document.querySelectorAll('input[name="reg-role"]:checked')].map(x=>x.value);
+  if(!staffId){toast('กรุณาเลือกชื่อในระบบก่อน','error');return;}
   if(!nick){toast('กรุณากรอกชื่อเล่น','error');return;}
-  if(!email){toast('กรุณากรอกอีเมล','error');return;}
+  if(!email){toast('❌ ไม่พบอีเมลของคุณในระบบ — ติดต่อแอดมินให้ซิงค์ข้อมูลก่อน','error');return;}
   if(!pass||pass.length<6){toast('รหัสผ่านอย่างน้อย 6 ตัว','error');return;}
-  if(!staffId){toast('กรุณาเลือกชื่อในระบบ','error');return;}
   if(!roles.length){toast('กรุณาเลือกตำแหน่งอย่างน้อย 1 ตำแหน่ง','error');return;}
   try{
     showLoader(true);
@@ -4888,6 +4996,243 @@ function runProjectStaffAudit(){
   }
 
   resultEl.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════
+// 📧 Email Mismatch Audit — หา user ที่ login email ≠ team email
+// ═══════════════════════════════════════════════════════════
+async function runEmailMismatchAudit(){
+  const resultEl = document.getElementById('email-audit-result');
+  if(!resultEl) return;
+  resultEl.innerHTML = '<div style="padding:12px;color:var(--text2)">⏳ กำลังโหลดข้อมูล users และ staff...</div>';
+
+  try {
+    if(!_fbDatabase){
+      resultEl.innerHTML = '<div style="padding:12px;color:var(--red)">❌ Firebase ไม่พร้อมใช้งาน</div>';
+      return;
+    }
+
+    // 1. Fetch /users — ทุก account ที่เคย login
+    const snapU = await _fbDatabase.ref('users').get();
+    const users = snapU.exists() ? (snapU.val()||{}) : {};
+
+    // 2. Build staff lookup by id (จาก localStorage cache + staff/)
+    const staffData = getStaffData();
+    const staffById = {};
+    Object.entries(staffData||{}).forEach(([cat, arr])=>{
+      (Array.isArray(arr)?arr:Object.values(arr||{})).forEach(s=>{
+        if(s && s.id) staffById[s.id] = { ...s, _cat: cat };
+      });
+    });
+
+    // 3. Cross-reference
+    const mismatches = [];   // staff users with email mismatch
+    const unlinked = [];     // users without staffId or staffId→null
+    let totalStaffUsers = 0;
+    let okCount = 0;
+
+    Object.entries(users).forEach(([uid, u])=>{
+      if(!u) return;
+      // Skip admins/managers — ตรวจเฉพาะ staff
+      if(u.role && u.role !== 'staff') return;
+      totalStaffUsers++;
+
+      const loginEmail = (u.email||'').trim().toLowerCase();
+      const staffId = u.staffId;
+
+      if(!staffId){
+        unlinked.push({ uid, loginEmail, nickname:u.nickname||'', reason: 'ไม่มี staffId (ยังไม่ได้ผูกทีม)' });
+        return;
+      }
+
+      const s = staffById[staffId];
+      if(!s){
+        unlinked.push({ uid, loginEmail, nickname:u.nickname||'', staffId, reason: 'staffId ไม่เจอในทีม (ถูกลบ?)' });
+        return;
+      }
+
+      const teamEmail = (s.email||'').trim().toLowerCase();
+      if(!teamEmail){
+        mismatches.push({
+          uid, loginEmail, teamEmail: '',
+          staffId: s.id, name: s.name||'', nickname: s.nickname||'', category: s._cat,
+          type: 'team-email-empty'
+        });
+        return;
+      }
+
+      if(loginEmail !== teamEmail){
+        mismatches.push({
+          uid, loginEmail, teamEmail,
+          staffId: s.id, name: s.name||'', nickname: s.nickname||'', category: s._cat,
+          type: 'mismatch'
+        });
+      } else {
+        okCount++;
+      }
+    });
+
+    renderEmailAuditResult(resultEl, totalStaffUsers, okCount, mismatches, unlinked);
+
+  } catch(e){
+    console.error('email audit error:', e);
+    resultEl.innerHTML = `<div style="padding:12px;color:var(--red)">❌ เกิดข้อผิดพลาด: ${e.message}</div>`;
+  }
+}
+
+function renderEmailAuditResult(resultEl, total, okCount, mismatches, unlinked){
+  if(!mismatches.length && !unlinked.length){
+    resultEl.innerHTML = `<div style="padding:14px;background:rgba(0,223,160,.08);border:1px solid rgba(0,223,160,.3);border-radius:8px;color:var(--green);font-weight:700">
+      ✅ ไม่พบปัญหา — ตรวจ ${total} บัญชี ทุกคน email ตรงกับข้อมูลทีมหมด
+    </div>`;
+    return;
+  }
+
+  let html = `<div style="padding:14px;background:rgba(255,158,0,.06);border:1px solid rgba(255,158,0,.3);border-radius:8px;margin-bottom:12px">
+    <div style="font-weight:800;color:var(--orange);font-size:14px">📊 ผลการตรวจ</div>
+    <div style="font-size:12px;color:var(--text2);margin-top:4px;line-height:1.7">
+      บัญชีสต๊าฟทั้งหมด: <strong style="color:var(--text)">${total}</strong> · 
+      ✅ OK: <strong style="color:var(--green)">${okCount}</strong> · 
+      🟥 mismatch: <strong style="color:var(--red)">${mismatches.length}</strong> · 
+      ⚠️ ไม่ผูกทีม: <strong style="color:#FFD700">${unlinked.length}</strong>
+    </div>
+  </div>`;
+
+  if(mismatches.length){
+    html += `<div style="font-size:13px;font-weight:800;color:var(--red);margin:14px 0 8px">🟥 Email ไม่ตรง (สต๊าฟจะเห็น "บัญชียังไม่ผูกกับข้อมูลทีม")</div>`;
+    mismatches.forEach(m => {
+      const teamEmailDisplay = m.teamEmail || '<em style="color:var(--text2)">(ว่าง)</em>';
+      const escapeEmail = (m.loginEmail||'').replace(/'/g,"\\'");
+      const displayName = m.nickname || m.name || m.staffId;
+      html += `<div style="background:rgba(255,64,64,.05);border:1px solid rgba(255,64,64,.25);border-radius:10px;padding:14px;margin-bottom:10px">
+        <div style="font-weight:800;font-size:14px;margin-bottom:8px">
+          👤 ${displayName}
+          <span style="font-weight:400;color:var(--text2);font-size:11px;margin-left:6px">[${m.category}]</span>
+        </div>
+        <div style="font-size:12px;line-height:1.8;background:var(--bg2);border-radius:8px;padding:10px 12px">
+          <div>🔐 <strong style="color:var(--text2);font-weight:600">Email ที่ใช้ Login:</strong></div>
+          <div style="font-family:monospace;color:var(--accent2);margin-left:20px;word-break:break-all">${m.loginEmail||'(ว่าง)'}</div>
+          <div style="margin-top:6px">📝 <strong style="color:var(--text2);font-weight:600">Email ในข้อมูลทีม:</strong></div>
+          <div style="font-family:monospace;color:var(--orange);margin-left:20px;word-break:break-all">${teamEmailDisplay}</div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn-blue btn-sm" onclick="fixMismatchByUpdateTeam('${m.staffId}','${escapeEmail}','${displayName.replace(/'/g,"\\'")}')" style="padding:7px 14px">✏️ อัปเดต email ในทีมให้ตรงกับ login</button>
+        </div>
+        <div style="font-size:10px;color:var(--text2);margin-top:6px;line-height:1.5">💡 การแก้นี้จะทำให้ระบบลิงก์บัญชีของคนนี้ได้ทันที · ไม่กระทบ Firebase Auth ของเขา</div>
+      </div>`;
+    });
+  }
+
+  if(unlinked.length){
+    html += `<div style="font-size:13px;font-weight:800;color:#FFD700;margin:14px 0 8px">⚠️ บัญชีไม่ผูกกับข้อมูลทีม</div>`;
+    unlinked.forEach(u => {
+      html += `<div style="background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.25);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:12px">
+        <div style="font-weight:700">${u.nickname||'(ไม่มีชื่อเล่น)'}</div>
+        <div style="font-family:monospace;color:var(--accent2);margin-top:2px;word-break:break-all">${u.loginEmail}</div>
+        <div style="color:var(--text2);margin-top:3px;font-size:11px">⚠️ ${u.reason}${u.staffId?' · staffId: '+u.staffId.substring(0,20)+'...':''}</div>
+      </div>`;
+    });
+    html += `<div style="font-size:11px;color:var(--text2);margin-top:6px;padding:8px 10px;background:rgba(255,215,0,.03);border-radius:6px;line-height:1.6">💡 กรณีนี้อาจเป็น admin account (skip ได้) หรือ staff ที่เคยมีแต่ลบออกจากทีมแล้ว · ไม่มี auto-fix เพราะไม่รู้จะผูกกับใคร</div>`;
+  }
+
+  resultEl.innerHTML = html;
+}
+
+async function fixMismatchByUpdateTeam(staffId, newEmail, displayName){
+  if(!staffId || !newEmail){ toast('ข้อมูลไม่ครบ','error'); return; }
+  if(!confirm(`ยืนยันเปลี่ยน email ของ "${displayName}" เป็น:\n${newEmail}\n\n(จะแก้ใน staff record · Firebase Auth ไม่โดน)`)) return;
+
+  try {
+    const staffData = getStaffData();
+    let found = false;
+    let oldEmail = '';
+    Object.keys(staffData).forEach(cat=>{
+      const arr = Array.isArray(staffData[cat]) ? staffData[cat] : Object.values(staffData[cat]||{});
+      const idx = arr.findIndex(s => s && s.id === staffId);
+      if(idx >= 0){
+        oldEmail = arr[idx].email || '(ว่าง)';
+        arr[idx].email = newEmail;
+        staffData[cat] = arr;
+        found = true;
+      }
+    });
+
+    if(!found){
+      toast('❌ ไม่เจอ staff id ในข้อมูลทีม','error');
+      return;
+    }
+
+    saveStaffData(staffData);
+    toast(`✅ อัปเดต email ของ "${displayName}" เรียบร้อย\n${oldEmail} → ${newEmail}`,'success');
+
+    // Re-run audit to show updated state
+    setTimeout(()=>runEmailMismatchAudit(), 600);
+  } catch(e){
+    console.error('fix error:', e);
+    toast('❌ เกิดข้อผิดพลาด: ' + e.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 🚫 Excluded Sync List — คนที่ admin ลบ (ห้าม sync กลับจากชีท)
+// ═══════════════════════════════════════════════════════════
+async function loadExcludedList(){
+  const resultEl = document.getElementById('excluded-list-result');
+  if(!resultEl) return;
+  resultEl.innerHTML = '<div style="padding:12px;color:var(--text2)">⏳ กำลังโหลด...</div>';
+
+  try {
+    if(!_fbDatabase){
+      resultEl.innerHTML = '<div style="padding:12px;color:var(--red)">❌ Firebase ไม่พร้อม</div>';
+      return;
+    }
+    const snap = await _fbDatabase.ref('staff_excluded').get();
+    const excluded = snap.exists() ? (snap.val() || {}) : {};
+    const entries = Object.entries(excluded)
+      .filter(([_,v]) => v && typeof v === 'object')
+      .map(([id, v]) => ({ id, ...v }))
+      .sort((a,b) => (b.deletedAt||'').localeCompare(a.deletedAt||''));
+
+    if(!entries.length){
+      resultEl.innerHTML = '<div style="padding:14px;background:rgba(0,223,160,.08);border:1px solid rgba(0,223,160,.3);border-radius:8px;color:var(--green);font-weight:700">✅ ไม่มีใครถูกบล็อก sync</div>';
+      return;
+    }
+
+    let html = `<div style="font-size:12px;color:var(--text2);margin-bottom:10px">🚫 พบ <strong style="color:var(--purple)">${entries.length}</strong> คนที่ถูกบล็อก sync:</div>`;
+
+    entries.forEach(e => {
+      const date = e.deletedAt ? new Date(e.deletedAt).toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '-';
+      const displayName = e.nickname || e.name || e.id;
+      const escapedId = String(e.id).replace(/'/g,"\\'");
+      const escapedName = displayName.replace(/'/g,"\\'");
+      html += `<div style="background:rgba(155,111,255,.06);border:1px solid rgba(155,111,255,.25);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="font-weight:700;font-size:13px">${displayName} ${e.name&&e.nickname?'<span style="color:var(--text2);font-weight:400;font-size:11px">('+e.name+')</span>':''}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px;font-family:monospace">${e.email || '(ไม่มี email)'}</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">🗑️ ${date}${e.deletedBy?' · โดย '+e.deletedBy:''}</div>
+        </div>
+        <button class="btn btn-sm" onclick="restoreExcluded('${escapedId}','${escapedName}')" style="background:var(--green);color:#fff;padding:6px 12px;border:none;font-weight:700">↩️ คืน</button>
+      </div>`;
+    });
+
+    resultEl.innerHTML = html;
+  } catch(err){
+    console.error('loadExcludedList error:', err);
+    resultEl.innerHTML = `<div style="padding:12px;color:var(--red)">❌ ${err.message}</div>`;
+  }
+}
+
+async function restoreExcluded(id, displayName){
+  if(!confirm(`คืน "${displayName}" ให้กลับ sync ได้?\n\n⚠️ ครั้งถัดไปที่กดปุ่ม 🔄 ซิงค์\nถ้าคนนี้ยังอยู่ในชีท → ข้อมูลจะกลับเข้าทีมทันที`)) return;
+
+  try {
+    await _fbDatabase.ref('staff_excluded/' + id).remove();
+    toast(`✅ คืน "${displayName}" แล้ว · กด 🔄 ซิงค์เพื่อให้ข้อมูลกลับมา`,'success');
+    loadExcludedList();
+  } catch(e){
+    console.error('restore error:', e);
+    toast('❌ ' + e.message,'error');
+  }
 }
 
 // ซ่อม orphan workers ทั้งหมด (พร้อม backup)
@@ -7179,12 +7524,31 @@ function saveStaff(){
   });
   saveStaffData(data);if(editingStaffId)saveStaffRoleIfChanged(editingStaffId);closeModal('modal-addstaff');renderStaff();toast(editingStaffId?'อัพเดทแล้ว ✅':'เพิ่มสมาชิกแล้ว ✅','success');
 }
-function deleteStaff(id,cat){
-  if(!confirm('ลบสมาชิกนี้?'))return;
+async function deleteStaff(id,cat){
+  const staff = getStaffById(id);
+  if(!staff){ toast('ไม่เจอสมาชิก','error'); return; }
+  const name = staff.nickname || staff.name || id;
+  if(!confirm(`ลบ "${name}" ออกจากทีม?\n\n🛡️ การลบจะบล็อกคนนี้ไม่ให้ sync กลับจากชีทอีก\n(ถ้าต้องการคืน → Settings > "🚫 รายชื่อบล็อก Sync")`))return;
+
+  // 1. เขียน excluded list ก่อน (ห้าม sync กลับ)
+  if(_fbDatabase){
+    try {
+      await _fbDatabase.ref('staff_excluded/' + id).set({
+        id,
+        name: staff.name || '',
+        nickname: staff.nickname || '',
+        email: staff.email || '',
+        deletedAt: new Date().toISOString(),
+        deletedBy: currentUser?.email || 'unknown',
+      });
+    } catch(e){ console.warn('excluded set error:', e); }
+  }
+
+  // 2. Remove from staff data
   const data=getStaffData();
-  // Remove from ALL categories (multi-position staff)
   Object.keys(data).forEach(k=>{data[k]=(data[k]||[]).filter(s=>s.id!==id)});
-  saveStaffData(data);renderStaff();toast('ลบแล้ว','info');
+  saveStaffData(data);renderStaff();
+  toast(`✅ ลบ "${name}" + บล็อก sync แล้ว`,'info');
 }
 
 // ══════════════════════════════════════════════
@@ -13057,7 +13421,8 @@ async function syncFromSheet(){
       `✅ ซิงค์สำเร็จ · ` +
       `➕ ใหม่ ${data.added||0} · ` +
       `⏭️ ข้าม ${data.skipped||0}` +
-      (data.backfilled ? ` · 📱 backfill QR ${data.backfilled}` : '');
+      (data.backfilled ? ` · 📱 backfill QR ${data.backfilled}` : '') +
+      (data.excluded ? ` · 🚫 บล็อก ${data.excluded}` : '');
     toast(msg, 'success');
     // รายชื่อคนใหม่ที่เพิ่มเข้ามาในรอบนี้จะมาจาก Firebase listener อัตโนมัติ (ไม่ต้อง handle ตรงนี้ซ้ำ)
   } catch(e) {
