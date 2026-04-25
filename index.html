@@ -733,6 +733,8 @@ body.sidebar-collapsed .main-content{
   .qgroup-r1,.qgroup-r2,.qgroup-r3{
     display:flex!important;width:100%;align-items:center;gap:10px;
   }
+  /* r1 (title row) reserve space for absolute-positioned chevron */
+  .qgroup-r1{padding-right:26px}
   .qgroup-title{min-width:0;flex:1}
   .qgroup-title > div:first-child{
     font-size:14px!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
@@ -5001,6 +5003,27 @@ function runProjectStaffAudit(){
 // ═══════════════════════════════════════════════════════════
 // 📧 Email Mismatch Audit — หา user ที่ login email ≠ team email
 // ═══════════════════════════════════════════════════════════
+// HTML escape helper — ป้องกัน XSS จากข้อมูลที่ user ควบคุมได้
+function _escH(str){
+  return String(str==null?'':str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+// JS string in HTML attr — escape single quote + backslash + other quotes
+function _escJ(str){
+  return String(str==null?'':str)
+    .replace(/\\/g,'\\\\')
+    .replace(/'/g,"\\'")
+    .replace(/"/g,'&quot;')
+    .replace(/</g,'\\x3c')
+    .replace(/>/g,'\\x3e')
+    .replace(/\n/g,'\\n')
+    .replace(/\r/g,'\\r');
+}
+
 async function runEmailMismatchAudit(){
   const resultEl = document.getElementById('email-audit-result');
   if(!resultEl) return;
@@ -5101,22 +5124,21 @@ function renderEmailAuditResult(resultEl, total, okCount, mismatches, unlinked){
   if(mismatches.length){
     html += `<div style="font-size:13px;font-weight:800;color:var(--red);margin:14px 0 8px">🟥 Email ไม่ตรง (สต๊าฟจะเห็น "บัญชียังไม่ผูกกับข้อมูลทีม")</div>`;
     mismatches.forEach(m => {
-      const teamEmailDisplay = m.teamEmail || '<em style="color:var(--text2)">(ว่าง)</em>';
-      const escapeEmail = (m.loginEmail||'').replace(/'/g,"\\'");
+      const teamEmailDisplay = m.teamEmail ? _escH(m.teamEmail) : '<em style="color:var(--text2)">(ว่าง)</em>';
       const displayName = m.nickname || m.name || m.staffId;
       html += `<div style="background:rgba(255,64,64,.05);border:1px solid rgba(255,64,64,.25);border-radius:10px;padding:14px;margin-bottom:10px">
         <div style="font-weight:800;font-size:14px;margin-bottom:8px">
-          👤 ${displayName}
-          <span style="font-weight:400;color:var(--text2);font-size:11px;margin-left:6px">[${m.category}]</span>
+          👤 ${_escH(displayName)}
+          <span style="font-weight:400;color:var(--text2);font-size:11px;margin-left:6px">[${_escH(m.category)}]</span>
         </div>
         <div style="font-size:12px;line-height:1.8;background:var(--bg2);border-radius:8px;padding:10px 12px">
           <div>🔐 <strong style="color:var(--text2);font-weight:600">Email ที่ใช้ Login:</strong></div>
-          <div style="font-family:monospace;color:var(--accent2);margin-left:20px;word-break:break-all">${m.loginEmail||'(ว่าง)'}</div>
+          <div style="font-family:monospace;color:var(--accent2);margin-left:20px;word-break:break-all">${_escH(m.loginEmail||'(ว่าง)')}</div>
           <div style="margin-top:6px">📝 <strong style="color:var(--text2);font-weight:600">Email ในข้อมูลทีม:</strong></div>
           <div style="font-family:monospace;color:var(--orange);margin-left:20px;word-break:break-all">${teamEmailDisplay}</div>
         </div>
         <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-          <button class="btn btn-blue btn-sm" onclick="fixMismatchByUpdateTeam('${m.staffId}','${escapeEmail}','${displayName.replace(/'/g,"\\'")}')" style="padding:7px 14px">✏️ อัปเดต email ในทีมให้ตรงกับ login</button>
+          <button class="btn btn-blue btn-sm" onclick="fixMismatchByUpdateTeam('${_escJ(m.staffId)}','${_escJ(m.loginEmail||'')}','${_escJ(displayName)}')" style="padding:7px 14px">✏️ อัปเดต email ในทีมให้ตรงกับ login</button>
         </div>
         <div style="font-size:10px;color:var(--text2);margin-top:6px;line-height:1.5">💡 การแก้นี้จะทำให้ระบบลิงก์บัญชีของคนนี้ได้ทันที · ไม่กระทบ Firebase Auth ของเขา</div>
       </div>`;
@@ -5127,9 +5149,9 @@ function renderEmailAuditResult(resultEl, total, okCount, mismatches, unlinked){
     html += `<div style="font-size:13px;font-weight:800;color:#FFD700;margin:14px 0 8px">⚠️ บัญชีไม่ผูกกับข้อมูลทีม</div>`;
     unlinked.forEach(u => {
       html += `<div style="background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.25);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:12px">
-        <div style="font-weight:700">${u.nickname||'(ไม่มีชื่อเล่น)'}</div>
-        <div style="font-family:monospace;color:var(--accent2);margin-top:2px;word-break:break-all">${u.loginEmail}</div>
-        <div style="color:var(--text2);margin-top:3px;font-size:11px">⚠️ ${u.reason}${u.staffId?' · staffId: '+u.staffId.substring(0,20)+'...':''}</div>
+        <div style="font-weight:700">${_escH(u.nickname||'(ไม่มีชื่อเล่น)')}</div>
+        <div style="font-family:monospace;color:var(--accent2);margin-top:2px;word-break:break-all">${_escH(u.loginEmail)}</div>
+        <div style="color:var(--text2);margin-top:3px;font-size:11px">⚠️ ${_escH(u.reason)}${u.staffId?' · staffId: '+_escH(String(u.staffId).substring(0,20))+'...':''}</div>
       </div>`;
     });
     html += `<div style="font-size:11px;color:var(--text2);margin-top:6px;padding:8px 10px;background:rgba(255,215,0,.03);border-radius:6px;line-height:1.6">💡 กรณีนี้อาจเป็น admin account (skip ได้) หรือ staff ที่เคยมีแต่ลบออกจากทีมแล้ว · ไม่มี auto-fix เพราะไม่รู้จะผูกกับใคร</div>`;
@@ -5203,15 +5225,13 @@ async function loadExcludedList(){
     entries.forEach(e => {
       const date = e.deletedAt ? new Date(e.deletedAt).toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '-';
       const displayName = e.nickname || e.name || e.id;
-      const escapedId = String(e.id).replace(/'/g,"\\'");
-      const escapedName = displayName.replace(/'/g,"\\'");
       html += `<div style="background:rgba(155,111,255,.06);border:1px solid rgba(155,111,255,.25);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:200px">
-          <div style="font-weight:700;font-size:13px">${displayName} ${e.name&&e.nickname?'<span style="color:var(--text2);font-weight:400;font-size:11px">('+e.name+')</span>':''}</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:2px;font-family:monospace">${e.email || '(ไม่มี email)'}</div>
-          <div style="font-size:10px;color:var(--text2);margin-top:2px">🗑️ ${date}${e.deletedBy?' · โดย '+e.deletedBy:''}</div>
+          <div style="font-weight:700;font-size:13px">${_escH(displayName)} ${e.name&&e.nickname?'<span style="color:var(--text2);font-weight:400;font-size:11px">('+_escH(e.name)+')</span>':''}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px;font-family:monospace">${_escH(e.email || '(ไม่มี email)')}</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">🗑️ ${_escH(date)}${e.deletedBy?' · โดย '+_escH(e.deletedBy):''}</div>
         </div>
-        <button class="btn btn-sm" onclick="restoreExcluded('${escapedId}','${escapedName}')" style="background:var(--green);color:#fff;padding:6px 12px;border:none;font-weight:700">↩️ คืน</button>
+        <button class="btn btn-sm" onclick="restoreExcluded('${_escJ(e.id)}','${_escJ(displayName)}')" style="background:var(--green);color:#fff;padding:6px 12px;border:none;font-weight:700">↩️ คืน</button>
       </div>`;
     });
 
@@ -7531,6 +7551,7 @@ async function deleteStaff(id,cat){
   if(!confirm(`ลบ "${name}" ออกจากทีม?\n\n🛡️ การลบจะบล็อกคนนี้ไม่ให้ sync กลับจากชีทอีก\n(ถ้าต้องการคืน → Settings > "🚫 รายชื่อบล็อก Sync")`))return;
 
   // 1. เขียน excluded list ก่อน (ห้าม sync กลับ)
+  let excludeOk = false;
   if(_fbDatabase){
     try {
       await _fbDatabase.ref('staff_excluded/' + id).set({
@@ -7541,14 +7562,26 @@ async function deleteStaff(id,cat){
         deletedAt: new Date().toISOString(),
         deletedBy: currentUser?.email || 'unknown',
       });
-    } catch(e){ console.warn('excluded set error:', e); }
+      excludeOk = true;
+    } catch(e){
+      console.warn('excluded set error:', e);
+      // ถ้าเขียน excluded ไม่ได้ → แจ้ง admin + ยืนยันอีกรอบว่าจะลบต่อไหม
+      if(!confirm(`⚠️ ระบบเขียน "บล็อก sync" ไม่สำเร็จ:\n${e.message}\n\nถ้าลบต่อ → ครั้งถัดไปกดซิงค์ "${name}" จะกลับมาจากชีท\n\nยืนยันลบต่อ?`)){
+        toast('ยกเลิกการลบ','info');
+        return;
+      }
+    }
   }
 
   // 2. Remove from staff data
   const data=getStaffData();
   Object.keys(data).forEach(k=>{data[k]=(data[k]||[]).filter(s=>s.id!==id)});
   saveStaffData(data);renderStaff();
-  toast(`✅ ลบ "${name}" + บล็อก sync แล้ว`,'info');
+  if(excludeOk){
+    toast(`✅ ลบ "${name}" + บล็อก sync แล้ว`,'info');
+  } else {
+    toast(`⚠️ ลบ "${name}" แล้ว · แต่ไม่ได้บล็อก sync`,'warn');
+  }
 }
 
 // ══════════════════════════════════════════════
