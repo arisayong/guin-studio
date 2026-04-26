@@ -12050,7 +12050,8 @@ function _migrateCalcCats(cats){
         rate: parseFloat(s.rate)||0,
         unit: s.unit || 'per-minute',
         ppl: parseInt(s.ppl)||1,
-        tax: parseFloat(s.tax)||0
+        tax: parseFloat(s.tax)||0,
+        note: String(s.note||'')
       }))};
       return;
     }
@@ -12064,7 +12065,8 @@ function _migrateCalcCats(cats){
         rate: parseFloat(s.rate)||0,
         unit: s.unit || 'per-minute',
         ppl: parseInt(s.ppl)||1,
-        tax: parseFloat(s.tax)||0
+        tax: parseFloat(s.tax)||0,
+        note: String(s.note||'')
       }))};
       return;
     }
@@ -12074,7 +12076,8 @@ function _migrateCalcCats(cats){
       rate: parseFloat(c.rate)||0,
       unit: c.unit || 'per-minute',
       ppl: parseInt(c.ppl)||1,
-      tax: parseFloat(c.tax)||0
+      tax: parseFloat(c.tax)||0,
+      note: String(c.note||'')
     }]};
   });
   return out;
@@ -12281,6 +12284,8 @@ function updateCalcSlotUnit(catKey, slotKey, val){
 
 function _calcSlotInputsHTML(catKey, slotKey, slot, color, labelPrefix){
   const s = slot || {};
+  const hasComment = !!(s.note||'').trim();
+  const noteEsc = (s.note||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
   return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">
     <div>
       <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">${labelPrefix?labelPrefix+' ราคา':'ราคา'}</label>
@@ -12301,15 +12306,56 @@ function _calcSlotInputsHTML(catKey, slotKey, slot, color, labelPrefix){
       <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">หัก %</label>
       <input type="number" min="0" max="100" value="${s.tax||''}" placeholder="0" style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcSetSlot('${catKey}','${slotKey}','tax',this.value);updateCalcLive('${catKey}','${slotKey}')">
     </div>
+    <div style="display:flex;align-items:flex-end">
+      <button type="button"
+        id="ccom-btn-${catKey}-${slotKey}"
+        onclick="toggleCalcComment('${catKey}','${slotKey}')"
+        title="หมายเหตุ/คอมเมนต์"
+        style="width:100%;padding:6px 10px;border-radius:7px;cursor:pointer;font-family:Kanit;font-size:13px;background:${hasComment?'rgba(155,111,255,.18)':'rgba(0,0,0,.3)'};color:${hasComment?'#9B6FFF':'var(--text2)'};border:1px solid ${hasComment?'rgba(155,111,255,.35)':'var(--border2)'}">
+        💬${hasComment?' •':''}
+      </button>
+    </div>
   </div>
-  <div id="calc-slot-note-${catKey}-${slotKey}" style="margin-top:6px;font-size:11px;color:var(--text2);min-height:16px"></div>`;
+  <div id="calc-slot-note-${catKey}-${slotKey}" style="margin-top:6px;font-size:11px;color:var(--text2);min-height:16px"></div>
+  <div id="ccom-${catKey}-${slotKey}" style="display:${hasComment?'block':'none'};margin-top:6px">
+    <textarea placeholder="หมายเหตุการคิดราคา · เช่น 'ลูกค้าตกลงราคานี้แล้ว · 12 มี.ค.', 'หัก 200 ค่าธรรมเนียม', 'ราคาพิเศษ — รับเป็น discount package'"
+      style="width:100%;min-height:48px;background:rgba(155,111,255,.05);border:1px solid rgba(155,111,255,.2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px;padding:7px 10px;resize:vertical"
+      oninput="_calcSetSlot('${catKey}','${slotKey}','note',this.value);_refreshCalcCommentBtn('${catKey}','${slotKey}')">${noteEsc}</textarea>
+  </div>`;
+}
+
+// Toggle comment textarea show/hide (match project page UX)
+function toggleCalcComment(catKey, slotKey){
+  const el = document.getElementById('ccom-'+catKey+'-'+slotKey);
+  if(!el) return;
+  const showing = el.style.display !== 'none';
+  el.style.display = showing ? 'none' : 'block';
+  if(!showing){
+    setTimeout(()=>el.querySelector('textarea')?.focus(), 80);
+  }
+}
+
+// Update toggle button colour to reflect whether note has content
+function _refreshCalcCommentBtn(catKey, slotKey){
+  const cc = _calcEditing.cats[catKey]; if(!cc || !Array.isArray(cc.slots)) return;
+  const idx = parseInt(slotKey); if(isNaN(idx)) return;
+  const has = !!(cc.slots[idx]?.note||'').trim();
+  const btn = document.getElementById('ccom-btn-'+catKey+'-'+slotKey);
+  if(btn){
+    btn.style.background = has?'rgba(155,111,255,.18)':'rgba(0,0,0,.3)';
+    btn.style.color = has?'#9B6FFF':'var(--text2)';
+    btn.style.borderColor = has?'rgba(155,111,255,.35)':'var(--border2)';
+    btn.innerHTML = '💬'+(has?' •':'');
+  }
 }
 
 function _calcSetSlot(catKey, slotKey, field, val){
   const cc = _calcEditing.cats[catKey]; if(!cc || !Array.isArray(cc.slots)) return;
   const idx = parseInt(slotKey);
   if(isNaN(idx) || !cc.slots[idx]) return;
-  cc.slots[idx][field] = (field==='ppl') ? (parseInt(val)||1) : (field==='label') ? String(val||'') : (parseFloat(val)||0);
+  if(field === 'ppl') cc.slots[idx][field] = parseInt(val)||1;
+  else if(field === 'label' || field === 'note') cc.slots[idx][field] = String(val||'');
+  else cc.slots[idx][field] = parseFloat(val)||0;
 }
 
 // Add a new slot to a category (default values)
