@@ -4674,7 +4674,8 @@ function renderTrkCalendar() {
   const palette = ['#00B4FF','#FFAA00','#9B6FFF','#FF6E40','#80CBC4','#FF80AB','#40CFFF','#FFD740','#69F0AE','#B0BEC5'];
 
   /* ── รวม events เฉพาะการ์ดที่ติ๊กเลือก · group by project ── */
-  const projectGroups = [];   // [{ projId, projLabel, frameColor, phases:[...], cardId }]
+  // **ใช้ Map แทน Array** เพื่อ dedupe โปรเจกต์ที่ซ้ำ projId
+  const projectGroupsMap = new Map();   // projId → group
   const checkedOrAll = getTrkCards().filter(c => trkCheckedCards.has(c.id));
   let projColorIdx = 0;
   checkedOrAll.forEach(card => {
@@ -4704,9 +4705,23 @@ function renderTrkCalendar() {
       });
     });
     if (!phaseRows.length) return;
+
+    // Dedupe — ถ้ามี group ของ projId นี้แล้ว merge phases เข้าไป (ไม่ซ้ำ key)
+    if(projectGroupsMap.has(projKey)){
+      const existing = projectGroupsMap.get(projKey);
+      const seenKeys = new Set(existing.phases.map(p=>p.key));
+      phaseRows.forEach(pr => {
+        if(!seenKeys.has(pr.key)) existing.phases.push(pr);
+      });
+      // อัปเดต start/end
+      existing.start = new Date(Math.min(existing.start.getTime(), ...phaseRows.map(r=>r.start.getTime())));
+      existing.end   = new Date(Math.max(existing.end.getTime(),   ...phaseRows.map(r=>r.end.getTime())));
+      return;
+    }
+
     const groupStart = phaseRows.reduce((min,r) => r.start < min ? r.start : min, phaseRows[0].start);
     const groupEnd   = phaseRows.reduce((max,r) => r.end   > max ? r.end   : max, phaseRows[0].end);
-    projectGroups.push({
+    projectGroupsMap.set(projKey, {
       projId: projKey,
       projLabel,
       frameColor: palette[projColorIdx++ % palette.length],
@@ -4716,6 +4731,7 @@ function renderTrkCalendar() {
       cardId: card.id,
     });
   });
+  const projectGroups = [...projectGroupsMap.values()];
 
   /* ── build week cells ── */
   const firstDay = new Date(trkCalYear, trkCalMonth, 1);
@@ -4729,6 +4745,7 @@ function renderTrkCalendar() {
 
   // Track which projects already showed the "Done" button — แสดงครั้งเดียวต่อโปรเจกต์
   // โดยกำหนด "สัปดาห์สุดท้ายของแต่ละโปรเจกต์" ไว้ล่วงหน้า — ใช้ index ของ week
+  // **ใช้ projId เป็น key หลัก** เพื่อกันซ้ำกรณี admin มี cards ซ้ำ projId เดียวกัน
   const _projLastWeekIdx = new Map();
   weeks.forEach((week, wIdx) => {
     const wFirst = week.find(d => d);
@@ -4737,11 +4754,8 @@ function renderTrkCalendar() {
     const wS_check = new Date(trkCalYear, trkCalMonth, wFirst); wS_check.setHours(0,0,0,0);
     const wE_check = new Date(trkCalYear, trkCalMonth, wLast);  wE_check.setHours(23,59,59,999);
     projectGroups.forEach(g => {
-      // ถ้าโปรเจกต์มี phase ที่ overlap สัปดาห์นี้ → mark ว่ายังเห็นได้ในสัปดาห์นี้
       if(g.phases.some(ph => ph.start <= wE_check && ph.end >= wS_check)){
-        // ใช้ projId (key ที่ stable) แทน
-        const key = g.cardId || g.projId;
-        // อัปเดตให้เป็นสัปดาห์ล่าสุดที่ยังเจอ → จะกลายเป็น "สัปดาห์สุดท้ายที่โปรเจกต์ยังโผล่"
+        const key = g.projId;  // ใช้ projId — stable คงที่ระหว่าง render
         _projLastWeekIdx.set(key, wIdx);
       }
     });
@@ -4849,7 +4863,7 @@ function renderTrkCalendar() {
       const labelEsc = String(g.projLabel||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
       const projIdEsc = String(linkedProj?.id||'').replace(/'/g,"\\'");
       // แสดงปุ่มเฉพาะสัปดาห์สุดท้ายของโปรเจกต์ — กันปุ่มซ้ำ
-      const _gKey = g.cardId || g.projId;
+      const _gKey = g.projId;  // ตรงกับ key ที่ใส่ใน Map
       const showDoneBtn = !!linkedProj && _projLastWeekIdx.get(_gKey) === _currentWeekIdx;
       const nameStyle = isProjDone ? 'text-decoration:line-through;opacity:.7' : isProjCancelled ? 'text-decoration:line-through;opacity:.5' : '';
       const headerBg = isProjDone ? 'rgba(0,223,160,.18)' : isProjCancelled ? 'rgba(120,120,120,.15)' : 'rgba(0,0,0,.04)';
@@ -4859,15 +4873,17 @@ function renderTrkCalendar() {
         if(isProjDone){
           doneBtnHTML = `<button onclick="event.stopPropagation();trkToggleProjectDone('${projIdEsc}')" title="คลิกเพื่อยกเลิกเสร็จสิ้น"
             style="padding:1px 8px;border-radius:10px;font-size:9px;font-weight:800;cursor:pointer;font-family:Kanit;
-            background:#00DFA0;border:1.5px solid #00DFA0;color:#fff;flex-shrink:0;line-height:1.4;pointer-events:auto">✅ เสร็จสิ้นแล้ว</button>`;
+            background:#00DFA0;border:1.5px solid #00DFA0;color:#fff;flex-shrink:0;line-height:1.4;pointer-events:auto">✅ เสร็จแล้ว</button>`;
         } else if(!isProjCancelled){
           doneBtnHTML = `<button onclick="event.stopPropagation();trkToggleProjectDone('${projIdEsc}')" title="คลิกเพื่อทำเครื่องหมายโปรเจกต์เสร็จสิ้น"
             style="padding:1px 8px;border-radius:10px;font-size:9px;font-weight:800;cursor:pointer;font-family:Kanit;
             background:transparent;border:1.5px solid ${finalFrameColor};color:${finalFrameColor};flex-shrink:0;line-height:1.4;pointer-events:auto"
             onmouseover="this.style.background='${finalFrameColor}';this.style.color='#fff'"
-            onmouseout="this.style.background='transparent';this.style.color='${finalFrameColor}'">✅ ทำเสร็จแล้ว</button>`;
+            onmouseout="this.style.background='transparent';this.style.color='${finalFrameColor}'">✅ เสร็จ</button>`;
         }
       }
+      // DEBUG marker — ลบทิ้งหลังทดสอบเสร็จ
+      console.log('[TRK_BTN v3]', g.projLabel, 'wIdx:', _currentWeekIdx, 'lastWeek:', _projLastWeekIdx.get(_gKey), 'showBtn:', showDoneBtn);
 
       const headerHTML = `<div style="position:absolute;top:${cardTop+1}px;left:${frameLeft};width:${frameWidth};height:${HEAD_H-1}px;
         background:${headerBg};border-bottom:1px solid rgba(0,0,0,.06);border-radius:${radL} ${radR} 0 0;
