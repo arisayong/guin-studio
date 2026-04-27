@@ -565,7 +565,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightnes
   .table-wrap table{min-width:460px}
   td,th{padding:9px 8px;font-size:12px}
   /* Calendar */
-  #my-cal-content,#proj-cal-content{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #my-cal-content{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .trk-calendar-card{min-width:320px}
   /* Modal bottom-sheet */
   .modal{width:100vw;max-width:100vw;border-radius:14px 14px 0 0;max-height:95vh}
@@ -845,12 +845,9 @@ body.sidebar-collapsed .main-content{
   #page-projects .page-actions,
   #page-track .page-actions,
   #page-docs .page-actions,
-  #page-proj-cal .page-actions,
   #page-calc .page-actions{flex-wrap:wrap!important}
   /* Calc summary ที่เป็น 4-col → ใช้กฎเดียวกับ queue summary (จับด้วย selector เดิม) */
   /* (ครอบคลุมแล้วจาก rule grid-template-columns:repeat(4,1fr) ข้างบน) */
-  /* Project calendar controls — center */
-  #proj-cal-content .trk-cal-nav{flex-wrap:wrap;gap:8px}
 
   /* ─── Generic: inline progress bars ที่ width fix → responsive ─── */
   div[style*="width:72px;height:6px"]{width:60px!important}
@@ -1054,7 +1051,6 @@ body.sidebar-collapsed .main-content{
    <div class="nav-section">งาน</div>
    <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span><span class="nav-badge hidden" id="deadline-badge">0</span></div>
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span><span class="nav-badge hidden" id="track-badge">0</span></div>
-   <div class="nav-item" onclick="nav('proj-cal')"><span class="nav-icon">🗓️</span><span>ปฏิทิน</span></div>
    <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-section">การเงิน</div>
    <div class="nav-item" onclick="nav('queue')"><span class="nav-icon">💸</span><span>คิวจ่ายเงิน</span><span class="nav-badge hidden" id="queue-badge">0</span></div>
@@ -1133,14 +1129,6 @@ body.sidebar-collapsed .main-content{
   </div>
 
   <!-- ── PROJECT CALENDAR ── -->
-  <div id="page-proj-cal" class="page hidden">
-   <div class="page-header">
-    <div class="page-title">🗓️ ปฏิทินโปรเจกต์</div>
-    <div class="page-subtitle">ภาพรวม deadline ทุกโปรเจกต์ในแต่ละเดือน</div>
-   </div>
-   <div id="proj-cal-content"></div>
-  </div>
-
   <!-- ── TRACK WORK ── -->
   <div id="page-track" class="page hidden">
    <div class="page-header">
@@ -2499,6 +2487,18 @@ let myCalYear  = new Date().getFullYear();
 let trkCalMonth = new Date().getMonth();
 let trkCalYear  = new Date().getFullYear();
 let trkCheckedCards = new Set();
+
+// Persist checked cards across reloads
+const _TRK_CHECKED_KEY = 'trk_checked_cards_v1';
+function saveTrkCheckedCards(){
+  try{ ls(_TRK_CHECKED_KEY, [...trkCheckedCards]); }catch(e){}
+}
+(function loadTrkCheckedCards(){
+  try{
+    const arr = ls(_TRK_CHECKED_KEY);
+    if(Array.isArray(arr)) arr.forEach(id => trkCheckedCards.add(id));
+  }catch(e){}
+})();
 let selectedYear = 'all';
 let selectedType = 'all';
 let chartMonthly = null;
@@ -4487,7 +4487,7 @@ async function seedDemo(){
 // ══════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════
-const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','profit','staff','docs','proj-cal','calc','payment','settings'];
+const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','profit','staff','docs','calc','payment','settings'];
 const MANAGER_PAGES=['mgr-projects','mgr-track','mgr-calendar','mgr-team'];
 function nav(page){
   const role=currentUser?.role||'staff';
@@ -4502,7 +4502,7 @@ function nav(page){
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
   const renders={
-    dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue,docs:renderDocs,'proj-cal':renderProjCal,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
+    dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
     'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar,
     'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-calendar':renderMgrCalendar,'mgr-team':renderMgrTeam
   };
@@ -4674,7 +4674,7 @@ function renderTrkCalendar() {
   const palette = ['#00B4FF','#FFAA00','#9B6FFF','#FF6E40','#80CBC4','#FF80AB','#40CFFF','#FFD740','#69F0AE','#B0BEC5'];
 
   /* ── รวม events เฉพาะการ์ดที่ติ๊กเลือก · group by project ── */
-  const projectGroups = [];   // [{ projId, projLabel, frameColor, phases:[{label, color, start, end}, ...] }]
+  const projectGroups = [];   // [{ projId, projLabel, frameColor, phases:[...], cardId }]
   const checkedOrAll = getTrkCards().filter(c => trkCheckedCards.has(c.id));
   let projColorIdx = 0;
   checkedOrAll.forEach(card => {
@@ -4688,14 +4688,22 @@ function renderTrkCalendar() {
       const [sy, sm, sd] = pd.startDate.split('-').map(Number);
       const [ey, em, ed] = pd.deadline.split('-').map(Number);
       phaseRows.push({
-        label: ph.label + (pd.submitTime ? ' '+toThaiTime(pd.submitTime) : ''),
-        color: ph.color,
+        key: ph.key,
+        label: ph.label,
+        color: ph.color === 'var(--cyan)' ? '#00B4FF'
+             : ph.color === 'var(--orange)' ? '#FF9E00'
+             : ph.color === 'var(--green)' ? '#00DFA0'
+             : ph.color === 'var(--purple)' ? '#9B6FFF'
+             : ph.color === 'var(--red)' ? '#FF4040'
+             : ph.color === 'var(--accent2)' ? '#1565FF'
+             : ph.color,
         start: new Date(sy, sm - 1, sd),
         end:   new Date(ey, em - 1, ed),
+        submitTime: pd.submitTime || '',
+        done: pd.status === 'done',
       });
     });
     if (!phaseRows.length) return;
-    // หา start/end overall ของโปรเจกต์
     const groupStart = phaseRows.reduce((min,r) => r.start < min ? r.start : min, phaseRows[0].start);
     const groupEnd   = phaseRows.reduce((max,r) => r.end   > max ? r.end   : max, phaseRows[0].end);
     projectGroups.push({
@@ -4781,10 +4789,10 @@ function renderTrkCalendar() {
       const frameSpan = frameColE - frameColS + 1;
 
       // Edge flags (round corners only at outer week edges)
-      const isFirstWeekSeg = groupStartInWeek >= wS;  // group starts in this week
-      const isLastWeekSeg  = groupEndInWeek   <= wE;  // group ends in this week
-      const radL = isFirstWeekSeg ? '7px' : '0';
-      const radR = isLastWeekSeg  ? '7px' : '0';
+      const isFirstWeekSeg = groupStartInWeek >= wS;
+      const isLastWeekSeg  = groupEndInWeek   <= wE;
+      const radL = isFirstWeekSeg ? '8px' : '0';
+      const radR = isLastWeekSeg  ? '8px' : '0';
       const borderL = isFirstWeekSeg ? `1px solid ${g.frameColor}` : 'none';
       const borderR = isLastWeekSeg  ? `1px solid ${g.frameColor}` : 'none';
 
@@ -4792,51 +4800,123 @@ function renderTrkCalendar() {
       const cardHeight = HEAD_H + visiblePhases.length * PHASE_ROW_H;
       rowOffset += cardHeight + CARD_GAP;
 
-      // Frame styled with column positioning (per cell math like phase strips)
+      // Frame styled with column positioning
       const frameLeft  = `calc(${frameColS}*((100% - 4px)/7) + 2px)`;
       const frameWidth = `calc(${frameSpan}*((100% - 4px)/7))`;
+
+      // Detect project done state — get from getProjects() to stay in sync with realtime
+      const linkedProj = g.cardId ? (function(){
+        const card = (getTrkCards()||[]).find(c => c.id === g.cardId);
+        if(!card || !card.projId) return null;
+        return (getProjects()||[]).find(x => x.id === card.projId) || null;
+      })() : null;
+      const isProjDone = linkedProj?.projStatus === 'done';
+      const isProjCancelled = linkedProj?.projStatus === 'cancelled';
+
+      // Frame color override if project is done
+      const finalFrameColor = isProjDone ? '#00DFA0' : isProjCancelled ? '#888' : g.frameColor;
+      const frameBgColor = isProjDone ? 'rgba(0,223,160,.10)' : isProjCancelled ? 'rgba(120,120,120,.08)' : 'rgba(255,255,255,.55)';
+
       const frameHTML = `<div style="position:absolute;top:${cardTop}px;left:${frameLeft};width:${frameWidth};height:${cardHeight}px;
-        border-top:1px solid ${g.frameColor};border-bottom:1px solid ${g.frameColor};
-        border-left:${borderL};border-right:${borderR};
+        border-top:1px solid ${finalFrameColor};border-bottom:1px solid ${finalFrameColor};
+        border-left:${isFirstWeekSeg ? `1px solid ${finalFrameColor}` : 'none'};
+        border-right:${isLastWeekSeg ? `1px solid ${finalFrameColor}` : 'none'};
         border-radius:${radL} ${radR} ${radR} ${radL};
-        background:rgba(255,255,255,.55);
+        background:${frameBgColor};
         overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)"></div>`;
 
-      // Header — same width as frame, positioned the same way
+      // Header — project name + "Done" toggle button (right side)
       const labelEsc = String(g.projLabel||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+      const projIdEsc = String(linkedProj?.id||'').replace(/'/g,"\\'");
+      // Show toggle button only on the last segment of the group (avoids duplicate buttons across weeks)
+      const showDoneBtn = isLastWeekSeg && !!linkedProj;
+      const nameStyle = isProjDone ? 'text-decoration:line-through;opacity:.7' : isProjCancelled ? 'text-decoration:line-through;opacity:.5' : '';
+      const headerBg = isProjDone ? 'rgba(0,223,160,.18)' : isProjCancelled ? 'rgba(120,120,120,.15)' : 'rgba(0,0,0,.04)';
+
+      let doneBtnHTML = '';
+      if(showDoneBtn){
+        if(isProjDone){
+          doneBtnHTML = `<button onclick="event.stopPropagation();trkToggleProjectDone('${projIdEsc}')" title="คลิกเพื่อยกเลิกเสร็จสิ้น"
+            style="padding:1px 8px;border-radius:10px;font-size:9px;font-weight:800;cursor:pointer;font-family:Kanit;
+            background:#00DFA0;border:1.5px solid #00DFA0;color:#fff;flex-shrink:0;line-height:1.4;pointer-events:auto">✅ เสร็จสิ้นแล้ว</button>`;
+        } else if(!isProjCancelled){
+          doneBtnHTML = `<button onclick="event.stopPropagation();trkToggleProjectDone('${projIdEsc}')" title="คลิกเพื่อทำเครื่องหมายโปรเจกต์เสร็จสิ้น"
+            style="padding:1px 8px;border-radius:10px;font-size:9px;font-weight:800;cursor:pointer;font-family:Kanit;
+            background:transparent;border:1.5px solid ${finalFrameColor};color:${finalFrameColor};flex-shrink:0;line-height:1.4;pointer-events:auto"
+            onmouseover="this.style.background='${finalFrameColor}';this.style.color='#fff'"
+            onmouseout="this.style.background='transparent';this.style.color='${finalFrameColor}'">✅ ทำเสร็จแล้ว</button>`;
+        }
+      }
+
       const headerHTML = `<div style="position:absolute;top:${cardTop+1}px;left:${frameLeft};width:${frameWidth};height:${HEAD_H-1}px;
-        background:rgba(0,0,0,.04);border-bottom:1px solid rgba(0,0,0,.06);border-radius:${radL} ${radR} 0 0;
-        padding:0 8px;display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;color:#0a1a3a;
-        pointer-events:none;overflow:hidden;box-sizing:border-box">
-        <span style="width:7px;height:7px;border-radius:50%;background:${g.frameColor};flex-shrink:0"></span>
-        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📁 ${labelEsc}</span>
+        background:${headerBg};border-bottom:1px solid rgba(0,0,0,.06);border-radius:${radL} ${radR} 0 0;
+        padding:0 4px 0 8px;display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;color:#0a1a3a;
+        overflow:hidden;box-sizing:border-box;pointer-events:none">
+        <span style="width:7px;height:7px;border-radius:50%;background:${finalFrameColor};flex-shrink:0"></span>
+        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;${nameStyle}">📁 ${labelEsc}${isProjCancelled?' · ❌ ยกเลิก':''}</span>
+        ${doneBtnHTML}
       </div>`;
 
-      // Phase strips — clipped to current week range
+      // Span (in days) for this group's frame range — used to calc bar fill width
+      const frameStartTime = frameClampS.getTime();
+      const frameEndTime   = frameClampE.getTime();
+      const frameRangeMs   = Math.max(864e5, frameEndTime - frameStartTime + 864e5);
+
+      // Bar chart-style phase rows: [name | bar | deadline · checkbox]
+      // Layout:
+      //   Left segment    — phase name (1.5 col equivalent, fixed-ish width)
+      //   Middle segment  — progress bar
+      //   Right segment   — deadline text + checkbox (1.3 col equivalent)
+      const NAME_W = 88;     // px reserved for name on left
+      const META_W = 95;     // px reserved for deadline + checkbox on right
       const phasesHTML = visiblePhases.map((ph, phIdx) => {
-        const clampS = ph.start < wS ? wS : ph.start;
-        const clampE = ph.end   > wE ? wE : ph.end;
-        const colS = clampS.getDay();
-        const colE = clampE.getDay();
-        const span = colE - colS + 1;
-        if (span <= 0) return '';
-
-        const isLastSeg = ph.end <= wE;
-        const dStr = isLastSeg ? ' · '+ph.end.getDate() : '';
-
         const rowTop = cardTop + HEAD_H + phIdx * PHASE_ROW_H;
-        const phLabelEsc = String(ph.label||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+        const isDone = !!ph.done;
+        const isLastSeg = ph.end <= wE;
 
-        return `<div style="position:absolute;top:${rowTop}px;
-          left:calc(${colS}*((100% - 8px)/7) + 4px + 2px);
-          width:calc(${span}*((100% - 8px)/7) - 2px);
-          height:${PHASE_ROW_H-1}px;background:${ph.color};
-          padding:0 6px;display:flex;align-items:center;
-          font-size:9px;font-weight:700;color:#000;overflow:hidden;
-          border-bottom:${phIdx<visiblePhases.length-1?'1px solid rgba(255,255,255,.5)':'none'}"
-          title="${phLabelEsc}">
-          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">${phLabelEsc}${dStr}</span>
-          ${isLastSeg ? '<span style="font-size:9px;font-weight:900;margin-left:auto;opacity:.85">🏁</span>' : ''}
+        // Bar fill % — based on phase start..end relative to frame range
+        const phStartTime = Math.max(ph.start.getTime(), frameStartTime);
+        const phEndTime   = Math.min(ph.end.getTime(),   frameEndTime);
+        const phLengthMs  = Math.max(864e5, phEndTime - phStartTime + 864e5);
+        const phStartOffset = phStartTime - frameStartTime;
+        const fillLeftPct = (phStartOffset / frameRangeMs) * 100;
+        const fillWidthPct = (phLengthMs / frameRangeMs) * 100;
+
+        const dStr = isLastSeg
+          ? ph.end.getDate() + (ph.submitTime ? ' · ' + ph.submitTime.slice(0,5) : '')
+          : '';
+
+        const phLabelEsc = String(ph.label||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+        // Strip "Adapt" out of full PHASES.label (which is "✍️ Adapt") to keep it short
+        const shortLabel = phLabelEsc.replace(/Adaptation/, 'Adapt').replace(/Dubbing/, 'Dub').replace(/Manager/, 'Mgr');
+
+        // Color tone: dim if done
+        const phColor = isDone ? '#22C55E' : ph.color;
+        const phBgTone = isDone ? 'rgba(34,197,94,.18)' : (ph.color + '22');  // 22 = ~13% alpha
+        const checkboxBg = isDone ? '#22C55E' : 'transparent';
+        const checkboxBorder = isDone ? '#22C55E' : '#5878a0';
+
+        // Onclick — toggle done/undone (need cardId + phase key)
+        // Find original phase key by matching label (since we built phases array earlier)
+        const cardIdEsc = String(g.cardId||'').replace(/'/g,"\\'");
+        const phKeyEsc  = String(ph.key||'').replace(/'/g,"\\'");
+        const togglerJs = `event.stopPropagation();trkTogglePhaseDone('${cardIdEsc}','${phKeyEsc}')`;
+
+        return `<div style="position:absolute;top:${rowTop}px;left:${frameLeft};width:${frameWidth};height:${PHASE_ROW_H-1}px;
+          display:flex;align-items:center;
+          border-bottom:${phIdx<visiblePhases.length-1?'1px solid rgba(255,255,255,.7)':'none'};
+          font-size:9.5px;font-weight:700;color:#0a1a3a;box-sizing:border-box;overflow:hidden">
+          <!-- Left: name -->
+          <span style="flex:0 0 ${NAME_W}px;padding:0 6px 0 8px;color:${phColor};font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-right:1px solid rgba(255,255,255,.5)">${shortLabel}${isDone?' ✓':''}</span>
+          <!-- Middle: bar track + fill -->
+          <div style="flex:1;height:6px;background:rgba(0,0,0,.06);border-radius:3px;margin:0 8px;position:relative;overflow:hidden">
+            <div style="position:absolute;left:${fillLeftPct.toFixed(2)}%;width:${fillWidthPct.toFixed(2)}%;top:0;bottom:0;background:${phColor};border-radius:3px;${isDone?'opacity:.7':''}"></div>
+          </div>
+          <!-- Right: deadline + checkbox -->
+          <span style="flex:0 0 ${META_W}px;display:flex;align-items:center;gap:6px;padding:0 8px;justify-content:flex-end;font-size:9px;color:#0a1a3a">
+            <span style="color:#0a1a3a;font-weight:700">${dStr}</span>
+            <span onclick="${togglerJs}" title="${isDone?'กดเพื่อยกเลิกเสร็จ':'กดเพื่อทำเครื่องหมายเสร็จ'}" style="width:13px;height:13px;border-radius:3px;border:1.5px solid ${checkboxBorder};background:${checkboxBg};cursor:pointer;flex-shrink:0;transition:.15s"></span>
+          </span>
         </div>`;
       }).join('');
 
@@ -4986,7 +5066,188 @@ function renderTrkBoard(){
     return card;
   });
   if(changed)saveTrkCards(cards);
-  el.innerHTML=cards.map(card=>renderTrkCardHTML(card)).join('');
+  el.innerHTML = renderTrkChipSelectorHTML(cards, projMap);
+}
+
+// New compact chip selector — replaces large board cards
+// Lets admin choose which projects appear in the calendar above
+function renderTrkChipSelectorHTML(cards, projMap){
+  if(!cards.length) return '';
+  const palette = ['#00B4FF','#FFAA00','#9B6FFF','#FF6E40','#80CBC4','#FF80AB','#40CFFF','#FFD740','#69F0AE','#B0BEC5'];
+  // Build chip list (sort by deadline asc)
+  const enriched = cards.map((card, idx) => {
+    const p = card.projId ? projMap[card.projId] : null;
+    const projName = p ? p.name : (card.title || 'การ์ด');
+    const projClient = p?.client || '';
+    // earliest deadline among phases
+    const phaseDeadlines = Object.values(card.phases||{}).map(ph=>ph?.deadline).filter(Boolean).sort();
+    const earliestDL = phaseDeadlines[0] || '';
+    const daysLeft = earliestDL ? Math.ceil((new Date(earliestDL) - new Date())/(864e5)) : null;
+    return {
+      card, p, projName, projClient,
+      color: palette[idx % palette.length],
+      isChecked: trkCheckedCards.has(card.id),
+      daysLeft, earliestDL,
+    };
+  });
+  // Sort: checked first, then by deadline
+  enriched.sort((a,b)=>{
+    if(a.isChecked !== b.isChecked) return a.isChecked ? -1 : 1;
+    if(!a.earliestDL) return 1;
+    if(!b.earliestDL) return -1;
+    return a.earliestDL.localeCompare(b.earliestDL);
+  });
+
+  const checkedCount = enriched.filter(x=>x.isChecked).length;
+  const totalCount   = enriched.length;
+  const allChecked   = checkedCount === totalCount;
+  const hasAny       = totalCount > 0;
+
+  const headerHTML = `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px">
+      🎯 เลือกโปรเจกต์ที่จะแสดงในปฏิทิน
+      <span style="font-size:11px;color:var(--text2);font-weight:500">(${checkedCount}/${totalCount})</span>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:6px">
+      ${hasAny ? `<button onclick="trkChipToggleAll(${!allChecked})" style="padding:5px 12px;border-radius:7px;background:transparent;border:1px solid var(--border2);color:var(--text2);font-family:Kanit;font-size:11px;font-weight:700;cursor:pointer">${allChecked?'☐ ยกเลิกทั้งหมด':'☑ เลือกทั้งหมด'}</button>` : ''}
+    </div>
+  </div>`;
+
+  const chipsHTML = enriched.map(({card, p, projName, projClient, color, isChecked, daysLeft, earliestDL}) => {
+    const dlBadge = daysLeft===null ? ''
+      : daysLeft<0 ? `<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:rgba(255,64,64,.15);color:var(--red);font-weight:700">เกิน ${Math.abs(daysLeft)} วัน</span>`
+      : daysLeft===0 ? `<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:rgba(255,64,64,.15);color:var(--red);font-weight:700">วันนี้!</span>`
+      : daysLeft<=3 ? `<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:rgba(255,158,0,.15);color:var(--orange);font-weight:700">${daysLeft} วัน</span>`
+      : '';
+    const isDoneProj = p?.projStatus==='done';
+    const isCancelled = p?.projStatus==='cancelled';
+    const projIcon = isDoneProj?'✅':isCancelled?'❌':'📁';
+    const opacityStyle = (isDoneProj||isCancelled) ? 'opacity:.6' : '';
+    const projLabelEsc = String(projName).replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    const clientEsc = projClient ? ' · '+String(projClient).replace(/</g,'&lt;') : '';
+
+    const chipBg = isChecked
+      ? `linear-gradient(90deg, ${color}25 0%, ${color}10 100%)`
+      : 'rgba(0,0,0,.2)';
+    const chipBorder = isChecked ? color : 'var(--border2)';
+    const checkBoxBg = isChecked ? color : 'transparent';
+    const checkMark  = isChecked ? '✓' : '';
+    const checkColor = isChecked ? '#fff' : 'transparent';
+
+    return `<div onclick="trkChipToggle('${card.id}')" style="display:inline-flex;align-items:center;gap:8px;padding:7px 12px;
+      background:${chipBg};border:1.5px solid ${chipBorder};border-radius:18px;cursor:pointer;
+      transition:.15s;font-size:12px;font-weight:600;color:var(--text);${opacityStyle}"
+      onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 2px 8px rgba(0,0,0,.25)'"
+      onmouseout="this.style.transform='';this.style.boxShadow=''">
+      <span style="width:16px;height:16px;border-radius:4px;background:${checkBoxBg};border:1.5px solid ${chipBorder};display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:${checkColor};font-weight:900;flex-shrink:0">${checkMark}</span>
+      <span style="width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0"></span>
+      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px">${projIcon} ${projLabelEsc}<span style="color:var(--text2);font-weight:500">${clientEsc}</span></span>
+      ${dlBadge}
+      <button onclick="event.stopPropagation();trkChipOpenProj('${card.projId||''}')" title="เปิดโปรเจกต์" style="background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:13px;padding:0 2px;flex-shrink:0">↗</button>
+    </div>`;
+  }).join('');
+
+  return `<div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px 16px">
+    ${headerHTML}
+    <div style="display:flex;flex-wrap:wrap;gap:7px">${chipsHTML || '<div style="color:var(--text2);font-size:12px;padding:14px;text-align:center;width:100%">ไม่มีโปรเจกต์ตรงเงื่อนไข</div>'}</div>
+  </div>`;
+}
+
+function trkChipToggle(cardId){
+  if(trkCheckedCards.has(cardId)) trkCheckedCards.delete(cardId);
+  else trkCheckedCards.add(cardId);
+  saveTrkCheckedCards();
+  renderTrkBoard();
+  renderTrkCalendar();
+}
+
+function trkChipToggleAll(checkAll){
+  const cards = getTrkCards();
+  if(checkAll){
+    cards.forEach(c => trkCheckedCards.add(c.id));
+  } else {
+    trkCheckedCards.clear();
+  }
+  saveTrkCheckedCards();
+  renderTrkBoard();
+  renderTrkCalendar();
+}
+
+function trkChipOpenProj(projId){
+  if(!projId){ toast('การ์ดนี้ยังไม่ได้ผูกกับโปรเจกต์','info'); return; }
+  if(typeof openProjDetail==='function') openProjDetail(projId);
+}
+
+// Toggle phase done status from calendar checkbox
+async function trkTogglePhaseDone(cardId, phaseKey){
+  if(!cardId || !phaseKey) return;
+  const cards = getTrkCards();
+  const idx = cards.findIndex(c => c.id === cardId);
+  if(idx < 0){ toast('ไม่พบการ์ด','error'); return; }
+  if(!cards[idx].phases) cards[idx].phases = {};
+  if(!cards[idx].phases[phaseKey]) cards[idx].phases[phaseKey] = {startDate:'',deadline:'',status:'none'};
+  const cur = cards[idx].phases[phaseKey].status;
+  const newStatus = (cur === 'done') ? 'doing' : 'done';
+  cards[idx].phases[phaseKey].status = newStatus;
+  saveTrkCards(cards);
+
+  // Sync ไปยัง projects/{projId}/phases/{phaseKey}/status ถ้าผูกโปรเจกต์
+  const linkedProjId = cards[idx].projId;
+  if(linkedProjId){
+    try {
+      const projs = getProjects();
+      const p = projs.find(x => x.id === linkedProjId);
+      if(p){
+        if(!p.phases) p.phases = {};
+        if(!p.phases[phaseKey]) p.phases[phaseKey] = {startDate:'',deadline:'',status:'none'};
+        p.phases[phaseKey].status = newStatus;
+        // saveProjectDB handles cache + Firebase write atomically
+        await saveProjectDB(p);
+      }
+    } catch(e){ console.warn('sync phase status to project failed:', e); }
+  }
+
+  renderTrkCalendar();
+  if(typeof toast==='function'){
+    toast(newStatus === 'done' ? '✅ ทำเครื่องหมายเสร็จ' : '⏳ ยกเลิกเครื่องหมายเสร็จ','info');
+  }
+}
+
+// Toggle entire project done/undone from calendar header button
+async function trkToggleProjectDone(projId){
+  if(!projId){ toast('โปรเจกต์ไม่ผูกอยู่กับการ์ด','error'); return; }
+  const projs = getProjects();
+  const p = projs.find(x => x.id === projId);
+  if(!p){ toast('ไม่พบโปรเจกต์','error'); return; }
+
+  const isCurrentlyDone = p.projStatus === 'done';
+  const newStatus = isCurrentlyDone ? 'active' : 'done';
+
+  // Optional: confirm before marking done (because it affects everything)
+  if(!isCurrentlyDone){
+    if(!confirm(`ทำเครื่องหมายโปรเจกต์ "${p.name}" ว่าเสร็จสิ้น?\n\n• ทุก phase ภายในจะถือว่าเสร็จด้วย\n• คุณยังสามารถยกเลิกได้ในภายหลังโดยกดปุ่มอีกครั้ง`)) return;
+  }
+
+  p.projStatus = newStatus;
+  // Mirror to all phases
+  if(p.phases && typeof p.phases === 'object'){
+    Object.keys(p.phases).forEach(k => {
+      if(p.phases[k]) p.phases[k].status = newStatus === 'done' ? 'done' : (p.phases[k].status === 'done' ? 'doing' : (p.phases[k].status||'none'));
+    });
+  }
+
+  try {
+    await saveProjectDB(p);
+    if(typeof toast==='function'){
+      toast(newStatus === 'done' ? `✅ "${p.name}" เสร็จสิ้นแล้ว` : `↩ ยกเลิกสถานะเสร็จสิ้นของ "${p.name}"`,'success');
+    }
+  } catch(e){
+    console.error('toggle proj done error:', e);
+    toast('❌ บันทึกไม่สำเร็จ: '+e.message,'error');
+    return;
+  }
+  renderTrkCalendar();
+  renderTrkBoard();
 }
 
 // Helper: ลบ dismiss flags ทั้งหมด (กู้คืนการ์ดที่ user เคยลบ)
@@ -9508,243 +9769,6 @@ function repreviewDoc(type, docNo) {
 
 
 
-// ══════════════════════════════════════════════
-// PROJECT CALENDAR — deadline view from real projects
-// ══════════════════════════════════════════════
-let projCalMonth = new Date().getMonth();
-let projCalYear  = new Date().getFullYear();
-let projCalFilter = 'all';
-let projCalSearchQ = ''; // 'all' | projId
-let projCalSort = 'newest'; // 'newest' | 'oldest'
-
-function renderProjCal() {
-  const el = document.getElementById('proj-cal-content'); if (!el) return;
-  const TM = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
-              'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-  const dows = ['อา','จ','อ','พ','พฤ','ศ','ส'];
-  const today = new Date(); today.setHours(0,0,0,0);
-  const years = []; for (let y=projCalYear-2; y<=projCalYear+2; y++) years.push(y);
-  const projs = getProjects();
-
-  // Color palette — one per project
-  const palette = ['#00B4FF','#FFAA00','#00DFA0','#9B6FFF','#FF6060','#FF80AB',
-                   '#40CFFF','#FFD740','#69F0AE','#FF6E40','#B0BEC5','#80CBC4'];
-  const projColors = {};
-  projs.forEach((p,i) => projColors[p.id] = palette[i % palette.length]);
-
-  // ── ALL projects that have a deadline (no month restriction)
-  const allEvents = projs
-    .filter(p => {
-      if (!p.deadline) return false;
-      if (projCalFilter !== 'all' && p.id !== projCalFilter) return false;
-      if (projCalSearchQ && !p.name.toLowerCase().includes(projCalSearchQ) && !(p.client||'').toLowerCase().includes(projCalSearchQ)) return false;
-      return true;
-    })
-    .map(p => {
-      const s = p.startDate ? parseLocalDate(p.startDate) : parseLocalDate(p.deadline);
-      const e = parseLocalDate(p.deadline);
-      const daysLeft = Math.ceil((e - today) / 864e5);
-      return {
-        p, start: s, end: e, color: projColors[p.id],
-        isOverdue: daysLeft < 0, isUrgent: daysLeft >= 0 && daysLeft <= 3, daysLeft
-      };
-    });
-
-  // Filter to just this month's visible range (but deadline dot always shown)
-  const monthStart = new Date(projCalYear, projCalMonth, 1);
-  const monthEnd   = new Date(projCalYear, projCalMonth+1, 0); monthEnd.setHours(23,59,59);
-
-  // Events that overlap this month (bar shown in calendar)
-  const visibleEvents = allEvents.filter(ev => ev.start <= monthEnd && ev.end >= monthStart);
-
-  // Dropdown + legend
-  const filterOpts = projs.map(p =>
-    `<option value="${p.id}" ${projCalFilter===p.id?'selected':''}>${p.name}${p.client?' · '+p.client:''}</option>`
-  ).join('');
-
-  const legendItems = allEvents.map(ev => {
-    const stIcon = getProjStatus(ev.p)==='paid'?'✅':getProjStatus(ev.p)==='approved'?'🔵':'⏳';
-    const isDoneLeg = getProjStatus(ev.p)==='paid';
-    const dLabel = isDoneLeg?'<span style="color:var(--green)">✅ เสร็จแล้ว</span>':ev.daysLeft<0?`เกิน${Math.abs(ev.daysLeft)}วัน`:ev.daysLeft===0?'วันนี้!':ev.daysLeft+'วัน';
-    const bg = isDoneLeg?'rgba(0,223,160,.08)':ev.isOverdue?'rgba(255,64,64,.12)':ev.isUrgent?'rgba(255,119,0,.12)':'rgba(255,255,255,.05)';
-    const border = isDoneLeg?'rgba(0,223,160,.25)':ev.isOverdue?'rgba(255,64,64,.35)':ev.isUrgent?'rgba(255,119,0,.35)':'var(--border2)';
-    return `<div style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;background:${bg};border:1px solid ${border};cursor:pointer;flex-shrink:0"
-              onclick="projCalFilter='${ev.p.id}';renderProjCal()">
-      <div style="width:12px;height:12px;border-radius:3px;background:${isDoneLeg?'var(--green)':ev.isOverdue?'#FF4040':ev.isUrgent?'#FF7700':ev.color};flex-shrink:0"></div>
-      <span style="font-size:11px;font-weight:700;color:${isDoneLeg?'var(--green)':ev.isOverdue?'var(--red)':ev.isUrgent?'var(--orange)':'var(--text)'}">${stIcon} ${ev.p.name}</span>
-      <span style="font-size:10px;color:${isDoneLeg?'var(--green)':ev.isOverdue?'var(--red)':ev.isUrgent?'var(--orange)':'var(--text2)'}">${dLabel}</span>
-    </div>`;
-  });
-
-  // ── Calendar grid ──
-  const firstDay = new Date(projCalYear, projCalMonth, 1);
-  const lastDay  = new Date(projCalYear, projCalMonth+1, 0);
-  const startDow = firstDay.getDay();
-  const cells = [];
-  for (let i=0; i<startDow; i++) cells.push(null);
-  for (let d=1; d<=lastDay.getDate(); d++) cells.push(d);
-  while (cells.length%7!==0) cells.push(null);
-  const weeks = []; for (let i=0; i<cells.length; i+=7) weeks.push(cells.slice(i,i+7));
-
-  let calHtml = `<div class="trk-calendar-card" style="margin-bottom:14px">
-    <div class="trk-cal-nav">
-      <button class="trk-cal-nav-btn" onclick="projCalMonth--;if(projCalMonth<0){projCalMonth=11;projCalYear--}renderProjCal()">‹ ก่อน</button>
-      <div class="trk-cal-title" style="display:flex;align-items:center;gap:8px">
-        🗓️
-        <select style="padding:6px 30px 6px 10px;font-size:15px;background:#f0f6ff;border:1px solid #c8d8f5;border-radius:8px;color:#0d1f3c;font-family:Kanit;font-weight:800;cursor:pointer;outline:none;appearance:none;background-image:url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%231565FF%27 stroke-width=%272.5%27%3E%3Cpath d=%27m6 9 6 6 6-6%27/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 8px center"
-          onchange="projCalMonth=parseInt(this.value);renderProjCal()">
-          ${TM.map((m,idx)=>`<option value="${idx}" ${idx===projCalMonth?'selected':''}>${m}</option>`).join('')}
-        </select>
-        <select class="trk-cal-year-sel" onchange="projCalYear=parseInt(this.value);renderProjCal()">
-          ${years.map(y=>`<option value="${y}"${y===projCalYear?' selected':''}>${y+543}</option>`).join('')}
-        </select>
-        <button onclick="projCalMonth=new Date().getMonth();projCalYear=new Date().getFullYear();renderProjCal()" style="padding:5px 12px;border-radius:7px;background:#1565FF;border:none;color:#fff;font-family:Kanit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap" title="กลับมาเดือนปัจจุบัน">วันนี้</button>
-      </div>
-      <button class="trk-cal-nav-btn" onclick="projCalMonth++;if(projCalMonth>11){projCalMonth=0;projCalYear++}renderProjCal()">หน้า ›</button>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:2px">
-      ${dows.map(d=>`<div class="trk-cal-dow">${d}</div>`).join('')}
-    </div>`;
-
-  weeks.forEach(week => {
-    const dayRow = week.map(d => {
-      if (!d) return `<div style="min-height:24px;padding:3px 0;border-right:1px solid #edf2fa;background:#fafcff"></div>`;
-      const dt = new Date(projCalYear, projCalMonth, d); dt.setHours(0,0,0,0);
-      const isToday = dt.getTime()===today.getTime();
-      // Deadline dots (projects whose deadline falls on this day)
-      const deadlinesOnDay = allEvents.filter(ev => ev.end.getTime()===dt.getTime());
-      const dots = deadlinesOnDay.length
-        ? `<div style="display:flex;justify-content:center;gap:2px;margin-top:2px">
-            ${deadlinesOnDay.map(ev=>`<div title="Deadline: ${ev.p.name}" style="width:7px;height:7px;border-radius:50%;background:${ev.isOverdue?'#FF4040':ev.isUrgent?'#FFAA00':ev.color};flex-shrink:0;cursor:pointer" onclick="openProjDetail('${ev.p.id}')"></div>`).join('')}
-           </div>` : '';
-      return `<div style="min-height:24px;padding:3px 0;text-align:center;border-right:1px solid #edf2fa;position:relative">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;font-size:12px;font-weight:700;color:${isToday?'#fff':'#0d1f3c'};background:${isToday?'#1565FF':'transparent'}">${d}</span>
-        ${dots}
-        ${isToday?`<div style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;background:#1565FF;border:2.5px solid #fff;box-shadow:0 0 0 2px rgba(21,101,255,.5);z-index:999"></div>`:''}
-      </div>`;
-    }).join('');
-
-    const wFirst = week.find(d=>d), wLast=[...week].reverse().find(d=>d);
-    if (!wFirst) { calHtml+=`<div style="display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid #edf2fa">${dayRow}</div>`; return; }
-    const wS=new Date(projCalYear,projCalMonth,wFirst); wS.setHours(0,0,0,0);
-    const wE=new Date(projCalYear,projCalMonth,wLast); wE.setHours(23,59,59,999);
-
-    // Only show bars for events overlapping this week
-    const weekBars = visibleEvents.map((ev, rowIdx) => {
-      if (ev.start>wE || ev.end<wS) return '';
-      const clampS = ev.start<wS?wS:ev.start;
-      const clampE = ev.end>wE?wE:ev.end;
-      const colS=clampS.getDay(), colE=clampE.getDay();
-      const span=colE-colS+1; if(span<=0) return '';
-      const isDoneProj=ev.p.projStatus==='done'||getProjStatus(ev.p)==='paid';
-      const barColor=isDoneProj?'rgba(0,223,160,.5)':ev.p.projStatus==='cancelled'?'rgba(150,150,150,.5)':ev.isOverdue?'#FF4040':ev.isUrgent?'#FF7700':ev.color;
-      const isFirst=ev.start>=wS, isLast=ev.end<=wE;
-      const deadlineLabel = isLast ? `<span style="font-size:9px;font-weight:900;margin-left:4px;opacity:.85">${ev.daysLeft<0?'⚠️':'🏁'}</span>` : '';
-      return `<div style="position:absolute;top:${rowIdx*22+2}px;left:calc(${colS}*(100%/7) + 2px);width:calc(${span}*(100%/7) - 4px);height:19px;
-        border-radius:${isFirst?'5px':'0'} ${isLast?'5px':'0'} ${isLast?'5px':'0'} ${isFirst?'5px':'0'};
-        background:${barColor};display:flex;align-items:center;padding:0 7px;overflow:hidden;
-        box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer" onclick="openProjDetail('${ev.p.id}')"
-        title="${ev.p.name} · ${ev.isOverdue?'เกิน '+Math.abs(ev.daysLeft)+' วัน':ev.daysLeft===0?'วันนี้!':ev.daysLeft+' วันเหลือ'}">
-        <span style="font-size:10px;font-weight:800;color:#000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-          ${ev.isOverdue?'⚠️ ':ev.isUrgent?'🔴 ':''} ${ev.p.name}
-        </span>${deadlineLabel}
-      </div>`;
-    }).join('');
-
-    // Today's vertical line — shown inside the bars layer on top
-    const todayColIdx = week.findIndex(d => {
-      if (!d) return false;
-      const dt = new Date(projCalYear, projCalMonth, d); dt.setHours(0,0,0,0);
-      return dt.getTime() === today.getTime();
-    });
-    const todayDot = todayColIdx >= 0
-      ? `<div style="position:absolute;top:3px;left:calc(${todayColIdx}*(100%/7) + (100%/14));transform:translateX(-50%);width:14px;height:14px;border-radius:50%;background:#1565FF;border:2.5px solid #fff;box-shadow:0 0 0 2px rgba(21,101,255,.6);z-index:999;pointer-events:none"></div>`
-      : '';
-
-    const barsH = Math.max(4, visibleEvents.filter(ev=>ev.start<=wE&&ev.end>=wS).length*22+6);
-    calHtml+=`<div style="display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid #edf2fa">${dayRow}</div>
-      <div style="position:relative;height:${barsH}px;margin-bottom:2px">${weekBars}${todayDot}</div>`;
-  });
-  calHtml += '</div>';
-
-  // ── Deadline table (all events sorted)
-  const sorted = [...allEvents].sort((a,b) => projCalSort==='oldest' ? a.end-b.end : b.end-a.end);
-  const overdueCnt = sorted.filter(e=>e.isOverdue&&e.p.projStatus!=='done'&&e.p.projStatus!=='cancelled').length;
-  const urgentCnt  = sorted.filter(e=>e.isUrgent&&e.p.projStatus!=='done'&&e.p.projStatus!=='cancelled').length;
-
-  const tableHtml = sorted.length ? `
-    <div class="table-wrap">
-      <div class="table-header">
-        <div class="table-title">📌 Deadline ทั้งหมด</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <select class="form-input form-select" style="padding:5px 24px 5px 8px;font-size:11px;width:120px" onchange="projCalSort=this.value;renderProjCal()">${projCalSort==='newest'?'<option value=\"newest\" selected>\uD83D\uDD3D \u0e43\u0e2b\u0e21\u0e48\u0e2a\u0e38\u0e14</option><option value=\"oldest\">\uD83D\uDD3C \u0e40\u0e01\u0e48\u0e32\u0e2a\u0e38\u0e14</option>':'<option value=\"newest\">\uD83D\uDD3D \u0e43\u0e2b\u0e21\u0e48\u0e2a\u0e38\u0e14</option><option value=\"oldest\" selected>\uD83D\uDD3C \u0e40\u0e01\u0e48\u0e32\u0e2a\u0e38\u0e14</option>'}</select>
-          ${overdueCnt?`<span style="font-size:11px;padding:3px 10px;border-radius:8px;background:rgba(255,64,64,.12);color:var(--red);font-weight:700">🔴 เกิน deadline: ${overdueCnt}</span>`:''}
-          ${urgentCnt?`<span style="font-size:11px;padding:3px 10px;border-radius:8px;background:rgba(255,158,0,.12);color:var(--orange);font-weight:700">⚠️ ใกล้ deadline: ${urgentCnt}</span>`:''}
-        </div>
-      </div>
-      <table><thead><tr>
-        <th>โปรเจกต์</th><th>ลูกค้า</th><th>ประเภท</th>
-        <th>เริ่มงาน</th><th>Deadline</th><th>เหลือ</th><th>สถานะงาน</th>
-      </tr></thead><tbody>
-      ${sorted.map(ev=>{
-        const st=getProjStatus(ev.p);
-        const stBadge=st==='paid'?`<span class="badge badge-paid">✅ จ่ายครบ</span>`:st==='approved'?`<span class="badge badge-approved">🔵 อนุมัติ</span>`:`<span class="badge badge-pending">⏳ รอจ่าย</span>`;
-        const isDone=ev.p.projStatus==='done'||getProjStatus(ev.p)==='paid';
-        const isCancelled=ev.p.projStatus==='cancelled';
-        const dColor=isDone?'var(--green)':isCancelled?'var(--text2)':ev.isOverdue?'var(--red)':ev.isUrgent?'var(--orange)':'var(--text2)';
-        const dLabel=isDone?'<span style="color:var(--green);font-weight:700">✅ เสร็จแล้ว</span>':isCancelled?'❌ ยกเลิก':ev.daysLeft===0?'🔴 วันนี้!':ev.isOverdue?`⚠️ เกิน ${Math.abs(ev.daysLeft)} วัน`:`${ev.daysLeft} วัน`;
-        return `<tr>
-          <td style="cursor:pointer" onclick="openProjDetail('${ev.p.id}')">
-            <div style="display:flex;align-items:center;gap:8px">
-              <div style="width:10px;height:10px;border-radius:2px;background:${ev.color};flex-shrink:0"></div>
-              <strong>${ev.p.name}</strong>
-            </div>
-          </td>
-          <td style="color:var(--text2);font-size:12px">${ev.p.client||'—'}</td>
-          <td><span style="font-size:11px;background:var(--bg2);padding:2px 8px;border-radius:8px;color:var(--text2)">${ev.p.type||'—'}</span></td>
-          <td style="font-size:12px;color:var(--text2)">${ev.p.startDate?fmtDate(ev.p.startDate):'—'}</td>
-          <td style="font-size:12px;font-weight:700">${fmtDate(ev.p.deadline)}</td>
-          <td style="font-weight:800;color:${dColor}">${dLabel}</td>
-          <td>
-            <select class="form-select" onclick="event.stopPropagation()"
-              style="padding:4px 24px 4px 8px;font-size:11px;border-radius:7px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:Kanit;cursor:pointer"
-              onchange="saveProjStatusAndRefreshCal('${ev.p.id}',this.value)">
-              <option value="notstarted" ${(ev.p.projStatus||'notstarted')==='notstarted'?'selected':''}>⬜ ยังไม่เริ่ม</option>
-              <option value="inprogress" ${ev.p.projStatus==='inprogress'?'selected':''}>⚙️ กำลังทำ</option>
-              <option value="done"       ${ev.p.projStatus==='done'?'selected':''}>✅ เสร็จแล้ว</option>
-              <option value="cancelled"  ${ev.p.projStatus==='cancelled'?'selected':''}>❌ ยกเลิก</option>
-            </select>
-          </td>
-        </tr>`;  // (merged above)
-      }).join('')}
-      </tbody></table>
-    </div>` : `<div style="text-align:center;padding:40px;color:var(--text2)">ยังไม่มีโปรเจกต์ที่มี deadline</div>`;
-
-  const filterBar = `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-    <select class="form-input form-select" style="padding:8px 32px 8px 12px;font-size:13px;max-width:260px" onchange="projCalFilter=this.value;renderProjCal()">
-      <option value="all" ${projCalFilter==='all'?'selected':''}>📋 ทุกโปรเจกต์ (${projs.length})</option>
-      ${filterOpts}
-    </select>
-    <select class="form-input form-select" style="padding:8px 32px 8px 12px;font-size:13px;width:140px" onchange="projCalSort=this.value;renderProjCal()">
-      <option value="newest" ${projCalSort==='newest'?'selected':''}>🔽 ใหม่สุด</option>
-      <option value="oldest" ${projCalSort==='oldest'?'selected':''}>🔼 เก่าสุด</option>
-    </select>
-    <div class="search-bar" style="margin:0;flex:1;max-width:280px">
-      <span class="icon">🔍</span>
-      <input placeholder="พิมค้นหาโปรเจกต์..." id="projcal-search"
-        oninput="projCalSearchQ=this.value.toLowerCase();renderProjCal()"
-        value="${typeof projCalSearchQ!=='undefined'?projCalSearchQ:''}"
-        style="font-size:13px">
-    </div>
-    ${projCalFilter!=='all'||projCalSearchQ?`<button class="btn btn-xs btn-outline" onclick="projCalFilter='all';projCalSearchQ='';renderProjCal()">✕ ล้าง</button>`:''}
-  </div>`;
-
-  const legendWrap = allEvents.length
-    ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">${legendItems.join('')}</div>` : '';
-
-  el.innerHTML = filterBar + calHtml + tableHtml;
-}
-
 
 function parseLocalDate(str) {
   if (!str) return new Date();
@@ -10338,7 +10362,8 @@ async function saveProjStatus(projId, status) {
 
 async function saveProjStatusAndRefreshCal(projId, status) {
   await saveProjStatus(projId, status);
-  renderProjCal();
+  // Refresh Track page (replaces old proj-cal page)
+  if(typeof renderTrack === 'function') renderTrack();
   // Also refresh projects page if active
   if (document.getElementById('page-projects')?.classList.contains('hidden') === false) {
     renderProjects();
