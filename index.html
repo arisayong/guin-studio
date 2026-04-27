@@ -4882,8 +4882,6 @@ function renderTrkCalendar() {
             onmouseout="this.style.background='transparent';this.style.color='${finalFrameColor}'">✅ เสร็จ</button>`;
         }
       }
-      // DEBUG marker — ลบทิ้งหลังทดสอบเสร็จ
-      console.log('[TRK_BTN v3]', g.projLabel, 'wIdx:', _currentWeekIdx, 'lastWeek:', _projLastWeekIdx.get(_gKey), 'showBtn:', showDoneBtn);
 
       const headerHTML = `<div style="position:absolute;top:${cardTop+1}px;left:${frameLeft};width:${frameWidth};height:${HEAD_H-1}px;
         background:${headerBg};border-bottom:1px solid rgba(0,0,0,.06);border-radius:${radL} ${radR} 0 0;
@@ -4909,7 +4907,7 @@ function renderTrkCalendar() {
       const phasesHTML = visiblePhases.map((ph, phIdx) => {
         const rowTop = cardTop + HEAD_H + phIdx * PHASE_ROW_H;
         const isDone = !!ph.done;
-        const isLastSeg = ph.end <= wE;
+        const isLastSeg = ph.end <= wE;  // phase จบในสัปดาห์นี้ → แสดงกล่องติ๊ก + deadline
 
         // Bar fill % — based on phase start..end relative to frame range
         const phStartTime = Math.max(ph.start.getTime(), frameStartTime);
@@ -4924,20 +4922,26 @@ function renderTrkCalendar() {
           : '';
 
         const phLabelEsc = String(ph.label||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-        // Strip "Adapt" out of full PHASES.label (which is "✍️ Adapt") to keep it short
         const shortLabel = phLabelEsc.replace(/Adaptation/, 'Adapt').replace(/Dubbing/, 'Dub').replace(/Manager/, 'Mgr');
 
         // Color tone: dim if done
         const phColor = isDone ? '#22C55E' : ph.color;
-        const phBgTone = isDone ? 'rgba(34,197,94,.18)' : (ph.color + '22');  // 22 = ~13% alpha
         const checkboxBg = isDone ? '#22C55E' : 'transparent';
         const checkboxBorder = isDone ? '#22C55E' : '#5878a0';
 
         // Onclick — toggle done/undone (need cardId + phase key)
-        // Find original phase key by matching label (since we built phases array earlier)
         const cardIdEsc = String(g.cardId||'').replace(/'/g,"\\'");
         const phKeyEsc  = String(ph.key||'').replace(/'/g,"\\'");
         const togglerJs = `event.stopPropagation();trkTogglePhaseDone('${cardIdEsc}','${phKeyEsc}')`;
+
+        // === META section (deadline + checkbox) ===
+        // แสดงเฉพาะถ้าเป็น segment สุดท้ายของ phase นี้ — กันแสดงกล่องติ๊กซ้ำในสัปดาห์ที่ยังไม่จบ
+        const metaHTML = isLastSeg
+          ? `<span style="flex:0 0 ${META_W}px;display:flex;align-items:center;gap:6px;padding:0 8px;justify-content:flex-end;font-size:9px;color:#0a1a3a">
+              <span style="color:#0a1a3a;font-weight:700">${dStr}</span>
+              <span onclick="${togglerJs}" title="${isDone?'กดเพื่อยกเลิกเสร็จ':'กดเพื่อทำเครื่องหมายเสร็จ'}" style="width:13px;height:13px;border-radius:3px;border:1.5px solid ${checkboxBorder};background:${checkboxBg};cursor:pointer;flex-shrink:0;transition:.15s"></span>
+            </span>`
+          : '';   // segment ที่ยังไม่จบ → ไม่มีกล่องติ๊ก ปล่อยให้ bar ยาวเลย
 
         return `<div style="position:absolute;top:${rowTop}px;left:${frameLeft};width:${frameWidth};height:${PHASE_ROW_H-1}px;
           display:flex;align-items:center;
@@ -4945,15 +4949,11 @@ function renderTrkCalendar() {
           font-size:9.5px;font-weight:700;color:#0a1a3a;box-sizing:border-box;overflow:hidden">
           <!-- Left: name -->
           <span style="flex:0 0 ${NAME_W}px;padding:0 6px 0 8px;color:${phColor};font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-right:1px solid rgba(255,255,255,.5)">${shortLabel}${isDone?' ✓':''}</span>
-          <!-- Middle: bar track + fill -->
+          <!-- Middle: bar track + fill (กว้างเต็มถ้า isLastSeg=false) -->
           <div style="flex:1;height:6px;background:rgba(0,0,0,.06);border-radius:3px;margin:0 8px;position:relative;overflow:hidden">
             <div style="position:absolute;left:${fillLeftPct.toFixed(2)}%;width:${fillWidthPct.toFixed(2)}%;top:0;bottom:0;background:${phColor};border-radius:3px;${isDone?'opacity:.7':''}"></div>
           </div>
-          <!-- Right: deadline + checkbox -->
-          <span style="flex:0 0 ${META_W}px;display:flex;align-items:center;gap:6px;padding:0 8px;justify-content:flex-end;font-size:9px;color:#0a1a3a">
-            <span style="color:#0a1a3a;font-weight:700">${dStr}</span>
-            <span onclick="${togglerJs}" title="${isDone?'กดเพื่อยกเลิกเสร็จ':'กดเพื่อทำเครื่องหมายเสร็จ'}" style="width:13px;height:13px;border-radius:3px;border:1.5px solid ${checkboxBorder};background:${checkboxBg};cursor:pointer;flex-shrink:0;transition:.15s"></span>
-          </span>
+          ${metaHTML}
         </div>`;
       }).join('');
 
