@@ -1960,9 +1960,15 @@ body.sidebar-collapsed .main-content{
 
 <div id="modal-project" class="modal-overlay hidden">
  <div class="modal" style="width:820px">
-  <div class="modal-head">
-   <div class="modal-title" id="proj-modal-title">➕ สร้างโปรเจกต์ใหม่</div>
-   <button class="btn-close" onclick="closeModal('modal-project')">✕</button>
+  <div class="modal-head" id="proj-modal-head" style="flex-direction:column;align-items:stretch;gap:0;padding:14px 18px">
+   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+    <div style="flex:1;min-width:0">
+     <div id="proj-modal-mode" style="font-size:12px;color:var(--text2);font-weight:600;margin-bottom:2px">➕ สร้างโปรเจกต์ใหม่</div>
+     <div id="proj-modal-title" class="modal-title" style="font-size:18px;line-height:1.25;margin-bottom:0">โปรเจกต์ใหม่</div>
+     <div id="proj-modal-meta" style="font-size:11px;color:var(--text2);font-weight:500;margin-top:3px;display:none"></div>
+    </div>
+    <button class="btn-close" onclick="closeModal('modal-project')" style="flex-shrink:0">✕</button>
+   </div>
   </div>
   <div class="modal-body">
    <div id="edit-presence-banner" style="display:none;background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.4);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--orange);line-height:1.5"></div>
@@ -5824,7 +5830,10 @@ async function openNewProject(){
   window._formDirty = false;
   initFormSlots();
   initFormPhases();
-  document.getElementById('proj-modal-title').textContent='➕ สร้างโปรเจกต์ใหม่';
+  document.getElementById('proj-modal-mode').textContent='➕ สร้างใหม่';
+  document.getElementById('proj-modal-title').textContent='โปรเจกต์ใหม่';
+  const _metaEl = document.getElementById('proj-modal-meta');
+  if(_metaEl){ _metaEl.textContent=''; _metaEl.style.display='none'; }
   ['pj-name','pj-client','pj-budget','pj-duration','pj-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const _ms=document.getElementById('pj-manager');if(_ms){const _mm=getAllManagerUsers();_ms.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+_mm.map(m=>`<option value="${m.uid}">${m.nickname||m.email}</option>`).join('');}
   ['pj-type'].forEach(id=>{const el=document.getElementById(id);if(el)el.selectedIndex=0;});
@@ -6483,7 +6492,17 @@ async function openEditProject(id){
   _editingBaseSnapshot = JSON.parse(JSON.stringify(p));
   window._formDirty = false;
   initFormSlots();
-  document.getElementById('proj-modal-title').textContent='✏️ แก้ไขโปรเจกต์';
+  document.getElementById('proj-modal-mode').textContent='✏️ กำลังแก้ไข';
+  document.getElementById('proj-modal-title').textContent= p.name || '(ไม่มีชื่อ)';
+  const _metaEl = document.getElementById('proj-modal-meta');
+  if(_metaEl){
+    const _metaParts = [];
+    if(p.type) _metaParts.push('🎬 '+p.type);
+    if(p.client) _metaParts.push('👤 '+p.client);
+    if(p.deadline) _metaParts.push('📅 '+fmtDate(p.deadline));
+    _metaEl.textContent = _metaParts.join('  ·  ');
+    _metaEl.style.display = _metaParts.length ? 'block' : 'none';
+  }
   document.getElementById('pj-name').value=p.name||'';
   document.getElementById('pj-client').value=p.client||'';
   // Populate manager dropdown
@@ -9437,22 +9456,77 @@ function renderProjCal() {
   projs.forEach((p,i) => projColors[p.id] = palette[i % palette.length]);
 
   // ── ALL projects that have a deadline (no month restriction)
-  const allEvents = projs
-    .filter(p => {
-      if (!p.deadline) return false;
-      if (projCalFilter !== 'all' && p.id !== projCalFilter) return false;
-      if (projCalSearchQ && !p.name.toLowerCase().includes(projCalSearchQ) && !(p.client||'').toLowerCase().includes(projCalSearchQ)) return false;
-      return true;
-    })
-    .map(p => {
+  // Now: each project becomes 1 group, with multiple phase rows inside
+  const PHASE_META = {
+    adp: { color:'#00B4FF', label:'✍️ Adapt' },
+    dub: { color:'#FF9E00', label:'🎤 Dub' },
+    mix: { color:'#00DFA0', label:'🎧 Mix' },
+    qc:  { color:'#9B6FFF', label:'✅ QC' },
+    sub: { color:'#FF4040', label:'🎬 Sub & Video' },
+    mgr: { color:'#1565FF', label:'🗂️ Manager' },
+  };
+  const PHASE_ORDER = ['adp','dub','mix','qc','sub','mgr'];
+
+  // Build event rows: each phase = 1 row · fall back to project's main deadline if no phases
+  const allEvents = [];
+  projs.forEach((p, projIdx) => {
+    if (projCalFilter !== 'all' && p.id !== projCalFilter) return;
+    if (projCalSearchQ && !p.name.toLowerCase().includes(projCalSearchQ) && !(p.client||'').toLowerCase().includes(projCalSearchQ)) return;
+
+    const projColor = palette[projIdx % palette.length];
+    // Collect all phase entries that have a deadline
+    const phaseRows = [];
+    if (p.phases && typeof p.phases === 'object') {
+      PHASE_ORDER.forEach(key => {
+        const ph = p.phases[key];
+        if (!ph || !ph.deadline) return;
+        const meta = PHASE_META[key];
+        const s = ph.startDate ? parseLocalDate(ph.startDate) : parseLocalDate(ph.deadline);
+        const e = parseLocalDate(ph.deadline);
+        const daysLeft = Math.ceil((e - today) / 864e5);
+        phaseRows.push({
+          phaseKey: key,
+          phaseLabel: meta.label,
+          phaseColor: meta.color,
+          start: s, end: e,
+          daysLeft,
+          isOverdue: daysLeft < 0,
+          isUrgent: daysLeft >= 0 && daysLeft <= 3,
+        });
+      });
+    }
+    // No phases? fall back to project deadline as single row
+    if (!phaseRows.length && p.deadline) {
       const s = p.startDate ? parseLocalDate(p.startDate) : parseLocalDate(p.deadline);
       const e = parseLocalDate(p.deadline);
       const daysLeft = Math.ceil((e - today) / 864e5);
-      return {
-        p, start: s, end: e, color: projColors[p.id],
-        isOverdue: daysLeft < 0, isUrgent: daysLeft >= 0 && daysLeft <= 3, daysLeft
-      };
+      phaseRows.push({
+        phaseKey: 'main',
+        phaseLabel: '📁 รวม',
+        phaseColor: projColor,
+        start: s, end: e,
+        daysLeft,
+        isOverdue: daysLeft < 0,
+        isUrgent: daysLeft >= 0 && daysLeft <= 3,
+      });
+    }
+    if (!phaseRows.length) return;
+
+    allEvents.push({
+      p,
+      color: projColor,
+      phases: phaseRows,
+      // Project-level overall info (use latest deadline among phases)
+      end: phaseRows.reduce((max,r) => r.end > max ? r.end : max, phaseRows[0].end),
+      start: phaseRows.reduce((min,r) => r.start < min ? r.start : min, phaseRows[0].start),
     });
+  });
+  // Compute project-wide daysLeft etc for backward compat with rest of the code
+  allEvents.forEach(ev => {
+    ev.daysLeft = Math.ceil((ev.end - today) / 864e5);
+    ev.isOverdue = ev.daysLeft < 0;
+    ev.isUrgent = ev.daysLeft >= 0 && ev.daysLeft <= 3;
+  });
 
   // Filter to just this month's visible range (but deadline dot always shown)
   const monthStart = new Date(projCalYear, projCalMonth, 1);
@@ -9533,27 +9607,83 @@ function renderProjCal() {
     const wS=new Date(projCalYear,projCalMonth,wFirst); wS.setHours(0,0,0,0);
     const wE=new Date(projCalYear,projCalMonth,wLast); wE.setHours(23,59,59,999);
 
-    // Only show bars for events overlapping this week
-    const weekBars = visibleEvents.map((ev, rowIdx) => {
-      if (ev.start>wE || ev.end<wS) return '';
-      const clampS = ev.start<wS?wS:ev.start;
-      const clampE = ev.end>wE?wE:ev.end;
-      const colS=clampS.getDay(), colE=clampE.getDay();
-      const span=colE-colS+1; if(span<=0) return '';
-      const isDoneProj=ev.p.projStatus==='done'||getProjStatus(ev.p)==='paid';
-      const barColor=isDoneProj?'rgba(0,223,160,.5)':ev.p.projStatus==='cancelled'?'rgba(150,150,150,.5)':ev.isOverdue?'#FF4040':ev.isUrgent?'#FF7700':ev.color;
-      const isFirst=ev.start>=wS, isLast=ev.end<=wE;
-      const deadlineLabel = isLast ? `<span style="font-size:9px;font-weight:900;margin-left:4px;opacity:.85">${ev.daysLeft<0?'⚠️':'🏁'}</span>` : '';
-      return `<div style="position:absolute;top:${rowIdx*22+2}px;left:calc(${colS}*(100%/7) + 2px);width:calc(${span}*(100%/7) - 4px);height:19px;
-        border-radius:${isFirst?'5px':'0'} ${isLast?'5px':'0'} ${isLast?'5px':'0'} ${isFirst?'5px':'0'};
-        background:${barColor};display:flex;align-items:center;padding:0 7px;overflow:hidden;
-        box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer" onclick="openProjDetail('${ev.p.id}')"
-        title="${ev.p.name} · ${ev.isOverdue?'เกิน '+Math.abs(ev.daysLeft)+' วัน':ev.daysLeft===0?'วันนี้!':ev.daysLeft+' วันเหลือ'}">
-        <span style="font-size:10px;font-weight:800;color:#000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-          ${ev.isOverdue?'⚠️ ':ev.isUrgent?'🔴 ':''} ${ev.p.name}
-        </span>${deadlineLabel}
+    // Render compact-card bars for projects overlapping this week
+    // Each project = 1 card · each phase = 1 row inside
+    const visibleInWeek = visibleEvents.filter(ev => ev.start <= wE && ev.end >= wS);
+    let rowOffset = 0;
+    const PHASE_ROW_H = 16;       // height of each phase strip
+    const HEAD_H      = 18;       // height of project header row
+    const CARD_GAP    = 5;        // gap between project cards
+    const HEAD_PAD_T  = 1;        // micro spacing for visual breathing
+    const cardBarsHTML = visibleInWeek.map((ev) => {
+      const visiblePhases = ev.phases.filter(ph => ph.start<=wE && ph.end>=wS);
+      if (!visiblePhases.length) return '';
+
+      const isDoneProj = ev.p.projStatus==='done' || getProjStatus(ev.p)==='paid';
+      const isCancelled = ev.p.projStatus==='cancelled';
+      const projOverdue = ev.isOverdue && !isDoneProj && !isCancelled;
+      const frameColor = isDoneProj?'#00DFA0':isCancelled?'#888':projOverdue?'#FF4040':ev.color;
+
+      const cardTop = rowOffset;
+      const cardHeight = HEAD_H + visiblePhases.length * PHASE_ROW_H;
+      rowOffset += cardHeight + CARD_GAP;
+
+      // Card frame (border + faint bg)
+      const frameHTML = `<div style="position:absolute;top:${cardTop}px;left:2px;right:2px;height:${cardHeight}px;
+        border:1px solid ${frameColor};border-radius:7px;background:rgba(255,255,255,.5);
+        overflow:hidden;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06)"
+        onclick="openProjDetail('${ev.p.id}')"
+        title="${(ev.p.name||'').replace(/"/g,'&quot;')} · ${ev.p.client||''}"></div>`;
+
+      // Card header (project name)
+      const projIcon = isDoneProj?'✅':isCancelled?'❌':projOverdue?'⚠️':'📁';
+      const headerHTML = `<div style="position:absolute;top:${cardTop+HEAD_PAD_T}px;left:6px;right:6px;height:${HEAD_H-HEAD_PAD_T}px;
+        background:rgba(0,0,0,.04);border-bottom:1px solid rgba(0,0,0,.06);border-radius:6px 6px 0 0;
+        padding:0 8px;display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;color:#0a1a3a;
+        pointer-events:none;overflow:hidden">
+        <span style="width:7px;height:7px;border-radius:50%;background:${frameColor};flex-shrink:0"></span>
+        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${projIcon} ${ev.p.name}${ev.p.client?' · '+ev.p.client:''}</span>
       </div>`;
+
+      // Phase rows — each phase clipped to its date range within the week
+      const phasesHTML = visiblePhases.map((ph, phIdx) => {
+        const clampS = ph.start<wS?wS:ph.start;
+        const clampE = ph.end>wE?wE:ph.end;
+        const colS = clampS.getDay(), colE = clampE.getDay();
+        const span = colE - colS + 1;
+        if (span <= 0) return '';
+
+        const phDoneOrCancel = isDoneProj || isCancelled;
+        const phColor = phDoneOrCancel
+          ? (isDoneProj?'rgba(0,223,160,.55)':'rgba(150,150,150,.45)')
+          : ph.isOverdue ? '#FF4040'
+          : ph.isUrgent ? '#FF7700'
+          : ph.phaseColor;
+
+        const isLastSeg = ph.end <= wE;
+        const deadlineMark = isLastSeg ? `<span style="font-size:9px;font-weight:900;margin-left:auto;opacity:.85">${ph.daysLeft<0?'⚠️':'🏁'}</span>` : '';
+        const dStr = fmtDate(ph.end.toISOString().slice(0,10));
+
+        const rowTop = cardTop + HEAD_H + phIdx * PHASE_ROW_H;
+        // Phase strip — uses absolute positioning across 7 cols
+        return `<div style="position:absolute;top:${rowTop}px;
+          left:calc(${colS}*((100% - 8px)/7) + 4px + 2px);
+          width:calc(${span}*((100% - 8px)/7) - 2px);
+          height:${PHASE_ROW_H-1}px;background:${phColor};
+          padding:0 6px;display:flex;align-items:center;gap:4px;
+          font-size:9px;font-weight:700;color:#000;overflow:hidden;
+          border-bottom:${phIdx<visiblePhases.length-1?'1px solid rgba(255,255,255,.5)':'none'};
+          cursor:pointer" onclick="event.stopPropagation();openProjDetail('${ev.p.id}')"
+          title="${ph.phaseLabel} · ${dStr}">
+          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">${ph.phaseLabel}${isLastSeg?' · '+ph.end.getDate():''}</span>${deadlineMark}
+        </div>`;
+      }).join('');
+
+      return frameHTML + headerHTML + phasesHTML;
     }).join('');
+
+    // Backward-compat: keep old single-bar weekBars logic as fallback (now empty since we use cardBarsHTML)
+    const weekBars = cardBarsHTML;
 
     // Today's vertical line — shown inside the bars layer on top
     const todayColIdx = week.findIndex(d => {
@@ -9565,11 +9695,22 @@ function renderProjCal() {
       ? `<div style="position:absolute;top:3px;left:calc(${todayColIdx}*(100%/7) + (100%/14));transform:translateX(-50%);width:14px;height:14px;border-radius:50%;background:#1565FF;border:2.5px solid #fff;box-shadow:0 0 0 2px rgba(21,101,255,.6);z-index:999;pointer-events:none"></div>`
       : '';
 
-    const barsH = Math.max(4, visibleEvents.filter(ev=>ev.start<=wE&&ev.end>=wS).length*22+6);
+    const barsH = Math.max(4, rowOffset + 4);
     calHtml+=`<div style="display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid #edf2fa">${dayRow}</div>
-      <div style="position:relative;height:${barsH}px;margin-bottom:2px">${weekBars}</div>`;
+      <div style="position:relative;height:${barsH}px;margin-bottom:2px">${weekBars}${todayDot}</div>`;
   });
   calHtml += '</div>';
+
+  // ── Team color legend (placed after calendar) ──
+  calHtml += `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:9px 14px;background:rgba(0,180,255,.05);border:1px solid rgba(0,180,255,.15);border-radius:9px;font-size:11px">
+    <span style="color:var(--text2);font-weight:700;align-self:center">🎨 สีของแต่ละทีม:</span>
+    <div style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--text)"><span style="display:inline-block;width:14px;height:7px;border-radius:2px;background:#00B4FF"></span>✍️ Adapt</div>
+    <div style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--text)"><span style="display:inline-block;width:14px;height:7px;border-radius:2px;background:#FF9E00"></span>🎤 Dub</div>
+    <div style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--text)"><span style="display:inline-block;width:14px;height:7px;border-radius:2px;background:#00DFA0"></span>🎧 Mix</div>
+    <div style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--text)"><span style="display:inline-block;width:14px;height:7px;border-radius:2px;background:#9B6FFF"></span>✅ QC</div>
+    <div style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--text)"><span style="display:inline-block;width:14px;height:7px;border-radius:2px;background:#FF4040"></span>🎬 Sub & Video</div>
+    <div style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--text)"><span style="display:inline-block;width:14px;height:7px;border-radius:2px;background:#1565FF"></span>🗂️ Manager</div>
+  </div>`;
 
   // ── Deadline table (all events sorted)
   const sorted = [...allEvents].sort((a,b) => projCalSort==='oldest' ? a.end-b.end : b.end-a.end);
