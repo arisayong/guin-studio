@@ -4727,6 +4727,9 @@ function renderTrkCalendar() {
   while (cells.length % 7 !== 0) cells.push(null);
   const weeks = []; for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
+  // Track which projects already showed the "Done" button — แสดงแค่ครั้งเดียวต่อโปรเจกต์
+  const _projDoneBtnShown = new Set();
+
   let html = `<div class="trk-calendar-card">
     <div class="trk-cal-nav">
       <button class="trk-cal-nav-btn" onclick="trkCalPrev()">‹ ก่อน</button>
@@ -4828,10 +4831,12 @@ function renderTrkCalendar() {
       // Header — project name + "Done" toggle button (right side)
       const labelEsc = String(g.projLabel||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
       const projIdEsc = String(linkedProj?.id||'').replace(/'/g,"\\'");
-      // แสดงปุ่มแค่สัปดาห์เดียว — สัปดาห์ที่ "วันสุดท้ายของทั้งโปรเจกต์" (g.end) อยู่ในนั้น
-      // ไม่ใช่ทุกสัปดาห์ที่ phase บางตัวจบ — ป้องกันปุ่มซ้ำ 2 ที่
-      const isProjectFinalWeek = g.end >= wS && g.end <= wE;
-      const showDoneBtn = isProjectFinalWeek && !!linkedProj;
+      // แสดงปุ่มครั้งเดียวต่อโปรเจกต์เสมอ — ใช้ Set track เพื่อป้องกันแสดงซ้ำในหลายสัปดาห์
+      let showDoneBtn = false;
+      if(linkedProj && !_projDoneBtnShown.has(linkedProj.id)){
+        showDoneBtn = true;
+        _projDoneBtnShown.add(linkedProj.id);
+      }
       const nameStyle = isProjDone ? 'text-decoration:line-through;opacity:.7' : isProjCancelled ? 'text-decoration:line-through;opacity:.5' : '';
       const headerBg = isProjDone ? 'rgba(0,223,160,.18)' : isProjCancelled ? 'rgba(120,120,120,.15)' : 'rgba(0,0,0,.04)';
 
