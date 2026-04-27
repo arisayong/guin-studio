@@ -4771,21 +4771,43 @@ function renderTrkCalendar() {
       const visiblePhases = g.phases.filter(ph => ph.start <= wE && ph.end >= wS);
       if (!visiblePhases.length) return '';
 
+      // Calc frame range = earliest phase start → latest phase end (clamped to week)
+      const groupStartInWeek = visiblePhases.reduce((min, ph) => ph.start < min ? ph.start : min, visiblePhases[0].start);
+      const groupEndInWeek   = visiblePhases.reduce((max, ph) => ph.end   > max ? ph.end   : max, visiblePhases[0].end);
+      const frameClampS = groupStartInWeek < wS ? wS : groupStartInWeek;
+      const frameClampE = groupEndInWeek   > wE ? wE : groupEndInWeek;
+      const frameColS = frameClampS.getDay();
+      const frameColE = frameClampE.getDay();
+      const frameSpan = frameColE - frameColS + 1;
+
+      // Edge flags (round corners only at outer week edges)
+      const isFirstWeekSeg = groupStartInWeek >= wS;  // group starts in this week
+      const isLastWeekSeg  = groupEndInWeek   <= wE;  // group ends in this week
+      const radL = isFirstWeekSeg ? '7px' : '0';
+      const radR = isLastWeekSeg  ? '7px' : '0';
+      const borderL = isFirstWeekSeg ? `1px solid ${g.frameColor}` : 'none';
+      const borderR = isLastWeekSeg  ? `1px solid ${g.frameColor}` : 'none';
+
       const cardTop = rowOffset;
       const cardHeight = HEAD_H + visiblePhases.length * PHASE_ROW_H;
       rowOffset += cardHeight + CARD_GAP;
 
-      // Card frame (full width across all 7 columns)
-      const frameHTML = `<div style="position:absolute;top:${cardTop}px;left:2px;right:2px;height:${cardHeight}px;
-        border:1px solid ${g.frameColor};border-radius:7px;background:rgba(255,255,255,.55);
+      // Frame styled with column positioning (per cell math like phase strips)
+      const frameLeft  = `calc(${frameColS}*((100% - 4px)/7) + 2px)`;
+      const frameWidth = `calc(${frameSpan}*((100% - 4px)/7))`;
+      const frameHTML = `<div style="position:absolute;top:${cardTop}px;left:${frameLeft};width:${frameWidth};height:${cardHeight}px;
+        border-top:1px solid ${g.frameColor};border-bottom:1px solid ${g.frameColor};
+        border-left:${borderL};border-right:${borderR};
+        border-radius:${radL} ${radR} ${radR} ${radL};
+        background:rgba(255,255,255,.55);
         overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)"></div>`;
 
-      // Header (project label) — full width
+      // Header — same width as frame, positioned the same way
       const labelEsc = String(g.projLabel||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-      const headerHTML = `<div style="position:absolute;top:${cardTop+1}px;left:6px;right:6px;height:${HEAD_H-1}px;
-        background:rgba(0,0,0,.04);border-bottom:1px solid rgba(0,0,0,.06);border-radius:6px 6px 0 0;
+      const headerHTML = `<div style="position:absolute;top:${cardTop+1}px;left:${frameLeft};width:${frameWidth};height:${HEAD_H-1}px;
+        background:rgba(0,0,0,.04);border-bottom:1px solid rgba(0,0,0,.06);border-radius:${radL} ${radR} 0 0;
         padding:0 8px;display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;color:#0a1a3a;
-        pointer-events:none;overflow:hidden">
+        pointer-events:none;overflow:hidden;box-sizing:border-box">
         <span style="width:7px;height:7px;border-radius:50%;background:${g.frameColor};flex-shrink:0"></span>
         <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📁 ${labelEsc}</span>
       </div>`;
