@@ -4670,24 +4670,42 @@ function renderTrkCalendar() {
   const today = new Date(); today.setHours(0,0,0,0);
   const years = []; for (let y = trkCalYear - 2; y <= trkCalYear + 2; y++) years.push(y);
 
-  /* ── รวม events เฉพาะการ์ดที่ติ๊กเลือก ── */
-  const events = [];
+  // Color palette สำหรับ project frame (สลับสี)
+  const palette = ['#00B4FF','#FFAA00','#9B6FFF','#FF6E40','#80CBC4','#FF80AB','#40CFFF','#FFD740','#69F0AE','#B0BEC5'];
+
+  /* ── รวม events เฉพาะการ์ดที่ติ๊กเลือก · group by project ── */
+  const projectGroups = [];   // [{ projId, projLabel, frameColor, phases:[{label, color, start, end}, ...] }]
   const checkedOrAll = getTrkCards().filter(c => trkCheckedCards.has(c.id));
+  let projColorIdx = 0;
   checkedOrAll.forEach(card => {
     const p = card.projId ? getProjects().find(x => x.id === card.projId) : null;
-    const projLabel = p ? p.name : '';
+    const projLabel = p ? p.name : (card.title || 'การ์ด');
+    const projKey = card.projId || ('card_'+card.id);
+    const phaseRows = [];
     PHASES.forEach(ph => {
       const pd = (card.phases || {})[ph.key] || {};
       if (!pd.startDate || !pd.deadline) return;
-      /* parse dates safely as LOCAL midnight */
       const [sy, sm, sd] = pd.startDate.split('-').map(Number);
       const [ey, em, ed] = pd.deadline.split('-').map(Number);
-      events.push({
-        label: ph.label + (projLabel ? ' · ' + projLabel : '') + (pd.submitTime ? ' '+toThaiTime(pd.submitTime) : ''),
+      phaseRows.push({
+        label: ph.label + (pd.submitTime ? ' '+toThaiTime(pd.submitTime) : ''),
         color: ph.color,
         start: new Date(sy, sm - 1, sd),
         end:   new Date(ey, em - 1, ed),
       });
+    });
+    if (!phaseRows.length) return;
+    // หา start/end overall ของโปรเจกต์
+    const groupStart = phaseRows.reduce((min,r) => r.start < min ? r.start : min, phaseRows[0].start);
+    const groupEnd   = phaseRows.reduce((max,r) => r.end   > max ? r.end   : max, phaseRows[0].end);
+    projectGroups.push({
+      projId: projKey,
+      projLabel,
+      frameColor: palette[projColorIdx++ % palette.length],
+      phases: phaseRows,
+      start: groupStart,
+      end: groupEnd,
+      cardId: card.id,
     });
   });
 
@@ -4715,7 +4733,7 @@ function renderTrkCalendar() {
       </div>
       <button class="trk-cal-nav-btn" onclick="trkCalNext()">หน้า ›</button>
     </div>
-    ${!events.length ? '<div style="text-align:center;padding:8px;color:#888;font-size:12px">☑ ติ๊กที่การ์ดด้านล่างเพื่อแสดงงานในปฏิทิน</div>' : ''}
+    ${!projectGroups.length ? '<div style="text-align:center;padding:8px;color:#888;font-size:12px">☑ ติ๊กที่การ์ดด้านล่างเพื่อแสดงงานในปฏิทิน</div>' : ''}
     <div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:2px">
       ${dows.map(d => `<div class="trk-cal-dow">${d}</div>`).join('')}
     </div>`;
@@ -4739,37 +4757,74 @@ function renderTrkCalendar() {
     const wS = new Date(trkCalYear, trkCalMonth, wFirst); wS.setHours(0,0,0,0);
     const wE = new Date(trkCalYear, trkCalMonth, wLast);  wE.setHours(23,59,59,999);
 
-    /* collect bars that overlap this week, grouped by row (to avoid overlap) */
-    const weekBars = [];
-    events.forEach(ev => {
-      if (ev.start > wE || ev.end < wS) return; // no overlap
-      const clampS = ev.start < wS ? wS : ev.start;
-      const clampE = ev.end   > wE ? wE : ev.end;
-      weekBars.push({ ev, clampS, clampE });
-    });
+    // Build cards for this week — only projects with at least 1 visible phase
+    const visibleGroups = projectGroups.filter(g =>
+      g.phases.some(ph => ph.start <= wE && ph.end >= wS)
+    );
 
-    /* calculate pixel-accurate position (0..6 columns) */
-    const barDivs = weekBars.map((b, rowIdx) => {
-      const colS = b.clampS.getDay(); // 0=Sun..6=Sat
-      const colE = b.clampE.getDay();
-      const spanCols = colE - colS + 1;
-      /* safety: if clampE day < clampS day (shouldn't happen but guard anyway) */
-      if (spanCols <= 0) return '';
-      const top   = rowIdx * 22 + 2;
-      const left  = `calc(${colS} * (100% / 7) + 2px)`;
-      const width = `calc(${spanCols} * (100% / 7) - 4px)`;
-      return `<div style="
-        position:absolute;top:${top}px;left:${left};width:${width};height:19px;
-        border-radius:5px;background:${b.ev.color};display:flex;align-items:center;
-        padding:0 7px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.2)">
-        <span style="font-size:10px;font-weight:800;color:#000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b.ev.label}</span>
+    let rowOffset = 0;
+    const PHASE_ROW_H = 16;
+    const HEAD_H      = 18;
+    const CARD_GAP    = 5;
+
+    const cardsHTML = visibleGroups.map(g => {
+      const visiblePhases = g.phases.filter(ph => ph.start <= wE && ph.end >= wS);
+      if (!visiblePhases.length) return '';
+
+      const cardTop = rowOffset;
+      const cardHeight = HEAD_H + visiblePhases.length * PHASE_ROW_H;
+      rowOffset += cardHeight + CARD_GAP;
+
+      // Card frame (full width across all 7 columns)
+      const frameHTML = `<div style="position:absolute;top:${cardTop}px;left:2px;right:2px;height:${cardHeight}px;
+        border:1px solid ${g.frameColor};border-radius:7px;background:rgba(255,255,255,.55);
+        overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)"></div>`;
+
+      // Header (project label) — full width
+      const labelEsc = String(g.projLabel||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+      const headerHTML = `<div style="position:absolute;top:${cardTop+1}px;left:6px;right:6px;height:${HEAD_H-1}px;
+        background:rgba(0,0,0,.04);border-bottom:1px solid rgba(0,0,0,.06);border-radius:6px 6px 0 0;
+        padding:0 8px;display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;color:#0a1a3a;
+        pointer-events:none;overflow:hidden">
+        <span style="width:7px;height:7px;border-radius:50%;background:${g.frameColor};flex-shrink:0"></span>
+        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📁 ${labelEsc}</span>
       </div>`;
+
+      // Phase strips — clipped to current week range
+      const phasesHTML = visiblePhases.map((ph, phIdx) => {
+        const clampS = ph.start < wS ? wS : ph.start;
+        const clampE = ph.end   > wE ? wE : ph.end;
+        const colS = clampS.getDay();
+        const colE = clampE.getDay();
+        const span = colE - colS + 1;
+        if (span <= 0) return '';
+
+        const isLastSeg = ph.end <= wE;
+        const dStr = isLastSeg ? ' · '+ph.end.getDate() : '';
+
+        const rowTop = cardTop + HEAD_H + phIdx * PHASE_ROW_H;
+        const phLabelEsc = String(ph.label||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+
+        return `<div style="position:absolute;top:${rowTop}px;
+          left:calc(${colS}*((100% - 8px)/7) + 4px + 2px);
+          width:calc(${span}*((100% - 8px)/7) - 2px);
+          height:${PHASE_ROW_H-1}px;background:${ph.color};
+          padding:0 6px;display:flex;align-items:center;
+          font-size:9px;font-weight:700;color:#000;overflow:hidden;
+          border-bottom:${phIdx<visiblePhases.length-1?'1px solid rgba(255,255,255,.5)':'none'}"
+          title="${phLabelEsc}">
+          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">${phLabelEsc}${dStr}</span>
+          ${isLastSeg ? '<span style="font-size:9px;font-weight:900;margin-left:auto;opacity:.85">🏁</span>' : ''}
+        </div>`;
+      }).join('');
+
+      return frameHTML + headerHTML + phasesHTML;
     }).join('');
 
-    const barsH = weekBars.length > 0 ? weekBars.length * 22 + 6 : 4;
+    const barsH = Math.max(4, rowOffset + 4);
     html += `
       <div style="display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid #edf2fa">${dayRow}</div>
-      <div style="position:relative;height:${barsH}px;margin-bottom:2px">${barDivs}</div>`;
+      <div style="position:relative;height:${barsH}px;margin-bottom:2px">${cardsHTML}</div>`;
   });
 
   html += '</div>';
@@ -9456,77 +9511,22 @@ function renderProjCal() {
   projs.forEach((p,i) => projColors[p.id] = palette[i % palette.length]);
 
   // ── ALL projects that have a deadline (no month restriction)
-  // Now: each project becomes 1 group, with multiple phase rows inside
-  const PHASE_META = {
-    adp: { color:'#00B4FF', label:'✍️ Adapt' },
-    dub: { color:'#FF9E00', label:'🎤 Dub' },
-    mix: { color:'#00DFA0', label:'🎧 Mix' },
-    qc:  { color:'#9B6FFF', label:'✅ QC' },
-    sub: { color:'#FF4040', label:'🎬 Sub & Video' },
-    mgr: { color:'#1565FF', label:'🗂️ Manager' },
-  };
-  const PHASE_ORDER = ['adp','dub','mix','qc','sub','mgr'];
-
-  // Build event rows: each phase = 1 row · fall back to project's main deadline if no phases
-  const allEvents = [];
-  projs.forEach((p, projIdx) => {
-    if (projCalFilter !== 'all' && p.id !== projCalFilter) return;
-    if (projCalSearchQ && !p.name.toLowerCase().includes(projCalSearchQ) && !(p.client||'').toLowerCase().includes(projCalSearchQ)) return;
-
-    const projColor = palette[projIdx % palette.length];
-    // Collect all phase entries that have a deadline
-    const phaseRows = [];
-    if (p.phases && typeof p.phases === 'object') {
-      PHASE_ORDER.forEach(key => {
-        const ph = p.phases[key];
-        if (!ph || !ph.deadline) return;
-        const meta = PHASE_META[key];
-        const s = ph.startDate ? parseLocalDate(ph.startDate) : parseLocalDate(ph.deadline);
-        const e = parseLocalDate(ph.deadline);
-        const daysLeft = Math.ceil((e - today) / 864e5);
-        phaseRows.push({
-          phaseKey: key,
-          phaseLabel: meta.label,
-          phaseColor: meta.color,
-          start: s, end: e,
-          daysLeft,
-          isOverdue: daysLeft < 0,
-          isUrgent: daysLeft >= 0 && daysLeft <= 3,
-        });
-      });
-    }
-    // No phases? fall back to project deadline as single row
-    if (!phaseRows.length && p.deadline) {
+  const allEvents = projs
+    .filter(p => {
+      if (!p.deadline) return false;
+      if (projCalFilter !== 'all' && p.id !== projCalFilter) return false;
+      if (projCalSearchQ && !p.name.toLowerCase().includes(projCalSearchQ) && !(p.client||'').toLowerCase().includes(projCalSearchQ)) return false;
+      return true;
+    })
+    .map(p => {
       const s = p.startDate ? parseLocalDate(p.startDate) : parseLocalDate(p.deadline);
       const e = parseLocalDate(p.deadline);
       const daysLeft = Math.ceil((e - today) / 864e5);
-      phaseRows.push({
-        phaseKey: 'main',
-        phaseLabel: '📁 รวม',
-        phaseColor: projColor,
-        start: s, end: e,
-        daysLeft,
-        isOverdue: daysLeft < 0,
-        isUrgent: daysLeft >= 0 && daysLeft <= 3,
-      });
-    }
-    if (!phaseRows.length) return;
-
-    allEvents.push({
-      p,
-      color: projColor,
-      phases: phaseRows,
-      // Project-level overall info (use latest deadline among phases)
-      end: phaseRows.reduce((max,r) => r.end > max ? r.end : max, phaseRows[0].end),
-      start: phaseRows.reduce((min,r) => r.start < min ? r.start : min, phaseRows[0].start),
+      return {
+        p, start: s, end: e, color: projColors[p.id],
+        isOverdue: daysLeft < 0, isUrgent: daysLeft >= 0 && daysLeft <= 3, daysLeft
+      };
     });
-  });
-  // Compute project-wide daysLeft etc for backward compat with rest of the code
-  allEvents.forEach(ev => {
-    ev.daysLeft = Math.ceil((ev.end - today) / 864e5);
-    ev.isOverdue = ev.daysLeft < 0;
-    ev.isUrgent = ev.daysLeft >= 0 && ev.daysLeft <= 3;
-  });
 
   // Filter to just this month's visible range (but deadline dot always shown)
   const monthStart = new Date(projCalYear, projCalMonth, 1);
@@ -9607,83 +9607,27 @@ function renderProjCal() {
     const wS=new Date(projCalYear,projCalMonth,wFirst); wS.setHours(0,0,0,0);
     const wE=new Date(projCalYear,projCalMonth,wLast); wE.setHours(23,59,59,999);
 
-    // Render compact-card bars for projects overlapping this week
-    // Each project = 1 card · each phase = 1 row inside
-    const visibleInWeek = visibleEvents.filter(ev => ev.start <= wE && ev.end >= wS);
-    let rowOffset = 0;
-    const PHASE_ROW_H = 16;       // height of each phase strip
-    const HEAD_H      = 18;       // height of project header row
-    const CARD_GAP    = 5;        // gap between project cards
-    const HEAD_PAD_T  = 1;        // micro spacing for visual breathing
-    const cardBarsHTML = visibleInWeek.map((ev) => {
-      const visiblePhases = ev.phases.filter(ph => ph.start<=wE && ph.end>=wS);
-      if (!visiblePhases.length) return '';
-
-      const isDoneProj = ev.p.projStatus==='done' || getProjStatus(ev.p)==='paid';
-      const isCancelled = ev.p.projStatus==='cancelled';
-      const projOverdue = ev.isOverdue && !isDoneProj && !isCancelled;
-      const frameColor = isDoneProj?'#00DFA0':isCancelled?'#888':projOverdue?'#FF4040':ev.color;
-
-      const cardTop = rowOffset;
-      const cardHeight = HEAD_H + visiblePhases.length * PHASE_ROW_H;
-      rowOffset += cardHeight + CARD_GAP;
-
-      // Card frame (border + faint bg)
-      const frameHTML = `<div style="position:absolute;top:${cardTop}px;left:2px;right:2px;height:${cardHeight}px;
-        border:1px solid ${frameColor};border-radius:7px;background:rgba(255,255,255,.5);
-        overflow:hidden;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06)"
-        onclick="openProjDetail('${ev.p.id}')"
-        title="${(ev.p.name||'').replace(/"/g,'&quot;')} · ${ev.p.client||''}"></div>`;
-
-      // Card header (project name)
-      const projIcon = isDoneProj?'✅':isCancelled?'❌':projOverdue?'⚠️':'📁';
-      const headerHTML = `<div style="position:absolute;top:${cardTop+HEAD_PAD_T}px;left:6px;right:6px;height:${HEAD_H-HEAD_PAD_T}px;
-        background:rgba(0,0,0,.04);border-bottom:1px solid rgba(0,0,0,.06);border-radius:6px 6px 0 0;
-        padding:0 8px;display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;color:#0a1a3a;
-        pointer-events:none;overflow:hidden">
-        <span style="width:7px;height:7px;border-radius:50%;background:${frameColor};flex-shrink:0"></span>
-        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${projIcon} ${ev.p.name}${ev.p.client?' · '+ev.p.client:''}</span>
+    // Only show bars for events overlapping this week
+    const weekBars = visibleEvents.map((ev, rowIdx) => {
+      if (ev.start>wE || ev.end<wS) return '';
+      const clampS = ev.start<wS?wS:ev.start;
+      const clampE = ev.end>wE?wE:ev.end;
+      const colS=clampS.getDay(), colE=clampE.getDay();
+      const span=colE-colS+1; if(span<=0) return '';
+      const isDoneProj=ev.p.projStatus==='done'||getProjStatus(ev.p)==='paid';
+      const barColor=isDoneProj?'rgba(0,223,160,.5)':ev.p.projStatus==='cancelled'?'rgba(150,150,150,.5)':ev.isOverdue?'#FF4040':ev.isUrgent?'#FF7700':ev.color;
+      const isFirst=ev.start>=wS, isLast=ev.end<=wE;
+      const deadlineLabel = isLast ? `<span style="font-size:9px;font-weight:900;margin-left:4px;opacity:.85">${ev.daysLeft<0?'⚠️':'🏁'}</span>` : '';
+      return `<div style="position:absolute;top:${rowIdx*22+2}px;left:calc(${colS}*(100%/7) + 2px);width:calc(${span}*(100%/7) - 4px);height:19px;
+        border-radius:${isFirst?'5px':'0'} ${isLast?'5px':'0'} ${isLast?'5px':'0'} ${isFirst?'5px':'0'};
+        background:${barColor};display:flex;align-items:center;padding:0 7px;overflow:hidden;
+        box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer" onclick="openProjDetail('${ev.p.id}')"
+        title="${ev.p.name} · ${ev.isOverdue?'เกิน '+Math.abs(ev.daysLeft)+' วัน':ev.daysLeft===0?'วันนี้!':ev.daysLeft+' วันเหลือ'}">
+        <span style="font-size:10px;font-weight:800;color:#000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${ev.isOverdue?'⚠️ ':ev.isUrgent?'🔴 ':''} ${ev.p.name}
+        </span>${deadlineLabel}
       </div>`;
-
-      // Phase rows — each phase clipped to its date range within the week
-      const phasesHTML = visiblePhases.map((ph, phIdx) => {
-        const clampS = ph.start<wS?wS:ph.start;
-        const clampE = ph.end>wE?wE:ph.end;
-        const colS = clampS.getDay(), colE = clampE.getDay();
-        const span = colE - colS + 1;
-        if (span <= 0) return '';
-
-        const phDoneOrCancel = isDoneProj || isCancelled;
-        const phColor = phDoneOrCancel
-          ? (isDoneProj?'rgba(0,223,160,.55)':'rgba(150,150,150,.45)')
-          : ph.isOverdue ? '#FF4040'
-          : ph.isUrgent ? '#FF7700'
-          : ph.phaseColor;
-
-        const isLastSeg = ph.end <= wE;
-        const deadlineMark = isLastSeg ? `<span style="font-size:9px;font-weight:900;margin-left:auto;opacity:.85">${ph.daysLeft<0?'⚠️':'🏁'}</span>` : '';
-        const dStr = fmtDate(ph.end.toISOString().slice(0,10));
-
-        const rowTop = cardTop + HEAD_H + phIdx * PHASE_ROW_H;
-        // Phase strip — uses absolute positioning across 7 cols
-        return `<div style="position:absolute;top:${rowTop}px;
-          left:calc(${colS}*((100% - 8px)/7) + 4px + 2px);
-          width:calc(${span}*((100% - 8px)/7) - 2px);
-          height:${PHASE_ROW_H-1}px;background:${phColor};
-          padding:0 6px;display:flex;align-items:center;gap:4px;
-          font-size:9px;font-weight:700;color:#000;overflow:hidden;
-          border-bottom:${phIdx<visiblePhases.length-1?'1px solid rgba(255,255,255,.5)':'none'};
-          cursor:pointer" onclick="event.stopPropagation();openProjDetail('${ev.p.id}')"
-          title="${ph.phaseLabel} · ${dStr}">
-          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">${ph.phaseLabel}${isLastSeg?' · '+ph.end.getDate():''}</span>${deadlineMark}
-        </div>`;
-      }).join('');
-
-      return frameHTML + headerHTML + phasesHTML;
     }).join('');
-
-    // Backward-compat: keep old single-bar weekBars logic as fallback (now empty since we use cardBarsHTML)
-    const weekBars = cardBarsHTML;
 
     // Today's vertical line — shown inside the bars layer on top
     const todayColIdx = week.findIndex(d => {
@@ -9695,22 +9639,11 @@ function renderProjCal() {
       ? `<div style="position:absolute;top:3px;left:calc(${todayColIdx}*(100%/7) + (100%/14));transform:translateX(-50%);width:14px;height:14px;border-radius:50%;background:#1565FF;border:2.5px solid #fff;box-shadow:0 0 0 2px rgba(21,101,255,.6);z-index:999;pointer-events:none"></div>`
       : '';
 
-    const barsH = Math.max(4, rowOffset + 4);
+    const barsH = Math.max(4, visibleEvents.filter(ev=>ev.start<=wE&&ev.end>=wS).length*22+6);
     calHtml+=`<div style="display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid #edf2fa">${dayRow}</div>
       <div style="position:relative;height:${barsH}px;margin-bottom:2px">${weekBars}${todayDot}</div>`;
   });
   calHtml += '</div>';
-
-  // ── Team color legend (placed after calendar) ──
-  calHtml += `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:9px 14px;background:rgba(0,180,255,.05);border:1px solid rgba(0,180,255,.15);border-radius:9px;font-size:11px">
-    <span style="color:var(--text2);font-weight:700;align-self:center">🎨 สีของแต่ละทีม:</span>
-    <div style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--text)"><span style="display:inline-block;width:14px;height:7px;border-radius:2px;background:#00B4FF"></span>✍️ Adapt</div>
-    <div style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--text)"><span style="display:inline-block;width:14px;height:7px;border-radius:2px;background:#FF9E00"></span>🎤 Dub</div>
-    <div style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--text)"><span style="display:inline-block;width:14px;height:7px;border-radius:2px;background:#00DFA0"></span>🎧 Mix</div>
-    <div style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--text)"><span style="display:inline-block;width:14px;height:7px;border-radius:2px;background:#9B6FFF"></span>✅ QC</div>
-    <div style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--text)"><span style="display:inline-block;width:14px;height:7px;border-radius:2px;background:#FF4040"></span>🎬 Sub & Video</div>
-    <div style="display:flex;align-items:center;gap:5px;font-weight:700;color:var(--text)"><span style="display:inline-block;width:14px;height:7px;border-radius:2px;background:#1565FF"></span>🗂️ Manager</div>
-  </div>`;
 
   // ── Deadline table (all events sorted)
   const sorted = [...allEvents].sort((a,b) => projCalSort==='oldest' ? a.end-b.end : b.end-a.end);
