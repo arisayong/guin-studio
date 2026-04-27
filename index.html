@@ -4727,8 +4727,25 @@ function renderTrkCalendar() {
   while (cells.length % 7 !== 0) cells.push(null);
   const weeks = []; for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
-  // Track which projects already showed the "Done" button — แสดงแค่ครั้งเดียวต่อโปรเจกต์
-  const _projDoneBtnShown = new Set();
+  // Track which projects already showed the "Done" button — แสดงครั้งเดียวต่อโปรเจกต์
+  // โดยกำหนด "สัปดาห์สุดท้ายของแต่ละโปรเจกต์" ไว้ล่วงหน้า — ใช้ index ของ week
+  const _projLastWeekIdx = new Map();
+  weeks.forEach((week, wIdx) => {
+    const wFirst = week.find(d => d);
+    const wLast  = [...week].reverse().find(d => d);
+    if(!wFirst) return;
+    const wS_check = new Date(trkCalYear, trkCalMonth, wFirst); wS_check.setHours(0,0,0,0);
+    const wE_check = new Date(trkCalYear, trkCalMonth, wLast);  wE_check.setHours(23,59,59,999);
+    projectGroups.forEach(g => {
+      // ถ้าโปรเจกต์มี phase ที่ overlap สัปดาห์นี้ → mark ว่ายังเห็นได้ในสัปดาห์นี้
+      if(g.phases.some(ph => ph.start <= wE_check && ph.end >= wS_check)){
+        // ใช้ projId (key ที่ stable) แทน
+        const key = g.cardId || g.projId;
+        // อัปเดตให้เป็นสัปดาห์ล่าสุดที่ยังเจอ → จะกลายเป็น "สัปดาห์สุดท้ายที่โปรเจกต์ยังโผล่"
+        _projLastWeekIdx.set(key, wIdx);
+      }
+    });
+  });
 
   let html = `<div class="trk-calendar-card">
     <div class="trk-cal-nav">
@@ -4749,7 +4766,7 @@ function renderTrkCalendar() {
       ${dows.map(d => `<div class="trk-cal-dow">${d}</div>`).join('')}
     </div>`;
 
-  weeks.forEach(week => {
+  weeks.forEach((week, _currentWeekIdx) => {
     /* day-number row */
     const dayRow = week.map(d => {
       if (!d) return `<div style="min-height:28px;padding:4px 0;border-right:1px solid #f0f4fa;background:#fafcff"></div>`;
@@ -4831,12 +4848,9 @@ function renderTrkCalendar() {
       // Header — project name + "Done" toggle button (right side)
       const labelEsc = String(g.projLabel||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
       const projIdEsc = String(linkedProj?.id||'').replace(/'/g,"\\'");
-      // แสดงปุ่มครั้งเดียวต่อโปรเจกต์เสมอ — ใช้ Set track เพื่อป้องกันแสดงซ้ำในหลายสัปดาห์
-      let showDoneBtn = false;
-      if(linkedProj && !_projDoneBtnShown.has(linkedProj.id)){
-        showDoneBtn = true;
-        _projDoneBtnShown.add(linkedProj.id);
-      }
+      // แสดงปุ่มเฉพาะสัปดาห์สุดท้ายของโปรเจกต์ — กันปุ่มซ้ำ
+      const _gKey = g.cardId || g.projId;
+      const showDoneBtn = !!linkedProj && _projLastWeekIdx.get(_gKey) === _currentWeekIdx;
       const nameStyle = isProjDone ? 'text-decoration:line-through;opacity:.7' : isProjCancelled ? 'text-decoration:line-through;opacity:.5' : '';
       const headerBg = isProjDone ? 'rgba(0,223,160,.18)' : isProjCancelled ? 'rgba(120,120,120,.15)' : 'rgba(0,0,0,.04)';
 
