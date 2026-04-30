@@ -481,11 +481,16 @@ body.safe-mode [data-money]:hover{filter:blur(0) !important}
 .staff-card-actions{display:flex;gap:6px;margin-top:11px}
 
 /* UNDO BAR */
-.undo-bar{position:fixed;top:calc(56px + 12px);right:18px;display:flex;gap:4px;z-index:140;background:var(--card);
-  border:1px solid var(--border);border-radius:10px;padding:4px 8px;box-shadow:0 4px 18px rgba(0,0,0,.5)}
+.undo-bar{position:fixed;top:calc(56px + 60px);right:18px;display:flex;gap:4px;z-index:140;background:var(--card);
+  border:1px solid var(--border);border-radius:10px;padding:4px 8px;box-shadow:0 4px 18px rgba(0,0,0,.5);
+  transition:opacity .15s, transform .15s}
 @media (max-width: 768px){
   .undo-bar{top:auto;bottom:14px;right:14px}
 }
+/* Hide undo-bar when notification panel is open (prevents overlap) */
+body.notif-open .undo-bar{opacity:0;pointer-events:none;transform:translateX(20px)}
+/* Notification panel — must be above undo-bar and other floating UI */
+#notif-panel{z-index:9999!important}
 
 /* CALENDAR CARD */
 .trk-calendar-card{background:#fff;border:1px solid #dce8f6;border-radius:var(--r);padding:22px;margin-bottom:14px;box-shadow:0 4px 22px rgba(0,0,0,.16)}
@@ -2740,8 +2745,13 @@ function toggleNotifPanel(ev){
   const panel = document.getElementById('notif-panel');
   if(!panel) return;
   const isOpen = panel.style.display !== 'none';
-  if(isOpen){ panel.style.display='none'; return; }
+  if(isOpen){
+    panel.style.display='none';
+    document.body.classList.remove('notif-open');
+    return;
+  }
   panel.style.display='block';
+  document.body.classList.add('notif-open');
   closeProfileMenu();
   // Mark notifications as read after 1.5 sec
   setTimeout(()=>{
@@ -2756,7 +2766,8 @@ function toggleNotifPanel(ev){
 
 function closeNotifPanel(){
   const panel = document.getElementById('notif-panel');
-  if(panel) panel.style.display='none';
+  if(panel){ panel.style.display='none'; }
+  document.body.classList.remove('notif-open');
 }
 
 document.addEventListener('click', function(e){
@@ -2764,7 +2775,7 @@ document.addEventListener('click', function(e){
   if(!panel || panel.style.display==='none') return;
   if(e.target.closest('#notif-panel')) return;
   if(e.target.closest('#top-bell-btn')) return;
-  panel.style.display='none';
+  closeNotifPanel();
 });
 
 async function addNotification({type, title, text, recipientUid, projId}){
@@ -5043,9 +5054,11 @@ function renderTrkCalendar() {
       const visiblePhases = g.phases.filter(ph => ph.start <= wE && ph.end >= wS);
       if (!visiblePhases.length) return '';
 
-      // Calc frame range = earliest phase start → latest phase end (clamped to week)
+      // Calc frame range:
+      // - groupStartInWeek = earliest phase start visible
+      // - groupEndInWeek = use g.end (ที่รวม project deadline แล้ว) ถ้าเข้าในสัปดาห์ หรือเลย
       const groupStartInWeek = visiblePhases.reduce((min, ph) => ph.start < min ? ph.start : min, visiblePhases[0].start);
-      const groupEndInWeek   = visiblePhases.reduce((max, ph) => ph.end   > max ? ph.end   : max, visiblePhases[0].end);
+      const groupEndInWeek   = g.end;  // ใช้ project-level end เพื่อให้ frame ขยายถึง project deadline
       const frameClampS = groupStartInWeek < wS ? wS : groupStartInWeek;
       const frameClampE = groupEndInWeek   > wE ? wE : groupEndInWeek;
       const frameColS = frameClampS.getDay();
@@ -5118,7 +5131,8 @@ function renderTrkCalendar() {
       if(g.projDeadline && showDoneBtn){  // แสดงเฉพาะ frame สุดท้ายที่มีปุ่ม
         const dlDay = g.projDeadline.getDate();
         const dlMonth = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][g.projDeadline.getMonth()];
-        deadlineBadge = `<span style="font-size:9px;color:${finalFrameColor};font-weight:800;background:${finalFrameColor}1a;padding:1px 6px;border-radius:8px;flex-shrink:0;white-space:nowrap" title="Deadline จริงของลูกค้า (มีเฉพาะ admin เห็น)">📅 ${dlDay} ${dlMonth}</span>`;
+        // Make badge prominent — bold, larger font, white text on accent bg
+        deadlineBadge = `<span style="font-size:10px;color:#fff;font-weight:800;background:${finalFrameColor};padding:2px 8px;border-radius:9px;flex-shrink:0;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.2)" title="📅 Deadline จริงของลูกค้า (admin เห็นเท่านั้น)">📅 ${dlDay} ${dlMonth}</span>`;
       }
 
       const headerHTML = `<div style="position:absolute;top:${cardTop+1}px;left:${frameLeft};width:${frameWidth};height:${HEAD_H-1}px;
