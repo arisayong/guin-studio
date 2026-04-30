@@ -1014,10 +1014,25 @@ body.sidebar-collapsed .main-content{
    <button class="top-bar-icon-btn" onclick="toggleTheme()" data-theme-toggle title="สลับธีมมืด/สว่าง">🌓</button>
    <!-- Keyboard shortcuts help -->
    <button class="top-bar-icon-btn" onclick="showKeyboardHelp()" title="ช็อตคัทแป้นพิมพ์ (?)">⌨️</button>
+   <!-- 🔔 Unified notification bell (ทุก role) -->
+   <button id="top-bell-btn" class="top-bar-icon-btn" onclick="toggleNotifPanel(event)" title="แจ้งเตือน" style="position:relative">
+    🔔<span id="top-bell-count" class="icon-badge" style="display:none;position:absolute;top:-3px;right:-3px;background:#FF4040;color:#fff;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--bg2);box-sizing:content-box">0</span>
+   </button>
    <!-- Avatar → toggle profile menu -->
    <div id="top-bar-avatar" class="top-bar-avatar" onclick="toggleProfileMenu(event)" title="โปรไฟล์และตั้งค่า">A</div>
   </div>
  </header>
+
+ <!-- 🔔 Notification panel (fixed, top-right) -->
+ <div id="notif-panel" class="profile-menu" style="display:none;width:380px;max-width:calc(100vw - 24px);max-height:480px;overflow:hidden" onclick="event.stopPropagation()">
+  <div style="padding:12px 16px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;background:var(--bg2)">
+   <div style="font-weight:800;font-size:14px;color:var(--text);display:flex;align-items:center;gap:8px">🔔 แจ้งเตือน <span id="notif-unread-pill" style="display:none;background:#FF4040;color:#fff;font-size:10px;padding:1px 7px;border-radius:9px;font-weight:700">0 ใหม่</span></div>
+   <button onclick="markAllNotifsRead()" style="background:transparent;border:none;color:var(--text2);font-size:11px;cursor:pointer;font-family:Kanit;font-weight:600;padding:4px 8px;border-radius:6px">✓ อ่านทั้งหมด</button>
+  </div>
+  <div id="notif-list" style="max-height:380px;overflow-y:auto">
+   <div style="text-align:center;padding:30px 20px;color:var(--text2);font-size:13px">ยังไม่มีการแจ้งเตือน</div>
+  </div>
+ </div>
 
  <!-- Profile dropdown (fixed, top-right) -->
  <div id="profile-menu" class="profile-menu" onclick="event.stopPropagation()">
@@ -1049,8 +1064,8 @@ body.sidebar-collapsed .main-content{
    <div class="nav-section">ภาพรวม</div>
    <div class="nav-item active" onclick="nav('dashboard')"><span class="nav-icon">🏠</span><span>หน้าหลัก</span></div>
    <div class="nav-section">งาน</div>
-   <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span><span class="nav-badge hidden" id="deadline-badge">0</span></div>
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span><span class="nav-badge hidden" id="track-badge">0</span></div>
+   <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span><span class="nav-badge hidden" id="deadline-badge">0</span></div>
    <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-section">การเงิน</div>
    <div class="nav-item" onclick="nav('queue')"><span class="nav-icon">💸</span><span>คิวจ่ายเงิน</span><span class="nav-badge hidden" id="queue-badge">0</span></div>
@@ -1579,7 +1594,6 @@ body.sidebar-collapsed .main-content{
       <div class="page-title" id="my-welcome">สวัสดี 👋</div>
       <div class="page-subtitle">งานและยอดค่าตอบแทนของคุณ</div>
      </div>
-     <div style="display:flex;align-items:center;gap:6px"><div id="my-appr-bell-wrap"></div><div id="my-warn-bell-wrap"></div></div>
     </div>
    </div>
 
@@ -2697,6 +2711,171 @@ document.addEventListener('click', function(e){
 document.addEventListener('keydown', function(e){
   if(e.key === 'Escape') closeProfileMenu();
 });
+
+// ════════════════════════════════════════════════════════════
+// 🔔 UNIFIED NOTIFICATION SYSTEM
+// ════════════════════════════════════════════════════════════
+const NOTIF_TYPES = {
+  payment:     { icon:'💰', bgColor:'rgba(0,223,160,.15)',  color:'var(--green)' },
+  staff_added: { icon:'➕', bgColor:'rgba(0,180,255,.15)',  color:'var(--accent2)' },
+  warning:     { icon:'⚠️', bgColor:'rgba(255,64,64,.15)',  color:'var(--red)' },
+  praise:      { icon:'⭐', bgColor:'rgba(255,158,0,.15)',  color:'var(--orange)' },
+};
+let _notifCache = [];
+let _notifListenerSet = false;
+
+function _notifTimeAgo(iso){
+  if(!iso) return '';
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if(diff < 60) return 'เมื่อสักครู่';
+  if(diff < 3600) return Math.floor(diff/60) + ' นาทีที่แล้ว';
+  if(diff < 86400) return Math.floor(diff/3600) + ' ชม.ที่แล้ว';
+  if(diff < 86400*7) return Math.floor(diff/86400) + ' วันที่แล้ว';
+  const d = new Date(iso);
+  return d.getDate()+' '+['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][d.getMonth()];
+}
+
+function toggleNotifPanel(ev){
+  if(ev) ev.stopPropagation();
+  const panel = document.getElementById('notif-panel');
+  if(!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  if(isOpen){ panel.style.display='none'; return; }
+  panel.style.display='block';
+  closeProfileMenu();
+  // Mark notifications as read after 1.5 sec
+  setTimeout(()=>{
+    const unread = _notifCache.filter(n => !n.read);
+    if(unread.length > 0 && _fbDatabase && currentUser?.uid){
+      const updates = {};
+      unread.forEach(n => { updates[`notifications/${currentUser.uid}/${n.id}/read`] = true; });
+      _fbDatabase.ref().update(updates).catch(()=>{});
+    }
+  }, 1500);
+}
+
+function closeNotifPanel(){
+  const panel = document.getElementById('notif-panel');
+  if(panel) panel.style.display='none';
+}
+
+document.addEventListener('click', function(e){
+  const panel = document.getElementById('notif-panel');
+  if(!panel || panel.style.display==='none') return;
+  if(e.target.closest('#notif-panel')) return;
+  if(e.target.closest('#top-bell-btn')) return;
+  panel.style.display='none';
+});
+
+async function addNotification({type, title, text, recipientUid, projId}){
+  if(!type || !title || !recipientUid) return;
+  if(!NOTIF_TYPES[type]) return;
+  if(!_fbDatabase) return;
+  try {
+    const ref = _fbDatabase.ref('notifications/'+recipientUid).push();
+    await ref.set({
+      type, title,
+      text: text || '',
+      projId: projId || '',
+      createdAt: new Date().toISOString(),
+      read: false,
+      createdBy: currentUser?.uid || 'system',
+    });
+  } catch(e){ console.warn('addNotification failed:', e); }
+}
+
+async function addNotificationToAdmins({type, title, text, projId, exceptUid}){
+  if(!_fbDatabase) return;
+  try {
+    const snap = await _fbDatabase.ref('users').get();
+    if(!snap.exists()) return;
+    const allUsers = snap.val();
+    const adminUids = Object.entries(allUsers)
+      .filter(([uid, u]) => u && u.role === 'admin' && uid !== exceptUid)
+      .map(([uid]) => uid);
+    await Promise.all(adminUids.map(uid =>
+      addNotification({type, title, text, projId, recipientUid:uid})
+    ));
+  } catch(e){ console.warn('addNotificationToAdmins failed:', e); }
+}
+
+function markAllNotifsRead(){
+  if(!_fbDatabase || !currentUser?.uid) return;
+  const updates = {};
+  _notifCache.filter(n => !n.read).forEach(n => {
+    updates[`notifications/${currentUser.uid}/${n.id}/read`] = true;
+  });
+  if(Object.keys(updates).length === 0){ toast('ไม่มีรายการใหม่','info'); return; }
+  _fbDatabase.ref().update(updates).then(()=>{
+    toast('✓ ทำเครื่องหมายอ่านทั้งหมดแล้ว','success');
+  }).catch(e=>toast('❌ '+e.message,'error'));
+}
+
+function _renderNotifList(){
+  const list = document.getElementById('notif-list');
+  const countEl = document.getElementById('top-bell-count');
+  const pillEl = document.getElementById('notif-unread-pill');
+  if(!list) return;
+  const sorted = [..._notifCache].sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+  const unreadCount = sorted.filter(n => !n.read).length;
+
+  if(countEl){
+    if(unreadCount > 0){ countEl.textContent = unreadCount > 99 ? '99+' : unreadCount; countEl.style.display='flex'; }
+    else countEl.style.display='none';
+  }
+  if(pillEl){
+    if(unreadCount > 0){ pillEl.textContent = unreadCount+' ใหม่'; pillEl.style.display='inline-block'; }
+    else pillEl.style.display='none';
+  }
+
+  if(sorted.length === 0){
+    list.innerHTML = '<div style="text-align:center;padding:30px 20px;color:var(--text2);font-size:13px">ยังไม่มีการแจ้งเตือน</div>';
+    return;
+  }
+  const top30 = sorted.slice(0, 30);
+  list.innerHTML = top30.map(n => {
+    const meta = NOTIF_TYPES[n.type] || NOTIF_TYPES.payment;
+    const titleEsc = String(n.title||'').replace(/</g,'&lt;');
+    const textEsc = String(n.text||'').replace(/</g,'&lt;');
+    const unreadStyle = n.read ? '' : 'background:rgba(0,180,255,.06)';
+    const unreadDot = n.read ? '' : '<span style="width:6px;height:6px;border-radius:50%;background:var(--accent2);margin-top:7px;flex-shrink:0;align-self:flex-start"></span>';
+    const clickHandler = n.projId ? `onclick="closeNotifPanel();if(typeof openProjDetail===\\'function\\')openProjDetail(\\'${n.projId}\\')" style="cursor:pointer"` : '';
+    return `<div ${clickHandler} style="padding:11px 14px;border-bottom:1px solid var(--border2);display:flex;gap:10px;${unreadStyle}">
+      ${unreadDot}
+      <div style="width:32px;height:32px;border-radius:8px;background:${meta.bgColor};color:${meta.color};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${meta.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">${titleEsc}</div>
+        ${textEsc ? `<div style="font-size:11.5px;color:var(--text2);line-height:1.5">${textEsc}</div>` : ''}
+        <div style="font-size:10px;color:var(--text2);opacity:.7;margin-top:3px">${_notifTimeAgo(n.createdAt)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadNotifications(){
+  if(!_fbDatabase || !currentUser?.uid) return;
+  if(_notifListenerSet) return;
+  _notifListenerSet = true;
+  const ref = _fbDatabase.ref('notifications/'+currentUser.uid);
+  ref.on('value', snap => {
+    _notifCache = [];
+    if(snap.exists()){
+      const data = snap.val();
+      const cutoff = Date.now() - 30*864e5; // 30 days
+      Object.entries(data).forEach(([id, n]) => {
+        if(!n) return;
+        const ts = new Date(n.createdAt||0).getTime();
+        if(ts < cutoff){
+          ref.child(id).remove().catch(()=>{});
+          return;
+        }
+        _notifCache.push({ id, ...n });
+      });
+    }
+    _renderNotifList();
+  }, err => console.warn('notif listener error:', err));
+}
+
 // ปิด drawer อัตโนมัติเมื่อคลิก nav-item บนมือถือ
 document.addEventListener('click', function(e){
   if(window.innerWidth > 768) return;
@@ -3702,6 +3881,24 @@ async function submitAppreciation() {
   const count = getAppreciations(_iaStaffId).length;
   toast('⭐ ออกใบชื่นชมแล้ว — '+(s?.nickname||_iaStaffId)+' ได้ครบ '+count+' ใบ'+(count>=3?' 🎁 ถึงเกณฑ์โบนัสแล้ว!':''),'success');
   renderStaff();
+
+  // === 🔔 ส่งแจ้งเตือนถึงสต๊าฟผู้รับใบชื่นชม ===
+  try {
+    const allUsersSnap = await _fbDatabase.ref('users').get();
+    if(allUsersSnap.exists()){
+      const allUsers = allUsersSnap.val();
+      const recipientUids = [];
+      Object.entries(allUsers).forEach(([uid, u]) => {
+        if(u && u.staffId === _iaStaffId) recipientUids.push(uid);
+      });
+      const titleText = (count >= 3) ? '⭐🎁 คุณได้รับใบชื่นชม (ครบโบนัส!)' : '⭐ คุณได้รับใบชื่นชม';
+      const bodyText = `หมวด: ${_iaSelItem}` + (appr.projName ? ` · ${appr.projName}` : '') + ` · สะสม ${count} ใบ`;
+      await Promise.all(recipientUids.map(uid =>
+        addNotification({type:'praise', title:titleText, text:bodyText, projId:appr.projId, recipientUid:uid})
+      ));
+    }
+  } catch(e){ console.warn('notify praise:', e); }
+
   setTimeout(() => { if (s) openEditStaff(_iaStaffId, s.category || s.categories?.[0] || 'dubbing'); }, 300);
 }
 
@@ -3901,6 +4098,24 @@ async function submitWarning() {
   closeModal('modal-issue-warning');
   toast('✅ ออกใบเตือนแล้ว — ' + (getStaffById(_iwStaffId)?.nickname || _iwStaffId), 'success');
   renderStaff();
+
+  // === 🔔 ส่งแจ้งเตือนถึงสต๊าฟผู้รับใบเตือน ===
+  try {
+    const allUsersSnap = await _fbDatabase.ref('users').get();
+    if(allUsersSnap.exists()){
+      const allUsers = allUsersSnap.val();
+      const recipientUids = [];
+      Object.entries(allUsers).forEach(([uid, u]) => {
+        if(u && u.staffId === _iwStaffId) recipientUids.push(uid);
+      });
+      const titleText = '⚠️ คุณได้รับใบตักเตือน';
+      const bodyText = `หมวด: ${_iwSelItem}` + (warn.projName ? ` · ${warn.projName}` : '');
+      await Promise.all(recipientUids.map(uid =>
+        addNotification({type:'warning', title:titleText, text:bodyText, projId:warn.projId, recipientUid:uid})
+      ));
+    }
+  } catch(e){ console.warn('notify warning:', e); }
+
   // reopen edit modal
   const s = getStaffById(_iwStaffId);
   if (s) setTimeout(() => openEditStaff(_iwStaffId, s.category || s.categories?.[0] || 'dubbing'), 300);
@@ -4208,6 +4423,9 @@ auth.onAuthStateChanged(async(fbUser)=>{
     currentUser = {uid: fbUser.uid, ...profile};
     console.log('✅ currentUser:', currentUser.email, currentUser.role);
     await enterApp();
+
+    // ═══ START NOTIFICATION LISTENER ═══
+    try { loadNotifications(); } catch(e) { console.warn('loadNotifications:', e); }
 
     // ═══ FORCE PASSWORD SETUP AFTER MAGIC LINK ═══
     // If the user just logged in via magic link, prompt them to set a password
@@ -4706,6 +4924,17 @@ function renderTrkCalendar() {
     });
     if (!phaseRows.length) return;
 
+    // === Calculate group end ===
+    // ถ้ามี project.deadline (admin กรอกไว้) → ใช้แทน phase สุดท้าย
+    // เพื่อให้ admin เห็นกรอบขยายถึง deadline จริงของลูกค้า
+    let groupEnd = phaseRows.reduce((max,r) => r.end > max ? r.end : max, phaseRows[0].end);
+    let projDeadlineDate = null;
+    if(p && p.deadline){
+      const [py, pm, pday] = p.deadline.split('-').map(Number);
+      projDeadlineDate = new Date(py, pm-1, pday);
+      if(projDeadlineDate > groupEnd) groupEnd = projDeadlineDate;
+    }
+
     // Dedupe — ถ้ามี group ของ projId นี้แล้ว merge phases เข้าไป (ไม่ซ้ำ key)
     if(projectGroupsMap.has(projKey)){
       const existing = projectGroupsMap.get(projKey);
@@ -4713,14 +4942,14 @@ function renderTrkCalendar() {
       phaseRows.forEach(pr => {
         if(!seenKeys.has(pr.key)) existing.phases.push(pr);
       });
-      // อัปเดต start/end
+      // อัปเดต start/end (end อาจเป็น project.deadline)
       existing.start = new Date(Math.min(existing.start.getTime(), ...phaseRows.map(r=>r.start.getTime())));
-      existing.end   = new Date(Math.max(existing.end.getTime(),   ...phaseRows.map(r=>r.end.getTime())));
+      existing.end   = new Date(Math.max(existing.end.getTime(),   groupEnd.getTime()));
+      if(projDeadlineDate) existing.projDeadline = projDeadlineDate;
       return;
     }
 
     const groupStart = phaseRows.reduce((min,r) => r.start < min ? r.start : min, phaseRows[0].start);
-    const groupEnd   = phaseRows.reduce((max,r) => r.end   > max ? r.end   : max, phaseRows[0].end);
     projectGroupsMap.set(projKey, {
       projId: projKey,
       projLabel,
@@ -4728,6 +4957,7 @@ function renderTrkCalendar() {
       phases: phaseRows,
       start: groupStart,
       end: groupEnd,
+      projDeadline: projDeadlineDate,  // อาจเป็น null ถ้าไม่ได้กรอกในโปรเจกต์
       cardId: card.id,
     });
   });
@@ -4883,12 +5113,21 @@ function renderTrkCalendar() {
         }
       }
 
+      // Build deadline-real badge if project has explicit deadline different from latest phase
+      let deadlineBadge = '';
+      if(g.projDeadline && showDoneBtn){  // แสดงเฉพาะ frame สุดท้ายที่มีปุ่ม
+        const dlDay = g.projDeadline.getDate();
+        const dlMonth = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][g.projDeadline.getMonth()];
+        deadlineBadge = `<span style="font-size:9px;color:${finalFrameColor};font-weight:800;background:${finalFrameColor}1a;padding:1px 6px;border-radius:8px;flex-shrink:0;white-space:nowrap" title="Deadline จริงของลูกค้า (มีเฉพาะ admin เห็น)">📅 ${dlDay} ${dlMonth}</span>`;
+      }
+
       const headerHTML = `<div style="position:absolute;top:${cardTop+1}px;left:${frameLeft};width:${frameWidth};height:${HEAD_H-1}px;
         background:${headerBg};border-bottom:1px solid rgba(0,0,0,.06);border-radius:${radL} ${radR} 0 0;
         padding:0 4px 0 8px;display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;color:#0a1a3a;
         overflow:hidden;box-sizing:border-box;pointer-events:none">
         <span style="width:7px;height:7px;border-radius:50%;background:${finalFrameColor};flex-shrink:0"></span>
         <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;${nameStyle}">📁 ${labelEsc}${isProjCancelled?' · ❌ ยกเลิก':''}</span>
+        ${deadlineBadge}
         ${doneBtnHTML}
       </div>`;
 
@@ -7088,6 +7327,35 @@ async function confirmPayment(){
   renderQueue();
   updateQueueBadge();
   toast(`💰 จ่าย ${s?.nickname} ${fmtB(amount)} (${vNo}) สำเร็จ ✅`,'success');
+
+  // === 🔔 ส่งแจ้งเตือน "ได้รับเงิน" ===
+  try {
+    // 1. หา uid ของสต๊าฟผู้รับ (ถ้ามี user account)
+    const allUsersSnap = await _fbDatabase.ref('users').get();
+    if(allUsersSnap.exists()){
+      const allUsers = allUsersSnap.val();
+      const recipientUids = [];
+      // หา user ที่ staffId === slipTarget.workerId
+      Object.entries(allUsers).forEach(([uid, u]) => {
+        if(u && u.staffId === slipTarget.workerId) recipientUids.push(uid);
+      });
+      const notifTitle = '💰 ได้รับเงินแล้ว';
+      const notifText = `โปรเจกต์ "${p.name}" · ${fmtB(amount)} · เลขที่ ${vNo}`;
+      // Notify staff
+      await Promise.all(recipientUids.map(uid =>
+        addNotification({type:'payment', title:notifTitle, text:notifText, projId:p.id, recipientUid:uid})
+      ));
+      // Notify all admins (so the team knows payment was made)
+      const adminText = `จ่าย ${s?.nickname || s?.name || ''} ${fmtB(amount)} · "${p.name}"`;
+      await addNotificationToAdmins({
+        type:'payment',
+        title:'💰 จ่ายเงินสำเร็จ',
+        text: adminText,
+        projId: p.id,
+      });
+    }
+  } catch(e){ console.warn('notify payment failed:', e); }
+
   slipTarget=null;
 }
 
@@ -13848,6 +14116,17 @@ async function syncFromSheet(){
       (data.backfilled ? ` · 📱 backfill QR ${data.backfilled}` : '') +
       (data.excluded ? ` · 🚫 บล็อก ${data.excluded}` : '');
     toast(msg, 'success');
+
+    // === 🔔 แจ้งเตือน admins ถ้ามีคนใหม่เพิ่ม ===
+    if((data.added||0) > 0){
+      try {
+        await addNotificationToAdmins({
+          type:'staff_added',
+          title:'➕ มีสมาชิกใหม่ในชีท',
+          text: `เพิ่มสมาชิกใหม่ ${data.added} คน · ข้าม ${data.skipped||0} · ${data.excluded?'บล็อก '+data.excluded:''}`,
+        });
+      } catch(e){ console.warn('notify staff_added:', e); }
+    }
     // รายชื่อคนใหม่ที่เพิ่มเข้ามาในรอบนี้จะมาจาก Firebase listener อัตโนมัติ (ไม่ต้อง handle ตรงนี้ซ้ำ)
   } catch(e) {
     console.error('[syncFromSheet]', e);
