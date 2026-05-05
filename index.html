@@ -1538,6 +1538,14 @@ body.sidebar-collapsed .main-content{
       <div class="tab" id="qst-approved" onclick="setQueueFilter('approved',this)">🔵 อนุมัติแล้ว</div>
       <div class="tab" id="qst-paid" onclick="setQueueFilter('paid',this)">✅ จ่ายแล้ว</div>
      </div>
+     <!-- Confirmation status filter (กลัวเอกสารหล่น) -->
+     <div class="tabs" style="margin:0;background:rgba(155,111,255,.06);border:1px solid rgba(155,111,255,.2)">
+      <div class="tab active" id="qcf-all" onclick="setQueueConfirmFilter('all',this)" style="font-size:12px;padding:7px 10px">📋 ใบยืนยัน:ทั้งหมด</div>
+      <div class="tab" id="qcf-none" onclick="setQueueConfirmFilter('none',this)" style="font-size:12px;padding:7px 10px">⚪ ยังไม่ส่ง</div>
+      <div class="tab" id="qcf-sent" onclick="setQueueConfirmFilter('sent',this)" style="font-size:12px;padding:7px 10px">⏳ รอ Staff</div>
+      <div class="tab" id="qcf-confirmed" onclick="setQueueConfirmFilter('confirmed',this)" style="font-size:12px;padding:7px 10px">✅ ยืนยันแล้ว</div>
+      <div class="tab" id="qcf-rejected" onclick="setQueueConfirmFilter('rejected',this)" style="font-size:12px;padding:7px 10px;color:var(--red)">❌ ปฏิเสธ</div>
+     </div>
      <!-- Month / cycle filter -->
      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
       <select id="q-year-sel" class="form-input form-select" style="padding:7px 32px 7px 10px;font-size:12px;width:110px" onchange="renderQueue()">
@@ -1599,6 +1607,7 @@ body.sidebar-collapsed .main-content{
       <div class="page-title" id="my-welcome">สวัสดี 👋</div>
       <div class="page-subtitle">งานและยอดค่าตอบแทนของคุณ</div>
      </div>
+     <div id="my-confirm-inbox-btn-wrap"></div>
     </div>
    </div>
 
@@ -2553,6 +2562,7 @@ const CAT_MAP = {
 };
 let selectedQYear = 'all';
 let selectedMonth = 'all';
+let selectedClient = 'all';
 
 const CATS = {
   adaptation: {label:'✍️ Adaptation', color:'var(--cyan)'},
@@ -2850,7 +2860,13 @@ function _renderNotifList(){
     const textEsc = String(n.text||'').replace(/</g,'&lt;');
     const unreadStyle = n.read ? '' : 'background:rgba(0,180,255,.06)';
     const unreadDot = n.read ? '' : '<span style="width:6px;height:6px;border-radius:50%;background:var(--accent2);margin-top:7px;flex-shrink:0;align-self:flex-start"></span>';
-    const clickHandler = n.projId ? `onclick="closeNotifPanel();if(typeof openProjDetail===\\'function\\')openProjDetail(\\'${n.projId}\\')" style="cursor:pointer"` : '';
+    // Click handler: ถ้าเป็น payment notification และ user เป็น staff → เปิด confirm inbox
+    let clickHandler = '';
+    if(n.type === 'payment' && currentUser?.role !== 'admin' && currentUser?.staffId){
+      clickHandler = `onclick="closeNotifPanel();openStaffConfirmInbox()" style="cursor:pointer"`;
+    } else if(n.projId){
+      clickHandler = `onclick="closeNotifPanel();if(typeof openProjDetail===\\'function\\')openProjDetail(\\'${n.projId}\\')" style="cursor:pointer"`;
+    }
     return `<div ${clickHandler} style="padding:11px 14px;border-bottom:1px solid var(--border2);display:flex;gap:10px;${unreadStyle}">
       ${unreadDot}
       <div style="width:32px;height:32px;border-radius:8px;background:${meta.bgColor};color:${meta.color};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${meta.icon}</div>
@@ -6192,7 +6208,7 @@ function getActivePhasesForProj(p){
 function renderProjects(){
   try {
   const projs=getProjects();
-  // Build year filter
+  // Build year set (รวมทุก year ใน projects)
   const yearSet=new Set();
   projs.forEach(p=>{
     if(p.date) yearSet.add(new Date(p.date).getFullYear());
@@ -6200,13 +6216,42 @@ function renderProjects(){
     if(p.startDate) yearSet.add(new Date(p.startDate).getFullYear());
   });
   const years=[...yearSet].filter(Boolean).sort((a,b)=>b-a);
+
+  // Build month options (เฉพาะปีที่เลือก)
+  const monthSet=new Set();
+  projs.forEach(p=>{
+    const dl = p.deadline || p.date || p.startDate;
+    if(!dl) return;
+    const d = new Date(dl);
+    if(selectedYear !== 'all' && d.getFullYear() !== Number(selectedYear)) return;
+    monthSet.add(d.getMonth());
+  });
+  const months=[...monthSet].sort((a,b)=>a-b);
+  const TM=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+  // Build client list (sorted, unique, ตัด empty)
+  const clientSet=new Set();
+  projs.forEach(p=>{ if(p.client && p.client.trim()) clientSet.add(p.client.trim()); });
+  const clients=[...clientSet].sort((a,b)=>a.localeCompare(b,'th'));
+
   const yf=document.getElementById('year-filter');
-  if(yf)yf.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+  if(yf)yf.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
     <label style="font-size:12px;color:var(--text2);font-weight:600;white-space:nowrap">📅 ปี</label>
-    <select class="form-input form-select" style="padding:7px 32px 7px 12px;font-size:13px;width:160px" onchange="selectedYear=this.value==='all'?'all':parseInt(this.value);renderProjects()">
+    <select class="form-input form-select" style="padding:7px 32px 7px 12px;font-size:13px;width:130px" onchange="selectedYear=this.value==='all'?'all':parseInt(this.value);selectedMonth='all';renderProjects()">
       <option value="all" ${selectedYear==='all'?'selected':''}>ทุกปี</option>
       ${years.map(y=>`<option value="${y}" ${selectedYear===y?'selected':''}>${y+543}</option>`).join('')}
     </select>
+    <label style="font-size:12px;color:var(--text2);font-weight:600;white-space:nowrap;margin-left:6px">📆 เดือน</label>
+    <select class="form-input form-select" style="padding:7px 32px 7px 12px;font-size:13px;width:130px" onchange="selectedMonth=this.value==='all'?'all':parseInt(this.value);renderProjects()">
+      <option value="all" ${selectedMonth==='all'?'selected':''}>ทุกเดือน</option>
+      ${months.map(m=>`<option value="${m}" ${selectedMonth===m?'selected':''}>${TM[m]}</option>`).join('')}
+    </select>
+    <label style="font-size:12px;color:var(--text2);font-weight:600;white-space:nowrap;margin-left:6px">👤 ลูกค้า</label>
+    <select class="form-input form-select" style="padding:7px 32px 7px 12px;font-size:13px;min-width:160px;max-width:240px" onchange="selectedClient=this.value;renderProjects()">
+      <option value="all" ${selectedClient==='all'?'selected':''}>ทุกลูกค้า (${clients.length})</option>
+      ${clients.map(c=>`<option value="${c.replace(/"/g,'&quot;')}" ${selectedClient===c?'selected':''}>${c}</option>`).join('')}
+    </select>
+    ${(selectedYear!=='all'||selectedMonth!=='all'||selectedClient!=='all'||selectedType!=='all')?`<button class="btn btn-outline btn-sm" style="padding:6px 12px;font-size:11px" onclick="selectedYear='all';selectedMonth='all';selectedClient='all';selectedType='all';renderProjects()">🔄 ล้างตัวกรอง</button>`:''}
   </div>`;
   // Build type filter
   const types=[...new Set(projs.map(p=>p.type).filter(Boolean))];
@@ -6220,6 +6265,7 @@ function renderProjList(){
   try {
     const q=(document.getElementById('proj-search')||{}).value?.toLowerCase()||'';
     let projs=getProjects().filter(p=>{
+      // Year filter
       if(selectedYear!=='all'){
         const yr=Number(selectedYear);
         const years=new Set([
@@ -6229,7 +6275,18 @@ function renderProjList(){
         ].filter(Boolean));
         if(!years.has(yr))return false;
       }
+      // Month filter (ใช้ deadline เป็นหลัก ถ้าไม่มีใช้ date หรือ startDate)
+      if(selectedMonth!=='all'){
+        const dl = p.deadline || p.date || p.startDate;
+        if(!dl) return false;
+        const m = new Date(dl).getMonth();
+        if(m !== Number(selectedMonth)) return false;
+      }
+      // Client filter
+      if(selectedClient!=='all' && (p.client||'').trim() !== selectedClient) return false;
+      // Type filter
       if(selectedType!=='all'&&p.type!==selectedType)return false;
+      // Search
       if(q&&!(p.name||'').toLowerCase().includes(q)&&!(p.client||'').toLowerCase().includes(q))return false;
       return true;
     });
@@ -7441,6 +7498,24 @@ function downloadReceiptHTML(){
 /* ── Fix 4: Queue month/cycle filter ── */
 let queueFilter = 'all';
 let queueCycleFilter='all';
+let queueConfirmFilter = 'all'; // all | none | sent | confirmed | rejected
+
+function setQueueConfirmFilter(filter, el){
+  queueConfirmFilter = filter;
+  document.querySelectorAll('[id^="qcf-"]').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  renderQueue();
+}
+
+// Helper: ดูสถานะ confirm ของ worker
+function getWorkerConfirmStatus(w){
+  return w?.confirmStatus || 'none';
+}
+
+// Block payment ถ้ายังไม่ confirm — ไม่ override (Yu บอก)
+function canPayWorker(w){
+  return getWorkerConfirmStatus(w) === 'confirmed';
+}
 
 function setQueueCycle(cycle, el){
   queueCycleFilter=cycle;
@@ -7557,7 +7632,14 @@ function renderQueue() {
     const workers = (p.workers||[]).filter(w => {
       // แสดงทุก worker แม้จะหา staff profile ไม่เจอ
       const s = getStaffById(w.id);
-      return s && (queueFilter === 'all' || w.status === queueFilter);
+      if(!s) return false;
+      if(queueFilter !== 'all' && w.status !== queueFilter) return false;
+      // Confirm filter
+      if(queueConfirmFilter !== 'all'){
+        const cs = getWorkerConfirmStatus(w);
+        if(cs !== queueConfirmFilter) return false;
+      }
+      return true;
     });
     if (workers.length) groups.push({ proj: p, workers });
   });
@@ -7569,16 +7651,38 @@ function renderQueue() {
   const cntPaid     = allWorkers.filter(w => w.status === 'paid').length;
   const totalUnpaid = allWorkers.filter(w => w.status !== 'paid').reduce((a,w) => a+(w.amount||0), 0);
 
+  // Confirm-related counts (สำหรับ summary "อย่าให้เอกสารหล่น")
+  const cntConfirmSent = allWorkers.filter(w => getWorkerConfirmStatus(w) === 'sent').length;
+  const cntConfirmRejected = allWorkers.filter(w => getWorkerConfirmStatus(w) === 'rejected').length;
+
   if (!groups.length) {
     el.innerHTML = '<div style="text-align:center;padding:56px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">ไม่มีรายการในเงื่อนไขนี้</div>';
     return;
   }
 
-  const summaryBar = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px">
+  const summaryBar = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">
     <div class="stat-card" style="padding:14px"><div class="stat-label">โปรเจกต์</div><div style="font-size:24px;font-weight:800;margin-top:6px">${groups.length}</div></div>
     <div class="stat-card" style="padding:14px;border-color:rgba(255,158,0,.35)"><div class="stat-label">⏳ รอจ่าย</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--orange)">${cntPending}</div></div>
     <div class="stat-card" style="padding:14px;border-color:rgba(0,180,255,.35)"><div class="stat-label">🔵 อนุมัติแล้ว</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--cyan)">${cntApproved}</div></div>
     <div class="stat-card" style="padding:14px;border-color:rgba(0,223,160,.35)"><div class="stat-label">💰 รอโอนรวม</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--green)">${fmtB(totalUnpaid)}</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:18px">
+    ${cntConfirmSent>0
+      ?`<div class="stat-card" style="padding:12px;border-color:rgba(155,111,255,.4);background:rgba(155,111,255,.05);cursor:pointer" onclick="setQueueConfirmFilter('sent',document.getElementById('qcf-sent'))">
+          <div class="stat-label">⏳ รอ Staff ยืนยัน</div>
+          <div style="font-size:20px;font-weight:800;margin-top:4px;color:#9B6FFF">${cntConfirmSent} ใบ</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">คลิกเพื่อกรอง →</div>
+        </div>`
+      :`<div class="stat-card" style="padding:12px;opacity:.55"><div class="stat-label">⏳ รอ Staff ยืนยัน</div><div style="font-size:20px;font-weight:800;margin-top:4px;color:var(--text2)">— ไม่มี —</div></div>`
+    }
+    ${cntConfirmRejected>0
+      ?`<div class="stat-card" style="padding:12px;border-color:rgba(255,64,64,.4);background:rgba(255,64,64,.05);cursor:pointer" onclick="setQueueConfirmFilter('rejected',document.getElementById('qcf-rejected'))">
+          <div class="stat-label">❌ Staff ปฏิเสธ — ต้องแก้</div>
+          <div style="font-size:20px;font-weight:800;margin-top:4px;color:var(--red)">${cntConfirmRejected} ใบ</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">คลิกเพื่อกรอง →</div>
+        </div>`
+      :`<div class="stat-card" style="padding:12px;opacity:.55"><div class="stat-label">❌ Staff ปฏิเสธ</div><div style="font-size:20px;font-weight:800;margin-top:4px;color:var(--text2)">— ไม่มี —</div></div>`
+    }
   </div>`;
 
   /* ── step dot helpers ── */
@@ -7602,27 +7706,59 @@ function renderQueue() {
     const s = cfg[status] || cfg.pending;
     return `<span style="padding:3px 10px;border-radius:12px;background:${s.bg};color:${s.color};border:1px solid ${s.border};font-size:11px;font-weight:700;white-space:nowrap">${s.label}</span>`;
   }
-  function actionBtns(pid, wid, slot, status, clientPaid) {
+  function actionBtns(pid, wid, slot, status, clientPaid, w) {
     if (status === 'pending') return `
       <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
         <button class="btn btn-xs btn-cyan" onclick="qApprove('${pid}','${wid}','${slot}')" title="ทีมทำงานเสร็จแล้ว">🔵 อนุมัติ</button>
         <button class="btn btn-xs btn-outline" onclick="openPayAmt('${pid}','${wid}','${slot}')" title="แก้ยอดเงิน">💰</button>
       </div>`;
     if (status === 'approved') {
-      // Client paid → button is prominent green "จ่ายทีม"
-      // Client not paid yet → button is disabled look (grey) with tooltip
+      const confirmSt = w ? getWorkerConfirmStatus(w) : 'none';
+      const isConfirmed = confirmSt === 'confirmed';
+      const isSent = confirmSt === 'sent';
+      const isRejected = confirmSt === 'rejected';
+
+      // === ยังไม่ส่งใบยืนยัน → ปุ่มหลัก = "ส่งใบยืนยัน" ===
+      if (confirmSt === 'none') {
+        return `
+          <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+            <button class="btn btn-xs" style="background:#9B6FFF;color:#fff;border:none;font-weight:700" onclick="askSendConfirmRequest('${pid}','${wid}','${slot}')" title="ส่งใบยืนยันยอดให้ Staff">📤 ส่งใบยืนยัน</button>
+            <button class="btn btn-xs btn-outline" onclick="openPayAmt('${pid}','${wid}','${slot}')" title="แก้ยอด">💰</button>
+            <button class="btn btn-xs btn-outline" onclick="qRevert('${pid}','${wid}','${slot}')" title="ย้อนกลับ">↩️</button>
+          </div>`;
+      }
+
+      // === ส่งใบยืนยันแล้ว — รอ Staff ตอบ ===
+      if (isSent) {
+        return `
+          <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+            <button class="btn btn-xs btn-outline" onclick="askResendConfirm('${pid}','${wid}','${slot}')" title="ส่ง notification ซ้ำให้ Staff">↻ ส่งซ้ำ</button>
+            <button class="btn btn-xs btn-outline" style="color:var(--red);border-color:rgba(255,64,64,.3)" onclick="askCancelConfirm('${pid}','${wid}','${slot}')" title="ยกเลิกใบยืนยัน">🚫 ยกเลิก</button>
+          </div>`;
+      }
+
+      // === Staff ปฏิเสธ → ต้องแก้ยอดก่อนส่งใหม่ ===
+      if (isRejected) {
+        return `
+          <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+            <button class="btn btn-xs btn-outline" onclick="viewRejectReason('${pid}','${wid}','${slot}')" title="ดูเหตุผลที่ปฏิเสธ">📋 ดูเหตุผล</button>
+            <button class="btn btn-xs btn-outline" onclick="openPayAmt('${pid}','${wid}','${slot}')" title="แก้ยอด">💰 แก้ยอด</button>
+            <button class="btn btn-xs" style="background:#9B6FFF;color:#fff;border:none;font-weight:700" onclick="askSendConfirmRequest('${pid}','${wid}','${slot}')" title="ส่งใบยืนยันใหม่">📤 ส่งใหม่</button>
+          </div>`;
+      }
+
+      // === Staff ยืนยันแล้ว → พร้อมจ่าย ===
       if (clientPaid) {
         return `
           <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
-            <button class="btn btn-xs btn-green" style="font-weight:800" onclick="qPay('${pid}','${wid}','${slot}')" title="ลูกค้าจ่ายแล้ว — จ่ายทีมเลย">💸 จ่ายทีม</button>
-            <button class="btn btn-xs btn-outline" onclick="openPayAmt('${pid}','${wid}','${slot}')" title="แก้ยอด">💰</button>
-            <button class="btn btn-xs btn-outline" onclick="qRevert('${pid}','${wid}','${slot}')" title="ย้อนกลับ (ถ้ากดผิด)">↩️</button>
+            <button class="btn btn-xs btn-green" style="font-weight:800" onclick="qPay('${pid}','${wid}','${slot}')" title="Staff ยืนยันแล้ว + ลูกค้าจ่ายแล้ว → จ่ายทีมเลย">💸 จ่ายทีม</button>
+            <button class="btn btn-xs btn-outline" onclick="qRevert('${pid}','${wid}','${slot}')" title="ย้อนกลับ">↩️</button>
           </div>`;
       } else {
         return `
           <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
-            <button class="btn btn-xs" style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.35);color:#FFD700;cursor:pointer;font-weight:700" onclick="askRevertWaiting('${pid}','${wid}','${slot}')" title="กดเพื่อย้อนกลับเป็น 'รอตรวจสอบ'">⏳ รอลูกค้าจ่าย</button>
-            <button class="btn btn-xs btn-green" onclick="qPay('${pid}','${wid}','${slot}')" title="ข้ามขั้น — จ่ายทีมก่อนลูกค้าจ่าย (ถ้าจำเป็น)">💸 จ่ายก่อน</button>
+            <button class="btn btn-xs" style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.35);color:#FFD700;cursor:pointer;font-weight:700" onclick="askRevertWaiting('${pid}','${wid}','${slot}')" title="ย้อนกลับเป็น 'รอตรวจสอบ'">⏳ รอลูกค้าจ่าย</button>
+            <button class="btn btn-xs btn-green" onclick="qPay('${pid}','${wid}','${slot}')" title="ข้ามขั้น — จ่ายทีมก่อนลูกค้าจ่าย">💸 จ่ายก่อน</button>
           </div>`;
       }
     }
@@ -7630,7 +7766,6 @@ function renderQueue() {
       <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
         <span style="font-size:11px;color:var(--green);font-weight:700">✅ โอนแล้ว</span>
       </div>`;
-    // legacy: waiting_client (if any exists from old data)
     if (status === 'waiting_client') return `
       <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
         <button class="btn btn-xs btn-green" style="font-weight:800" onclick="qPay('${pid}','${wid}','${slot}')" title="จ่ายทีม">💸 จ่ายทีม</button>
@@ -7691,6 +7826,32 @@ function renderQueue() {
       const isPaid     = w.status === 'paid';
       // Smart derived status: approved + client paid = ready to pay team
       const readyToPayTeam = isApproved && clientPaid;
+      // Confirmation status
+      const confirmSt = getWorkerConfirmStatus(w);
+      const confirmBadge = (()=>{
+        if(isPaid) return ''; // จ่ายแล้ว ไม่ต้องแสดง confirm badge
+        if(confirmSt === 'sent'){
+          // คำนวณระยะเวลาที่ส่งไป
+          let waitBadge = '';
+          if(w.confirmSentAt){
+            const days = (Date.now() - new Date(w.confirmSentAt).getTime()) / 86400000;
+            if(days >= 3){
+              waitBadge = `<div style="margin-top:3px;padding:2px 7px;border-radius:5px;background:rgba(255,64,64,.18);border:1px solid rgba(255,64,64,.5);color:var(--red);font-size:9px;font-weight:800;white-space:nowrap">⚠️ ส่งไป ${Math.floor(days)} วัน — ตามด่วน</div>`;
+            } else if(days >= 1){
+              waitBadge = `<div style="margin-top:3px;padding:2px 7px;border-radius:5px;background:rgba(255,158,0,.15);border:1px solid rgba(255,158,0,.4);color:var(--orange);font-size:9px;font-weight:700;white-space:nowrap">⏰ ส่งไป ${Math.floor(days)} วัน</div>`;
+            } else {
+              const hrs = Math.floor((Date.now() - new Date(w.confirmSentAt).getTime()) / 3600000);
+              if(hrs >= 1){
+                waitBadge = `<div style="margin-top:3px;font-size:9px;color:var(--text2);white-space:nowrap">ส่งไป ${hrs} ชม.</div>`;
+              }
+            }
+          }
+          return '<div style="padding:3px 8px;border-radius:6px;background:rgba(155,111,255,.12);border:1px solid rgba(155,111,255,.3);color:#9B6FFF;font-size:10px;font-weight:700;white-space:nowrap">⏳ รอ Staff ยืนยัน</div>' + waitBadge;
+        }
+        if(confirmSt === 'confirmed') return '<div style="padding:3px 8px;border-radius:6px;background:rgba(0,223,160,.12);border:1px solid rgba(0,223,160,.3);color:var(--green);font-size:10px;font-weight:700;white-space:nowrap" title="Staff ยืนยันยอดแล้ว">✅ Staff ยืนยันแล้ว</div>';
+        if(confirmSt === 'rejected') return `<div style="padding:3px 8px;border-radius:6px;background:rgba(255,64,64,.12);border:1px solid rgba(255,64,64,.3);color:var(--red);font-size:10px;font-weight:700;white-space:nowrap;cursor:help" title="${(w.confirmRejectReason||'').replace(/"/g,'&quot;')}">❌ ปฏิเสธ — ดูเหตุผล</div>`;
+        return '';
+      })();
       return `<div style="display:flex;align-items:center;gap:14px;padding:13px 18px;border-top:1px solid rgba(255,255,255,.04);background:${isPaid?'rgba(0,223,160,.02)':readyToPayTeam?'rgba(0,223,160,.05)':isApproved?'rgba(255,215,0,.04)':''}">
         <!-- Avatar + name -->
         <div style="display:flex;align-items:center;gap:10px;min-width:170px">
@@ -7711,8 +7872,8 @@ function renderQueue() {
           <div style="color:var(--text2)">${s.account}</div>
           ${s.promptpay ? `<div style="color:var(--text2);font-size:10px">📱 ${s.promptpay}</div>` : ''}
         </div>
-        <!-- Status badge (auto-derived) -->
-        <div style="flex:1;display:flex;align-items:center;justify-content:center">
+        <!-- Status badge (auto-derived) + confirm badge -->
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px">
           ${(()=>{
             if(w.status==='paid') return '<span style="padding:5px 12px;border-radius:20px;background:rgba(0,223,160,.15);color:var(--green);font-size:11px;font-weight:700">✅ จ่ายแล้ว</span>';
             if(w.status==='pending') return '<span style="padding:5px 12px;border-radius:20px;background:rgba(120,120,140,.15);color:var(--text2);font-size:11px;font-weight:700">⏳ รอดำเนินการ</span>';
@@ -7721,10 +7882,11 @@ function renderQueue() {
             if(w.status==='approved' && clientPaid) return '<span style="padding:5px 12px;border-radius:20px;background:rgba(0,223,160,.15);color:var(--green);font-size:11px;font-weight:700;border:1px solid rgba(0,223,160,.35)">🟢 พร้อมจ่ายทีม</span>';
             return '';
           })()}
+          ${confirmBadge}
         </div>
         <!-- Action buttons -->
         <div style="min-width:280px;display:flex;justify-content:flex-end">
-          ${actionBtns(p.id, w.id, w.slot, w.status, clientPaid)}
+          ${actionBtns(p.id, w.id, w.slot, w.status, clientPaid, w)}
         </div>
       </div>`;
     }).join('');
@@ -7769,6 +7931,18 @@ function renderQueue() {
       </div>
       <!-- Worker rows (collapsible — default hidden, expand on click) -->
       <div id="${groupId}" style="display:none">
+        <!-- Bulk action bar -->
+        ${(()=>{
+          // คนที่ "approved" + ยังไม่ส่งใบยืนยัน ทั้งหมดในโปรเจกต์นี้
+          const eligible = g.workers.filter(w => w.status === 'approved' && getWorkerConfirmStatus(w) === 'none');
+          if(!eligible.length) return '';
+          return `<div style="padding:10px 18px;background:rgba(155,111,255,.05);border-top:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <div style="font-size:12px;color:var(--text);font-weight:600">
+              💡 มี <strong style="color:#9B6FFF">${eligible.length} คน</strong> ที่ยังไม่ส่งใบยืนยันยอด
+            </div>
+            <button class="btn btn-xs" style="background:#9B6FFF;color:#fff;border:none;font-weight:700" onclick="askBulkSendConfirm('${p.id}')">📤 ส่งใบยืนยันทุกคนในโปรเจกต์นี้ (${eligible.length})</button>
+          </div>`;
+        })()}
         <!-- sub-header -->
         <div style="display:flex;align-items:center;gap:14px;padding:7px 18px;background:rgba(0,0,0,.15);border-top:1px solid var(--border2)">
           <div style="min-width:170px;font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">ชื่อ-ตำแหน่ง</div>
@@ -7946,6 +8120,475 @@ function askRevertWaiting(projId, workerId, slot){
   setTimeout(()=>{ if(el.parentNode) el.remove(); }, 8000);
 }
 
+// ════════════════════════════════════════════════════════════
+// 💰 PAYMENT CONFIRMATION WORKFLOW
+// ════════════════════════════════════════════════════════════
+
+// Helper: หา worker + เก็บ confirm fields
+async function _updateWorkerConfirm(projId, workerId, slot, updates){
+  const projs = getProjects();
+  const idx = projs.findIndex(x => x.id === projId);
+  if(idx < 0){ toast('ไม่พบโปรเจกต์','error'); return false; }
+  const p = projs[idx];
+  const wIdx = (p.workers||[]).findIndex(x => x.id === workerId && x.slot === slot);
+  if(wIdx < 0){ toast('ไม่พบทีมงาน','error'); return false; }
+  Object.assign(p.workers[wIdx], updates);
+  await saveProjectDB(p);
+  return true;
+}
+
+// Admin → ส่งใบยืนยัน (กับ confirm dialog ป้องกันมือลั่น)
+async function askSendConfirmRequest(projId, workerId, slot){
+  const p = getProjects().find(x=>x.id===projId);
+  const w = p?.workers.find(x=>x.id===workerId && x.slot===slot);
+  const s = getStaffById(workerId);
+  if(!p || !w || !s){ toast('ไม่พบข้อมูล','error'); return; }
+
+  if(!confirm(`📤 ส่งใบยืนยันยอดให้ ${s.nickname}?\n\n` +
+    `โปรเจกต์: ${p.name}\n` +
+    `ยอด: ${fmtB(w.amount||0)}\n` +
+    `บัญชี: ${s.bank} ${s.account}\n\n` +
+    `Staff จะได้รับการแจ้งเตือนและต้องกดยืนยันก่อนคุณจะโอนเงินได้`)) return;
+
+  await sendConfirmRequest(projId, workerId, slot);
+}
+
+async function sendConfirmRequest(projId, workerId, slot){
+  const p = getProjects().find(x=>x.id===projId);
+  const w = p?.workers.find(x=>x.id===workerId && x.slot===slot);
+  const s = getStaffById(workerId);
+  if(!p || !w || !s) return;
+
+  const ok = await _updateWorkerConfirm(projId, workerId, slot, {
+    confirmStatus: 'sent',
+    confirmSentAt: new Date().toISOString(),
+    confirmAmount: w.amount || 0,
+    confirmRespondedAt: null,
+    confirmRejectReason: null,
+  });
+  if(!ok) return;
+
+  // ส่ง notification ให้ staff (ถ้ามี user account)
+  try {
+    const allUsersSnap = await _fbDatabase.ref('users').get();
+    if(allUsersSnap.exists()){
+      const allUsers = allUsersSnap.val();
+      const recipientUids = [];
+      Object.entries(allUsers).forEach(([uid, u]) => {
+        if(u && u.staffId === workerId) recipientUids.push(uid);
+      });
+      const titleText = '💰 ใบยืนยันยอดเงิน — กรุณายืนยัน';
+      const bodyText = `${p.name} · ${fmtB(w.amount||0)} · กดเพื่อดูรายละเอียด`;
+      await Promise.all(recipientUids.map(uid =>
+        addNotification({type:'payment', title:titleText, text:bodyText, projId:p.id, recipientUid:uid})
+      ));
+    }
+  } catch(e){ console.warn('notify confirm:', e); }
+
+  toast(`📤 ส่งใบยืนยันให้ ${s.nickname} แล้ว — รอตอบกลับ`,'success');
+  renderQueue();
+}
+
+// === Bulk send: ส่งใบยืนยันทุกคนในโปรเจกต์ที่ยังไม่ได้ส่ง ===
+async function askBulkSendConfirm(projId){
+  const p = getProjects().find(x=>x.id===projId);
+  if(!p){ toast('ไม่พบโปรเจกต์','error'); return; }
+  const eligible = (p.workers||[]).filter(w => w.status === 'approved' && getWorkerConfirmStatus(w) === 'none');
+  if(!eligible.length){ toast('ไม่มีคนที่ต้องส่งใบยืนยัน','info'); return; }
+
+  // Build summary text
+  const lines = eligible.map(w => {
+    const s = getStaffById(w.id);
+    return `• ${s?.nickname || w.id} — ${fmtB(w.amount||0)}`;
+  }).slice(0, 8);
+  const more = eligible.length > 8 ? `\n...และอีก ${eligible.length-8} คน` : '';
+  const totalAmt = eligible.reduce((a,w) => a+(w.amount||0), 0);
+
+  if(!confirm(`📤 ส่งใบยืนยันยอดทุกคนในโปรเจกต์ "${p.name}"?\n\n` +
+    `จำนวน: ${eligible.length} คน\n` +
+    `ยอดรวม: ${fmtB(totalAmt)}\n\n` +
+    `รายชื่อ:\n${lines.join('\n')}${more}\n\n` +
+    `Staff แต่ละคนจะได้รับ notification ของตัวเอง`)) return;
+
+  toast(`📤 กำลังส่ง ${eligible.length} ใบ...`,'info');
+
+  let successCount = 0;
+  let failCount = 0;
+  for(const w of eligible){
+    try {
+      // อัปเดต status (ไม่ผ่าน sendConfirmRequest เพื่อหลีก toast ซ้ำ)
+      const ok = await _updateWorkerConfirm(projId, w.id, w.slot, {
+        confirmStatus: 'sent',
+        confirmSentAt: new Date().toISOString(),
+        confirmAmount: w.amount || 0,
+        confirmRespondedAt: null,
+        confirmRejectReason: null,
+      });
+      if(ok){
+        successCount++;
+        // ส่ง notification ให้ staff คนนั้น
+        try {
+          const allUsersSnap = await _fbDatabase.ref('users').get();
+          if(allUsersSnap.exists()){
+            const allUsers = allUsersSnap.val();
+            const recipientUids = [];
+            Object.entries(allUsers).forEach(([uid, u]) => {
+              if(u && u.staffId === w.id) recipientUids.push(uid);
+            });
+            const titleText = '💰 ใบยืนยันยอดเงิน — กรุณายืนยัน';
+            const bodyText = `${p.name} · ${fmtB(w.amount||0)} · กดเพื่อดูรายละเอียด`;
+            await Promise.all(recipientUids.map(uid =>
+              addNotification({type:'payment', title:titleText, text:bodyText, projId:p.id, recipientUid:uid})
+            ));
+          }
+        } catch(e){ console.warn('bulk notify:', e); }
+      } else {
+        failCount++;
+      }
+    } catch(e){
+      console.warn('bulk send error:', e);
+      failCount++;
+    }
+  }
+
+  if(failCount > 0){
+    toast(`📤 ส่งสำเร็จ ${successCount} ใบ · ล้มเหลว ${failCount}`,'warn');
+  } else {
+    toast(`📤 ส่งใบยืนยันครบ ${successCount} ใบแล้ว`,'success');
+  }
+  renderQueue();
+}
+
+// Admin → ส่งซ้ำ
+async function askResendConfirm(projId, workerId, slot){
+  const s = getStaffById(workerId);
+  if(!confirm(`↻ ส่ง notification ซ้ำให้ ${s?.nickname || 'Staff'}?`)) return;
+  // ส่ง notification ใหม่ (ไม่ reset confirmStatus)
+  try {
+    const p = getProjects().find(x=>x.id===projId);
+    const w = p?.workers.find(x=>x.id===workerId && x.slot===slot);
+    const allUsersSnap = await _fbDatabase.ref('users').get();
+    if(allUsersSnap.exists()){
+      const allUsers = allUsersSnap.val();
+      const recipientUids = [];
+      Object.entries(allUsers).forEach(([uid, u]) => {
+        if(u && u.staffId === workerId) recipientUids.push(uid);
+      });
+      await Promise.all(recipientUids.map(uid =>
+        addNotification({
+          type:'payment',
+          title:'⏰ เตือน: ใบยืนยันยอดยังไม่ตอบ',
+          text:`${p.name} · ${fmtB(w.amount||0)} · กรุณายืนยัน`,
+          projId:p.id, recipientUid:uid,
+        })
+      ));
+    }
+    toast('🔔 ส่ง notification ซ้ำแล้ว','success');
+  } catch(e){ console.warn(e); }
+}
+
+// Admin → ยกเลิกใบยืนยัน (เพื่อแก้ยอดแล้วส่งใหม่)
+async function askCancelConfirm(projId, workerId, slot){
+  const s = getStaffById(workerId);
+  if(!confirm(`🚫 ยกเลิกใบยืนยันยอดของ ${s?.nickname || 'Staff'}?\n\n` +
+    `สถานะจะ reset เป็น "ยังไม่ส่ง" — ต้องส่งใหม่`)) return;
+  await _updateWorkerConfirm(projId, workerId, slot, {
+    confirmStatus: 'none',
+    confirmSentAt: null,
+    confirmRespondedAt: null,
+    confirmRejectReason: null,
+    confirmAmount: null,
+  });
+  toast('🚫 ยกเลิกใบยืนยันแล้ว','info');
+  renderQueue();
+}
+
+// Admin → ดูเหตุผลที่ Staff ปฏิเสธ
+function viewRejectReason(projId, workerId, slot){
+  const p = getProjects().find(x=>x.id===projId);
+  const w = p?.workers.find(x=>x.id===workerId && x.slot===slot);
+  const s = getStaffById(workerId);
+  const reason = w?.confirmRejectReason || '(ไม่ได้ระบุเหตุผล)';
+  const respondedAt = w?.confirmRespondedAt ? new Date(w.confirmRespondedAt).toLocaleString('th-TH') : '';
+  alert(`❌ ${s?.nickname || 'Staff'} ปฏิเสธยอด\n\n` +
+    `ยอดที่ส่งไป: ${fmtB(w?.confirmAmount || w?.amount || 0)}\n` +
+    `เวลา: ${respondedAt}\n\n` +
+    `เหตุผล:\n${reason}\n\n` +
+    `→ แก้ยอด แล้วกด "📤 ส่งใหม่"`);
+}
+
+// ───── Staff side ─────
+
+// เปิด modal "ใบยืนยันยอด" สำหรับ staff
+async function openStaffConfirmInbox(){
+  const modalId = 'modal-staff-confirm-inbox';
+  let modal = document.getElementById(modalId);
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal-overlay hidden';
+    modal.innerHTML = `
+      <div class="modal" style="width:680px;max-width:96vw;max-height:90vh">
+        <div class="modal-head" style="padding:14px 18px">
+          <div class="modal-title">📥 ใบยืนยันยอดเงิน</div>
+          <button class="btn-close" onclick="closeModal('${modalId}')">✕</button>
+        </div>
+        <div class="modal-body" id="staff-confirm-inbox-body" style="padding:14px 18px;overflow-y:auto"></div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  await renderStaffConfirmInbox();
+  openModal(modalId);
+}
+
+async function renderStaffConfirmInbox(){
+  const body = document.getElementById('staff-confirm-inbox-body');
+  if(!body) return;
+  if(!currentUser?.staffId){
+    body.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2)">ไม่พบข้อมูลทีมงานของคุณ</div>';
+    return;
+  }
+  // หา workers ทั้งหมดที่เป็นของ staff คนนี้
+  const projs = getProjects();
+  const myItems = []; // {p, w}
+  projs.forEach(p => {
+    (p.workers||[]).forEach(w => {
+      if(w.id === currentUser.staffId && w.confirmStatus){
+        myItems.push({p, w});
+      }
+    });
+  });
+  // Sort: pending (sent) first, then rejected, then confirmed (newest first)
+  const orderMap = {sent:0, rejected:1, confirmed:2, none:3};
+  myItems.sort((a,b) => {
+    const oa = orderMap[a.w.confirmStatus] ?? 9;
+    const ob = orderMap[b.w.confirmStatus] ?? 9;
+    if(oa !== ob) return oa - ob;
+    return (b.w.confirmSentAt||'').localeCompare(a.w.confirmSentAt||'');
+  });
+
+  if(!myItems.length){
+    body.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2);font-size:13px">ยังไม่มีใบยืนยันยอด</div>';
+    return;
+  }
+
+  const cntSent = myItems.filter(x=>x.w.confirmStatus==='sent').length;
+  const cntConfirmed = myItems.filter(x=>x.w.confirmStatus==='confirmed').length;
+  const cntRejected = myItems.filter(x=>x.w.confirmStatus==='rejected').length;
+
+  // Tabs
+  const tabsHTML = `<div style="display:flex;gap:6px;margin-bottom:14px;background:var(--bg2);padding:4px;border-radius:10px">
+    <button onclick="_setStaffConfirmTab('all',this)" data-tab="all" class="active" style="flex:1;padding:8px 14px;border-radius:7px;border:none;cursor:pointer;font-family:Kanit;font-weight:700;font-size:12px;background:var(--card);color:var(--text)">ทั้งหมด (${myItems.length})</button>
+    <button onclick="_setStaffConfirmTab('sent',this)" data-tab="sent" style="flex:1;padding:8px 14px;border-radius:7px;border:none;cursor:pointer;font-family:Kanit;font-weight:700;font-size:12px;background:transparent;color:var(--text2)">⏳ รอยืนยัน (${cntSent})</button>
+    <button onclick="_setStaffConfirmTab('confirmed',this)" data-tab="confirmed" style="flex:1;padding:8px 14px;border-radius:7px;border:none;cursor:pointer;font-family:Kanit;font-weight:700;font-size:12px;background:transparent;color:var(--text2)">✅ ยืนยันแล้ว (${cntConfirmed})</button>
+    <button onclick="_setStaffConfirmTab('rejected',this)" data-tab="rejected" style="flex:1;padding:8px 14px;border-radius:7px;border:none;cursor:pointer;font-family:Kanit;font-weight:700;font-size:12px;background:transparent;color:var(--text2)">❌ ปฏิเสธ (${cntRejected})</button>
+  </div>
+  <div id="staff-confirm-inbox-list"></div>`;
+  body.innerHTML = tabsHTML;
+  _staffConfirmTabFilter = 'all';
+  _renderStaffConfirmList(myItems);
+}
+
+let _staffConfirmTabFilter = 'all';
+function _setStaffConfirmTab(tab, btn){
+  _staffConfirmTabFilter = tab;
+  // Update tab visual
+  document.querySelectorAll('#staff-confirm-inbox-body [data-tab]').forEach(b=>{
+    b.style.background = 'transparent';
+    b.style.color = 'var(--text2)';
+    b.classList.remove('active');
+  });
+  if(btn){
+    btn.style.background = 'var(--card)';
+    btn.style.color = 'var(--text)';
+    btn.classList.add('active');
+  }
+  renderStaffConfirmInbox();
+}
+
+function _renderStaffConfirmList(items){
+  const list = document.getElementById('staff-confirm-inbox-list');
+  if(!list) return;
+  const filtered = _staffConfirmTabFilter === 'all'
+    ? items
+    : items.filter(x => x.w.confirmStatus === _staffConfirmTabFilter);
+  if(!filtered.length){
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2);font-size:13px">ไม่มีรายการในหมวดนี้</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(({p, w}) => {
+    const cs = w.confirmStatus;
+    const sentAt = w.confirmSentAt ? new Date(w.confirmSentAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
+    const respAt = w.confirmRespondedAt ? new Date(w.confirmRespondedAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
+    const slot = (w.slot||'').split('-')[0];
+    const slotLabel = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', mgr:'🗂️ Manager'}[slot] || slot;
+
+    let bg, borderColor, statusLabel, actions = '';
+    if(cs === 'sent'){
+      bg = 'rgba(155,111,255,.06)';
+      borderColor = 'rgba(155,111,255,.35)';
+      statusLabel = '<span style="padding:3px 9px;border-radius:7px;background:rgba(155,111,255,.15);color:#9B6FFF;font-size:11px;font-weight:700">⏳ รอคุณยืนยัน</span>';
+      actions = `<div style="display:flex;gap:8px;margin-top:12px">
+        <button onclick="staffConfirmYes('${p.id}','${w.id}','${w.slot}')" style="flex:1;padding:9px;border-radius:8px;background:var(--green);color:#000;border:none;font-family:Kanit;font-weight:800;font-size:13px;cursor:pointer">✅ ยืนยันยอดถูกต้อง</button>
+        <button onclick="staffConfirmNo('${p.id}','${w.id}','${w.slot}')" style="flex:0 0 auto;padding:9px 16px;border-radius:8px;background:transparent;color:var(--red);border:1.5px solid var(--red);font-family:Kanit;font-weight:700;font-size:13px;cursor:pointer">✗ ปฏิเสธ</button>
+      </div>`;
+    } else if(cs === 'confirmed'){
+      bg = 'rgba(0,223,160,.04)';
+      borderColor = 'rgba(0,223,160,.25)';
+      statusLabel = `<span style="padding:3px 9px;border-radius:7px;background:rgba(0,223,160,.15);color:var(--green);font-size:11px;font-weight:700">✅ ยืนยันแล้ว</span>`;
+    } else if(cs === 'rejected'){
+      bg = 'rgba(255,64,64,.04)';
+      borderColor = 'rgba(255,64,64,.25)';
+      statusLabel = `<span style="padding:3px 9px;border-radius:7px;background:rgba(255,64,64,.15);color:var(--red);font-size:11px;font-weight:700">❌ คุณปฏิเสธ</span>`;
+    } else return '';
+
+    const reasonHTML = (cs === 'rejected' && w.confirmRejectReason)
+      ? `<div style="margin-top:8px;padding:8px 12px;background:rgba(255,64,64,.06);border-left:3px solid var(--red);border-radius:6px;font-size:12px;color:var(--text)"><strong>เหตุผล:</strong> ${(w.confirmRejectReason||'').replace(/</g,'&lt;')}</div>`
+      : '';
+
+    const isPaid = w.status === 'paid';
+    const paidNote = isPaid ? `<div style="margin-top:6px;font-size:11px;color:var(--green);font-weight:700">💰 โอนแล้ว · เลขที่ ${w.voucherNo||'-'}</div>` : '';
+
+    // === Breakdown box — ให้ Staff ตรวจรายละเอียดได้ตรงจุด ===
+    const myStaff = getStaffById(workerId);
+    const finalAmount = w.confirmAmount || w.amount || 0;
+    const rate = w.ratePerUnit || 0;
+    const unit = w.unit || 'เหมา';
+    const dur = p.duration || 0;
+    let breakdownLines = [];
+    if(unit === 'นาที' && dur > 0 && rate > 0){
+      breakdownLines.push(`<div style="display:flex;justify-content:space-between"><span>${dur} นาที × ${fmtB(rate)}/นาที</span><span style="font-weight:700">${fmtB(rate*dur)}</span></div>`);
+    } else if(unit === 'เหมา' && rate > 0){
+      breakdownLines.push(`<div style="display:flex;justify-content:space-between"><span>เหมาจ่าย</span><span style="font-weight:700">${fmtB(rate)}</span></div>`);
+    } else if(rate > 0){
+      breakdownLines.push(`<div style="display:flex;justify-content:space-between"><span>${fmtB(rate)} × ${dur||1} ${unit}</span><span style="font-weight:700">${fmtB(rate*(dur||1))}</span></div>`);
+    }
+    // หมายเหตุ (เช่น หัก 200฿)
+    if(w.comment && w.comment.trim()){
+      breakdownLines.push(`<div style="margin-top:4px;padding-top:4px;border-top:1px dashed rgba(255,255,255,.08);color:var(--orange)"><span style="font-size:10px">📝 หมายเหตุ:</span> ${(w.comment||'').replace(/</g,'&lt;')}</div>`);
+    }
+    // บัญชี
+    if(myStaff){
+      breakdownLines.push(`<div style="margin-top:4px;padding-top:4px;border-top:1px dashed rgba(255,255,255,.08);font-size:10.5px;color:var(--text2)">โอนเข้า: <strong style="color:var(--text)">${myStaff.bank||'-'} ${myStaff.account||''}</strong>${myStaff.promptpay?` · 📱 ${myStaff.promptpay}`:''}</div>`);
+    }
+    const breakdownHTML = breakdownLines.length
+      ? `<div style="margin-top:8px;background:rgba(0,0,0,.25);border-radius:7px;padding:8px 12px;font-size:11px;color:var(--text);line-height:1.7">${breakdownLines.join('')}</div>`
+      : '';
+
+    return `<div style="background:${bg};border:1px solid ${borderColor};border-radius:10px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:2px">${p.name}</div>
+          <div style="font-size:11px;color:var(--text2)">${slotLabel}${p.client?' · '+p.client:''}</div>
+          ${sentAt?`<div style="font-size:10px;color:var(--text2);margin-top:2px">📤 ส่งเมื่อ: ${sentAt}${respAt?` · ตอบกลับ: ${respAt}`:''}</div>`:''}
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--text2)">ยอดที่จะโอน</div>
+          <div style="font-size:22px;font-weight:800;color:var(--green)">${fmtB(finalAmount)}</div>
+          <div style="margin-top:5px">${statusLabel}</div>
+        </div>
+      </div>
+      ${breakdownHTML}
+      ${reasonHTML}
+      ${paidNote}
+      ${actions}
+    </div>`;
+  }).join('');
+}
+
+// Staff: กดยืนยัน (มี confirm dialog)
+async function staffConfirmYes(projId, workerId, slot){
+  const p = getProjects().find(x=>x.id===projId);
+  const w = p?.workers.find(x=>x.id===workerId && x.slot===slot);
+  if(!p || !w){ toast('ไม่พบข้อมูล','error'); return; }
+  const amt = w.confirmAmount || w.amount || 0;
+  if(!confirm(`✅ ยืนยันยอด ${fmtB(amt)} สำหรับ "${p.name}"?\n\n` +
+    `เมื่อยืนยันแล้ว Admin จะโอนเงินให้คุณตามยอดนี้`)) return;
+  const ok = await _updateWorkerConfirm(projId, workerId, slot, {
+    confirmStatus: 'confirmed',
+    confirmRespondedAt: new Date().toISOString(),
+    confirmRejectReason: null,
+  });
+  if(!ok) return;
+  // แจ้งเตือน admin ทุกคน
+  try {
+    const s = getStaffById(workerId);
+    await addNotificationToAdmins({
+      type:'payment',
+      title:'✅ Staff ยืนยันยอดแล้ว',
+      text: `${s?.nickname || workerId} ยืนยัน ${fmtB(amt)} · ${p.name}`,
+      projId: p.id,
+    });
+  } catch(e){ console.warn(e); }
+  toast('✅ ยืนยันแล้ว — Admin จะดำเนินการโอน','success');
+  await renderStaffConfirmInbox();
+}
+
+// Staff: กดปฏิเสธ — มี modal กรอกเหตุผล
+function staffConfirmNo(projId, workerId, slot){
+  const p = getProjects().find(x=>x.id===projId);
+  const w = p?.workers.find(x=>x.id===workerId && x.slot===slot);
+  if(!p || !w) return;
+
+  const modalId = 'modal-reject-reason';
+  let modal = document.getElementById(modalId);
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal-overlay hidden';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div class="modal" style="width:480px;max-width:96vw">
+      <div class="modal-head" style="padding:14px 18px">
+        <div class="modal-title">✗ ปฏิเสธยอด</div>
+        <button class="btn-close" onclick="closeModal('${modalId}')">✕</button>
+      </div>
+      <div class="modal-body" style="padding:16px 18px">
+        <div style="margin-bottom:10px;font-size:13px;color:var(--text)">
+          <strong>${p.name}</strong> · ${fmtB(w.confirmAmount || w.amount || 0)}
+        </div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:700">เหตุผล (ไม่บังคับ — ระบุเพื่อให้ Admin แก้ได้ตรงจุด)</div>
+        <textarea id="reject-reason-text" placeholder="เช่น ยอดไม่ตรงกับที่ตกลง · ชื่องานไม่ใช่งานของฉัน · ฯลฯ"
+          style="width:100%;min-height:90px;padding:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;resize:vertical"></textarea>
+      </div>
+      <div class="modal-foot" style="padding:12px 18px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="closeModal('${modalId}')">ยกเลิก</button>
+        <button class="btn" style="background:var(--red);color:#fff;border:none" onclick="_submitRejectReason('${projId}','${workerId}','${slot}')">✗ ส่งคำปฏิเสธ</button>
+      </div>
+    </div>`;
+  openModal(modalId);
+  setTimeout(()=>document.getElementById('reject-reason-text')?.focus(),100);
+}
+
+async function _submitRejectReason(projId, workerId, slot){
+  const reason = (document.getElementById('reject-reason-text')?.value || '').trim();
+  const p = getProjects().find(x=>x.id===projId);
+  const w = p?.workers.find(x=>x.id===workerId && x.slot===slot);
+  if(!p || !w) return;
+  const ok = await _updateWorkerConfirm(projId, workerId, slot, {
+    confirmStatus: 'rejected',
+    confirmRespondedAt: new Date().toISOString(),
+    confirmRejectReason: reason,
+  });
+  if(!ok) return;
+  closeModal('modal-reject-reason');
+  // แจ้งเตือน admin
+  try {
+    const s = getStaffById(workerId);
+    await addNotificationToAdmins({
+      type:'payment',
+      title:'❌ Staff ปฏิเสธยอด',
+      text: `${s?.nickname || workerId} ปฏิเสธ ${fmtB(w.confirmAmount || w.amount || 0)} · ${p.name}${reason?' · "'+reason.slice(0,40)+(reason.length>40?'...':'')+'"':''}`,
+      projId: p.id,
+    });
+  } catch(e){ console.warn(e); }
+  toast('✗ ส่งคำปฏิเสธแล้ว','info');
+  await renderStaffConfirmInbox();
+}
+
+
+
 /* approved → waiting_client (รอลูกค้าจ่าย) */
 async function qWaitingClient(projId, workerId, slot) {
   const nowIso = new Date().toISOString();
@@ -7973,6 +8616,24 @@ async function qRevert(projId, workerId, slot) {
 
 /* เปิด modal จ่าย — ทำงานจาก pending หรือ approved ก็ได้ */
 function qPay(projId, workerId, slot) {
+  // === Block: ต้องมี confirm ก่อนถึงจะจ่ายได้ (Yu บอก "ถ้าไม่ยืนยัน เงินก็จะไม่ถูกโอน") ===
+  const _p_check = getProjects().find(x => x.id === projId);
+  const _w_check = _p_check?.workers.find(x => x.id === workerId && x.slot === slot);
+  if(_w_check && !canPayWorker(_w_check)){
+    const cs = getWorkerConfirmStatus(_w_check);
+    if(cs === 'none'){
+      toast('⛔ ต้องส่งใบยืนยันยอดให้ Staff ก่อน','warn');
+      return;
+    }
+    if(cs === 'sent'){
+      toast('⏳ กำลังรอ Staff ยืนยัน — ยังโอนไม่ได้','warn');
+      return;
+    }
+    if(cs === 'rejected'){
+      toast('❌ Staff ปฏิเสธ — ต้องแก้ยอดและส่งใหม่','warn');
+      return;
+    }
+  }
   slipTarget = { projId, workerId, slot };
   const p = getProjects().find(x => x.id === projId);
   const w = p?.workers.find(x => x.id === workerId && x.slot === slot);
@@ -8575,6 +9236,30 @@ function renderMyDash(){
     _scheduleMyDashRetry('no currentUser');
     return;
   }
+
+  // === Render ปุ่ม "ใบยืนยันยอด" (สำหรับ staff) ===
+  try {
+    const btnWrap = document.getElementById('my-confirm-inbox-btn-wrap');
+    if(btnWrap && currentUser.staffId){
+      // Count pending confirms
+      let pendingCount = 0;
+      getProjects().forEach(p => {
+        (p.workers||[]).forEach(w => {
+          if(w.id === currentUser.staffId && w.confirmStatus === 'sent') pendingCount++;
+        });
+      });
+      const badgeHTML = pendingCount > 0
+        ? `<span style="background:#FF4040;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:9px;margin-left:6px">${pendingCount}</span>`
+        : '';
+      const btnColor = pendingCount > 0 ? '#9B6FFF' : 'var(--border2)';
+      const btnTextColor = pendingCount > 0 ? '#fff' : 'var(--text)';
+      btnWrap.innerHTML = `<button onclick="openStaffConfirmInbox()" style="padding:8px 14px;border-radius:9px;background:${pendingCount>0?'#9B6FFF':'var(--card)'};border:1.5px solid ${btnColor};color:${btnTextColor};font-family:Kanit;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:.15s">
+        💰 ใบยืนยันยอด${badgeHTML}
+      </button>`;
+    } else if(btnWrap){
+      btnWrap.innerHTML = '';
+    }
+  } catch(e){ console.warn('confirm inbox btn:', e); }
 
   // ═══ ชั้นที่ 1: resolve staffId (ถ้าหาย ลอง match email) ═══
   if(!currentUser.staffId && currentUser.email){
