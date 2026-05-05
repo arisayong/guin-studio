@@ -1281,7 +1281,7 @@ body.sidebar-collapsed .main-content{
     <div id="email-audit-result" style="margin-top:10px"></div>
    </div>
 
-   <!-- Duplicate Staff Detector — หาสมาชิกซ้ำ (email ตรง / เลขบัญชีตรง / ชื่อใกล้กัน) -->
+   <!-- Duplicate Staff Detector — หาสมาชิกซ้ำ -->
    <div class="section-card" style="border-left:4px solid #FF80AB;margin-bottom:16px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
      <span style="font-size:28px">👥</span>
@@ -1292,6 +1292,19 @@ body.sidebar-collapsed .main-content{
      <button class="btn btn-outline" onclick="findDuplicateStaff()" style="padding:10px 18px;border-color:#FF80AB;color:#FF80AB">🔍 สแกนตรวจ</button>
     </div>
     <div id="duplicate-result" style="margin-top:10px"></div>
+   </div>
+
+   <!-- Repair Broken staffId — ซ่อม users ที่ staffId ชี้ไปคนที่ถูกลบ -->
+   <div class="section-card" style="border-left:4px solid #00DFA0;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">🔧</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:var(--green)">ซ่อม staffId ที่เสียหาย</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">ตรวจ users ที่ staffId ชี้ไปคนที่ไม่มีในระบบ (ลบไปแล้ว/merge ไปแล้ว) → ลอง re-resolve จาก email · แก้ปัญหา "บัญชียังไม่ผูกกับข้อมูลทีม" หลัง merge</div>
+     </div>
+     <button class="btn btn-outline" onclick="repairBrokenStaffIds()" style="padding:10px 18px;border-color:var(--green);color:var(--green)">🔧 สแกน + ซ่อม</button>
+    </div>
+    <div id="repair-result" style="margin-top:10px"></div>
    </div>
 
    <!-- Excluded Sync List — คนที่ admin ลบ (ห้าม sync กลับ) -->
@@ -6055,6 +6068,132 @@ async function deleteOrphanUser(uid, displayName){
 }
 
 // ═══════════════════════════════════════════════════════════
+// 🔧 Repair Broken staffId — ซ่อม users ที่ staffId ชี้ไปคนที่ถูกลบ
+// ═══════════════════════════════════════════════════════════
+async function repairBrokenStaffIds(){
+  const resultEl = document.getElementById('repair-result');
+  if(!resultEl) return;
+  resultEl.innerHTML = '<div style="padding:12px;color:var(--text2)">⏳ กำลังสแกน...</div>';
+  if(!_fbDatabase){
+    resultEl.innerHTML = '<div style="padding:12px;color:var(--red)">❌ Firebase ไม่พร้อม</div>';
+    return;
+  }
+  try {
+    const usersSnap = await _fbDatabase.ref('users').get();
+    if(!usersSnap.exists()){
+      resultEl.innerHTML = '<div style="padding:12px;color:var(--text2)">ไม่มีข้อมูล users</div>';
+      return;
+    }
+    const allUsers = usersSnap.val();
+    const allStaff = getAllStaff();
+    const validStaffIds = new Set(allStaff.map(s => s.id));
+
+    const _extractEmails = (str) => {
+      const m = String(str||'').match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi);
+      return m ? m.map(x=>x.toLowerCase()) : [];
+    };
+
+    // Build email → staff map
+    const staffByEmail = {};
+    allStaff.forEach(s => {
+      _extractEmails(s.email).forEach(em => { staffByEmail[em] = s; });
+    });
+
+    const broken = [];   // users ที่ staffId ไม่อยู่ใน staff_v3 + match email ได้
+    const stillBroken = []; // users ที่ staffId ไม่อยู่ + email ก็ไม่ตรง
+    const updates = {};
+
+    Object.entries(allUsers).forEach(([uid, u]) => {
+      if(!u || u.role === 'admin') return; // skip admin
+      if(!u.staffId) return; // skip ที่ไม่มี staffId เลย (handled by other audit)
+      if(validStaffIds.has(u.staffId)) return; // OK
+
+      // staffId ชี้ไปคนที่ไม่มี → ลอง re-resolve จาก email
+      const emailLower = (u.email||'').trim().toLowerCase();
+      const matched = emailLower ? staffByEmail[emailLower] : null;
+      if(matched){
+        broken.push({
+          uid,
+          email: u.email,
+          oldStaffId: u.staffId,
+          newStaffId: matched.id,
+          newName: matched.nickname || matched.name,
+          category: matched.category,
+        });
+        updates['users/'+uid+'/staffId'] = matched.id;
+      } else {
+        stillBroken.push({
+          uid,
+          email: u.email || '(ว่าง)',
+          oldStaffId: u.staffId,
+          nickname: u.nickname || '',
+        });
+      }
+    });
+
+    if(!broken.length && !stillBroken.length){
+      resultEl.innerHTML = `<div style="padding:14px;background:rgba(0,223,160,.08);border:1px solid rgba(0,223,160,.3);border-radius:10px;color:var(--green);font-weight:700">✅ ไม่พบ user ที่ staffId เสียหาย — ทุก user ผูกกับ staff record ที่มีอยู่</div>`;
+      return;
+    }
+
+    let html = '';
+
+    if(broken.length){
+      html += `<div style="padding:14px;background:rgba(0,223,160,.06);border:1px solid rgba(0,223,160,.3);border-radius:10px;margin-bottom:12px">
+        <div style="font-weight:800;color:var(--green);font-size:14px;margin-bottom:6px">🔧 พบ ${broken.length} user ที่ซ่อมได้ทันที (email ตรงกับ staff record อื่น)</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:10px">user เหล่านี้เคยผูกกับ id ที่ถูกลบ/merge ไปแล้ว — ระบบจะอัปเดต staffId ให้ชี้ไป record ปัจจุบัน</div>`;
+      broken.slice(0, 30).forEach(b => {
+        html += `<div style="background:var(--bg2);border-radius:7px;padding:10px 12px;margin-bottom:6px;font-size:12px">
+          <div style="font-weight:700">${_escH(b.newName)} <span style="color:var(--text2);font-weight:400;font-size:11px">[${_escH(b.category)}]</span></div>
+          <div style="font-size:10.5px;color:var(--accent2);margin-top:2px">📧 ${_escH(b.email||'')}</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px;line-height:1.5">id เก่า: <code style="color:var(--red)">${_escH(b.oldStaffId.substring(0,16))}...</code> → ใหม่: <code style="color:var(--green)">${_escH(b.newStaffId)}</code></div>
+        </div>`;
+      });
+      if(broken.length > 30) html += `<div style="font-size:11px;color:var(--text2);margin-top:6px">... และอีก ${broken.length-30} รายการ</div>`;
+      html += `<button class="btn" style="background:var(--green);color:#000;padding:9px 16px;font-weight:700;margin-top:8px" onclick="_applyRepairBrokenStaffIds()">🔧 ซ่อมทั้งหมด (${broken.length} user)</button>
+        <div style="font-size:10px;color:var(--text2);margin-top:6px">💡 หลัง fix → บอก user เหล่านี้ logout + login ใหม่ เพื่อให้ระบบ load ค่าล่าสุด</div>
+      </div>`;
+      window._repairUpdates = updates;
+      window._repairCount = broken.length;
+    }
+
+    if(stillBroken.length){
+      html += `<div style="padding:14px;background:rgba(255,64,64,.06);border:1px solid rgba(255,64,64,.3);border-radius:10px">
+        <div style="font-weight:800;color:var(--red);font-size:14px;margin-bottom:6px">⚠️ ${stillBroken.length} user ซ่อมอัตโนมัติไม่ได้</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:10px">staffId ชี้ไปคนที่ไม่มี + email ก็ match ไม่เจอ — ต้องแก้มือ</div>`;
+      stillBroken.slice(0, 20).forEach(b => {
+        html += `<div style="background:var(--bg2);border-radius:7px;padding:9px 12px;margin-bottom:5px;font-size:12px">
+          <div style="font-weight:700">${_escH(b.nickname||'(ไม่มีชื่อเล่น)')}</div>
+          <div style="font-size:10.5px;color:var(--accent2);margin-top:2px">📧 ${_escH(b.email)}</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">staffId เก่า: <code>${_escH(b.oldStaffId.substring(0,20))}...</code></div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    resultEl.innerHTML = html;
+  } catch(e){
+    console.error('repairBrokenStaffIds:', e);
+    resultEl.innerHTML = `<div style="padding:12px;color:var(--red)">❌ ${e.message}</div>`;
+  }
+}
+
+async function _applyRepairBrokenStaffIds(){
+  const updates = window._repairUpdates || {};
+  const count = window._repairCount || 0;
+  if(!Object.keys(updates).length){ toast('ไม่มีรายการ','info'); return; }
+  if(!confirm(`ยืนยันซ่อม ${count} user?\n\nระบบจะอัปเดต users/{uid}/staffId ให้ชี้ไป staff record ปัจจุบัน\n\n💡 หลัง fix → บอก user เหล่านั้น logout + login ใหม่`)) return;
+
+  try {
+    await _fbDatabase.ref().update(updates);
+    toast(`🔧 ซ่อมเรียบร้อย ${count} user — บอกพวกเขา logout/login ใหม่`,'success');
+    setTimeout(()=>repairBrokenStaffIds(), 600);
+  } catch(e){
+    toast('❌ '+e.message,'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // 👥 Duplicate Staff Detector — หาคนที่อาจซ้ำกัน
 // ═══════════════════════════════════════════════════════════
 function findDuplicateStaff(){
@@ -6211,6 +6350,25 @@ async function mergeDuplicateStaff(keepId, removeIds, keepName){
       ls('projects', projs);
     }
 
+    // === 1.5 Update users/{uid}/staffId — สำหรับ user ที่ผูกกับ removeIds ===
+    let updatedUserCount = 0;
+    try {
+      const usersSnap = await _fbDatabase.ref('users').get();
+      if(usersSnap.exists()){
+        const allUsers = usersSnap.val();
+        const userUpdates = {};
+        Object.entries(allUsers).forEach(([uid, u]) => {
+          if(u && removeIds.includes(u.staffId)){
+            userUpdates['users/'+uid+'/staffId'] = keepId;
+            updatedUserCount++;
+          }
+        });
+        if(Object.keys(userUpdates).length > 0){
+          await _fbDatabase.ref().update(userUpdates);
+        }
+      }
+    } catch(e){ console.warn('update users staffId:', e); }
+
     // === 2. ลบ records ซ้ำจาก staff_v3 ===
     const staffData = getStaffData();
     let removedCount = 0;
@@ -6230,7 +6388,7 @@ async function mergeDuplicateStaff(keepId, removeIds, keepName){
     // === 3. ลบ confirmStatus ของ orphan workers ใน projects ===
     // (ไม่จำเป็น เพราะ id เปลี่ยนเป็น keepId แล้ว)
 
-    toast(`✅ Merge สำเร็จ — ลบ ${removedCount} records · ย้ายงาน ${updatedWorkerCount} ใน ${updatedProjCount} โปรเจกต์`,'success');
+    toast(`✅ Merge สำเร็จ — ลบ ${removedCount} records · ย้ายงาน ${updatedWorkerCount} ใน ${updatedProjCount} โปรเจกต์${updatedUserCount?' · ผูก user '+updatedUserCount+' บัญชี':''}`,'success');
     setTimeout(()=>findDuplicateStaff(), 600);
   } catch(e){
     console.error('mergeDuplicateStaff:', e);
