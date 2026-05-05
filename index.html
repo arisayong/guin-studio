@@ -1281,6 +1281,19 @@ body.sidebar-collapsed .main-content{
     <div id="email-audit-result" style="margin-top:10px"></div>
    </div>
 
+   <!-- Duplicate Staff Detector — หาสมาชิกซ้ำ (email ตรง / เลขบัญชีตรง / ชื่อใกล้กัน) -->
+   <div class="section-card" style="border-left:4px solid #FF80AB;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">👥</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:#FF80AB">ตรวจสมาชิกซ้ำ</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">หาสมาชิกที่อาจเป็นคนเดียวกันแต่มี 2 records (email/เลขบัญชี/ชื่อ-นามสกุล ตรงกัน) · รวมเป็น record เดียวเพื่อกันข้อมูลกระจัด</div>
+     </div>
+     <button class="btn btn-outline" onclick="findDuplicateStaff()" style="padding:10px 18px;border-color:#FF80AB;color:#FF80AB">🔍 สแกนตรวจ</button>
+    </div>
+    <div id="duplicate-result" style="margin-top:10px"></div>
+   </div>
+
    <!-- Excluded Sync List — คนที่ admin ลบ (ห้าม sync กลับ) -->
    <div class="section-card" style="border-left:4px solid var(--purple);margin-bottom:16px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
@@ -6037,6 +6050,190 @@ async function deleteOrphanUser(uid, displayName){
     setTimeout(()=>runEmailMismatchAudit(), 600);
   } catch(e){
     console.error('deleteOrphanUser:', e);
+    toast('❌ '+e.message,'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 👥 Duplicate Staff Detector — หาคนที่อาจซ้ำกัน
+// ═══════════════════════════════════════════════════════════
+function findDuplicateStaff(){
+  const resultEl = document.getElementById('duplicate-result');
+  if(!resultEl) return;
+  resultEl.innerHTML = '<div style="padding:12px;color:var(--text2)">⏳ กำลังสแกน...</div>';
+
+  // รวบรวม staff ทั้งหมดพร้อม category
+  const allStaff = [];
+  const staffData = getStaffData();
+  Object.entries(staffData||{}).forEach(([cat, arr]) => {
+    (Array.isArray(arr)?arr:Object.values(arr||{})).filter(Boolean).forEach(s => {
+      if(s?.id) allStaff.push({...s, _cat: cat});
+    });
+  });
+
+  // จัดกลุ่มตาม signature
+  const _normalize = (s) => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  const _extractEmails = (str) => {
+    const m = String(str||'').match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi);
+    return m ? m.map(x=>x.toLowerCase()) : [];
+  };
+
+  const groupsByEmail = {};   // email → [staff,...]
+  const groupsByAccount = {}; // bank+account → [staff,...]
+  const groupsByName = {};    // full-name → [staff,...]
+
+  allStaff.forEach(s => {
+    // by email
+    _extractEmails(s.email).forEach(em => {
+      (groupsByEmail[em] = groupsByEmail[em] || []).push(s);
+    });
+    // by account number (only if both bank+account exist)
+    if(s.bank && s.account){
+      const key = _normalize(s.bank) + '|' + String(s.account).replace(/[\s-]/g,'');
+      if(key.length > 5) (groupsByAccount[key] = groupsByAccount[key] || []).push(s);
+    }
+    // by full name (เช่น "ภาคภูมิ นามมูลน้อย" — เฉพาะเมื่อมีทั้ง first+last)
+    const nm = _normalize(s.name);
+    if(nm && nm.includes(' ')){ // ต้องมีนามสกุลด้วย กันชื่อสามัญ
+      (groupsByName[nm] = groupsByName[nm] || []).push(s);
+    }
+  });
+
+  // หา group ที่มี > 1 records
+  const seenPairs = new Set(); // กัน group ซ้ำ (ถ้า 2 คนเดียวกันเจอทั้ง email + account)
+  const dupGroups = [];
+
+  const _addGroup = (members, reason) => {
+    if(members.length < 2) return;
+    // dedupe ภายใน group (ป้องกัน same id โผล่ 2 ครั้ง)
+    const uniqueMembers = [];
+    const seenIds = new Set();
+    members.forEach(m => { if(!seenIds.has(m.id)){ seenIds.add(m.id); uniqueMembers.push(m); } });
+    if(uniqueMembers.length < 2) return;
+    // กัน group ซ้ำ
+    const key = uniqueMembers.map(m=>m.id).sort().join('|');
+    if(seenPairs.has(key)) return;
+    seenPairs.add(key);
+    dupGroups.push({ members: uniqueMembers, reason });
+  };
+
+  Object.entries(groupsByEmail).forEach(([em, members]) => {
+    _addGroup(members, `📧 Email ตรงกัน: ${em}`);
+  });
+  Object.entries(groupsByAccount).forEach(([key, members]) => {
+    _addGroup(members, `🏦 เลขบัญชีตรงกัน`);
+  });
+  Object.entries(groupsByName).forEach(([nm, members]) => {
+    _addGroup(members, `👤 ชื่อ-นามสกุลตรงกัน: ${nm}`);
+  });
+
+  if(!dupGroups.length){
+    resultEl.innerHTML = `<div style="padding:14px;background:rgba(0,223,160,.08);border:1px solid rgba(0,223,160,.3);border-radius:10px;color:var(--green);font-weight:700">✅ ไม่พบสมาชิกซ้ำ — staff ทั้ง ${allStaff.length} คนเป็น records แยกกัน</div>`;
+    return;
+  }
+
+  let html = `<div style="padding:14px;background:rgba(255,128,171,.08);border:1px solid rgba(255,128,171,.3);border-radius:10px;margin-bottom:12px">
+    <div style="font-weight:800;color:#FF80AB;font-size:14px;margin-bottom:4px">⚠️ พบ ${dupGroups.length} กลุ่มที่อาจเป็นคนซ้ำกัน</div>
+    <div style="font-size:11px;color:var(--text2)">สแกน ${allStaff.length} สต๊าฟ · กดปุ่มเลือก "เก็บคนนี้" → records อื่นในกลุ่มจะถูกลบและย้ายงาน workers ไปที่คนที่เลือก</div>
+  </div>`;
+
+  dupGroups.forEach((g, gi) => {
+    html += `<div style="background:rgba(255,128,171,.04);border:1px solid rgba(255,128,171,.25);border-radius:10px;padding:14px;margin-bottom:10px">
+      <div style="font-size:12px;color:#FF80AB;font-weight:700;margin-bottom:8px">${_escH(g.reason)}</div>`;
+    g.members.forEach((m, mi) => {
+      const others = g.members.filter(x => x.id !== m.id);
+      const idsToDelete = others.map(x => x.id);
+      const idsJson = JSON.stringify(idsToDelete).replace(/"/g,'&quot;');
+      html += `<div style="background:var(--bg2);border-radius:7px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px;font-size:12px">
+          <div style="font-weight:700">${_escH(m.nickname||m.name)} <span style="color:var(--text2);font-weight:400;font-size:11px">[${_escH(m._cat)}]</span></div>
+          <div style="font-size:10.5px;color:var(--text2);margin-top:2px">id: <code>${_escH(m.id.substring(0,12))}...</code></div>
+          ${m.email?`<div style="font-size:10.5px;color:var(--accent2);margin-top:1px">📧 ${_escH(m.email)}</div>`:''}
+          ${m.bank?`<div style="font-size:10.5px;color:var(--text2);margin-top:1px">🏦 ${_escH(m.bank)} ${_escH(m.account||'')}</div>`:''}
+        </div>
+        <button class="btn btn-blue btn-sm" style="padding:7px 14px;font-size:11px" onclick='mergeDuplicateStaff("${_escJ(m.id)}", ${idsJson}, "${_escJ(m.nickname||m.name)}")'>✅ เก็บคนนี้ · ลบ ${idsToDelete.length} คนที่เหลือ</button>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  html += `<div style="font-size:11px;color:var(--text2);padding:8px 10px;background:rgba(255,255,255,.03);border-radius:6px;line-height:1.6;margin-top:6px">
+    💡 <strong>การ Merge ทำอะไร:</strong> 1) ลบ records ที่ไม่ได้เลือกออกจาก staff_v3 · 2) update worker.id ใน projects ทั้งหมดที่ชี้ไป id เก่า → ให้ชี้ไป id ที่เลือก · 3) auto-publish public list ใหม่
+  </div>`;
+
+  resultEl.innerHTML = html;
+}
+
+async function mergeDuplicateStaff(keepId, removeIds, keepName){
+  if(!keepId || !Array.isArray(removeIds) || !removeIds.length){
+    toast('ข้อมูลไม่ครบ','error'); return;
+  }
+  if(!confirm(`✅ เก็บ "${keepName}" + ลบอีก ${removeIds.length} คน?\n\n` +
+    `ระบบจะ:\n` +
+    `1. ย้ายงานทั้งหมดของคนซ้ำ → ไปที่ "${keepName}" (id: ${keepId.substring(0,8)}...)\n` +
+    `2. ลบ records ซ้ำออกจากระบบ\n` +
+    `3. อัปเดต public list อัตโนมัติ\n\n` +
+    `⚠️ การกระทำนี้ undo ไม่ได้ (ระบบสำรอง backup ใน localStorage 24 ชม.)`)) return;
+
+  try {
+    // === Backup ก่อน ===
+    const backup = {
+      timestamp: new Date().toISOString(),
+      keepId, removeIds, keepName,
+      staffData: JSON.parse(JSON.stringify(getStaffData())),
+      projects: JSON.parse(JSON.stringify(getProjects())),
+    };
+    ls('_merge_dup_backup_'+Date.now(), backup);
+
+    toast('⏳ กำลัง merge...','info');
+
+    // === 1. Update worker.id ใน projects ที่ชี้ไป removeIds → keepId ===
+    const projs = getProjects();
+    let updatedProjCount = 0;
+    let updatedWorkerCount = 0;
+    const updates = {};
+    for(const p of projs){
+      let dirty = false;
+      (p.workers||[]).forEach(w => {
+        if(removeIds.includes(w.id)){
+          w.id = keepId;
+          dirty = true;
+          updatedWorkerCount++;
+        }
+      });
+      if(dirty){
+        updatedProjCount++;
+        updates['projects/'+p.id+'/workers'] = p.workers;
+      }
+    }
+    if(Object.keys(updates).length > 0){
+      await _fbDatabase.ref().update(updates);
+      // update local cache
+      ls('projects', projs);
+    }
+
+    // === 2. ลบ records ซ้ำจาก staff_v3 ===
+    const staffData = getStaffData();
+    let removedCount = 0;
+    Object.keys(staffData).forEach(cat => {
+      const arr = Array.isArray(staffData[cat]) ? staffData[cat] : Object.values(staffData[cat]||{});
+      const filtered = arr.filter(s => {
+        if(s && removeIds.includes(s.id)){
+          removedCount++;
+          return false;
+        }
+        return true;
+      });
+      staffData[cat] = filtered;
+    });
+    saveStaffData(staffData);  // จะ auto-publish public list ด้วย
+
+    // === 3. ลบ confirmStatus ของ orphan workers ใน projects ===
+    // (ไม่จำเป็น เพราะ id เปลี่ยนเป็น keepId แล้ว)
+
+    toast(`✅ Merge สำเร็จ — ลบ ${removedCount} records · ย้ายงาน ${updatedWorkerCount} ใน ${updatedProjCount} โปรเจกต์`,'success');
+    setTimeout(()=>findDuplicateStaff(), 600);
+  } catch(e){
+    console.error('mergeDuplicateStaff:', e);
     toast('❌ '+e.message,'error');
   }
 }
