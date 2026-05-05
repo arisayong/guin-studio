@@ -5745,19 +5745,82 @@ function runProjectStaffAudit(){
   }
 
   if(unfixable.length){
+    // Build staff options (ครบทุกคน)
+    const staffOptions = Object.values(allStaff).map(s =>
+      `<option value="${_escH(s.id)}">${_escH(s.nickname||s.name)} [${_escH(s.category||'')}]${s.email?' · '+_escH(s.email):''}</option>`
+    ).sort().join('');
+
     html += `<div style="padding:14px;background:rgba(128,128,128,.06);border:1px solid rgba(128,128,128,.3);border-radius:10px">
-      <div style="font-weight:700;color:var(--text2);margin-bottom:8px">❓ ${unfixable.length} worker เดาไม่ออก (ไม่มีชื่อ/เมล match)</div>`;
-    unfixable.slice(0, 20).forEach(e => {
-      html += `<div style="font-size:11px;color:var(--text2);padding:4px 0">
-        • ${e.projName} → "${e.workerName}" (id: ${e.workerId.substring(0,20)}...) · ${e.status}
+      <div style="font-weight:700;color:var(--text2);margin-bottom:10px">❓ ${unfixable.length} worker เดาไม่ออก — เลือกสต๊าฟด้วยตัวเอง</div>`;
+
+    // Group orphans by workerId — เพื่อแก้ทีเดียวสำหรับ id เดียวกันที่กระจายในหลายโปรเจกต์
+    const grouped = {};
+    unfixable.forEach(e => {
+      (grouped[e.workerId] = grouped[e.workerId] || {workerId: e.workerId, workerName: e.workerName, items: []}).items.push(e);
+    });
+
+    Object.values(grouped).forEach((g, gi) => {
+      const projList = g.items.map(x => x.projName).slice(0,5).join(', ') + (g.items.length>5?` +${g.items.length-5}`:'');
+      const totalAmt = g.items.reduce((a,x)=>a+(x.amount||0), 0);
+      html += `<div style="background:var(--bg2);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:12px">
+        <div style="margin-bottom:6px">
+          <strong>${_escH(g.workerName)}</strong>
+          <span style="color:var(--text2);font-weight:400;font-size:10.5px"> · พบใน ${g.items.length} งาน · ยอดรวม ${fmtB(totalAmt)}</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--text2);margin-bottom:6px">📁 ${_escH(projList)}</div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:6px">id เก่า: <code>${_escH(g.workerId.substring(0,20))}...</code></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <select id="orphan-select-${gi}" class="form-input form-select" style="flex:1;min-width:200px;padding:6px 28px 6px 10px;font-size:11px">
+            <option value="">— เลือกสต๊าฟ —</option>
+            ${staffOptions}
+          </select>
+          <button class="btn btn-blue btn-sm" style="padding:6px 12px;font-size:11px" onclick="manualLinkOrphan('${_escJ(g.workerId)}', document.getElementById('orphan-select-${gi}').value, '${_escJ(g.workerName)}')">🔗 ผูก</button>
+        </div>
       </div>`;
     });
-    if(unfixable.length > 20) html += `<div style="font-size:11px;color:var(--text2);margin-top:6px">... และอีก ${unfixable.length - 20} รายการ</div>`;
-    html += `<div style="margin-top:10px;font-size:11px;color:var(--text2)">กรณีนี้ต้องแก้มือ — ลบ worker ออกจากโปรเจกต์ หรือสร้าง staff record ใหม่</div>
+    html += `<div style="margin-top:10px;font-size:11px;color:var(--text2);padding:8px 10px;background:rgba(255,255,255,.03);border-radius:6px;line-height:1.6">
+      💡 <strong>วิธีใช้:</strong> เลือกสต๊าฟที่ตรงกับ worker นั้นจาก dropdown แล้วกด 🔗 ผูก<br>
+      → ระบบจะ update worker.id ในทุกโปรเจกต์ที่ใช้ id เก่านี้ ให้ชี้ไปสต๊าฟที่เลือก
+    </div>
     </div>`;
   }
 
   resultEl.innerHTML = html;
+}
+
+// ผูก orphan worker กับ staff ที่ admin เลือก
+async function manualLinkOrphan(oldWorkerId, newStaffId, oldName){
+  if(!oldWorkerId || !newStaffId){ toast('กรุณาเลือกสต๊าฟก่อน','warn'); return; }
+  const newStaff = getStaffById(newStaffId);
+  if(!newStaff){ toast('ไม่พบสต๊าฟที่เลือก','error'); return; }
+  if(!confirm(`🔗 ผูก worker "${oldName}" → ${newStaff.nickname||newStaff.name}?\n\nระบบจะ update worker.id ในทุกโปรเจกต์ที่ใช้ id เก่านี้\n(ไม่กระทบ staff record)`)) return;
+
+  try {
+    const projs = getProjects();
+    const updates = {};
+    let count = 0;
+    projs.forEach(p => {
+      let dirty = false;
+      (p.workers||[]).forEach(w => {
+        if(w.id === oldWorkerId){
+          w.id = newStaffId;
+          dirty = true;
+          count++;
+        }
+      });
+      if(dirty){
+        updates['projects/'+p.id+'/workers'] = p.workers;
+      }
+    });
+    if(!Object.keys(updates).length){ toast('ไม่พบ worker ที่ตรง','info'); return; }
+    await _fbDatabase.ref().update(updates);
+    ls('projects', projs);
+    toast(`🔗 ผูกแล้ว — update ${count} worker ใน ${Object.keys(updates).length} โปรเจกต์`,'success');
+    setTimeout(()=>runProjectStaffAudit(), 600);
+  } catch(e){
+    console.error('manualLinkOrphan:', e);
+    toast('❌ '+e.message,'error');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
