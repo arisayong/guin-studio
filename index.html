@@ -1387,9 +1387,10 @@ body.sidebar-collapsed .main-content{
     </div>
     <div style="background:rgba(155,111,255,.06);border:1px solid rgba(155,111,255,.2);border-radius:10px;padding:14px;margin-bottom:12px">
      <div style="font-size:12px;color:var(--text);line-height:1.7">
-      💡 <strong style="color:#9B6FFF">ทำครั้งเดียวพอ:</strong> กดปุ่มนี้หลังอัพเกรดระบบใหม่ เพื่อ copy รายชื่อทีมงานไป public path<br>
-      🔒 <strong>ปลอดภัย:</strong> copy แค่ ชื่อ + ชื่อเล่น + ประเภทงาน (ไม่ copy ธนาคาร/เมล/ข้อมูลส่วนตัว)<br>
-      ⚙️ <strong>หลังกดครั้งแรก:</strong> ระบบจะอัพเดท public list อัตโนมัติทุกครั้งที่เพิ่ม/แก้/ลบทีมงาน
+      💡 <strong style="color:#9B6FFF">เมื่อใช้:</strong> หลัง sync จาก Google Sheet · หรือเมื่อสมาชิกใหม่ login แต่ระบบไม่รู้จัก<br>
+      🔒 <strong>ข้อมูลที่ copy:</strong> ชื่อ + ชื่อเล่น + ประเภทงาน + email (จำเป็นสำหรับ resolve staffId ตอน login)<br>
+      🚫 <strong>ไม่ copy:</strong> ธนาคาร · เบอร์โทร · QR · ข้อมูลส่วนตัวอื่นๆ<br>
+      ⚙️ <strong>ใช้แก้ปัญหา:</strong> "บัญชียังไม่ผูกกับข้อมูลทีม" / "ข้อมูลไม่ขึ้นในระบบ"
      </div>
     </div>
     <button class="btn" style="background:rgba(155,111,255,.15);border:1px solid rgba(155,111,255,.35);color:#9B6FFF;display:flex;align-items:center;gap:8px" onclick="syncPublicStaffList()">🔐 Sync รายชื่อสู่ Public List เดี๋ยวนี้</button>
@@ -4432,10 +4433,15 @@ auth.onAuthStateChanged(async(fbUser)=>{
             structured[cat].push(s);
           });
           ls('staff_v3', structured);
-          // ถ้า admin save email ไว้ใน staff record จริง — หา match
+          // ถ้า admin save email ไว้ใน staff record จริง — หา match (tolerant ของ format แปลกๆ)
+          const _extractEmails = (str) => {
+            if(!str) return [];
+            const matches = String(str).match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi);
+            return matches ? matches.map(x=>x.toLowerCase()) : [];
+          };
           const matched = list.find(s => {
-            const se = (s.email||'').toLowerCase().trim();
-            return se && se.split(/[,;\s]+/).some(x => x.trim() === emailLc);
+            const emails = _extractEmails(s.email);
+            return emails.includes(emailLc);
           });
           if(matched){
             profile.staffId = matched.id;
@@ -5875,17 +5881,93 @@ function renderEmailAuditResult(resultEl, total, okCount, mismatches, unlinked){
 
   if(unlinked.length){
     html += `<div style="font-size:13px;font-weight:800;color:#FFD700;margin:14px 0 8px">⚠️ บัญชีไม่ผูกกับข้อมูลทีม</div>`;
+
+    // Try to auto-match each unlinked user against staff_v3 by email
+    const fixableUnlinked = []; // {uid, loginEmail, staff}
+    const trulyUnfixable = [];
     unlinked.forEach(u => {
-      html += `<div style="background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.25);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:12px">
-        <div style="font-weight:700">${_escH(u.nickname||'(ไม่มีชื่อเล่น)')}</div>
-        <div style="font-family:monospace;color:var(--accent2);margin-top:2px;word-break:break-all">${_escH(u.loginEmail)}</div>
-        <div style="color:var(--text2);margin-top:3px;font-size:11px">⚠️ ${_escH(u.reason)}${u.staffId?' · staffId: '+_escH(String(u.staffId).substring(0,20))+'...':''}</div>
-      </div>`;
+      if(!u.loginEmail){ trulyUnfixable.push(u); return; }
+      // หา staff_v3 ที่ email ตรง
+      const allStaff = getAllStaff();
+      const matched = allStaff.find(s => {
+        const se = (s.email||'').trim().toLowerCase();
+        if(!se) return false;
+        return se.split(/[,;\s]+/).some(x => x.trim() === u.loginEmail.trim().toLowerCase());
+      });
+      if(matched){
+        fixableUnlinked.push({...u, matchedStaff: matched});
+      } else {
+        trulyUnfixable.push(u);
+      }
     });
-    html += `<div style="font-size:11px;color:var(--text2);margin-top:6px;padding:8px 10px;background:rgba(255,215,0,.03);border-radius:6px;line-height:1.6">💡 กรณีนี้อาจเป็น admin account (skip ได้) หรือ staff ที่เคยมีแต่ลบออกจากทีมแล้ว · ไม่มี auto-fix เพราะไม่รู้จะผูกกับใคร</div>`;
+
+    if(fixableUnlinked.length){
+      html += `<div style="padding:12px;background:rgba(0,223,160,.06);border:1px solid rgba(0,223,160,.3);border-radius:9px;margin-bottom:10px">
+        <div style="font-weight:700;color:var(--green);margin-bottom:8px">🔗 ${fixableUnlinked.length} บัญชีพบ staff record ที่ผูกได้ (email ตรงกัน)</div>`;
+      fixableUnlinked.forEach(u => {
+        html += `<div style="background:var(--bg2);border-radius:7px;padding:9px 12px;margin-bottom:6px;font-size:12px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="flex:1;min-width:180px">
+              <div style="font-weight:700">${_escH(u.matchedStaff.nickname||u.matchedStaff.name)} <span style="color:var(--text2);font-weight:400;font-size:11px">→ ${_escH(u.matchedStaff.id)}</span></div>
+              <div style="font-family:monospace;color:var(--accent2);font-size:10.5px;margin-top:2px">${_escH(u.loginEmail)}</div>
+            </div>
+            <button class="btn btn-blue btn-sm" style="padding:6px 12px;font-size:11px" onclick="linkUserToStaff('${_escJ(u.uid)}','${_escJ(u.matchedStaff.id)}','${_escJ(u.matchedStaff.nickname||u.matchedStaff.name)}')">🔗 ผูกบัญชี</button>
+          </div>
+        </div>`;
+      });
+      html += `<button class="btn" style="background:var(--green);color:#000;padding:8px 14px;font-size:12px;font-weight:700;margin-top:6px" onclick="linkAllUsersToStaff()">⚡ ผูกทั้งหมด (${fixableUnlinked.length} บัญชี)</button>
+        <div style="font-size:10px;color:var(--text2);margin-top:6px">💡 จะอัปเดต <code>users/{uid}/staffId</code> ใน Firebase ให้ผูกกับ staff record · ไม่กระทบ Firebase Auth</div>
+      </div>`;
+      window._auditFixableUnlinked = fixableUnlinked;
+    }
+
+    if(trulyUnfixable.length){
+      trulyUnfixable.forEach(u => {
+        html += `<div style="background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.25);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:12px">
+          <div style="font-weight:700">${_escH(u.nickname||'(ไม่มีชื่อเล่น)')}</div>
+          <div style="font-family:monospace;color:var(--accent2);margin-top:2px;word-break:break-all">${_escH(u.loginEmail)}</div>
+          <div style="color:var(--text2);margin-top:3px;font-size:11px">⚠️ ${_escH(u.reason)}${u.staffId?' · staffId: '+_escH(String(u.staffId).substring(0,20))+'...':''}</div>
+        </div>`;
+      });
+      html += `<div style="font-size:11px;color:var(--text2);margin-top:6px;padding:8px 10px;background:rgba(255,215,0,.03);border-radius:6px;line-height:1.6">💡 กรณีนี้อาจเป็น admin account (skip ได้) หรือ staff ที่ยังไม่มีใน staff_v3 — ลองเพิ่มในหน้า "จัดการทีม" ก่อน แล้วสแกนใหม่</div>`;
+    }
   }
 
   resultEl.innerHTML = html;
+}
+
+// Auto-link 1 user to a staff record (set users/{uid}/staffId)
+async function linkUserToStaff(uid, staffId, displayName){
+  if(!uid || !staffId){ toast('ข้อมูลไม่ครบ','error'); return; }
+  if(!confirm(`ยืนยันผูกบัญชีนี้กับ "${displayName}"?\n\n(จะ set users/${uid.substring(0,8)}.../staffId = ${staffId})`)) return;
+  try {
+    await _fbDatabase.ref('users/'+uid+'/staffId').set(staffId);
+    toast('🔗 ผูกบัญชีแล้ว — ' + displayName, 'success');
+    setTimeout(()=>runEmailMismatchAudit(), 600);
+  } catch(e){
+    toast('❌ '+e.message, 'error');
+  }
+}
+
+// Bulk auto-link all fixable unlinked users
+async function linkAllUsersToStaff(){
+  const list = window._auditFixableUnlinked || [];
+  if(!list.length){ toast('ไม่มีรายการ','info'); return; }
+  if(!confirm(`ยืนยันผูกทั้งหมด ${list.length} บัญชี?\n\n` +
+    list.slice(0,8).map(u=>`• ${u.nickname||u.matchedStaff.nickname} → ${u.matchedStaff.id}`).join('\n') +
+    (list.length>8?`\n...และอีก ${list.length-8} บัญชี`:''))) return;
+
+  toast(`⏳ กำลังผูก ${list.length} บัญชี...`,'info');
+  let success = 0, fail = 0;
+  for(const u of list){
+    try {
+      await _fbDatabase.ref('users/'+u.uid+'/staffId').set(u.matchedStaff.id);
+      success++;
+    } catch(e){ fail++; console.warn('link error:', e); }
+  }
+  if(fail>0) toast(`🔗 ผูกสำเร็จ ${success} · ล้มเหลว ${fail}`,'warn');
+  else toast(`🔗 ผูกครบ ${success} บัญชีแล้ว`,'success');
+  setTimeout(()=>runEmailMismatchAudit(), 600);
 }
 
 async function fixMismatchByUpdateTeam(staffId, newEmail, displayName){
@@ -9154,12 +9236,17 @@ function _findStaffByEmail(email){
   const e = (email||'').trim().toLowerCase();
   if(!e) return null;
   const all = getAllStaff();
+  // Extract all email-like substrings from team email field (tolerant ของ format แปลกๆ)
+  const extractEmails = (str) => {
+    if(!str) return [];
+    // regex จับ pattern xxx@yyy.zzz
+    const matches = String(str).match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi);
+    return matches ? matches.map(x=>x.toLowerCase()) : [];
+  };
   // exact match first
   const exact = all.find(s => {
-    const se = (s.email||'').trim().toLowerCase();
-    if(!se) return false;
-    // staff.email อาจมีหลาย email คั่น comma/space
-    return se.split(/[,;\s]+/).some(x => x.trim() === e);
+    const emails = extractEmails(s.email);
+    return emails.includes(e);
   });
   return exact || null;
 }
@@ -12003,6 +12090,51 @@ function startFirebaseSync() {
     try {
       const val = snap.exists() ? snap.val() : {};
       ls('staff_v3', val);
+
+      // ═══ Auto-mirror to public/staff_list ═══
+      // เมื่อ admin เปลี่ยน staff (รวม sync จาก Sheet ที่เขียนเข้า staff/ ตรงๆ)
+      // → re-publish public list ให้มี email field ใหม่
+      // → ป้องกัน case "พีช login แต่ระบบไม่รู้จัก เพราะ public list ยังไม่มี"
+      if(currentUser?.role === 'admin'){
+        try {
+          const publicList = [];
+          Object.entries(val||{}).forEach(([cat, arr]) => {
+            (Array.isArray(arr)?arr:Object.values(arr||{})).filter(Boolean).forEach(s => {
+              if(!s?.id) return;
+              publicList.push({
+                id: s.id,
+                name: s.name || '',
+                nickname: s.nickname || '',
+                category: cat,
+                email: s.email || '',
+              });
+            });
+          });
+          // Compare กับ public ปัจจุบัน — เขียนเฉพาะถ้าต่างกัน (ลด write)
+          _fbDatabase.ref('public/staff_list').once('value').then(pubSnap => {
+            const old = pubSnap.exists() ? pubSnap.val() : [];
+            const oldArr = Array.isArray(old) ? old : Object.values(old||{});
+            // Diff คร่าวๆ จาก length + email/id ของแต่ละคน
+            let needUpdate = (oldArr.length !== publicList.length);
+            if(!needUpdate){
+              const oldMap = {};
+              oldArr.forEach(o => { if(o?.id) oldMap[o.id] = o; });
+              for(const p of publicList){
+                const o = oldMap[p.id];
+                if(!o || (o.email||'') !== (p.email||'') || (o.nickname||'') !== (p.nickname||'')){
+                  needUpdate = true; break;
+                }
+              }
+            }
+            if(needUpdate){
+              _fbDatabase.ref('public/staff_list').set(publicList)
+                .then(()=>console.log('🔄 Auto-mirrored', publicList.length, 'staff to public/staff_list'))
+                .catch(e=>console.warn('public mirror:', e.message));
+            }
+          });
+        } catch(e){ console.warn('auto-mirror public:', e); }
+      }
+
       // Staff pages sync on staff data change (only for staff users)
       if(currentUser&&currentUser.role==='staff'){
         const pgSD=document.getElementById('page-my-dashboard');
@@ -14843,26 +14975,31 @@ async function syncPublicStaffList(){
   }
   if(statusEl) statusEl.innerHTML = '<div style="color:var(--text2);font-size:12px;padding:8px">⏳ กำลัง sync...</div>';
   try {
-    const d = getStaffData();
+    // อ่านจาก Firebase ตรงๆ (ไม่ใช้ local cache) เผื่อ admin เพิ่งซิงค์จากชีท
+    const snap = await _fbDatabase.ref('staff').get();
+    const d = snap.exists() ? snap.val() : getStaffData();
     const publicList = [];
+    let withEmail = 0;
     Object.entries(d||{}).forEach(([cat,arr])=>{
       (Array.isArray(arr)?arr:Object.values(arr||{})).filter(Boolean).forEach(s=>{
         if(!s?.id) return;
+        if(s.email) withEmail++;
         publicList.push({
           id: s.id,
           name: s.name || '',
           nickname: s.nickname || '',
-          category: cat
+          category: cat,
+          email: s.email || '',  // 🔥 สำคัญ! ต้องมี email เพื่อ resolve staffId ตอน login
         });
       });
     });
     await _fbDatabase.ref('public/staff_list').set(publicList);
     if(statusEl) statusEl.innerHTML = `<div style="background:rgba(0,223,160,.12);border:1px solid rgba(0,223,160,.35);border-radius:9px;padding:10px 14px;font-size:12px;color:var(--green);line-height:1.6">
       ✅ <strong>Sync เสร็จเรียบร้อย!</strong><br>
-      <span style="color:var(--text2)">Copy ${publicList.length} รายชื่อไป public/staff_list</span><br>
+      <span style="color:var(--text2)">Copy ${publicList.length} รายชื่อ (มี email ${withEmail} คน) ไป public/staff_list</span><br>
       <span style="color:var(--text2)">📌 ต่อไประบบจะ auto-sync ทุกครั้งที่แก้ไขทีมงาน</span>
     </div>`;
-    toast(`🔐 Sync เสร็จ: ${publicList.length} รายชื่อ`,'success');
+    toast(`🔐 Sync เสร็จ: ${publicList.length} รายชื่อ (มี email ${withEmail})`,'success');
   } catch(e){
     console.error('[syncPublicStaffList]', e);
     if(statusEl) statusEl.innerHTML = `<div style="background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.3);border-radius:9px;padding:10px 14px;font-size:12px;color:var(--red)">❌ Sync ไม่สำเร็จ: ${e.message||e.code}</div>`;
