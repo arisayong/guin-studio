@@ -5860,6 +5860,24 @@ function renderEmailAuditResult(resultEl, total, okCount, mismatches, unlinked){
     mismatches.forEach(m => {
       const teamEmailDisplay = m.teamEmail ? _escH(m.teamEmail) : '<em style="color:var(--text2)">(ว่าง)</em>';
       const displayName = m.nickname || m.name || m.staffId;
+      const loginEmpty = !m.loginEmail || !m.loginEmail.trim();
+
+      // Build action area — แตกตาม case
+      let actionsHTML = '';
+      let explainHTML = '';
+      if(loginEmpty){
+        // Login email ว่าง — บัญชี orphan เก่าที่ไม่มี email field
+        actionsHTML = `<button class="btn btn-outline btn-sm" style="padding:7px 14px;color:var(--red);border-color:rgba(255,64,64,.4)" onclick="deleteOrphanUser('${_escJ(m.uid)}','${_escJ(displayName)}')">🗑️ ลบบัญชี orphan นี้</button>`;
+        explainHTML = `<div style="font-size:11px;color:var(--text2);margin-top:6px;line-height:1.6;padding:8px 10px;background:rgba(255,64,64,.04);border-radius:6px">
+          ⚠️ <strong>บัญชีนี้ไม่มี email field</strong> — เป็นบัญชี orphan เก่า (สร้างก่อนระบบบันทึก email หรือ anonymous user ที่ค้าง)<br>
+          • ถ้าคนนี้ยังใช้งาน → ให้เขา <strong>logout + login ใหม่</strong> → ระบบจะ save email ครั้งใหม่<br>
+          • ถ้าไม่ใช่คนปัจจุบัน → กดลบทิ้งได้
+        </div>`;
+      } else {
+        actionsHTML = `<button class="btn btn-blue btn-sm" onclick="fixMismatchByUpdateTeam('${_escJ(m.staffId)}','${_escJ(m.loginEmail||'')}','${_escJ(displayName)}')" style="padding:7px 14px">✏️ อัปเดต email ในทีมให้ตรงกับ login</button>`;
+        explainHTML = `<div style="font-size:10px;color:var(--text2);margin-top:6px;line-height:1.5">💡 การแก้นี้จะทำให้ระบบลิงก์บัญชีของคนนี้ได้ทันที · ไม่กระทบ Firebase Auth ของเขา</div>`;
+      }
+
       html += `<div style="background:rgba(255,64,64,.05);border:1px solid rgba(255,64,64,.25);border-radius:10px;padding:14px;margin-bottom:10px">
         <div style="font-weight:800;font-size:14px;margin-bottom:8px">
           👤 ${_escH(displayName)}
@@ -5867,14 +5885,14 @@ function renderEmailAuditResult(resultEl, total, okCount, mismatches, unlinked){
         </div>
         <div style="font-size:12px;line-height:1.8;background:var(--bg2);border-radius:8px;padding:10px 12px">
           <div>🔐 <strong style="color:var(--text2);font-weight:600">Email ที่ใช้ Login:</strong></div>
-          <div style="font-family:monospace;color:var(--accent2);margin-left:20px;word-break:break-all">${_escH(m.loginEmail||'(ว่าง)')}</div>
+          <div style="font-family:monospace;color:${loginEmpty?'var(--red)':'var(--accent2)'};margin-left:20px;word-break:break-all">${loginEmpty?'<em>(ว่าง — ไม่มีข้อมูล)</em>':_escH(m.loginEmail)}</div>
           <div style="margin-top:6px">📝 <strong style="color:var(--text2);font-weight:600">Email ในข้อมูลทีม:</strong></div>
           <div style="font-family:monospace;color:var(--orange);margin-left:20px;word-break:break-all">${teamEmailDisplay}</div>
         </div>
         <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-          <button class="btn btn-blue btn-sm" onclick="fixMismatchByUpdateTeam('${_escJ(m.staffId)}','${_escJ(m.loginEmail||'')}','${_escJ(displayName)}')" style="padding:7px 14px">✏️ อัปเดต email ในทีมให้ตรงกับ login</button>
+          ${actionsHTML}
         </div>
-        <div style="font-size:10px;color:var(--text2);margin-top:6px;line-height:1.5">💡 การแก้นี้จะทำให้ระบบลิงก์บัญชีของคนนี้ได้ทันที · ไม่กระทบ Firebase Auth ของเขา</div>
+        ${explainHTML}
       </div>`;
     });
   }
@@ -6002,6 +6020,24 @@ async function fixMismatchByUpdateTeam(staffId, newEmail, displayName){
   } catch(e){
     console.error('fix error:', e);
     toast('❌ เกิดข้อผิดพลาด: ' + e.message, 'error');
+  }
+}
+
+// ลบบัญชี orphan ใน users/{uid} (สำหรับ user ที่ไม่มี email field)
+async function deleteOrphanUser(uid, displayName){
+  if(!uid){ toast('ข้อมูลไม่ครบ — uid ว่าง','error'); return; }
+  if(!_fbDatabase){ toast('Firebase ไม่พร้อม','error'); return; }
+  if(!confirm(`⚠️ ลบบัญชี orphan ของ "${displayName||'(ไม่ทราบชื่อ)'}"?\n\n` +
+    `จะลบ users/${uid.substring(0,12)}... ออกจาก Firebase Database\n` +
+    `(ไม่กระทบ Firebase Auth — ถ้ายังต้องการ login ให้สร้างบัญชีใหม่)\n\n` +
+    `ใช้กรณี: บัญชี anonymous ค้าง · บัญชีเก่าที่ไม่ใช้แล้ว`)) return;
+  try {
+    await _fbDatabase.ref('users/'+uid).remove();
+    toast(`🗑️ ลบบัญชี orphan แล้ว — ${displayName||'(ไม่มีชื่อ)'}`,'success');
+    setTimeout(()=>runEmailMismatchAudit(), 600);
+  } catch(e){
+    console.error('deleteOrphanUser:', e);
+    toast('❌ '+e.message,'error');
   }
 }
 
