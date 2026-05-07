@@ -1079,6 +1079,7 @@ body.sidebar-collapsed .main-content{
    <div class="nav-item" onclick="nav('payment')"><span class="nav-icon">💳</span><span>บัญชีรับเงิน</span></div>
    <div class="nav-section">ทีมงาน</div>
    <div class="nav-item" onclick="nav('staff')"><span class="nav-icon">👥</span><span>จัดการทีม</span></div>
+   <div class="nav-item" onclick="nav('team-earnings')"><span class="nav-icon">💰</span><span>รายได้ทีม</span></div>
    <div class="nav-section">ระบบ</div>
    <div class="nav-item" onclick="nav('settings')"><span class="nav-icon">🛠️</span><span>ตั้งค่า & สำรองข้อมูล</span></div>
   </nav>
@@ -1305,6 +1306,23 @@ body.sidebar-collapsed .main-content{
      <button class="btn btn-outline" onclick="repairBrokenStaffIds()" style="padding:10px 18px;border-color:var(--green);color:var(--green)">🔧 สแกน + ซ่อม</button>
     </div>
     <div id="repair-result" style="margin-top:10px"></div>
+   </div>
+
+   <!-- Worker Inspector — debug tool หางานในโปรเจกต์เฉพาะ -->
+   <div class="section-card" style="border-left:4px solid #00B4FF;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">🔎</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:var(--accent2)">ตรวจ workers ในโปรเจกต์</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">ดูว่าโปรเจกต์มี worker คนไหนบ้าง · เปรียบ id แต่ละ worker กับ staff record ปัจจุบัน · ใช้แก้ปัญหา "ข้อมูลขึ้นไม่ครบ"</div>
+     </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+     <input id="worker-search-proj" placeholder="ชื่อโปรเจกต์ (เช่น C02, C15)" style="flex:1;min-width:160px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12px;outline:none">
+     <input id="worker-search-staff" placeholder="ชื่อสต๊าฟ (เว้นว่าง = ทุกคน)" style="flex:1;min-width:160px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12px;outline:none">
+     <button class="btn btn-blue btn-sm" onclick="inspectWorkers()" style="padding:8px 16px">🔎 ค้นหา</button>
+    </div>
+    <div id="inspect-result" style="margin-top:6px"></div>
    </div>
 
    <!-- Excluded Sync List — คนที่ admin ลบ (ห้าม sync กลับ) -->
@@ -1624,6 +1642,51 @@ body.sidebar-collapsed .main-content{
    <div id="team-summary-row" class="team-summary-row"></div>
    <div id="staff-cat-tabs" style="margin-bottom:14px"></div>
    <div id="staff-grid"></div>
+  </div>
+
+  <!-- ── TEAM EARNINGS (admin only) ── -->
+  <div id="page-team-earnings" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">💰 รายได้ทีม</div>
+    <div class="page-subtitle">สรุปรายได้ของทีมงานแต่ละคน · เห็นเฉพาะ admin</div>
+   </div>
+
+   <!-- Filters -->
+   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+    <label style="font-size:12px;color:var(--text2);font-weight:700">📅 ช่วงเวลา</label>
+    <select id="te-period" class="form-input form-select" style="padding:7px 32px 7px 12px;font-size:13px;width:160px" onchange="renderTeamEarnings()">
+     <option value="all">ทั้งหมด</option>
+     <option value="thisyear">ปีนี้</option>
+     <option value="thismonth">เดือนนี้</option>
+     <option value="last3m">3 เดือนล่าสุด</option>
+     <option value="last6m">6 เดือนล่าสุด</option>
+    </select>
+    <label style="font-size:12px;color:var(--text2);font-weight:700;margin-left:6px">👥 หมวด</label>
+    <select id="te-cat" class="form-input form-select" style="padding:7px 32px 7px 12px;font-size:13px;width:160px" onchange="renderTeamEarnings()">
+     <option value="all">ทุกหมวด</option>
+     <option value="dubbing">🎤 Dubbing</option>
+     <option value="adaptation">✍️ Adaptation</option>
+     <option value="mix">🎧 Mix</option>
+     <option value="qc">✅ QC</option>
+     <option value="subVideo">🎬 Sub & Video</option>
+     <option value="manager">🗂️ Manager</option>
+    </select>
+    <label style="font-size:12px;color:var(--text2);font-weight:700;margin-left:6px">📊 สถานะ</label>
+    <select id="te-status" class="form-input form-select" style="padding:7px 32px 7px 12px;font-size:13px;width:160px" onchange="renderTeamEarnings()">
+     <option value="all">ทั้งหมด</option>
+     <option value="paid">✅ จ่ายแล้ว</option>
+     <option value="unpaid">⏳ ยังไม่จ่าย</option>
+    </select>
+    <div style="flex:1;min-width:160px;display:flex;justify-content:flex-end">
+     <input id="te-search" placeholder="🔍 ค้นชื่อทีมงาน..." style="padding:7px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;outline:none;width:220px" oninput="renderTeamEarnings()">
+    </div>
+   </div>
+
+   <!-- Summary cards -->
+   <div id="te-summary" style="margin-bottom:14px"></div>
+
+   <!-- Table -->
+   <div id="te-table-wrap"></div>
   </div>
 
   <!-- ── MY DASHBOARD ── -->
@@ -4764,7 +4827,7 @@ async function seedDemo(){
 // ══════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════
-const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','profit','staff','docs','calc','payment','settings'];
+const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','profit','staff','team-earnings','docs','calc','payment','settings'];
 const MANAGER_PAGES=['mgr-projects','mgr-track','mgr-calendar','mgr-team'];
 function nav(page){
   const role=currentUser?.role||'staff';
@@ -4779,7 +4842,7 @@ function nav(page){
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
   const renders={
-    dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
+    dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,'team-earnings':renderTeamEarnings,queue:renderQueue,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
     'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar,
     'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-calendar':renderMgrCalendar,'mgr-team':renderMgrTeam
   };
@@ -4794,7 +4857,7 @@ function pushUndo(){undoStack.push(JSON.stringify(projectsCache));if(undoStack.l
 function undo(){if(!undoStack.length){toast('ไม่มีประวัติ','warn');return}redoStack.push(JSON.stringify(projectsCache));projectsCache=JSON.parse(undoStack.pop());saveProjects(projectsCache);refreshCurrentPage();updateUndoUI();toast('↩️ Undo','info')}
 function redo(){if(!redoStack.length){toast('ไม่มี','warn');return}undoStack.push(JSON.stringify(projectsCache));projectsCache=JSON.parse(redoStack.pop());saveProjects(projectsCache);refreshCurrentPage();updateUndoUI();toast('↪️ Redo','info')}
 function updateUndoUI(){const u=document.getElementById('undo-btn'),r=document.getElementById('redo-btn');if(u)u.style.opacity=undoStack.length?'1':'0.4';if(r)r.style.opacity=redoStack.length?'1':'0.4'}
-function refreshCurrentPage(){const renders={dashboard:renderDash,projects:renderProjects,profit:renderProfit,staff:renderStaff,queue:renderQueue};const p=window._currentPage;if(p&&renders[p])renders[p]()}
+function refreshCurrentPage(){const renders={dashboard:renderDash,projects:renderProjects,profit:renderProfit,staff:renderStaff,'team-earnings':renderTeamEarnings,queue:renderQueue};const p=window._currentPage;if(p&&renders[p])renders[p]()}
 
 function updateQueueBadge(){
   const n=getProjects().reduce((a,p)=>a+(p.workers||[]).filter(w=>w.status==='pending'||w.status==='approved').length,0);
@@ -6457,6 +6520,88 @@ async function mergeDuplicateStaff(keepId, removeIds, keepName){
     console.error('mergeDuplicateStaff:', e);
     toast('❌ '+e.message,'error');
   }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 🔎 Worker Inspector — ดู workers ในโปรเจกต์
+// ═══════════════════════════════════════════════════════════
+function inspectWorkers(){
+  const resultEl = document.getElementById('inspect-result');
+  if(!resultEl) return;
+  const projQuery = (document.getElementById('worker-search-proj')?.value||'').trim().toLowerCase();
+  const staffQuery = (document.getElementById('worker-search-staff')?.value||'').trim().toLowerCase();
+
+  const projs = getProjects();
+  const allStaff = {};
+  Object.values(getStaffData()||{}).forEach(arr => {
+    (arr||[]).forEach(s => { if(s?.id) allStaff[s.id] = s; });
+  });
+
+  // Filter projects
+  const matchedProjs = projs.filter(p => {
+    if(!projQuery) return false; // ต้องมี project query
+    return (p.name||'').toLowerCase().includes(projQuery);
+  });
+
+  if(!projQuery){
+    resultEl.innerHTML = '<div style="padding:10px;color:var(--text2);font-size:12px">⚠️ กรุณาใส่ชื่อโปรเจกต์ก่อนค้นหา</div>';
+    return;
+  }
+  if(!matchedProjs.length){
+    resultEl.innerHTML = `<div style="padding:14px;background:rgba(255,64,64,.06);border:1px solid rgba(255,64,64,.25);border-radius:9px;color:var(--red);font-size:12px">❌ ไม่พบโปรเจกต์ที่ชื่อ "${projQuery}"</div>`;
+    return;
+  }
+
+  let html = `<div style="font-size:12px;color:var(--text2);margin-bottom:8px">พบ ${matchedProjs.length} โปรเจกต์</div>`;
+
+  matchedProjs.forEach(p => {
+    const workers = (p.workers||[]);
+    let filteredWorkers = workers;
+    if(staffQuery){
+      filteredWorkers = workers.filter(w => {
+        const s = allStaff[w.id];
+        const nm = (s?.name||'').toLowerCase();
+        const nk = (s?.nickname||'').toLowerCase();
+        const wname = (w.name||'').toLowerCase();
+        return nm.includes(staffQuery) || nk.includes(staffQuery) || wname.includes(staffQuery) || w.id.toLowerCase().includes(staffQuery);
+      });
+    }
+
+    html += `<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="font-weight:800;font-size:14px;color:var(--accent2);margin-bottom:4px">📁 ${_escH(p.name)}</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:8px">${_escH(p.client||'-')}${p.deadline?' · Deadline: '+_escH(p.deadline):''} · ${workers.length} workers</div>`;
+
+    if(!filteredWorkers.length){
+      html += `<div style="font-size:11px;color:var(--text2);padding:8px;text-align:center">${staffQuery?'ไม่พบ worker ที่ชื่อ "'+_escH(staffQuery)+'" ในโปรเจกต์นี้':'ไม่มี workers'}</div>`;
+    } else {
+      filteredWorkers.forEach(w => {
+        const s = allStaff[w.id];
+        const found = !!s;
+        const slot = (w.slot||'').split('-')[0];
+        const slotLabel = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'}[slot] || slot;
+        const bg = found ? 'rgba(0,223,160,.04)' : 'rgba(255,64,64,.06)';
+        const border = found ? 'rgba(0,223,160,.25)' : 'rgba(255,64,64,.3)';
+
+        html += `<div style="background:${bg};border:1px solid ${border};border-radius:7px;padding:9px 12px;margin-bottom:5px;font-size:11.5px">
+          <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <div style="flex:1;min-width:150px">
+              <div style="font-weight:700">${found?_escH(s.nickname||s.name):'<span style="color:var(--red)">⚠️ ORPHAN</span> '+_escH(w.name||'(no name)')}</div>
+              <div style="font-size:10.5px;color:var(--text2);margin-top:1px">${_escH(slotLabel)}${w.slot?.includes('main')?' · หลัก':w.slot?.includes('-sub')?' · รอง':''} · ${_escH(w.status||'-')}</div>
+              ${found ? `<div style="font-size:10px;color:var(--text2);margin-top:1px">📧 ${_escH(s.email||'(ไม่มี email)')}</div>` : ''}
+              <div style="font-size:9.5px;color:var(--text2);margin-top:1px">id: <code>${_escH(w.id.substring(0,20))}${w.id.length>20?'...':''}</code></div>
+            </div>
+            <div style="text-align:right;min-width:80px">
+              <div style="font-size:13px;font-weight:800;color:var(--accent2)">${w.amount?fmtB(w.amount):'-'}</div>
+              ${found?'<div style="font-size:9px;color:var(--green);margin-top:2px">✓ พบใน staff_v3</div>':'<div style="font-size:9px;color:var(--red);margin-top:2px">✗ ไม่อยู่ใน staff_v3</div>'}
+            </div>
+          </div>
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  });
+
+  resultEl.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -9209,6 +9354,286 @@ function viewVoucher(vNo) {
 // ══════════════════════════════════════════════
 // PROFIT
 // ══════════════════════════════════════════════
+// ══════════════════════════════════════════════
+// 💰 TEAM EARNINGS — สรุปรายได้ทีมแต่ละคน (admin only)
+// ══════════════════════════════════════════════
+let _teSortBy = 'totalDesc'; // sort state
+
+function renderTeamEarnings(){
+  if(currentUser?.role !== 'admin') return;
+
+  const summaryEl = document.getElementById('te-summary');
+  const tableEl   = document.getElementById('te-table-wrap');
+  if(!summaryEl || !tableEl) return;
+
+  // Filters
+  const period = document.getElementById('te-period')?.value || 'all';
+  const catFilter = document.getElementById('te-cat')?.value || 'all';
+  const statusFilter = document.getElementById('te-status')?.value || 'all';
+  const search = (document.getElementById('te-search')?.value || '').trim().toLowerCase();
+
+  // Date range based on period
+  const now = new Date();
+  let startDate = null, endDate = null;
+  if(period === 'thisyear'){
+    startDate = new Date(now.getFullYear(), 0, 1);
+    endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+  } else if(period === 'thismonth'){
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    endDate = new Date(now.getFullYear(), now.getMonth()+1, 0, 23, 59, 59);
+  } else if(period === 'last3m'){
+    startDate = new Date(now.getFullYear(), now.getMonth()-2, 1);
+    endDate = new Date(now.getFullYear(), now.getMonth()+1, 0, 23, 59, 59);
+  } else if(period === 'last6m'){
+    startDate = new Date(now.getFullYear(), now.getMonth()-5, 1);
+    endDate = new Date(now.getFullYear(), now.getMonth()+1, 0, 23, 59, 59);
+  }
+
+  const inDateRange = (dateStr) => {
+    if(!startDate || !dateStr) return true;
+    const d = new Date(dateStr);
+    if(isNaN(d.getTime())) return true;
+    return d >= startDate && d <= endDate;
+  };
+
+  // Build per-staff totals
+  const staffData = getStaffData();
+  const allStaff = {};
+  Object.entries(staffData||{}).forEach(([cat, arr]) => {
+    (Array.isArray(arr)?arr:Object.values(arr||{})).filter(Boolean).forEach(s => {
+      if(s?.id) allStaff[s.id] = {...s, _cat: cat};
+    });
+  });
+
+  // Init aggregated structure
+  const totals = {}; // id → { staff, paid, unpaid, jobsPaid, jobsUnpaid, lastPaidAt }
+  Object.values(allStaff).forEach(s => {
+    totals[s.id] = {
+      staff: s,
+      paid: 0,
+      unpaid: 0,
+      jobsPaid: 0,
+      jobsUnpaid: 0,
+      lastPaidAt: null,
+    };
+  });
+
+  // Aggregate from projects
+  const projs = getProjects();
+  projs.forEach(p => {
+    const projDate = p.deadline || p.date || p.startDate || p.createdAt;
+    if(!inDateRange(projDate)) return;
+    if(p.projStatus === 'cancelled') return; // ข้าม cancelled
+    (p.workers||[]).forEach(w => {
+      if(!w?.id || !totals[w.id]) return;
+      const amt = w.amount || 0;
+      if(w.status === 'paid'){
+        totals[w.id].paid += amt;
+        totals[w.id].jobsPaid++;
+        const pa = w.paidAt || projDate;
+        if(pa && (!totals[w.id].lastPaidAt || pa > totals[w.id].lastPaidAt)){
+          totals[w.id].lastPaidAt = pa;
+        }
+      } else {
+        totals[w.id].unpaid += amt;
+        totals[w.id].jobsUnpaid++;
+      }
+    });
+  });
+
+  // To array + filters
+  let rows = Object.values(totals).filter(r => {
+    if(r.jobsPaid === 0 && r.jobsUnpaid === 0) return false; // ไม่มีงานเลย → ซ่อน
+    if(catFilter !== 'all' && r.staff._cat !== catFilter) return false;
+    if(statusFilter === 'paid' && r.paid === 0) return false;
+    if(statusFilter === 'unpaid' && r.unpaid === 0) return false;
+    if(search){
+      const nm = (r.staff.name||'').toLowerCase();
+      const nk = (r.staff.nickname||'').toLowerCase();
+      if(!nm.includes(search) && !nk.includes(search)) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  if(_teSortBy === 'totalDesc') rows.sort((a,b) => (b.paid+b.unpaid) - (a.paid+a.unpaid));
+  else if(_teSortBy === 'paidDesc') rows.sort((a,b) => b.paid - a.paid);
+  else if(_teSortBy === 'unpaidDesc') rows.sort((a,b) => b.unpaid - a.unpaid);
+  else if(_teSortBy === 'jobsDesc') rows.sort((a,b) => (b.jobsPaid+b.jobsUnpaid) - (a.jobsPaid+a.jobsUnpaid));
+  else if(_teSortBy === 'name') rows.sort((a,b) => (a.staff.nickname||a.staff.name||'').localeCompare(b.staff.nickname||b.staff.name||'','th'));
+
+  // Grand totals
+  const grandPaid = rows.reduce((a,r) => a+r.paid, 0);
+  const grandUnpaid = rows.reduce((a,r) => a+r.unpaid, 0);
+  const grandJobs = rows.reduce((a,r) => a+r.jobsPaid+r.jobsUnpaid, 0);
+
+  // === Summary cards ===
+  summaryEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+    <div class="stat-card"><div class="stat-label">👥 ทีมงานในรายการ</div><div style="font-size:24px;font-weight:800;margin-top:4px">${rows.length}</div><div style="font-size:11px;color:var(--text2);margin-top:2px">${grandJobs} งาน รวมกัน</div></div>
+    <div class="stat-card" style="border-color:rgba(0,223,160,.35)"><div class="stat-label">✅ จ่ายแล้วรวม</div><div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--green)">${fmtB(grandPaid)}</div></div>
+    <div class="stat-card" style="border-color:rgba(255,158,0,.35)"><div class="stat-label">⏳ ค้างจ่ายรวม</div><div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--orange)">${fmtB(grandUnpaid)}</div></div>
+    <div class="stat-card" style="border-color:rgba(0,180,255,.35)"><div class="stat-label">💰 รวมทั้งหมด</div><div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--accent2)">${fmtB(grandPaid+grandUnpaid)}</div></div>
+  </div>`;
+
+  // === Table ===
+  if(!rows.length){
+    tableEl.innerHTML = `<div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:40px;text-align:center;color:var(--text2)">
+      <div style="font-size:36px;margin-bottom:8px">💼</div>
+      <div style="font-weight:700">ไม่พบข้อมูล</div>
+      <div style="font-size:12px;margin-top:4px">ลองเปลี่ยน filter หรือล้างคำค้นหา</div>
+    </div>`;
+    return;
+  }
+
+  // Category colors
+  const catColors = {dubbing:'var(--orange)', adaptation:'var(--cyan)', mix:'var(--green)', qc:'var(--purple)', subVideo:'var(--red)', manager:'var(--accent2)'};
+  const catLabels = {dubbing:'🎤 Dubbing', adaptation:'✍️ Adapt', mix:'🎧 Mix', qc:'✅ QC', subVideo:'🎬 Sub', manager:'🗂️ Mgr'};
+
+  // Sort header helper
+  const sortBtn = (key, label) => {
+    const active = _teSortBy === key;
+    return `<span onclick="_teSetSort('${key}')" style="cursor:pointer;color:${active?'var(--accent2)':'var(--text2)'};font-weight:${active?'800':'600'}">${label}${active?' ↓':''}</span>`;
+  };
+
+  let html = `<div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;overflow:hidden">
+    <!-- Table header -->
+    <div style="display:grid;grid-template-columns:1.5fr 0.8fr 1fr 1fr 1fr 0.7fr;gap:10px;padding:12px 18px;background:var(--bg2);border-bottom:1px solid var(--border2);font-size:11px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">
+      <div>${sortBtn('name','ทีมงาน')}</div>
+      <div>หมวด</div>
+      <div style="text-align:right">${sortBtn('paidDesc','✅ จ่ายแล้ว')}</div>
+      <div style="text-align:right">${sortBtn('unpaidDesc','⏳ ค้างจ่าย')}</div>
+      <div style="text-align:right">${sortBtn('totalDesc','💰 รวม')}</div>
+      <div style="text-align:center">${sortBtn('jobsDesc','📋 งาน')}</div>
+    </div>`;
+
+  rows.forEach((r, i) => {
+    const s = r.staff;
+    const catColor = catColors[s._cat] || 'var(--text2)';
+    const catLabel = catLabels[s._cat] || s._cat;
+    const total = r.paid + r.unpaid;
+    const paidPct = total > 0 ? Math.round(r.paid/total*100) : 0;
+
+    html += `<div onclick="openTeamEarningsDetail('${_escJ(s.id)}')" style="display:grid;grid-template-columns:1.5fr 0.8fr 1fr 1fr 1fr 0.7fr;gap:10px;padding:12px 18px;border-top:1px solid rgba(255,255,255,.04);align-items:center;cursor:pointer;transition:background .12s" onmouseover="this.style.background='rgba(0,180,255,.04)'" onmouseout="this.style.background=''">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <div style="width:34px;height:34px;border-radius:50%;background:${catColor}22;color:${catColor};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">${_escH((s.nickname||s.name||'?')[0])}</div>
+        <div style="min-width:0;flex:1">
+          <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_escH(s.nickname||s.name)}</div>
+          <div style="font-size:10.5px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_escH(s.name)}</div>
+        </div>
+      </div>
+      <div><span style="padding:3px 8px;border-radius:6px;background:${catColor}1a;color:${catColor};font-size:10px;font-weight:700">${catLabel}</span></div>
+      <div style="text-align:right">
+        <div style="font-weight:800;color:var(--green);font-size:14px">${fmtB(r.paid)}</div>
+        <div style="font-size:10px;color:var(--text2)">${r.jobsPaid} งาน</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:800;color:${r.unpaid?'var(--orange)':'var(--text2)'};font-size:14px">${fmtB(r.unpaid)}</div>
+        <div style="font-size:10px;color:var(--text2)">${r.jobsUnpaid} งาน</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:800;color:var(--accent2);font-size:14px">${fmtB(total)}</div>
+        ${total > 0 ? `<div style="font-size:10px;color:var(--text2)">${paidPct}% จ่ายแล้ว</div>` : ''}
+      </div>
+      <div style="text-align:center">
+        <div style="font-weight:800;font-size:14px">${r.jobsPaid+r.jobsUnpaid}</div>
+        <div style="font-size:10px;color:var(--text2)">งาน</div>
+      </div>
+    </div>`;
+  });
+
+  html += `</div>
+    <div style="font-size:11px;color:var(--text2);margin-top:10px;padding:8px 12px;background:rgba(255,255,255,.02);border-radius:6px;line-height:1.6">
+      💡 คลิกแถวใดก็ได้ → ดูรายละเอียดงานทั้งหมดของทีมงานคนนั้น
+    </div>`;
+
+  tableEl.innerHTML = html;
+}
+
+function _teSetSort(key){
+  _teSortBy = key;
+  renderTeamEarnings();
+}
+
+// === Detail modal: ดูงานทั้งหมดของ staff คนนั้น ===
+function openTeamEarningsDetail(staffId){
+  const s = getStaffById(staffId);
+  if(!s){ toast('ไม่พบทีมงาน','error'); return; }
+
+  // Find matching jobs
+  const projs = getProjects();
+  const jobs = [];
+  projs.forEach(p => {
+    if(p.projStatus === 'cancelled') return;
+    (p.workers||[]).forEach(w => {
+      if(w.id === staffId){
+        const slot = (w.slot||'').split('-')[0];
+        const slotLabel = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub', mgr:'🗂️ Manager'}[slot] || slot;
+        const slotSuf = (w.slot||'').includes('main') ? ' · หลัก' : (w.slot||'').includes('-sub') ? ' · รอง' : '';
+        jobs.push({
+          projId: p.id,
+          projName: p.name,
+          client: p.client||'-',
+          deadline: p.deadline || p.date,
+          paidAt: w.paidAt || '',
+          status: w.status,
+          amount: w.amount||0,
+          role: slotLabel + slotSuf,
+          voucherNo: w.voucherNo || '',
+        });
+      }
+    });
+  });
+  // Sort: newest first by deadline (or paidAt if available)
+  jobs.sort((a,b) => (b.paidAt||b.deadline||'').localeCompare(a.paidAt||a.deadline||''));
+
+  const totalPaid = jobs.filter(j=>j.status==='paid').reduce((a,j)=>a+j.amount, 0);
+  const totalUnpaid = jobs.filter(j=>j.status!=='paid').reduce((a,j)=>a+j.amount, 0);
+
+  const modalId = 'modal-te-detail';
+  let modal = document.getElementById(modalId);
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal-overlay hidden';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `<div class="modal" style="width:760px;max-width:96vw;max-height:90vh">
+    <div class="modal-head" style="padding:14px 18px">
+      <div class="modal-title">💰 รายได้ของ ${_escH(s.nickname||s.name)}</div>
+      <button class="btn-close" onclick="closeModal('${modalId}')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:14px 18px;overflow-y:auto">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+        <div class="stat-card" style="border-color:rgba(0,223,160,.35)"><div class="stat-label">✅ จ่ายแล้ว</div><div style="font-size:20px;font-weight:800;margin-top:4px;color:var(--green)">${fmtB(totalPaid)}</div></div>
+        <div class="stat-card" style="border-color:rgba(255,158,0,.35)"><div class="stat-label">⏳ ค้างจ่าย</div><div style="font-size:20px;font-weight:800;margin-top:4px;color:var(--orange)">${fmtB(totalUnpaid)}</div></div>
+        <div class="stat-card" style="border-color:rgba(0,180,255,.35)"><div class="stat-label">💰 รวม</div><div style="font-size:20px;font-weight:800;margin-top:4px;color:var(--accent2)">${fmtB(totalPaid+totalUnpaid)}</div></div>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:700">📋 รายการงานทั้งหมด (${jobs.length})</div>
+      ${jobs.length === 0 ? '<div style="text-align:center;padding:30px;color:var(--text2);font-size:13px">ไม่มีงาน</div>' : `
+      <div style="background:var(--bg2);border-radius:9px;overflow:hidden">
+        ${jobs.map(j => {
+          const statusBadge = j.status === 'paid'
+            ? '<span style="padding:3px 8px;border-radius:6px;background:rgba(0,223,160,.15);color:var(--green);font-size:10px;font-weight:700">✅ จ่ายแล้ว</span>'
+            : '<span style="padding:3px 8px;border-radius:6px;background:rgba(255,158,0,.15);color:var(--orange);font-size:10px;font-weight:700">⏳ ค้างจ่าย</span>';
+          const dateStr = j.paidAt ? `จ่ายเมื่อ ${fmtDate(j.paidAt)}` : (j.deadline ? `Deadline ${fmtDate(j.deadline)}` : '');
+          return `<div onclick="closeModal('${modalId}');openProjDetail('${_escJ(j.projId)}')" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border2);cursor:pointer;transition:.12s" onmouseover="this.style.background='rgba(0,180,255,.04)'" onmouseout="this.style.background=''">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_escH(j.projName)}</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:1px">${_escH(j.role)} · ${_escH(j.client)}</div>
+              <div style="font-size:10px;color:var(--text2);margin-top:1px">${_escH(dateStr)}${j.voucherNo?' · '+_escH(j.voucherNo):''}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-size:15px;font-weight:800;color:var(--accent2)">${fmtB(j.amount)}</div>
+              <div style="margin-top:3px">${statusBadge}</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`}
+    </div>
+  </div>`;
+  openModal(modalId);
+}
+
 function renderProfit(){
   const projs=getProjects();let revenue=0,paid=0,pending=0;
   projs.forEach(p=>{revenue+=p.budget||0;(p.workers||[]).forEach(w=>{if(w.status==='paid')paid+=w.amount||0;else pending+=w.amount||0})});
