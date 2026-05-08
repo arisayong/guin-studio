@@ -1277,7 +1277,10 @@ body.sidebar-collapsed .main-content{
       <div style="font-size:17px;font-weight:800;color:var(--orange)">ตรวจ Email ไม่ตรงกัน (Login ↔ ข้อมูลทีม)</div>
       <div style="font-size:12px;color:var(--text2);margin-top:2px">สแกนบัญชีที่ email ที่ใช้ login ไม่ตรงกับ email ในข้อมูลทีม · เป็นสาเหตุที่สต๊าฟเห็น "บัญชียังไม่ผูกกับข้อมูลทีม"</div>
      </div>
-     <button class="btn btn-outline" onclick="runEmailMismatchAudit()" style="padding:10px 18px;border-color:var(--orange);color:var(--orange)">🔍 สแกนตรวจ</button>
+     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="healAllUsersEmail()" style="padding:10px 16px;border-color:var(--green);color:var(--green);font-size:12px" title="ดึง email จาก Firebase Auth → save ทับ users/{uid}/email สำหรับ users ที่ email ว่าง">🩹 Heal Email ว่าง</button>
+      <button class="btn btn-outline" onclick="runEmailMismatchAudit()" style="padding:10px 18px;border-color:var(--orange);color:var(--orange)">🔍 สแกนตรวจ</button>
+     </div>
     </div>
     <div id="email-audit-result" style="margin-top:10px"></div>
    </div>
@@ -4544,6 +4547,33 @@ auth.onAuthStateChanged(async(fbUser)=>{
 
     currentUser = {uid: fbUser.uid, ...profile};
     console.log('✅ currentUser:', currentUser.email, currentUser.role);
+
+    // ═══ HEAL USER RECORD ═══
+    // ทุกครั้งที่ login — เช็คว่า users/{uid} มี email field ไหม ถ้าไม่มี/ต่างจาก auth → update
+    // แก้ปัญหา user records เก่าที่สมัครก่อนระบบบันทึก email field
+    try {
+      if(_fbDatabase && fbUser.email){
+        const healUpdates = {};
+        const savedEmail = (profile.email||'').trim().toLowerCase();
+        const authEmail = fbUser.email.trim().toLowerCase();
+        // ถ้า user record ไม่มี email หรือ email ไม่ตรงกับ auth → update
+        if(savedEmail !== authEmail){
+          healUpdates['users/'+fbUser.uid+'/email'] = fbUser.email;
+        }
+        // ถ้าไม่มี nickname หรือ name → fill จาก auth
+        if(!profile.nickname && (fbUser.displayName || fbUser.email)){
+          healUpdates['users/'+fbUser.uid+'/nickname'] = fbUser.displayName || fbUser.email.split('@')[0];
+        }
+        if(!profile.name && fbUser.displayName){
+          healUpdates['users/'+fbUser.uid+'/name'] = fbUser.displayName;
+        }
+        if(Object.keys(healUpdates).length > 0){
+          await _fbDatabase.ref().update(healUpdates).catch(e=>console.warn('heal user:',e.message));
+          console.log('🩹 Healed user record fields:', Object.keys(healUpdates).map(k=>k.split('/').pop()).join(', '));
+        }
+      }
+    } catch(e){ console.warn('heal user record:', e); }
+
     await enterApp();
 
     // ═══ START NOTIFICATION LISTENER ═══
@@ -4795,10 +4825,34 @@ function showLoader(on){
   let el=document.getElementById('app-loader');
   if(on&&!el){el=document.createElement('div');el.id='app-loader';
     el.style.cssText='position:fixed;inset:0;background:rgba(4,8,15,.97);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px';
-    el.innerHTML='<div style="font-size:52px">🎙️</div><div style="color:var(--accent2);font-size:16px;font-weight:800;letter-spacing:3px">GUIN HOME STUDIO</div><div class="ai-loader"><div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div></div>';
-    document.body.appendChild(el)}
+    el.innerHTML='<div style="font-size:52px">🎙️</div><div style="color:var(--accent2);font-size:16px;font-weight:800;letter-spacing:3px">GUIN HOME STUDIO</div><div class="ai-loader"><div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div></div><div style="margin-top:16px;font-size:11px;color:var(--text2)">กด <kbd style="background:rgba(255,255,255,.1);padding:2px 8px;border-radius:4px;font-family:monospace">Esc</kbd> เพื่อข้าม</div>';
+    document.body.appendChild(el);
+    // Auto-hide หลัง 30 วินาที — ป้องกัน loader ค้างจนใช้งานไม่ได้
+    if(window._loaderAutoHideTimer) clearTimeout(window._loaderAutoHideTimer);
+    window._loaderAutoHideTimer = setTimeout(()=>{
+      const e2 = document.getElementById('app-loader');
+      if(e2 && e2.style.display !== 'none'){
+        console.warn('⚠️ Loader auto-hidden after 30s — possible stuck state');
+        e2.style.display = 'none';
+      }
+    }, 30000);
+  }
   if(el)el.style.display=on?'flex':'none';
+  if(!on && window._loaderAutoHideTimer){
+    clearTimeout(window._loaderAutoHideTimer);
+    window._loaderAutoHideTimer = null;
+  }
 }
+// ESC = ปิด loader (ถ้าค้าง)
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape'){
+    const el = document.getElementById('app-loader');
+    if(el && el.style.display !== 'none'){
+      console.log('⏭️ User pressed Esc, hiding loader');
+      el.style.display = 'none';
+    }
+  }
+});
 
 // SEED DEMO
 async function seedDemo(){
@@ -5908,6 +5962,70 @@ function _escJ(str){
     .replace(/>/g,'\\x3e')
     .replace(/\n/g,'\\n')
     .replace(/\r/g,'\\r');
+}
+
+// ═══════════════════════════════════════════════════════════
+// 🩹 Heal All Users Email — ดึง email จาก Firebase Auth → save ทับ users/{uid}/email
+// แก้ปัญหา users records เก่าที่ไม่มี email field
+// หมายเหตุ: ต้องอาศัย email ที่ users เคย login แล้ว (เก็บใน Firebase Auth)
+//          แต่เราอ่าน Firebase Auth ของคนอื่นจาก client ไม่ได้
+//          → เลยใช้ method "ดู audit แล้วถ้าเจอคนที่ login email = ว่าง — บอกเขาให้ logout/login ใหม่"
+//          ระบบจะ auto-heal ตอนเขา login ใหม่ (ดู onAuthStateChanged)
+// ═══════════════════════════════════════════════════════════
+async function healAllUsersEmail(){
+  if(!_fbDatabase){ toast('Firebase ไม่พร้อม','error'); return; }
+
+  if(!confirm(`🩹 Heal Email ของ users ที่ field ว่าง?\n\n` +
+    `ระบบจะอ่าน users records ทั้งหมด หา users ที่ "email = ว่าง"\n` +
+    `แล้วลอง match กับ public/staff_list ที่ staffId เดียวกัน → save email\n\n` +
+    `ถ้า user ไม่มีทั้ง email + staffId → ต้องให้เขา logout/login ใหม่เพื่อ heal`)) return;
+
+  try {
+    toast('🩹 กำลัง heal...', 'info');
+    const usersSnap = await _fbDatabase.ref('users').get();
+    if(!usersSnap.exists()){ toast('ไม่มีข้อมูล users','info'); return; }
+    const users = usersSnap.val() || {};
+
+    // โหลด public/staff_list (มี email)
+    const staffSnap = await _fbDatabase.ref('public/staff_list').get();
+    const staffList = staffSnap.exists() ? (staffSnap.val()||[]) : [];
+    const staffArr = Array.isArray(staffList) ? staffList : Object.values(staffList);
+    const staffById = {};
+    staffArr.forEach(s => { if(s?.id) staffById[s.id] = s; });
+
+    const updates = {};
+    let healed = 0, stillEmpty = 0;
+    Object.entries(users).forEach(([uid, u]) => {
+      if(!u) return;
+      const hasEmail = u.email && u.email.trim();
+      if(hasEmail) return; // ไม่ต้อง heal — มี email อยู่แล้ว
+
+      // ลอง resolve email จาก staff record ที่ผูกกับ staffId
+      if(u.staffId && staffById[u.staffId] && staffById[u.staffId].email){
+        const matched = staffById[u.staffId];
+        // Extract email ที่ valid
+        const emailMatches = String(matched.email||'').match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi);
+        if(emailMatches && emailMatches.length > 0){
+          updates['users/'+uid+'/email'] = emailMatches[0].toLowerCase();
+          healed++;
+          return;
+        }
+      }
+      stillEmpty++;
+    });
+
+    if(Object.keys(updates).length > 0){
+      await _fbDatabase.ref().update(updates);
+    }
+
+    let msg = `🩹 Heal เสร็จ — เติม email ให้ ${healed} บัญชี`;
+    if(stillEmpty > 0) msg += ` · ยังเหลือ ${stillEmpty} บัญชีที่ heal ไม่ได้ (ไม่มี staffId หรือ staff ไม่มี email)`;
+    toast(msg, 'success');
+    setTimeout(()=>runEmailMismatchAudit(), 600);
+  } catch(e){
+    console.error('healAllUsersEmail:', e);
+    toast('❌ '+e.message, 'error');
+  }
 }
 
 async function runEmailMismatchAudit(){
