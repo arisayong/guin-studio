@@ -255,7 +255,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .page-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center}
 
 /* STATS */
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:26px}
 .stat-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:20px;
   transition:all .25s;position:relative;overflow:hidden;cursor:pointer}
 .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
@@ -1618,17 +1618,150 @@ body.sidebar-collapsed .main-content{
 
   <!-- ── PROFIT ── -->
   <div id="page-profit" class="page hidden">
-   <div class="page-header"><div class="page-title">📊 กำไร-ขาดทุน</div><div class="page-subtitle">สรุปรายรับ-รายจ่ายสตูดิโอ</div>
-    <div class="page-actions"><button class="btn btn-outline btn-sm" onclick="exportPaymentCSV()">⬇️ Export CSV</button></div>
+   <!-- === Header === -->
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+    <div>
+     <div class="page-title" style="margin:0">📊 รายงานการเงิน</div>
+     <div class="page-subtitle" style="margin-top:2px" id="profit-subtitle">สรุปครบทุกโปรเจกต์</div>
+    </div>
+    <div style="display:flex;gap:6px">
+     <button class="btn btn-outline btn-sm" onclick="exportPaymentCSV()" title="ดาวน์โหลด CSV">⬇️ Export</button>
+     <button class="btn btn-outline btn-sm" onclick="window.print()" title="พิมพ์รายงาน">🖨️ Print</button>
+    </div>
    </div>
-   <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)" id="profit-stats"></div>
-   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
-    <div class="section-card"><div class="section-title">📊 ค่าตอบแทนรายเดือน</div><canvas id="chart-monthly" height="200"></canvas></div>
-    <div class="section-card"><div class="section-title">🥧 สัดส่วนตามหมวด</div><canvas id="chart-cat" height="200"></canvas></div>
+
+   <!-- === A+C Filter Bar === -->
+   <div style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:8px;padding:9px 13px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;flex-wrap:wrap" id="profit-filter-bar">
+     <span style="font-size:15px;color:var(--text2)">🔍</span>
+     <div id="profit-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+     <input id="profit-search" placeholder="พิมพ์ค้นหา หรือ ลูกค้า: เดือน: นาที:>30 ..." style="flex:1;min-width:140px;border:none;background:transparent;height:24px;font-size:13px;color:var(--text);outline:none" oninput="renderProfit()">
+     <button class="btn btn-outline btn-sm" style="padding:4px 10px;border-style:dashed;font-size:11px" onclick="_profOpenFilterMenu(event)">+ filter</button>
+    </div>
+    <!-- Quick chips -->
+    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center;font-size:11px">
+     <span style="color:var(--text2)">Quick:</span>
+     <button class="btn btn-outline btn-sm" style="padding:3px 9px;font-size:11px" onclick="_profQuickFilter('thismonth')">เดือนนี้</button>
+     <button class="btn btn-outline btn-sm" style="padding:3px 9px;font-size:11px" onclick="_profQuickFilter('loss')">ขาดทุน</button>
+     <button class="btn btn-outline btn-sm" style="padding:3px 9px;font-size:11px" onclick="_profQuickFilter('waiting')">รอลูกค้าจ่าย</button>
+     <button class="btn btn-outline btn-sm" style="padding:3px 9px;font-size:11px" onclick="_profQuickFilter('top10')">Top 10 กำไร</button>
+     <button class="btn btn-outline btn-sm" style="padding:3px 9px;font-size:11px;color:var(--text2)" onclick="_profClearFilters()">ล้าง</button>
+    </div>
    </div>
-   <div class="table-wrap">
-    <div class="table-header"><div class="table-title">🧾 ยอดค้างจ่ายรายคน</div></div>
-    <table><thead><tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>ยอดค้าง</th><th>โปรเจกต์</th><th>Action</th></tr></thead><tbody id="unpaid-table"></tbody></table>
+
+   <!-- === Bento Row 1: Hero + KPI + Cash Flow === -->
+   <div style="display:grid;grid-template-columns:repeat(12,1fr);grid-auto-rows:minmax(80px,auto);gap:10px;margin-bottom:12px">
+    <!-- Hero: 6 cols x 2 rows -->
+    <div style="grid-column:span 6;grid-row:span 2;background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:20px;display:flex;flex-direction:column;justify-content:space-between" id="profit-hero">
+     <div>
+      <div style="font-size:10.5px;color:var(--text2);letter-spacing:0.5px;text-transform:uppercase;font-weight:700">กำไรสุทธิ · <span style="font-weight:400;color:var(--text2)">ทั้งหมด</span></div>
+      <div style="font-size:44px;font-weight:800;margin-top:6px;letter-spacing:-1.2px;line-height:1" id="profit-hero-amount">฿0</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--text2)" id="profit-hero-sub">—</div>
+     </div>
+     <div style="position:relative;height:60px;margin-top:8px"><canvas id="profit-mini-chart"></canvas></div>
+    </div>
+    <!-- KPI Revenue -->
+    <div style="grid-column:span 3;background:var(--bg2);padding:14px 16px;border-radius:12px">
+     <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;font-weight:700">รายได้รวม</div>
+     <div style="font-size:20px;font-weight:800;margin-top:4px" id="profit-kpi-revenue">฿0</div>
+     <div style="font-size:10px;color:var(--text2);margin-top:2px" id="profit-kpi-revenue-sub">รวม Budget</div>
+    </div>
+    <!-- KPI Cost -->
+    <div style="grid-column:span 3;background:var(--bg2);padding:14px 16px;border-radius:12px">
+     <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;font-weight:700">รายจ่ายทีม</div>
+     <div style="font-size:20px;font-weight:800;margin-top:4px" id="profit-kpi-cost">฿0</div>
+     <div style="font-size:10px;color:var(--text2);margin-top:2px" id="profit-kpi-cost-sub">0 รายการ</div>
+    </div>
+    <!-- Cash Flow: 6 cols -->
+    <div style="grid-column:span 6;background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px 16px">
+     <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:0.4px;font-weight:700;margin-bottom:10px">💸 กระแสเงินสด</div>
+     <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:6px;align-items:center" id="profit-cashflow">
+      <div style="text-align:center"><div style="font-size:9.5px;color:var(--text2);text-transform:uppercase;letter-spacing:0.3px">รอลูกค้า</div><div style="font-size:14px;font-weight:800;margin-top:3px;color:var(--orange)" id="cf-pending">฿0</div></div>
+      <span style="color:var(--text2);font-size:14px">→</span>
+      <div style="text-align:center"><div style="font-size:9.5px;color:var(--text2);text-transform:uppercase;letter-spacing:0.3px">รับแล้ว</div><div style="font-size:14px;font-weight:800;margin-top:3px" id="cf-received">฿0</div></div>
+      <span style="color:var(--text2);font-size:14px">→</span>
+      <div style="text-align:center"><div style="font-size:9.5px;color:var(--text2);text-transform:uppercase;letter-spacing:0.3px">จ่ายทีม</div><div style="font-size:14px;font-weight:800;margin-top:3px" id="cf-paid">฿0</div></div>
+     </div>
+    </div>
+   </div>
+
+   <!-- === Bento Row 2: Trend + Clients === -->
+   <div style="display:grid;grid-template-columns:repeat(12,1fr);gap:10px;margin-bottom:12px">
+    <div style="grid-column:span 7;background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px">
+     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:700">📈 แนวโน้มรายได้ vs กำไร</div>
+      <div style="display:flex;gap:14px;font-size:11px">
+       <span style="display:flex;align-items:center;gap:4px;color:var(--text2)"><span style="width:8px;height:2px;background:#185FA5"></span>รายได้</span>
+       <span style="display:flex;align-items:center;gap:4px;color:var(--text2)"><span style="width:8px;height:2px;background:#0F6E56"></span>กำไร</span>
+      </div>
+     </div>
+     <div style="position:relative;height:170px"><canvas id="profit-trend-chart"></canvas></div>
+    </div>
+    <div style="grid-column:span 5;background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px">
+     <div style="font-size:13px;font-weight:700;margin-bottom:10px">👥 ลูกค้า</div>
+     <div style="position:relative;height:100px"><canvas id="profit-client-chart"></canvas></div>
+     <div id="profit-client-legend" style="display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:11px"></div>
+    </div>
+   </div>
+
+   <!-- === Project Table === -->
+   <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;overflow:hidden">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+     <div style="font-size:13px;font-weight:700">📁 โปรเจกต์ · <span id="profit-proj-count" style="color:var(--text2);font-weight:400">0</span></div>
+     <span style="font-size:11px;color:var(--text2)">ติ๊กเพื่อเลือกดูยอดเฉพาะกลุ่ม</span>
+     <div style="margin-left:auto;font-size:11px;color:var(--text2)">
+      เรียง: <select id="profit-sort" style="height:24px;padding:0 6px;font-size:11px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);border-radius:6px" onchange="renderProfit()">
+       <option value="profitDesc">กำไรมาก→น้อย</option>
+       <option value="profitAsc">ขาดทุนก่อน</option>
+       <option value="budgetDesc">Budget มาก→น้อย</option>
+       <option value="dateDesc">วันล่าสุด</option>
+       <option value="name">ตามชื่อ</option>
+      </select>
+     </div>
+    </div>
+    <div style="overflow-x:auto">
+     <table style="width:100%;font-size:12px;border-collapse:collapse">
+      <thead><tr style="font-size:10.5px;color:var(--text2);letter-spacing:.4px;text-transform:uppercase;background:var(--bg2)">
+       <th style="padding:9px 0 9px 14px;text-align:left;font-weight:700;width:36px">
+        <input type="checkbox" id="profit-select-all" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)" onchange="_profToggleAll(this.checked)">
+       </th>
+       <th style="padding:9px 8px;text-align:left;font-weight:700">โปรเจกต์</th>
+       <th style="padding:9px 8px;text-align:left;font-weight:700">ลูกค้า</th>
+       <th style="padding:9px 8px;text-align:center;font-weight:700">นาที</th>
+       <th style="padding:9px 8px;text-align:right;font-weight:700">Budget</th>
+       <th style="padding:9px 8px;text-align:right;font-weight:700">รายจ่าย</th>
+       <th style="padding:9px 8px;text-align:right;font-weight:700">กำไร</th>
+       <th style="padding:9px 12px;text-align:left;font-weight:700">สถานะ</th>
+      </tr></thead>
+      <tbody id="profit-table-body"></tbody>
+     </table>
+    </div>
+   </div>
+
+   <!-- === Selection Footer Bar (เด้งขึ้นเมื่อมีการเลือก) === -->
+   <div id="profit-selection-bar" style="display:none;margin-top:14px;background:var(--card);border:1.5px solid var(--accent2);border-radius:14px;padding:14px 18px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:18px;color:var(--accent2)">☑️</span>
+     <div style="font-size:13px;font-weight:700;color:var(--accent2)" id="profit-sel-title">ยอดของโปรเจกต์ที่เลือก · 0 จาก 0</div>
+     <button class="btn btn-outline btn-sm" style="margin-left:auto;padding:4px 10px;font-size:11px;color:var(--text2)" onclick="_profClearSelection()">ยกเลิกการเลือก</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+     <div style="background:rgba(0,180,255,0.08);border:1px solid rgba(0,180,255,0.25);padding:14px 16px;border-radius:10px">
+      <div style="font-size:10.5px;color:var(--accent2);text-transform:uppercase;letter-spacing:0.4px;font-weight:700">Budget รวม</div>
+      <div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--accent2);letter-spacing:-0.5px" id="profit-sel-budget">฿0</div>
+      <div style="font-size:10px;color:var(--text2);margin-top:2px" id="profit-sel-budget-pct">— ของยอดทั้งหมด</div>
+     </div>
+     <div style="background:rgba(255,158,0,0.06);border:1px solid rgba(255,158,0,0.25);padding:14px 16px;border-radius:10px">
+      <div style="font-size:10.5px;color:var(--orange);text-transform:uppercase;letter-spacing:0.4px;font-weight:700">รายจ่ายทีม</div>
+      <div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--orange);letter-spacing:-0.5px" id="profit-sel-cost">฿0</div>
+      <div style="font-size:10px;color:var(--text2);margin-top:2px" id="profit-sel-cost-pct">— ของ Budget</div>
+     </div>
+     <div style="background:rgba(0,223,160,0.08);border:1px solid rgba(0,223,160,0.25);padding:14px 16px;border-radius:10px">
+      <div style="font-size:10.5px;color:var(--green);text-transform:uppercase;letter-spacing:0.4px;font-weight:700">กำไรสุทธิ</div>
+      <div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--green);letter-spacing:-0.5px" id="profit-sel-profit">฿0</div>
+      <div style="font-size:10px;color:var(--text2);margin-top:2px" id="profit-sel-profit-pct">Margin —</div>
+     </div>
+    </div>
    </div>
   </div>
 
@@ -2106,6 +2239,16 @@ body.sidebar-collapsed .main-content{
      <div id="pj-budget-calc" style="font-size:11px;color:var(--text2);margin-top:4px;display:none"></div>
     </div>
     <div class="form-group" style="margin:0"><label class="form-label">ความยาว (นาที)</label><input class="form-input" id="pj-duration" type="number" placeholder="ถ้ามี" min="0" step="any" onwheel="this.blur()" oninput="calcProjSummary();renderAllWorkerLists()"></div>
+   </div>
+   <!-- 🎁 Promo / ทำฟรี — ลูกค้าไม่จ่ายเงิน → ไม่นับเป็นรายได้ -->
+   <div style="margin-bottom:12px">
+    <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(255,128,171,.06);border:1px solid rgba(255,128,171,.25);border-radius:9px;cursor:pointer;transition:.15s" onmouseover="this.style.background='rgba(255,128,171,.1)'" onmouseout="this.style.background='rgba(255,128,171,.06)'">
+     <input type="checkbox" id="pj-is-promo" style="width:18px;height:18px;cursor:pointer;accent-color:#FF80AB" onchange="calcProjSummary()">
+     <div style="flex:1">
+      <div style="font-size:13px;font-weight:700;color:#FF80AB">🎁 โปรเจกต์ Promo / ทำฟรี</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:2px">ลูกค้าไม่จ่ายเงินให้เรา · จะไม่ถูกนับเป็นรายได้ + กำไรในระบบ (แต่ยังต้องจ่ายค่าแรงทีม)</div>
+     </div>
+    </label>
    </div>
    <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">ชื่อ / URL ลูกค้า</label><input class="form-input" id="pj-client" placeholder="ชื่อลูกค้า หรือ link"></div>
@@ -4980,35 +5123,67 @@ async function copyProject(id){
 // DASHBOARD
 // ══════════════════════════════════════════════
 function renderDash(){
-  const projs=getProjects();let paid=0,pending=0,revenue=0,pendingWorkers=[];
+  const projs=getProjects();
+  let paid=0,pending=0,revenue=0,revenuePending=0,pendingWorkers=[];
   const today=new Date();today.setHours(0,0,0,0);
-  projs.forEach(p=>{revenue+=p.budget||0;(p.workers||[]).forEach(w=>{if(w.status==='paid')paid+=w.amount||0;else{pending+=w.amount||0;pendingWorkers.push({proj:p,worker:w})}})});
+  projs.forEach(p=>{
+    // ข้าม cancelled projects
+    if(p.projStatus === 'cancelled') return;
+    const clientPaid = !!ls('client_paid_'+p.id);
+    const budget = p.budget||0;
+    if(clientPaid){
+      revenue += budget;       // เงินจริงที่ได้รับจากลูกค้า
+    } else {
+      revenuePending += budget;  // ค้างรอลูกค้าจ่าย
+    }
+    (p.workers||[]).forEach(w=>{
+      if(w.status==='paid') paid+=w.amount||0;
+      else { pending+=w.amount||0; pendingWorkers.push({proj:p,worker:w}); }
+    });
+  });
+  // กำไรสุทธิ = รายได้จริง (ลูกค้าจ่ายแล้ว) - รายจ่ายทีมทั้งหมด
   const profit=revenue-(paid+pending);
+  const totalRevenue = revenue + revenuePending; // budget รวมทุกโปรเจกต์
+  const paidCount = projs.reduce((a,p) => a + (p.workers||[]).filter(w=>w.status==='paid').length, 0);
+  const projCancelled = projs.filter(p => p.projStatus === 'cancelled').length;
+  const projActive = projs.length - projCancelled;
   const urgent=projs.filter(p=>{if(!p.deadline)return false;const dl=new Date(p.deadline);dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));return diff>=0&&diff<=7}).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
   document.getElementById('dash-stats').innerHTML=`
     <div class="stat-card" onclick="nav('projects')">
      <span class="stat-icon">📁</span>
      <div class="stat-label">โปรเจกต์ทั้งหมด</div>
      <div class="stat-value">${projs.length}</div>
-     <div class="stat-delta up">คลิกเพื่อดูทั้งหมด</div>
+     <div class="stat-delta up">${projActive} ดำเนินการ${projCancelled?' · '+projCancelled+' ยกเลิก':''}</div>
     </div>
-    <div class="stat-card">
-     <span class="stat-icon">💹</span>
-     <div class="stat-label">รายได้รวม (Budget)</div>
-     <div class="stat-value" style="color:var(--accent2)">${fmtB(revenue)}</div>
-     <div class="stat-delta up">จากลูกค้าทั้งหมด</div>
+    <div class="stat-card" title="รวม budget ของโปรเจกต์ที่ลูกค้าจ่ายแล้ว (ไม่รวม VDT05/promo)">
+     <span class="stat-icon">💰</span>
+     <div class="stat-label">รายได้รับแล้ว</div>
+     <div class="stat-value" style="color:var(--green)">${fmtB(revenue)}</div>
+     <div class="stat-delta up">ลูกค้าจ่ายเข้ามาแล้ว</div>
+    </div>
+    <div class="stat-card" title="รวม budget ของโปรเจกต์ที่ลูกค้ายังไม่จ่าย (รอบิล/promo/ทำเปล่า)">
+     <span class="stat-icon">📋</span>
+     <div class="stat-label">รอลูกค้าจ่าย</div>
+     <div class="stat-value" style="color:${revenuePending?'var(--orange)':'var(--text2)'}">${fmtB(revenuePending)}</div>
+     <div class="stat-delta ${revenuePending?'down':'up'}">${revenuePending?'รวม Budget ทั้งหมด '+fmtB(totalRevenue):'ลูกค้าจ่ายครบแล้ว 🎉'}</div>
     </div>
     <div class="stat-card" onclick="nav('queue')">
      <span class="stat-icon">⏳</span>
-     <div class="stat-label">รอจ่ายเงิน</div>
+     <div class="stat-label">ค้างจ่ายทีม</div>
      <div class="stat-value" style="color:${pendingWorkers.length?'var(--orange)':'var(--green)'}">${fmtB(pending)}</div>
      <div class="stat-delta ${pendingWorkers.length?'down':'up'}">${pendingWorkers.length?pendingWorkers.length+' คน รอดำเนินการ':'ไม่มีค้างจ่าย 🎉'}</div>
     </div>
+    <div class="stat-card" onclick="nav('team-earnings')">
+     <span class="stat-icon">💸</span>
+     <div class="stat-label">จ่ายทีมไปแล้ว</div>
+     <div class="stat-value" style="color:var(--green)">${fmtB(paid)}</div>
+     <div class="stat-delta up">${paidCount} คน รับเงินแล้ว</div>
+    </div>
     <div class="stat-card" onclick="nav('profit')">
      <span class="stat-icon">📈</span>
-     <div class="stat-label">กำไรสุทธิ (โดยประมาณ)</div>
+     <div class="stat-label">กำไรสุทธิ</div>
      <div class="stat-value" style="color:${profit>=0?'var(--green)':'var(--red)'}">${fmtB(profit)}</div>
-     <div class="stat-delta ${profit>=0?'up':'down'}">${profit>=0?'Revenue - รายจ่ายทีม':'ขาดทุน — ตรวจสอบด่วน'}</div>
+     <div class="stat-delta ${profit>=0?'up':'down'}">${fmtB(revenue)} − ${fmtB(paid+pending)}</div>
     </div>`;
   const urgentEl=document.getElementById('dash-queue');
   urgentEl.innerHTML=urgent.length?urgent.map(p=>{const dl=new Date(p.deadline);dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));const color=diff<=1?'var(--red)':diff<=3?'var(--orange)':'var(--text2)';
@@ -9752,31 +9927,448 @@ function openTeamEarningsDetail(staffId){
   openModal(modalId);
 }
 
+// ════════════════════════════════════════════════════════════
+// 📊 PROFIT/FINANCE PAGE — Bento Layout + A+C Filter + Selection
+// ════════════════════════════════════════════════════════════
+window._profitState = {
+  filters: [],        // [{type: 'client'|'year'|'month'|'name'|'budget'|'profit'|'minute'|'status', op: ...}]
+  selectedIds: new Set(), // project IDs ที่ติ๊กไว้
+  sort: 'profitDesc',
+  charts: {},
+};
+
+function _profGetFilteredProjs(){
+  const projs = getProjects();
+  const search = (document.getElementById('profit-search')?.value || '').trim().toLowerCase();
+  const filters = window._profitState.filters;
+  const sort = document.getElementById('profit-sort')?.value || 'profitDesc';
+  window._profitState.sort = sort;
+
+  let filtered = projs.filter(p => {
+    // search text (free)
+    if(search){
+      const blob = [p.name, p.client, p.type].filter(Boolean).join(' ').toLowerCase();
+      // smart: ถ้า search ขึ้นต้น keyword: ที่ระบบรู้จัก ให้ใช้แยก
+      const m = search.match(/^([a-zก-๛]+):\s*(.+)$/i);
+      if(m){
+        const key = m[1].toLowerCase();
+        const val = m[2].trim().toLowerCase();
+        if(key === 'ลูกค้า' || key === 'client'){
+          if(!(p.client||'').toLowerCase().includes(val)) return false;
+        } else if(key === 'นาที' || key === 'minute'){
+          const opMatch = val.match(/^([<>]=?|=)?\s*(\d+)/);
+          if(opMatch){
+            const op = opMatch[1] || '=';
+            const n = parseInt(opMatch[2]);
+            const dur = p.duration || 0;
+            if(op === '>' && !(dur > n)) return false;
+            if(op === '>=' && !(dur >= n)) return false;
+            if(op === '<' && !(dur < n)) return false;
+            if(op === '<=' && !(dur <= n)) return false;
+            if(op === '=' && dur !== n) return false;
+          }
+        } else if(key === 'กำไร' || key === 'profit'){
+          const opMatch = val.match(/^([<>]=?|=)?\s*(\d+)/);
+          if(opMatch){
+            const op = opMatch[1] || '>';
+            const n = parseInt(opMatch[2]);
+            const prof = (p.budget||0) - getProjExpense(p);
+            if(op === '>' && !(prof > n)) return false;
+            if(op === '<' && !(prof < n)) return false;
+            if(op === '>=' && !(prof >= n)) return false;
+            if(op === '<=' && !(prof <= n)) return false;
+            if(op === '=' && prof !== n) return false;
+          }
+        }
+      } else {
+        // plain text — substring match
+        if(!blob.includes(search)) return false;
+      }
+    }
+    // chip filters
+    for(const f of filters){
+      if(f.type === 'client'){
+        if((p.client||'') !== f.value) return false;
+      } else if(f.type === 'year'){
+        const d = p.deadline||p.date||p.startDate||p.createdAt;
+        if(!d) return false;
+        const y = new Date(d).getFullYear();
+        if(y !== f.value) return false;
+      } else if(f.type === 'month'){
+        const d = p.deadline||p.date||p.startDate||p.createdAt;
+        if(!d) return false;
+        const dt = new Date(d);
+        if(dt.getMonth() !== f.value) return false;
+      } else if(f.type === 'monthRange'){
+        const d = p.deadline||p.date||p.startDate||p.createdAt;
+        if(!d) return false;
+        const dt = new Date(d);
+        const ym = dt.getFullYear()*12 + dt.getMonth();
+        if(ym < f.from || ym > f.to) return false;
+      } else if(f.type === 'nameStart'){
+        if(!(p.name||'').toLowerCase().startsWith(f.value.toLowerCase())) return false;
+      } else if(f.type === 'status'){
+        const cp = !!ls('client_paid_'+p.id);
+        const allPaid = (p.workers||[]).length>0 && (p.workers||[]).every(w=>w.status==='paid');
+        const hasLoss = ((p.budget||0) - getProjExpense(p)) < 0;
+        if(f.value === 'waiting' && cp) return false;
+        if(f.value === 'received' && !cp) return false;
+        if(f.value === 'paid' && !allPaid) return false;
+        if(f.value === 'loss' && !hasLoss) return false;
+      }
+    }
+    return true;
+  });
+
+  // sort
+  filtered.sort((a,b) => {
+    const aP = (a.budget||0) - getProjExpense(a);
+    const bP = (b.budget||0) - getProjExpense(b);
+    if(sort === 'profitDesc') return bP - aP;
+    if(sort === 'profitAsc') return aP - bP;
+    if(sort === 'budgetDesc') return (b.budget||0) - (a.budget||0);
+    if(sort === 'dateDesc') return (b.deadline||b.date||'').localeCompare(a.deadline||a.date||'');
+    if(sort === 'name') return (a.name||'').localeCompare(b.name||'','th');
+    return 0;
+  });
+
+  return filtered;
+}
+
+function _profStatusBadge(p){
+  const cp = !!ls('client_paid_'+p.id);
+  const workers = p.workers||[];
+  const hasWorkers = workers.length > 0;
+  const allPaid = hasWorkers && workers.every(w=>w.status==='paid');
+  const pendingCount = workers.filter(w=>w.status!=='paid').length;
+  const prof = (p.budget||0) - getProjExpense(p);
+  if(prof < 0){
+    return '<span style="font-size:10.5px;background:rgba(255,64,64,0.12);color:var(--red);padding:2px 8px;border-radius:10px;font-weight:700">⚠️ ขาดทุน</span>';
+  }
+  if(p.projStatus === 'cancelled'){
+    return '<span style="font-size:10.5px;background:rgba(120,120,140,0.15);color:var(--text2);padding:2px 8px;border-radius:10px">❌ ยกเลิก</span>';
+  }
+  if(allPaid && cp){
+    return '<span style="font-size:10.5px;background:rgba(0,223,160,0.15);color:var(--green);padding:2px 8px;border-radius:10px;font-weight:700">✅ เสร็จสมบูรณ์</span>';
+  }
+  if(cp && pendingCount > 0){
+    return `<span style="font-size:10.5px;background:rgba(155,111,255,0.15);color:#9B6FFF;padding:2px 8px;border-radius:10px;font-weight:700">💰 รับแล้ว · ค้างทีม ${pendingCount}</span>`;
+  }
+  if(!cp){
+    return '<span style="font-size:10.5px;background:rgba(255,158,0,0.15);color:var(--orange);padding:2px 8px;border-radius:10px;font-weight:700">⏳ รอลูกค้า</span>';
+  }
+  return '<span style="font-size:10.5px;background:rgba(120,120,140,0.15);color:var(--text2);padding:2px 8px;border-radius:10px">—</span>';
+}
+
+function _profRenderChips(){
+  const filters = window._profitState.filters;
+  const el = document.getElementById('profit-chips');
+  if(!el) return;
+  if(!filters.length){ el.innerHTML = ''; return; }
+  el.innerHTML = filters.map((f, i) => {
+    let label = '';
+    if(f.type === 'client') label = `👤 ลูกค้า: ${f.value}`;
+    else if(f.type === 'year') label = `📅 ปี: ${f.value+543}`;
+    else if(f.type === 'month') label = `📅 เดือน: ${['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][f.value]}`;
+    else if(f.type === 'monthRange') label = `📅 ช่วงเดือน`;
+    else if(f.type === 'nameStart') label = `📝 ชื่อขึ้นต้น: ${f.value}`;
+    else if(f.type === 'status') label = `📊 ${ {waiting:'รอลูกค้า',received:'ลูกค้าจ่ายแล้ว',paid:'จ่ายทีมครบ',loss:'ขาดทุน'}[f.value] }`;
+    return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;background:rgba(0,180,255,0.12);color:var(--accent2);border-radius:6px;font-size:11px;font-weight:600">${label}<span style="cursor:pointer;font-size:13px;line-height:1;color:var(--accent2);margin-left:2px" onclick="_profRemoveFilter(${i})">×</span></span>`;
+  }).join('');
+}
+
+function _profAddFilter(filter){
+  // ป้องกัน duplicate
+  const existIdx = window._profitState.filters.findIndex(f => f.type === filter.type);
+  if(existIdx >= 0) window._profitState.filters.splice(existIdx, 1);
+  window._profitState.filters.push(filter);
+  renderProfit();
+}
+
+function _profRemoveFilter(idx){
+  window._profitState.filters.splice(idx, 1);
+  renderProfit();
+}
+
+function _profClearFilters(){
+  window._profitState.filters = [];
+  const s = document.getElementById('profit-search');
+  if(s) s.value = '';
+  renderProfit();
+}
+
+function _profQuickFilter(type){
+  const now = new Date();
+  if(type === 'thismonth'){
+    _profAddFilter({type:'month', value: now.getMonth()});
+    _profAddFilter({type:'year', value: now.getFullYear()});
+  } else if(type === 'loss'){
+    _profAddFilter({type:'status', value: 'loss'});
+  } else if(type === 'waiting'){
+    _profAddFilter({type:'status', value: 'waiting'});
+  } else if(type === 'top10'){
+    document.getElementById('profit-sort').value = 'profitDesc';
+    renderProfit();
+  }
+}
+
+function _profOpenFilterMenu(ev){
+  ev.stopPropagation();
+  // ปิดเมนูเก่า (ถ้ามี)
+  document.getElementById('profit-filter-menu')?.remove();
+
+  const projs = getProjects();
+  const clients = [...new Set(projs.map(p => p.client).filter(Boolean))].sort();
+  const years = [...new Set(projs.map(p => {
+    const d = p.deadline||p.date||p.startDate||p.createdAt;
+    return d ? new Date(d).getFullYear() : null;
+  }).filter(y => y))].sort((a,b)=>b-a);
+
+  const menu = document.createElement('div');
+  menu.id = 'profit-filter-menu';
+  menu.style.cssText = 'position:fixed;z-index:99999;background:var(--card);border:1px solid var(--border2);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);padding:8px;min-width:240px;max-height:60vh;overflow-y:auto';
+  const btn = ev.currentTarget.getBoundingClientRect();
+  menu.style.top = (btn.bottom + 6) + 'px';
+  menu.style.left = Math.max(8, btn.left - 100) + 'px';
+
+  menu.innerHTML = `
+    <div style="font-size:10px;color:var(--text2);letter-spacing:0.5px;text-transform:uppercase;padding:4px 8px;font-weight:700">เพิ่มตัวกรอง</div>
+    <div style="margin-top:4px">
+      <div style="font-size:11px;color:var(--text2);padding:6px 8px 2px;font-weight:600">ลูกค้า</div>
+      ${clients.map(c => `<div onclick="_profAddFilter({type:'client',value:'${(c||'').replace(/'/g,"\\'")}'});document.getElementById('profit-filter-menu').remove()" style="padding:6px 10px;cursor:pointer;font-size:12px;border-radius:6px" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">${_escH(c)}</div>`).join('')}
+    </div>
+    <div style="margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">
+      <div style="font-size:11px;color:var(--text2);padding:6px 8px 2px;font-weight:600">ปี</div>
+      ${years.map(y => `<div onclick="_profAddFilter({type:'year',value:${y}});document.getElementById('profit-filter-menu').remove()" style="padding:6px 10px;cursor:pointer;font-size:12px;border-radius:6px" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">${y+543}</div>`).join('')}
+    </div>
+    <div style="margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">
+      <div style="font-size:11px;color:var(--text2);padding:6px 8px 2px;font-weight:600">เดือน</div>
+      ${['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'].map((m,i)=>`<div onclick="_profAddFilter({type:'month',value:${i}});document.getElementById('profit-filter-menu').remove()" style="padding:6px 10px;cursor:pointer;font-size:12px;border-radius:6px;display:inline-block;width:30%" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">${m}</div>`).join('')}
+    </div>
+    <div style="margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">
+      <div style="font-size:11px;color:var(--text2);padding:6px 8px 2px;font-weight:600">สถานะการจ่าย</div>
+      <div onclick="_profAddFilter({type:'status',value:'waiting'});document.getElementById('profit-filter-menu').remove()" style="padding:6px 10px;cursor:pointer;font-size:12px;border-radius:6px" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">⏳ รอลูกค้าจ่าย</div>
+      <div onclick="_profAddFilter({type:'status',value:'received'});document.getElementById('profit-filter-menu').remove()" style="padding:6px 10px;cursor:pointer;font-size:12px;border-radius:6px" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">💰 ลูกค้าจ่ายแล้ว</div>
+      <div onclick="_profAddFilter({type:'status',value:'paid'});document.getElementById('profit-filter-menu').remove()" style="padding:6px 10px;cursor:pointer;font-size:12px;border-radius:6px" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">✅ จ่ายทีมครบ</div>
+      <div onclick="_profAddFilter({type:'status',value:'loss'});document.getElementById('profit-filter-menu').remove()" style="padding:6px 10px;cursor:pointer;font-size:12px;border-radius:6px;color:var(--red)" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">⚠️ ขาดทุน</div>
+    </div>
+  `;
+  document.body.appendChild(menu);
+  setTimeout(()=>{
+    document.addEventListener('click', function _close(e){
+      if(!menu.contains(e.target)){ menu.remove(); document.removeEventListener('click', _close); }
+    });
+  }, 50);
+}
+
+function _profToggleProj(projId){
+  const sel = window._profitState.selectedIds;
+  if(sel.has(projId)) sel.delete(projId);
+  else sel.add(projId);
+  _profUpdateSelection();
+}
+
+function _profToggleAll(checked){
+  const sel = window._profitState.selectedIds;
+  const filtered = _profGetFilteredProjs();
+  if(checked){
+    filtered.forEach(p => sel.add(p.id));
+  } else {
+    filtered.forEach(p => sel.delete(p.id));
+  }
+  renderProfit();
+}
+
+function _profClearSelection(){
+  window._profitState.selectedIds.clear();
+  renderProfit();
+}
+
+function _profUpdateSelection(){
+  const sel = window._profitState.selectedIds;
+  const projs = getProjects();
+  const selectedProjs = projs.filter(p => sel.has(p.id));
+  const bar = document.getElementById('profit-selection-bar');
+  if(!bar) return;
+  if(!sel.size){
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'block';
+  const totalBudget = selectedProjs.reduce((a,p) => a+(p.budget||0), 0);
+  const totalCost = selectedProjs.reduce((a,p) => a+getProjExpense(p), 0);
+  const totalProfit = totalBudget - totalCost;
+  // all totals for %
+  const filteredAll = _profGetFilteredProjs();
+  const grandBudget = filteredAll.reduce((a,p) => a+(p.budget||0), 0);
+  const pctBudget = grandBudget>0 ? (totalBudget/grandBudget*100).toFixed(1) : 0;
+  const pctCost = totalBudget>0 ? (totalCost/totalBudget*100).toFixed(1) : 0;
+  const margin = totalBudget>0 ? (totalProfit/totalBudget*100).toFixed(1) : 0;
+
+  document.getElementById('profit-sel-title').textContent = `ยอดของโปรเจกต์ที่เลือก · ${sel.size} จาก ${filteredAll.length}`;
+  document.getElementById('profit-sel-budget').textContent = fmtB(totalBudget);
+  document.getElementById('profit-sel-budget-pct').textContent = `${pctBudget}% ของยอดทั้งหมด`;
+  document.getElementById('profit-sel-cost').textContent = fmtB(totalCost);
+  document.getElementById('profit-sel-cost-pct').textContent = `${pctCost}% ของ Budget ที่เลือก`;
+  document.getElementById('profit-sel-profit').textContent = fmtB(totalProfit);
+  document.getElementById('profit-sel-profit-pct').textContent = `Margin ${margin}% · ${sel.size} โปรเจกต์`;
+  document.getElementById('profit-sel-profit').style.color = totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
+}
+
 function renderProfit(){
-  const projs=getProjects();let revenue=0,paid=0,pending=0;
-  projs.forEach(p=>{revenue+=p.budget||0;(p.workers||[]).forEach(w=>{if(w.status==='paid')paid+=w.amount||0;else pending+=w.amount||0})});
-  document.getElementById('profit-stats').innerHTML=`
-    <div class="stat-card"><span class="stat-icon">💹</span><div class="stat-label">รายได้รวม</div><div class="stat-value" style="color:var(--green)">${fmtB(revenue)}</div></div>
-    <div class="stat-card"><span class="stat-icon">💸</span><div class="stat-label">จ่ายออกแล้ว</div><div class="stat-value" style="color:var(--red)">${fmtB(paid)}</div></div>
-    <div class="stat-card"><span class="stat-icon">⏳</span><div class="stat-label">ค้างจ่าย</div><div class="stat-value" style="color:var(--orange)">${fmtB(pending)}</div></div>`;
-  const months=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-  const mData=new Array(12).fill(0);
-  projs.forEach(p=>{const _rd=p.startDate||p.date||p.createdAt;if(!_rd)return;const m=new Date(_rd).getMonth();if(isNaN(m)||m<0||m>11)return;(p.workers||[]).forEach(w=>{if(w.status==='paid')mData[m]+=(w.amount||0)})});
-  if(chartMonthly)chartMonthly.destroy();
-  chartMonthly=new Chart(document.getElementById('chart-monthly'),{type:'bar',data:{labels:months,datasets:[{label:'฿',data:mData,backgroundColor:'rgba(21,101,255,.7)',borderColor:'var(--accent)',borderWidth:2,borderRadius:8}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6890B8'},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#6890B8'},grid:{color:'rgba(255,255,255,.04)'}}}}});
-  const catTotals={dubbing:0,adaptation:0,mix:0,qc:0,subVideo:0,manager:0};
-  projs.forEach(p=>(p.workers||[]).forEach(w=>{const s=getStaffById(w.id);if(s&&w.status==='paid')catTotals[s.category]=(catTotals[s.category]||0)+(w.amount||0)}));
-  if(chartCat)chartCat.destroy();
-  chartCat=new Chart(document.getElementById('chart-cat'),{type:'doughnut',data:{labels:Object.values(CATS).map(c=>c.label),datasets:[{data:Object.values(catTotals),backgroundColor:['rgba(255,158,0,.8)','rgba(0,180,255,.8)','rgba(0,223,160,.8)','rgba(155,111,255,.8)','rgba(255,64,64,.8)','rgba(21,101,255,.8)'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#6890B8',padding:10,font:{size:11}}}}}});
-  const unpaid={};
-  projs.forEach(p=>(p.workers||[]).forEach(w=>{const s=getStaffById(w.id);if(s&&w.status!=='paid'){if(!unpaid[s.id])unpaid[s.id]={s,total:0,projs:[]};unpaid[s.id].total+=w.amount||0;unpaid[s.id].projs.push(p.name)}}));
-  document.getElementById('unpaid-table').innerHTML=Object.values(unpaid).sort((a,b)=>b.total-a.total).map(({s,total,projs})=>`<tr>
-    <td><strong>${s.name}</strong> (${s.nickname})</td>
-    <td style="color:${CATS[s.category]?.color||'var(--text2)'}">${(()=>{const pre=(w.slot||'').split('-')[0];const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};const suf=w.slot?.includes('main')?' · หลัก':w.slot?.includes('-sub')?' · รอง':'';return (lbl[pre]||CATS[s.category]?.label||'')+suf;})()}</td>
-    <td style="color:var(--orange);font-weight:800">${fmtB(total)}</td>
-    <td style="font-size:11px;color:var(--text2)">${projs.slice(0,3).join(', ')}${projs.length>3?'...':''}</td>
-    <td><button class="btn btn-sm btn-blue" onclick="nav('queue')">จัดการ</button></td>
-  </tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:20px">🎉 ไม่มียอดค้าง</td></tr>';
+  const projs = getProjects();
+  const filtered = _profGetFilteredProjs();
+  const sel = window._profitState.selectedIds;
+
+  // === Chips ===
+  _profRenderChips();
+
+  // === Subtitle ===
+  const sub = document.getElementById('profit-subtitle');
+  if(sub) sub.textContent = `แสดง ${filtered.length} จาก ${projs.length} โปรเจกต์${window._profitState.filters.length?' · มี '+window._profitState.filters.length+' filter':''}`;
+
+  // === Totals สำหรับการ์ดหลัก (ของทั้งหมดที่ filter แล้ว) ===
+  let revenue=0, cost=0, paidCost=0, pendingCost=0, recvRevenue=0, pendingRevenue=0;
+  let workerCount = 0;
+  filtered.forEach(p => {
+    const budget = p.budget||0;
+    const cp = !!ls('client_paid_'+p.id);
+    revenue += budget;
+    if(cp) recvRevenue += budget;
+    else pendingRevenue += budget;
+    (p.workers||[]).forEach(w => {
+      const amt = w.amount||0;
+      cost += amt;
+      workerCount++;
+      if(w.status === 'paid') paidCost += amt;
+      else pendingCost += amt;
+    });
+  });
+  const profit = revenue - cost;
+  const margin = revenue>0 ? (profit/revenue*100).toFixed(1) : 0;
+
+  // === Hero ===
+  document.getElementById('profit-hero-amount').textContent = fmtB(profit);
+  document.getElementById('profit-hero-amount').style.color = profit>=0 ? 'var(--text)' : 'var(--red)';
+  document.getElementById('profit-hero-sub').innerHTML = `<span style="color:${profit>=0?'var(--green)':'var(--red)'};font-weight:700">${profit>=0?'📈':'📉'} Margin ${margin}%</span><span style="color:var(--text2)">· ${filtered.length} โปรเจกต์ · ${workerCount} รายการ</span>`;
+
+  // === KPI ===
+  document.getElementById('profit-kpi-revenue').textContent = fmtB(revenue);
+  document.getElementById('profit-kpi-revenue-sub').textContent = `รวม Budget ${filtered.length}`;
+  document.getElementById('profit-kpi-cost').textContent = fmtB(cost);
+  document.getElementById('profit-kpi-cost-sub').textContent = `${workerCount} รายการ`;
+
+  // === Cash flow ===
+  document.getElementById('cf-pending').textContent = fmtB(pendingRevenue);
+  document.getElementById('cf-received').textContent = fmtB(recvRevenue);
+  document.getElementById('cf-paid').textContent = fmtB(paidCost);
+
+  // === Mini chart (Hero) — กำไรรายเดือน 6 เดือนล่าสุด ===
+  const now = new Date();
+  const months6 = [];
+  for(let i=5;i>=0;i--){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    months6.push({y:d.getFullYear(), m:d.getMonth(), label:['ม.ค','ก.พ','มี.ค','เม.ย','พ.ค','มิ.ย','ก.ค','ส.ค','ก.ย','ต.ค','พ.ย','ธ.ค'][d.getMonth()]});
+  }
+  const profitByMonth = months6.map(({y,m}) => {
+    let rev=0, c=0;
+    filtered.forEach(p => {
+      const d = p.deadline||p.date||p.startDate||p.createdAt;
+      if(!d) return;
+      const dt = new Date(d);
+      if(dt.getFullYear()===y && dt.getMonth()===m){
+        rev += p.budget||0;
+        c += getProjExpense(p);
+      }
+    });
+    return {label: months6.find(x=>x.y===y&&x.m===m).label, revenue:rev, profit:rev-c};
+  });
+
+  // === Charts ===
+  if(window._profitState.charts.mini){window._profitState.charts.mini.destroy()}
+  const miniCtx = document.getElementById('profit-mini-chart');
+  if(miniCtx){
+    window._profitState.charts.mini = new Chart(miniCtx, {
+      type:'line',
+      data:{labels:profitByMonth.map(x=>x.label),datasets:[{data:profitByMonth.map(x=>x.profit),borderColor:'#0F6E56',backgroundColor:'rgba(15,110,86,0.18)',borderWidth:1.5,tension:0.4,fill:true,pointRadius:0}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{y:{display:false,beginAtZero:true},x:{display:false}}}
+    });
+  }
+
+  if(window._profitState.charts.trend){window._profitState.charts.trend.destroy()}
+  const trendCtx = document.getElementById('profit-trend-chart');
+  if(trendCtx){
+    window._profitState.charts.trend = new Chart(trendCtx, {
+      type:'line',
+      data:{
+        labels: profitByMonth.map(x=>x.label),
+        datasets:[
+          {label:'รายได้', data: profitByMonth.map(x=>x.revenue), borderColor:'#185FA5', backgroundColor:'rgba(24,95,165,0.10)', borderWidth:2, tension:0.3, fill:true, pointRadius:3, pointBackgroundColor:'#185FA5'},
+          {label:'กำไร', data: profitByMonth.map(x=>x.profit), borderColor:'#0F6E56', backgroundColor:'rgba(15,110,86,0.10)', borderWidth:2, tension:0.3, fill:true, pointRadius:3, pointBackgroundColor:'#0F6E56'}
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{font:{size:10},color:'#6890B8',callback:v=>'฿'+(v/1000).toFixed(0)+'k'}},x:{grid:{display:false},ticks:{font:{size:10},color:'#6890B8'}}}}
+    });
+  }
+
+  // === Client donut ===
+  const clientTotals = {};
+  filtered.forEach(p => {
+    const c = p.client||'(ไม่ระบุ)';
+    clientTotals[c] = (clientTotals[c]||0) + (p.budget||0);
+  });
+  const clientEntries = Object.entries(clientTotals).sort((a,b)=>b[1]-a[1]);
+  const colors = ['#378ADD','#1D9E75','#B4B2A9','#D85A30','#D4537E','#7F77DD'];
+  if(window._profitState.charts.client){window._profitState.charts.client.destroy()}
+  const clientCtx = document.getElementById('profit-client-chart');
+  if(clientCtx){
+    window._profitState.charts.client = new Chart(clientCtx, {
+      type:'doughnut',
+      data:{labels:clientEntries.map(x=>x[0]),datasets:[{data:clientEntries.map(x=>x[1]),backgroundColor:colors,borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'70%',plugins:{legend:{display:false}}}
+    });
+  }
+  document.getElementById('profit-client-legend').innerHTML = clientEntries.slice(0,5).map(([n,v],i) => `<div style="display:flex;justify-content:space-between"><span style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:2px;background:${colors[i%colors.length]}"></span>${_escH(n)}</span><span style="font-weight:700;font-variant-numeric:tabular-nums">${fmtB(v)}</span></div>`).join('');
+
+  // === Project count ===
+  document.getElementById('profit-proj-count').textContent = filtered.length;
+
+  // === Table ===
+  const tbody = document.getElementById('profit-table-body');
+  if(!filtered.length){
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--text2);font-size:13px"><div style="font-size:32px;margin-bottom:8px">📭</div>ไม่พบโปรเจกต์ตามเงื่อนไข</td></tr>';
+  } else {
+    tbody.innerHTML = filtered.map(p => {
+      const budget = p.budget||0;
+      const cost = getProjExpense(p);
+      const prof = budget - cost;
+      const isSel = sel.has(p.id);
+      const bg = isSel ? 'background:rgba(0,180,255,0.06)' : '';
+      const profColor = prof < 0 ? 'var(--red)' : prof === 0 ? 'var(--text2)' : 'var(--green)';
+      return `<tr style="border-top:1px solid rgba(255,255,255,0.04);${bg}">
+        <td style="padding:9px 0 9px 14px"><input type="checkbox" ${isSel?'checked':''} onchange="_profToggleProj('${p.id}')" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"></td>
+        <td style="padding:9px 8px;font-weight:700;cursor:pointer" onclick="openProjDetail('${p.id}')">${_escH(p.name||'(ไม่มีชื่อ)')}</td>
+        <td style="padding:9px 8px;color:var(--text2)">${_escH(p.client||'-')}</td>
+        <td style="padding:9px 8px;text-align:center;color:${p.duration?'var(--text)':'var(--text2)'}">${p.duration||'—'}</td>
+        <td style="padding:9px 8px;text-align:right;font-variant-numeric:tabular-nums">${fmtB(budget)}</td>
+        <td style="padding:9px 8px;text-align:right;color:var(--text2);font-variant-numeric:tabular-nums">${fmtB(cost)}</td>
+        <td style="padding:9px 8px;text-align:right;font-weight:800;color:${profColor};font-variant-numeric:tabular-nums">${prof<0?'-':''}${fmtB(Math.abs(prof))}</td>
+        <td style="padding:9px 12px">${_profStatusBadge(p)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // === select all checkbox state ===
+  const selAll = document.getElementById('profit-select-all');
+  if(selAll){
+    const filteredIds = filtered.map(p=>p.id);
+    const selFromFiltered = filteredIds.filter(id=>sel.has(id));
+    selAll.checked = filteredIds.length>0 && selFromFiltered.length===filteredIds.length;
+    selAll.indeterminate = selFromFiltered.length>0 && selFromFiltered.length<filteredIds.length;
+  }
+
+  // === Selection bar ===
+  _profUpdateSelection();
 }
 
 // ══════════════════════════════════════════════
