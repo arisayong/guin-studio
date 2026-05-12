@@ -5141,9 +5141,12 @@ function renderDash(){
       else { pending+=w.amount||0; pendingWorkers.push({proj:p,worker:w}); }
     });
   });
-  // กำไรสุทธิ = รายได้จริง (ลูกค้าจ่ายแล้ว) - รายจ่ายทีมทั้งหมด
-  const profit=revenue-(paid+pending);
-  const totalRevenue = revenue + revenuePending; // budget รวมทุกโปรเจกต์
+  // กำไรคาด = Budget ทั้งหมด − ค่าจ้างทีมทั้งหมด (เหมือนหน้ารายงานการเงิน)
+  // ไม่ใช่ revenue-(paid+pending) เพราะนั่นจะติดลบเมื่อลูกค้ายังไม่จ่าย
+  const totalRevenue = revenue + revenuePending; // budget รวมทุกโปรเจกต์ (ไม่นับ cancelled)
+  const totalCost = paid + pending;              // ค่าจ้างทีมรวมทั้งหมด
+  const profit = totalRevenue - totalCost;       // กำไรคาด (ถ้าทุกอย่างจบตามแผน)
+  const cashNet = revenue - paid;                // เงินสดสุทธิ (รับจริง - จ่ายจริง)
   const paidCount = projs.reduce((a,p) => a + (p.workers||[]).filter(w=>w.status==='paid').length, 0);
   const projCancelled = projs.filter(p => p.projStatus === 'cancelled').length;
   const projActive = projs.length - projCancelled;
@@ -5155,13 +5158,13 @@ function renderDash(){
      <div class="stat-value">${projs.length}</div>
      <div class="stat-delta up">${projActive} ดำเนินการ${projCancelled?' · '+projCancelled+' ยกเลิก':''}</div>
     </div>
-    <div class="stat-card" title="รวม budget ของโปรเจกต์ที่ลูกค้าจ่ายแล้ว (ไม่รวม VDT05/promo)">
+    <div class="stat-card" title="รวม budget ของโปรเจกต์ที่ลูกค้าจ่ายเงินเข้ามาแล้ว">
      <span class="stat-icon">💰</span>
      <div class="stat-label">รายได้รับแล้ว</div>
      <div class="stat-value" style="color:var(--green)">${fmtB(revenue)}</div>
      <div class="stat-delta up">ลูกค้าจ่ายเข้ามาแล้ว</div>
     </div>
-    <div class="stat-card" title="รวม budget ของโปรเจกต์ที่ลูกค้ายังไม่จ่าย (รอบิล/promo/ทำเปล่า)">
+    <div class="stat-card" title="รวม budget ของโปรเจกต์ที่ลูกค้ายังไม่จ่าย">
      <span class="stat-icon">📋</span>
      <div class="stat-label">รอลูกค้าจ่าย</div>
      <div class="stat-value" style="color:${revenuePending?'var(--orange)':'var(--text2)'}">${fmtB(revenuePending)}</div>
@@ -5179,11 +5182,11 @@ function renderDash(){
      <div class="stat-value" style="color:var(--green)">${fmtB(paid)}</div>
      <div class="stat-delta up">${paidCount} คน รับเงินแล้ว</div>
     </div>
-    <div class="stat-card" onclick="nav('profit')">
+    <div class="stat-card" onclick="nav('profit')" title="กำไรคาด = Budget ทั้งหมด − ค่าจ้างทีมทั้งหมด · ถ้าทุกอย่างจบตามแผน">
      <span class="stat-icon">📈</span>
-     <div class="stat-label">กำไรสุทธิ</div>
+     <div class="stat-label">กำไรคาด</div>
      <div class="stat-value" style="color:${profit>=0?'var(--green)':'var(--red)'}">${fmtB(profit)}</div>
-     <div class="stat-delta ${profit>=0?'up':'down'}">${fmtB(revenue)} − ${fmtB(paid+pending)}</div>
+     <div class="stat-delta ${profit>=0?'up':'down'}">${fmtB(totalRevenue)} − ${fmtB(totalCost)} · ถ้าจบครบ</div>
     </div>`;
   const urgentEl=document.getElementById('dash-queue');
   urgentEl.innerHTML=urgent.length?urgent.map(p=>{const dl=new Date(p.deadline);dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));const color=diff<=1?'var(--red)':diff<=3?'var(--orange)':'var(--text2)';
