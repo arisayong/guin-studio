@@ -1285,6 +1285,19 @@ body.sidebar-collapsed .main-content{
     <div id="email-audit-result" style="margin-top:10px"></div>
    </div>
 
+   <!-- Staff Coverage Audit — สแกนหาคนเห็นงานไม่ครบ -->
+   <div class="section-card" style="border-left:4px solid #9B6FFF;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">🔬</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:#9B6FFF">ตรวจทีมงานเห็นงานครบไหม</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">หาทีมงานที่มีงานกระจายอยู่ใน staff records หลายตัว (id ต่างกัน แต่ email/ชื่อเดียวกัน) → ทำให้ staff เห็นงานไม่ครบ</div>
+     </div>
+     <button class="btn btn-outline" onclick="runStaffCoverageAudit()" style="padding:10px 18px;border-color:#9B6FFF;color:#9B6FFF">🔬 สแกน</button>
+    </div>
+    <div id="coverage-audit-result" style="margin-top:10px"></div>
+   </div>
+
    <!-- Duplicate Staff Detector — หาสมาชิกซ้ำ -->
    <div class="section-card" style="border-left:4px solid #FF80AB;margin-bottom:16px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
@@ -6631,7 +6644,7 @@ function findDuplicateStaff(){
 
   const groupsByEmail = {};   // email → [staff,...]
   const groupsByAccount = {}; // bank+account → [staff,...]
-  const groupsByName = {};    // full-name → [staff,...]
+  const groupsByAllNames = {}; // ชื่อเล่น+ชื่อจริง+นามสกุล ตรงกันหมด → [staff,...]
 
   allStaff.forEach(s => {
     // by email
@@ -6643,10 +6656,15 @@ function findDuplicateStaff(){
       const key = _normalize(s.bank) + '|' + String(s.account).replace(/[\s-]/g,'');
       if(key.length > 5) (groupsByAccount[key] = groupsByAccount[key] || []).push(s);
     }
-    // by full name (เช่น "ภาคภูมิ นามมูลน้อย" — เฉพาะเมื่อมีทั้ง first+last)
+    // 🧠 By all-3-names — ชื่อเล่น + ชื่อจริง + นามสกุล ต้องตรงกันหมด
+    //    ป้องกันชื่อสามัญซ้ำ (เช่น "ก้อย" หลายคน, นามสกุลสามัญหลายคน)
+    //    ต้องมี "ทั้ง 3 field" มีค่าครบจึงจะ match ได้
+    const nk = _normalize(s.nickname);
     const nm = _normalize(s.name);
-    if(nm && nm.includes(' ')){ // ต้องมีนามสกุลด้วย กันชื่อสามัญ
-      (groupsByName[nm] = groupsByName[nm] || []).push(s);
+    const ln = _normalize(s.lastName);
+    if(nk && nm && ln && nk.length > 0 && nm.length > 0 && ln.length > 0){
+      const key3 = `${nk}|${nm}|${ln}`;
+      (groupsByAllNames[key3] = groupsByAllNames[key3] || []).push(s);
     }
   });
 
@@ -6674,8 +6692,9 @@ function findDuplicateStaff(){
   Object.entries(groupsByAccount).forEach(([key, members]) => {
     _addGroup(members, `🏦 เลขบัญชีตรงกัน`);
   });
-  Object.entries(groupsByName).forEach(([nm, members]) => {
-    _addGroup(members, `👤 ชื่อ-นามสกุลตรงกัน: ${nm}`);
+  Object.entries(groupsByAllNames).forEach(([k, members]) => {
+    const [nk, nm, ln] = k.split('|');
+    _addGroup(members, `👤 ชื่อเล่น + ชื่อจริง + นามสกุล ตรงกันหมด: ${nk} / ${nm} ${ln}`);
   });
 
   if(!dupGroups.length){
@@ -6811,6 +6830,189 @@ async function mergeDuplicateStaff(keepId, removeIds, keepName){
 // ═══════════════════════════════════════════════════════════
 // 🔎 Worker Inspector — ดู workers ในโปรเจกต์
 // ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// 🔬 Staff Coverage Audit — สแกนหาทีมงานที่อาจเห็นงานไม่ครบ
+// (worker.id ในโปรเจกต์ที่ผูกกับ staff record อื่นที่ใช้ email/ชื่อเดียวกัน)
+// ═══════════════════════════════════════════════════════════
+function runStaffCoverageAudit(){
+  const resultEl = document.getElementById('coverage-audit-result');
+  if(!resultEl) return;
+  resultEl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text2)">⏳ กำลังสแกน...</div>';
+
+  setTimeout(()=>{
+    try {
+      const projs = getProjects();
+      const allStaff = getAllStaff() || [];
+      const staffByEmail = {}; // email → staff list (อาจมีหลาย record ที่ email ซ้ำ)
+      const staffByNameNick = {}; // ชื่อ+ชื่อเล่น (lowercase) → staff list
+      allStaff.forEach(s => {
+        if(!s) return;
+        const em = (s.email||'').trim().toLowerCase();
+        if(em){
+          (staffByEmail[em] = staffByEmail[em] || []).push(s);
+        }
+        const key = ((s.name||'')+'|'+(s.nickname||'')).toLowerCase();
+        if(key !== '|') (staffByNameNick[key] = staffByNameNick[key] || []).push(s);
+      });
+
+      // หา "คนที่มีงานกระจายหลาย id" — กลุ่มที่ email หรือ ชื่อ+เล่นซ้ำ
+      const issues = [];
+      Object.entries(staffByEmail).forEach(([em, group]) => {
+        if(group.length < 2) return;
+        const ids = group.map(g => g.id);
+        // เช็คว่ามีงานกระจายอยู่ในหลาย id ไหม
+        let projCount = 0;
+        const projsByStaff = {};
+        ids.forEach(id => { projsByStaff[id] = 0; });
+        projs.forEach(p => {
+          (p.workers||[]).forEach(w => {
+            if(ids.includes(w.id)){
+              projsByStaff[w.id]++;
+              projCount++;
+            }
+          });
+        });
+        // ถ้ามีงานกระจายตั้งแต่ 2 id ขึ้นไป
+        const usedIds = Object.entries(projsByStaff).filter(([_, c]) => c > 0);
+        if(usedIds.length >= 2){
+          issues.push({
+            type: 'email_dup',
+            label: 'Email ซ้ำ',
+            email: em,
+            staffs: group,
+            projsByStaff,
+            totalProjs: projCount
+          });
+        }
+      });
+
+      if(!issues.length){
+        resultEl.innerHTML = '<div style="padding:14px;background:rgba(0,223,160,0.06);border:1px solid rgba(0,223,160,0.25);border-radius:9px;color:var(--green);font-size:13px;font-weight:700">✅ ไม่พบปัญหา — ทีมงานทุกคนเห็นงานครบ</div>';
+        return;
+      }
+
+      let html = `<div style="padding:12px;background:rgba(255,158,0,0.08);border:1px solid rgba(255,158,0,0.3);border-radius:9px;margin-bottom:10px;font-size:13px;color:var(--orange);font-weight:700">⚠️ พบ ${issues.length} กลุ่มที่ทีมงานอาจเห็นงานไม่ครบ</div>`;
+
+      issues.forEach((iss, gi) => {
+        html += `<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:800;color:var(--orange);margin-bottom:6px">📧 ${_escH(iss.email)}</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:8px">มี ${iss.staffs.length} staff records ใช้ email นี้ — งาน ${iss.totalProjs} ชิ้นกระจายในหลาย id</div>
+          <div style="display:flex;flex-direction:column;gap:6px">`;
+
+        iss.staffs.forEach((s, si) => {
+          const cnt = iss.projsByStaff[s.id] || 0;
+          html += `<div style="background:var(--card);border-radius:7px;padding:8px 12px;display:flex;align-items:center;gap:10px;font-size:12px">
+            <div style="flex:1">
+              <div style="font-weight:700">${_escH(s.nickname||s.name)}${si===0?' <span style="font-size:10px;background:rgba(0,223,160,0.15);color:var(--green);padding:1px 6px;border-radius:6px">KEEP</span>':''}</div>
+              <div style="font-size:10.5px;color:var(--text2)">id: <code>${_escH((s.id||'').substring(0,18))}...</code> · ${s.category||'-'}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-weight:700;color:${cnt>0?'var(--accent2)':'var(--text2)'};font-size:14px">${cnt} งาน</div>
+            </div>
+          </div>`;
+        });
+        html += `</div>
+          <div style="display:flex;gap:6px;margin-top:10px">
+            <button class="btn btn-blue btn-sm" style="padding:6px 12px;font-size:11px" onclick="autoMergeAndMigrate('${_escJ(iss.email)}')">🔧 Merge อัตโนมัติ → keep id แรก ย้ายงานทุกชิ้นมา</button>
+          </div>
+        </div>`;
+      });
+
+      html += `<div style="margin-top:10px;padding:10px;background:var(--bg2);border-radius:8px;font-size:11px;color:var(--text2);line-height:1.6">
+        💡 กดปุ่ม <b>"Merge อัตโนมัติ"</b> — ระบบจะเก็บ staff record แรก แล้วย้าย worker.id ทั้งหมดในทุกโปรเจกต์ที่ใช้ id อื่น → มาเป็น id แรก<br>
+        แล้วลบ staff record ที่ซ้ำออก เพื่อให้สต๊าฟเห็นงานครบทุกชิ้น
+      </div>`;
+
+      resultEl.innerHTML = html;
+    } catch(e){
+      console.error('coverage audit:', e);
+      resultEl.innerHTML = '<div style="padding:10px;color:var(--red);font-size:12px">❌ '+e.message+'</div>';
+    }
+  }, 100);
+}
+
+// Merge staff records ที่ email เดียวกัน + migrate worker.id ทุกที่
+async function autoMergeAndMigrate(email){
+  if(!_fbDatabase){ toast('Firebase ไม่พร้อม','error'); return; }
+  const em = (email||'').trim().toLowerCase();
+  const allStaff = getAllStaff() || [];
+  const group = allStaff.filter(s => (s.email||'').trim().toLowerCase() === em);
+  if(group.length < 2){ toast('ไม่พบ duplicate','info'); return; }
+
+  const keep = group[0];
+  const removeIds = group.slice(1).map(g => g.id);
+
+  if(!confirm(`🔧 Merge ${group.length} staff records ที่ email = ${email}\n\n` +
+    `✅ เก็บ: ${keep.nickname||keep.name} (id: ${keep.id.substring(0,16)}...)\n` +
+    `❌ ลบ: ${removeIds.length} record อื่น\n\n` +
+    `+ ย้าย worker.id ในโปรเจกต์ทั้งหมดมาที่ id ที่เก็บ\n` +
+    `+ ลบ staff records ที่ซ้ำ\n\n` +
+    `ดำเนินการ?`)) return;
+
+  try {
+    toast('🔧 กำลัง merge...', 'info');
+    const updates = {};
+    let migratedCount = 0;
+    let migratedProjs = 0;
+
+    // 1) Migrate worker.id ในโปรเจกต์
+    const projs = getProjects();
+    projs.forEach(p => {
+      let dirty = false;
+      (p.workers||[]).forEach(w => {
+        if(removeIds.includes(w.id)){
+          w.id = keep.id;
+          dirty = true;
+          migratedCount++;
+        }
+      });
+      if(dirty){
+        updates['projects/'+p.id+'/workers'] = p.workers;
+        migratedProjs++;
+      }
+    });
+
+    // 2) Migrate users/{uid}/staffId
+    const usersSnap = await _fbDatabase.ref('users').get();
+    if(usersSnap.exists()){
+      const users = usersSnap.val() || {};
+      Object.entries(users).forEach(([uid, u]) => {
+        if(u && removeIds.includes(u.staffId)){
+          updates['users/'+uid+'/staffId'] = keep.id;
+        }
+      });
+    }
+
+    // 3) ลบ staff records ที่ซ้ำจาก staff_v3
+    const staffData = getStaffData() || {};
+    Object.entries(staffData).forEach(([cat, arr]) => {
+      const filtered = (Array.isArray(arr)?arr:Object.values(arr||{}))
+        .filter(s => !removeIds.includes(s?.id));
+      updates['staff_v3/'+cat] = filtered;
+    });
+
+    // 4) Update public/staff_list
+    const pubSnap = await _fbDatabase.ref('public/staff_list').get();
+    if(pubSnap.exists()){
+      const list = pubSnap.val() || [];
+      const arr = Array.isArray(list) ? list : Object.values(list);
+      const filtered = arr.filter(s => !removeIds.includes(s?.id));
+      updates['public/staff_list'] = filtered;
+    }
+
+    await _fbDatabase.ref().update(updates);
+
+    // อัปเดต local cache
+    if(getProjects){ ls('projects', projs); }
+
+    toast(`✅ Merge เสร็จ — ย้าย ${migratedCount} workers ใน ${migratedProjs} โปรเจกต์ · ลบ ${removeIds.length} duplicate`, 'success');
+    setTimeout(()=>runStaffCoverageAudit(), 800);
+  } catch(e){
+    console.error('autoMergeAndMigrate:', e);
+    toast('❌ '+e.message, 'error');
+  }
+}
+
 function inspectWorkers(){
   const resultEl = document.getElementById('inspect-result');
   if(!resultEl) return;
@@ -10985,11 +11187,72 @@ function renderMyDash(){
   const f = window._myFilter;
   const q = (document.getElementById('my-search')?.value || '').toLowerCase();
 
+  // === 🧠 Smart Identity Matching ===
+  // คนเดียวกัน ก็ต่อเมื่อ:
+  //   • id ตรง (เคสปกติ), หรือ
+  //   • email ตรง (email ไม่ซ้ำกันในระบบ), หรือ
+  //   • ชื่อเล่น + ชื่อจริง + นามสกุล ตรงกันหมดทั้ง 3 (กันชื่อซ้ำ)
+  const norm = (str) => (str||'').toString().trim().toLowerCase().replace(/\s+/g,' ');
+  const allStaffData = getAllStaff() || [];
+
+  // ดึง emails ของเรา (รวมจาก staff record + currentUser)
+  const myEmails = new Set();
+  const myIds = new Set([s.id]);
+  if(Array.isArray(s.aliasIds)) s.aliasIds.forEach(x => myIds.add(x));
+  const myEmailRaw = String(s.email||'').match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || [];
+  myEmailRaw.forEach(e => myEmails.add(e.toLowerCase()));
+  if(currentUser.email) myEmails.add(String(currentUser.email).trim().toLowerCase());
+
+  // ชื่อทั้ง 3 ของเรา (ต้องครบทั้ง 3)
+  const myNick = norm(s.nickname);
+  const myName = norm(s.name);
+  const myLast = norm(s.lastName);
+  const myHasAll3Names = myNick && myName && myLast;
+  const my3Key = myHasAll3Names ? `${myNick}|${myName}|${myLast}` : null;
+
+  function _workerIsMe(w){
+    if(!w) return false;
+
+    // (1) id ตรง
+    if(w.id && myIds.has(w.id)) return true;
+
+    // หา staff record ที่ worker.id อ้างถึง (ถ้ามี)
+    const wStaff = w.id ? allStaffData.find(x => x.id === w.id) : null;
+
+    // (2) email ตรง — ดูจาก staff record หรือ field ใน worker เอง
+    if(wStaff){
+      const wEmails = String(wStaff.email||'').match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || [];
+      for(const em of wEmails){
+        if(myEmails.has(em.toLowerCase())) return true;
+      }
+    }
+    if(w.email){
+      const we = String(w.email).match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || [];
+      for(const em of we){
+        if(myEmails.has(em.toLowerCase())) return true;
+      }
+    }
+
+    // (3) ชื่อเล่น+ชื่อจริง+นามสกุล ตรงครบทั้ง 3 (ทำได้เฉพาะเมื่อเรามี 3 field ครบ)
+    if(my3Key){
+      const target = wStaff || w;
+      const tNick = norm(target.nickname);
+      const tName = norm(target.name);
+      const tLast = norm(target.lastName);
+      if(tNick && tName && tLast){
+        const t3 = `${tNick}|${tName}|${tLast}`;
+        if(t3 === my3Key) return true;
+      }
+    }
+
+    return false;
+  }
+
   // Collect all items
   const projs = getProjects();
   const allItems = [];
   projs.forEach(p => {
-    const myWs = (p.workers||[]).filter(x => x.id === s.id);
+    const myWs = (p.workers||[]).filter(_workerIsMe);
     if(!myWs.length) return;
     myWs.forEach(w => {
       const realAmt = w.amount || 0;
