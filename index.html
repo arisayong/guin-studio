@@ -5241,14 +5241,17 @@ function renderDash(){
   }
   const projs=getProjects();
   let paid=0,pending=0,revenue=0,revenuePending=0,pendingWorkers=[];
+  let recvCost=0;  // ค่าจ้างทีมของโปรเจกต์ที่ลูกค้าจ่ายแล้ว (ใช้คำนวณ "กำไรจริง")
   const today=new Date();today.setHours(0,0,0,0);
   projs.forEach(p=>{
     // ข้าม cancelled projects
     if(p.projStatus === 'cancelled') return;
     const clientPaid = !!ls('client_paid_'+p.id);
     const budget = p.budget||0;
+    const projWorkerCost = (p.workers||[]).reduce((a,w)=>a+(w.amount||0),0);
     if(clientPaid){
-      revenue += budget;       // เงินจริงที่ได้รับจากลูกค้า
+      revenue += budget;        // เงินจริงที่ได้รับจากลูกค้า
+      recvCost += projWorkerCost; // ค่าจ้างทีมในโปรเจกต์ที่รับเงินมาแล้ว
     } else {
       revenuePending += budget;  // ค้างรอลูกค้าจ่าย
     }
@@ -5257,11 +5260,11 @@ function renderDash(){
       else { pending+=w.amount||0; pendingWorkers.push({proj:p,worker:w}); }
     });
   });
-  // กำไรคาด = Budget ทั้งหมด − ค่าจ้างทีมทั้งหมด (เหมือนหน้ารายงานการเงิน)
-  // ไม่ใช่ revenue-(paid+pending) เพราะนั่นจะติดลบเมื่อลูกค้ายังไม่จ่าย
+  // กำไรจริง = รับจริงจากลูกค้า − ค่าจ้างทีมในโปรเจกต์ที่รับเงินมาแล้ว
+  //   (ไม่นับโปรเจกต์ที่ลูกค้ายังไม่จ่าย เพราะยังไม่ใช่กำไรจริง)
   const totalRevenue = revenue + revenuePending; // budget รวมทุกโปรเจกต์ (ไม่นับ cancelled)
   const totalCost = paid + pending;              // ค่าจ้างทีมรวมทั้งหมด
-  const profit = totalRevenue - totalCost;       // กำไรคาด (ถ้าทุกอย่างจบตามแผน)
+  const profit = revenue - recvCost;             // กำไรจากโปรเจกต์ที่รับเงินมาแล้ว
   const cashNet = revenue - paid;                // เงินสดสุทธิ (รับจริง - จ่ายจริง)
   const paidCount = projs.reduce((a,p) => a + (p.workers||[]).filter(w=>w.status==='paid').length, 0);
   const projCancelled = projs.filter(p => p.projStatus === 'cancelled').length;
@@ -5298,11 +5301,11 @@ function renderDash(){
      <div class="stat-value" style="color:var(--green)">${fmtB(paid)}</div>
      <div class="stat-delta up">${paidCount} คน รับเงินแล้ว</div>
     </div>
-    <div class="stat-card" onclick="nav('profit')" title="กำไรคาด = Budget ทั้งหมด − ค่าจ้างทีมทั้งหมด · ถ้าทุกอย่างจบตามแผน">
+    <div class="stat-card" onclick="nav('profit')" title="กำไรจริง = รับจริงจากลูกค้า − ค่าจ้างทีมในโปรเจกต์ที่รับเงินมาแล้ว">
      <span class="stat-icon">📈</span>
-     <div class="stat-label">กำไรคาด</div>
+     <div class="stat-label">กำไรจริง (รับแล้ว)</div>
      <div class="stat-value" style="color:${profit>=0?'var(--green)':'var(--red)'}">${fmtB(profit)}</div>
-     <div class="stat-delta ${profit>=0?'up':'down'}">${fmtB(totalRevenue)} − ${fmtB(totalCost)} · ถ้าจบครบ</div>
+     <div class="stat-delta ${profit>=0?'up':'down'}">${fmtB(revenue)} − ${fmtB(recvCost)}</div>
     </div>`;
   const urgentEl=document.getElementById('dash-queue');
   urgentEl.innerHTML=urgent.length?urgent.map(p=>{const dl=new Date(p.deadline);dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));const color=diff<=1?'var(--red)':diff<=3?'var(--orange)':'var(--text2)';
