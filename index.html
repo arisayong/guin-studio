@@ -9268,8 +9268,8 @@ function renderQueue() {
     // Client payment status (already defined above)
     const clientPaidDate = ls('client_paid_date_'+p.id);
     const clientPaidBtn = `<div onclick="event.stopPropagation();toggleClientPaid('${p.id}')" style="cursor:pointer;padding:6px 12px;border-radius:8px;border:1px solid ${clientPaid?'rgba(0,223,160,.4)':'rgba(255,255,255,.15)'};background:${clientPaid?'rgba(0,223,160,.12)':'rgba(255,255,255,.04)'};display:flex;flex-direction:column;align-items:center;gap:2px;transition:all .2s;min-width:90px" title="กดเพื่อสลับสถานะ">
-      <span style="font-size:12px;font-weight:800;color:${clientPaid?'var(--green)':'var(--text2)'}">${clientPaid?'✅ รับเงินแล้ว':'⏳ ยังไม่ได้รับ'}</span>
-      ${clientPaid&&clientPaidDate?`<span style="font-size:9px;color:var(--green);opacity:.8">${clientPaidDate}</span>`:'<span style="font-size:9px;color:var(--text2)">ลูกค้าจ่ายเรา</span>'}
+      <span style="font-size:12px;font-weight:800;color:${clientPaid?'var(--green)':'var(--text2)'}">${clientPaid?'✅ ลูกค้าจ่ายแล้ว':'⏳ ลูกค้ายังไม่จ่าย'}</span>
+      ${clientPaid&&clientPaidDate?`<span style="font-size:9px;color:var(--green);opacity:.8">${clientPaidDate}</span>`:'<span style="font-size:9px;color:var(--text2)">ลูกค้าจ่ายเรา (ไม่ใช่จ่ายทีม)</span>'}
     </div>`;
 
     const borderColor = allPaid ? 'rgba(0,223,160,.3)' : anyApproved ? 'rgba(0,180,255,.3)' : 'var(--border2)';
@@ -11307,14 +11307,25 @@ async function deleteStaff(id,cat){
 // MY DASHBOARD & HISTORY (Staff View)
 // ══════════════════════════════════════════════
 // Staff-side badge: ยุบทุก state ที่ไม่ใช่ paid ให้เป็น "ยังไม่ได้รับ" + sub-reason เล็ก ๆ
+// "พร้อมโอน" → เป็นข่าวดี (เขียว) + แสดงวันที่ลูกค้าจ่ายเงินเข้ามา เพื่อให้สตาฟรู้ว่า "เงินกำลังมา"
 function staffStatusBadge(status, projId, reasonKey){
   if(status === 'paid'){
     return '<span class="badge badge-paid" style="background:rgba(0,223,160,.15);border:1px solid rgba(0,223,160,.35);color:var(--green);padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;display:inline-block">✅ ได้รับแล้ว</span>';
   }
-  let reason = '';
   const rk = reasonKey || (status==='waiting_client' ? 'waiting_client' : status==='approved' ? (ls('client_paid_'+projId)?'ready':'waiting_client') : 'pending_admin');
-  if(rk === 'ready') reason = 'พร้อมโอน';
-  else if(rk === 'waiting_client') reason = 'รอลูกค้าจ่าย';
+
+  // === กรณี "พร้อมโอน" — แยกออกมาเป็น badge สีเขียวอ่อน เพราะเป็นข่าวดี (ลูกค้าจ่ายแล้ว แค่รอ admin โอน) ===
+  if(rk === 'ready'){
+    const clientPaidDate = ls('client_paid_date_'+projId);
+    return `<div style="display:inline-flex;flex-direction:column;gap:2px;align-items:flex-start">
+      <span class="badge" style="background:rgba(0,223,160,.12);border:1px solid rgba(0,223,160,.4);color:var(--green);padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;display:inline-block">🟢 พร้อมโอน · รอ admin</span>
+      <span style="font-size:10px;color:var(--green);opacity:.85;padding-left:2px;font-weight:600">${clientPaidDate?'ลูกค้าจ่ายแล้ว '+clientPaidDate:'ลูกค้าจ่ายแล้ว'}</span>
+    </div>`;
+  }
+
+  // === กรณีอื่น ๆ → "ยังไม่ได้รับ" สีส้ม + เหตุผล ===
+  let reason = '';
+  if(rk === 'waiting_client') reason = 'รอลูกค้าจ่าย';
   else reason = 'แอดมินกำลังตรวจ';
   return `<div style="display:inline-flex;flex-direction:column;gap:2px;align-items:flex-start">
     <span class="badge badge-unpaid" style="background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.3);color:var(--orange);padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;display:inline-block">⌛ ยังไม่ได้รับ</span>
