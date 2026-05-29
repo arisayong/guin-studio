@@ -13966,54 +13966,141 @@ function clearVcPersonWorks(staffId){
 }
 
 // สร้าง HTML ใบสำคัญจ่ายแบบ multi-line item (1 ใบ × หลายงาน)
+// ใช้ดีไซน์เดียวกับใบแจ้งหนี้ (buildInvoiceHTML) เพื่อให้เอกสารทุกใบดูเป็นชุดเดียวกัน
 function buildMultiVoucherHTML(opts){
   // opts: {vNo, staff, items:[{projName, slot, amount}], totalAmt, date, note}
-  const thaiDate = (d) => d ? new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}) : '—';
+  // แปลงวันที่ — รองรับทั้ง ISO (YYYY-MM-DD), Thai (DD/MM/YYYY ปีไทย), หรือ Date obj
+  const _parseDate = (d) => {
+    if(!d) return null;
+    if(d instanceof Date) return isNaN(d.getTime()) ? null : d;
+    const s = String(d).trim();
+    // Thai format DD/MM/YYYY → convert ปีไทยเป็น ค.ศ. ถ้าจำเป็น
+    const thMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(thMatch){
+      let y = parseInt(thMatch[3]);
+      if(y > 2400) y -= 543; // ปีไทย → ค.ศ.
+      return new Date(y, parseInt(thMatch[2])-1, parseInt(thMatch[1]));
+    }
+    // ISO format
+    const dt = new Date(s);
+    return isNaN(dt.getTime()) ? null : dt;
+  };
+  const thaiDate = (d) => {
+    const parsed = _parseDate(d);
+    return parsed ? parsed.toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}) : '—';
+  };
   const SLOT_LBL = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', mgr:'🗂️ Manager'};
-  const rows = opts.items.map(it => {
+  const adminSig = ls('admin_signature');
+  const rows = opts.items.map((it, i) => {
     const slotKey = (it.slot||'').split('-')[0];
     const slotLbl = SLOT_LBL[slotKey] || slotKey;
     const slotSuf = (it.slot||'').includes('main') ? ' · หลัก' : (it.slot||'').includes('-sub') ? ' · รอง' : '';
-    return `<tr>
-      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:13px"><strong>${it.projName}</strong></td>
-      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#555">${slotLbl}${slotSuf}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:13px;font-weight:700;color:#0f766e">฿${(it.amount||0).toLocaleString()}</td>
+    return `<tr style="border-bottom:1px solid #f3f4f6;background:${i%2?'#fafafa':'#fff'}">
+      <td style="padding:12px 14px"><div style="font-weight:600;color:#111827">${it.projName||'—'}</div><div style="font-size:11px;color:#9ca3af;margin-top:2px">${slotLbl}${slotSuf}</div></td>
+      <td style="padding:12px 8px;text-align:center;color:#374151">1</td>
+      <td style="padding:12px 8px;text-align:center;color:#6b7280">งาน</td>
+      <td style="padding:12px 8px;text-align:right;color:#374151">฿${(it.amount||0).toLocaleString()}</td>
+      <td style="padding:12px 14px;text-align:right;font-weight:600;color:#111827">฿${(it.amount||0).toLocaleString()}</td>
     </tr>`;
   }).join('');
-  return `<div style="background:#fff;color:#111;border-radius:12px;padding:32px;font-family:'Kanit',sans-serif;max-width:680px;margin:0 auto;border:1px solid #e5e7eb">
-    <div style="text-align:center;border-bottom:2px solid #1565FF;padding-bottom:14px;margin-bottom:18px">
-      <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:48px;object-fit:contain;display:block;margin:0 auto">
-      <div style="font-size:18px;font-weight:800;margin-top:8px">ใบสำคัญจ่าย / Payment Voucher</div>
-      <div style="font-size:13px;color:#666;margin-top:4px">เลขที่: <strong>${opts.vNo}</strong> · วันที่: ${thaiDate(opts.date)}</div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;font-size:13px">
-      <div>
-        <div style="color:#666;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">ผู้รับเงิน</div>
-        <div style="font-size:15px;font-weight:700">${opts.staff.name || opts.staff.nickname}</div>
-        ${opts.staff.nickname && opts.staff.name !== opts.staff.nickname ? `<div style="color:#666;font-size:12px">(${opts.staff.nickname})</div>` : ''}
+  // Bank info section (ของผู้รับ — ฝั่งทีมงาน)
+  const bankCardHTML = `<div style="padding:0 30px 18px">
+    <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:9px;font-weight:700">💳 ช่องทางรับเงิน</div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;display:flex;gap:12px;align-items:center">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <div style="width:26px;height:26px;border-radius:6px;background:#1565FF;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0">฿</div>
+          <div style="font-size:12px;font-weight:700;color:#111827">${opts.staff.bank||'ธนาคาร'}</div>
+        </div>
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;margin-top:4px">เลขบัญชี</div>
+        <div style="font-size:14px;font-weight:700;font-family:monospace;color:#1565FF;letter-spacing:1px">${opts.staff.account||'—'}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:2px">ชื่อบัญชี: <strong style="color:#374151">${opts.staff.name||opts.staff.nickname||'—'}</strong></div>
+        ${opts.staff.promptpay?`<div style="font-size:11px;color:#6b7280;margin-top:2px">📱 พร้อมเพย์: <strong style="color:#374151">${opts.staff.promptpay}</strong></div>`:''}
       </div>
-      <div>
-        <div style="color:#666;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">ช่องทางรับเงิน</div>
-        <div style="font-size:13px;font-weight:600">${opts.staff.bank||'—'} ${opts.staff.account||''}</div>
-        ${opts.staff.promptpay?`<div style="font-size:12px;color:#444;margin-top:2px">📱 ${opts.staff.promptpay}</div>`:''}
+      ${opts.staff.qrUrl?`<img src="${opts.staff.qrUrl}" style="width:88px;height:88px;object-fit:contain;background:#fff;border:1px solid #e5e7eb;border-radius:6px;flex-shrink:0">`:''}
+    </div>
+  </div>`;
+  return `<div id="printable-voucher" data-vno="${opts.vNo}" style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:620px;margin:0 auto;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb">
+    <div style="background:#0d1e3d;padding:26px 30px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:72px;object-fit:contain;display:block">
+          <div style="color:#a0c0ff;font-size:11px;margin-top:7px">penguinstudiovoice@gmail.com</div>
+        </div>
+        <div style="text-align:right">
+          <div style="color:#fff;font-size:20px;font-weight:700;letter-spacing:1px">ใบสำคัญจ่าย</div>
+          <div style="color:#a0c0ff;font-size:10px;margin-top:2px;letter-spacing:0.5px">PAYMENT VOUCHER</div>
+          <div style="margin-top:10px;background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 12px">
+            <div style="color:#a0c0ff;font-size:10px;letter-spacing:1px">เลขที่</div>
+            <div style="color:#fff;font-size:15px;font-weight:600">${opts.vNo}</div>
+            <div style="color:#a0c0ff;font-size:11px;margin-top:3px">${thaiDate(opts.date)}</div>
+          </div>
+        </div>
       </div>
     </div>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:18px">
-      <thead>
-        <tr style="background:#f1f5f9">
-          <th style="padding:10px 12px;text-align:left;font-size:12px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #cbd5e1">โปรเจกต์</th>
-          <th style="padding:10px 12px;text-align:left;font-size:12px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #cbd5e1">หน้าที่</th>
-          <th style="padding:10px 12px;text-align:right;font-size:12px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #cbd5e1">ยอดเงิน</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div style="display:flex;justify-content:space-between;align-items:center;border-top:2px dashed #cbd5e1;padding-top:14px;margin-bottom:${opts.note?'14px':'0'}">
-      <div style="font-size:14px;font-weight:700;color:#1565FF">รวม ${opts.items.length} รายการ</div>
-      <div style="font-size:24px;font-weight:800;color:#1565FF">฿${(opts.totalAmt||0).toLocaleString()}</div>
+    <div style="height:5px;background:linear-gradient(90deg,#1565FF,#4080FF,#70A0FF);-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important"></div>
+    <div style="padding:22px 30px 0">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:14px">
+        <div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ผู้รับเงิน</div>
+          <div style="font-size:16px;font-weight:700;color:#111827">${opts.staff.name||opts.staff.nickname||'—'}</div>
+          ${opts.staff.nickname && opts.staff.name && opts.staff.name!==opts.staff.nickname?'<div style="font-size:12px;color:#6b7280;margin-top:3px">('+opts.staff.nickname+')</div>':''}
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ผู้จ่าย</div>
+          <div style="font-size:16px;font-weight:700;color:#111827">Guin Home Studio</div>
+        </div>
+      </div>
+      <div style="padding:10px 14px;background:#f3f6fb;border:1px solid #e5e7eb;border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:12px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+        <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:1.5px;font-weight:600">ค่าตอบแทนสำหรับ</div>
+        <div style="font-size:13px;font-weight:700;color:#1565FF">${opts.items.length} รายการ</div>
+      </div>
     </div>
-    ${opts.note ? `<div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:9px 12px;border-radius:5px;font-size:12px;color:#78350f;margin-top:10px"><strong>หมายเหตุ:</strong> ${opts.note}</div>` : ''}
-    <div style="text-align:center;margin-top:24px;padding-top:14px;border-top:1px solid #e5e7eb;font-size:11px;color:#94a3b8">Guin Home Studio · ${thaiDate(new Date())}</div>
+    <div style="height:1px;background:#f3f4f6;margin:18px 30px"></div>
+    <div style="padding:0 30px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:#0d1e3d;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+            <th style="text-align:left;padding:10px 14px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase">รายการ</th>
+            <th style="text-align:center;padding:10px 8px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">จำนวน</th>
+            <th style="text-align:center;padding:10px 8px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">หน่วย</th>
+            <th style="text-align:right;padding:10px 8px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:95px">ราคา/หน่วย</th>
+            <th style="text-align:right;padding:10px 14px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:105px">รวม</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:flex-end;padding:18px 30px">
+      <div style="min-width:240px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6">
+          <span style="font-size:13px;color:#6b7280">จำนวนรายการ</span>
+          <span style="font-size:13px;color:#374151">${opts.items.length}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:3px solid #0d1e3d">
+          <span style="font-size:14px;font-weight:700;color:#111827">ยอดที่โอน</span>
+          <span style="font-size:20px;font-weight:700;color:#1565FF">฿${(opts.totalAmt||0).toLocaleString()}</span>
+        </div>
+      </div>
+    </div>
+    ${opts.note?'<div style="padding:0 30px 10px;font-size:11px;color:#6b7280"><strong>หมายเหตุ:</strong> '+opts.note+'</div>':''}
+    ${bankCardHTML}
+    <div style="padding:0 30px 26px">
+      <div style="width:260px;margin-left:auto;text-align:center">
+        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="height:96px;max-width:220px;object-fit:contain;display:block;margin:0 auto 8px">
+        <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
+        <div style="font-size:13px;font-weight:700;color:#111827">ผู้ออกใบสำคัญจ่าย / Guin Home Studio</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(opts.date)}</div>
+      </div>
+    </div>
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:9px 30px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:10px;color:#9ca3af">GUIN HOME STUDIO · Payment System</div>
+      <div style="display:flex;gap:5px">
+        <div style="width:6px;height:6px;border-radius:50%;background:#1565FF"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#4080FF"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#70A0FF"></div>
+      </div>
+    </div>
   </div>`;
 }
 
