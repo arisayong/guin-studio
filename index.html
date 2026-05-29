@@ -1008,6 +1008,8 @@ body.sidebar-collapsed .main-content{
  <header class="top-bar">
   <div class="top-bar-left">
    <button class="top-bar-menu-btn" onclick="toggleMobileMenu()" aria-label="เมนู" title="เมนู">☰</button>
+   <!-- 🧭 ปุ่มย้อนกลับ (แสดงเมื่อมี nav history) -->
+   <button id="top-back-btn" class="top-bar-icon-btn" onclick="_goBackOneStep()" title="ย้อนกลับ" style="display:none;margin-right:4px">←</button>
    <div class="top-bar-brand" onclick="nav(currentUser?.role==='admin'?'dashboard':'my-dashboard')" style="cursor:pointer">
     <span class="guin-logo"></span>
     <div class="top-bar-brand-text">
@@ -1118,6 +1120,8 @@ body.sidebar-collapsed .main-content{
     <div class="page-title">🏠 ภาพรวมระบบ</div>
     <div class="page-subtitle">GuinStudio — อัปเดต ณ วันนี้</div>
    </div>
+   <!-- 🎯 สิ่งที่ต้องดำเนินการ (admin priority box) -->
+   <div id="dash-priority" style="margin-bottom:18px"></div>
    <!-- Quick Actions Bar — ทำบ่อย ๆ คลิกเดียวถึง -->
    <div id="quick-actions" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:18px">
     <button class="qa-btn qa-blue" onclick="nav('projects');setTimeout(()=>openNewProject(),100)">
@@ -1862,6 +1866,9 @@ body.sidebar-collapsed .main-content{
      <div id="my-confirm-inbox-btn-wrap"></div>
     </div>
    </div>
+
+   <!-- 📋 ที่ต้องทำตอนนี้ (staff priority box) -->
+   <div id="my-priority" style="margin-bottom:14px"></div>
 
    <!-- Summary cards: 4 statuses -->
    <div id="my-summary-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px"></div>
@@ -5177,7 +5184,76 @@ function nav(page){
   window._currentPage=page;
   // 🛒 Cart FAB ปรากฏเฉพาะหน้า queue · ซ่อนหน้าอื่น
   try { _updateCartFab(); } catch(e){}
+  // 🧭 อัพเดท top-bar back button visibility
+  try { _updateBackButton(); } catch(e){}
 }
+
+// ══════════════════════════════════════════════
+// 🧭 NAVIGATION HISTORY ENHANCEMENT (additive · ไม่แตะ nav() เดิม)
+//   - กดปุ่ม back ของ browser/mouse → กลับหน้าก่อนใน app (ไม่ใช่ออกเว็บ)
+//   - จดจำตำแหน่ง scroll ของแต่ละหน้า
+//   - ปุ่ม back ใน top bar แสดงเมื่อมี history
+// ══════════════════════════════════════════════
+const _pageScrollMemory = new Map(); // page → scrollY
+const _navStackKeys = []; // ติดตาม key ของ nav entries ใน _backStack (เพื่อนับ depth)
+
+(function wrapNavForHistory(){
+  const _origNavFn = nav;
+  window.nav = function(page){
+    const prevPage = window._currentPage;
+    const prevScroll = window.scrollY || document.documentElement.scrollTop || 0;
+    // เก็บ scroll ของหน้าเดิมไว้ (ใช้ตอนกลับมาภายหลัง)
+    if(prevPage) _pageScrollMemory.set(prevPage, prevScroll);
+    // เรียก nav() เดิม — render ตามปกติ
+    _origNavFn(page);
+    // กลับมาที่หน้าเดิม → คืน scroll
+    if(prevPage === page){
+      const y = _pageScrollMemory.get(page) || 0;
+      requestAnimationFrame(()=>{ try{ window.scrollTo(0, y); }catch(_){} });
+      return;
+    }
+    // หน้าใหม่ → push เข้า history stack เพื่อ trap back
+    if(prevPage && prevPage !== page){
+      const key = 'navpage:' + prevPage + ':' + Date.now() + ':' + Math.random().toString(36).slice(2,6);
+      _navStackKeys.push(key);
+      try {
+        _backPush(key, function _backToPrev(){
+          // ลบ key จาก _navStackKeys (เพราะปิดตัวเอง)
+          const idx = _navStackKeys.indexOf(key);
+          if(idx >= 0) _navStackKeys.splice(idx, 1);
+          // กลับไปหน้าก่อนหน้าโดยตรง (ไม่ผ่าน wrapper เพื่อไม่ push ซ้ำ)
+          _origNavFn(prevPage);
+          window._currentPage = prevPage;
+          try { _updateCartFab(); } catch(_){}
+          try { _updateBackButton(); } catch(_){}
+          // คืน scroll ของหน้าก่อนหน้า (ใช้ค่าที่บันทึกตอนออกจากหน้านั้น)
+          const restoreY = _pageScrollMemory.get(prevPage) || prevScroll || 0;
+          // ใช้ multi-frame retry เพราะบางหน้า render async
+          let tries = 0;
+          const tryScroll = () => {
+            try { window.scrollTo(0, restoreY); } catch(_){}
+            tries++;
+            if(tries < 3) requestAnimationFrame(tryScroll);
+          };
+          requestAnimationFrame(tryScroll);
+        });
+      } catch(e){ console.warn('nav history push:', e); }
+    }
+    // คืน scroll ของหน้าใหม่ (ถ้าเคยอยู่หน้านี้และเก็บไว้)
+    // ถ้าเป็นการกด nav ปกติ (ไม่ใช่ back) → scroll top
+    requestAnimationFrame(()=>{ try{ window.scrollTo(0, 0); }catch(_){} });
+  };
+})();
+
+// อัพเดท visibility ของปุ่ม back ใน top bar
+function _updateBackButton(){
+  const btn = document.getElementById('top-back-btn');
+  if(!btn) return;
+  // แสดงปุ่มเมื่อมี nav history (ใน app)
+  btn.style.display = _navStackKeys.length > 0 ? 'flex' : 'none';
+}
+// ผู้ใช้กดปุ่ม back ใน top-bar → trigger history.back()
+function _goBackOneStep(){ try { history.back(); } catch(_){} }
 
 // ══════════════════════════════════════════════
 // UNDO / REDO
@@ -5337,6 +5413,89 @@ function renderDash(){
   projTb.innerHTML=pendingWorkers.length?pendingWorkers.slice(0,8).map(({proj:p,worker:w})=>{const s=getStaffById(w.id);if(!s)return'';
     return`<tr><td><strong>${s.nickname}</strong></td><td style="font-size:12px;color:var(--text2)">${p.name}</td><td style="color:var(--accent2);font-weight:700">${fmtB(w.amount)}</td><td>${statusBadge(w.status, p.id)}</td></tr>`}).join('')
     :'<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:20px">🎉 ไม่มีค้างจ่าย</td></tr>';
+  // 🎯 Render "สิ่งที่ต้องดำเนินการ" widget (additive · ไม่กระทบ stats เดิม)
+  try { _renderDashPriority(projs, today); } catch(e){ console.warn('dash priority:', e); }
+}
+
+// ══════════════════════════════════════════════
+// 🎯 ADMIN DASHBOARD PRIORITY WIDGET
+//   - แสดงงานที่ admin ต้องทำก่อน เปิด app แล้วรู้ทันที
+//   - ทุก chip กดได้ → พาไปหน้าที่เกี่ยวข้อง
+//   - ไม่แตะข้อมูลสถิติเดิม
+// ══════════════════════════════════════════════
+function _renderDashPriority(projs, today){
+  const el = document.getElementById('dash-priority');
+  if(!el) return;
+  // นับจำนวนแต่ละหมวด
+  let cntReadyToPay = 0;        // ทีมยืนยันแล้ว + ลูกค้าจ่าย → จ่ายได้เลย
+  let cntStaffRejected = 0;     // staff ปฏิเสธ
+  let cntWaitingStaff = 0;      // ส่งใบยืนยันไปแล้ว รอ staff
+  let cntNeedApprove = 0;       // pending รอ admin อนุมัติ
+  let cntCartItems = 0;         // ในตะกร้า
+  let cntDeadlineToday = 0, cntDeadlineSoon = 0; // วันนี้ / ใน 3 วัน
+  let cntClientPaidUnreviewed = 0; // ลูกค้าจ่ายแล้ว แต่ทีมยังไม่ได้รับ (รอ admin โอนต่อ)
+  try { cntCartItems = (typeof _confirmCart !== 'undefined') ? _confirmCart.size : 0; } catch(_){}
+  (projs||[]).forEach(p => {
+    if(p.projStatus === 'cancelled') return;
+    const cp = !!ls('client_paid_'+p.id);
+    (p.workers||[]).forEach(w => {
+      const cs = (typeof getWorkerConfirmStatus === 'function') ? getWorkerConfirmStatus(w) : (w.confirmStatus || 'none');
+      if(w.status === 'pending') cntNeedApprove++;
+      if(w.status === 'approved' && cs === 'confirmed' && cp) cntReadyToPay++;
+      if(cs === 'sent') cntWaitingStaff++;
+      if(cs === 'rejected') cntStaffRejected++;
+      if(cp && w.status === 'approved') cntClientPaidUnreviewed++;
+    });
+    if(p.deadline){
+      const dl = new Date(p.deadline); dl.setHours(0,0,0,0);
+      const diff = Math.ceil((dl - today)/(864e5));
+      if(diff === 0) cntDeadlineToday++;
+      else if(diff > 0 && diff <= 3) cntDeadlineSoon++;
+    }
+  });
+  // Build chips
+  const chips = [];
+  if(cntReadyToPay > 0)
+    chips.push({label:'พร้อมจ่ายทีม', count:cntReadyToPay, sub:'ทีมยืนยัน + ลูกค้าจ่ายแล้ว', icon:'🟢', color:'var(--green)', bg:'rgba(0,223,160,.1)', action:"nav('queue');setQueueConfirmFilter('confirmed',document.getElementById('qcf-confirmed'))"});
+  if(cntStaffRejected > 0)
+    chips.push({label:'Staff ปฏิเสธ', count:cntStaffRejected, sub:'ต้องแก้ยอด/ส่งใหม่', icon:'❌', color:'var(--red)', bg:'rgba(255,64,64,.1)', action:"nav('queue');setQueueConfirmFilter('rejected',document.getElementById('qcf-rejected'))"});
+  if(cntWaitingStaff > 0)
+    chips.push({label:'รอ Staff ยืนยัน', count:cntWaitingStaff, sub:'ส่งไปแล้ว · รอตอบ', icon:'⏳', color:'#9B6FFF', bg:'rgba(155,111,255,.1)', action:"nav('queue');setQueueConfirmFilter('sent',document.getElementById('qcf-sent'))"});
+  if(cntCartItems > 0)
+    chips.push({label:'ในตะกร้ารอส่ง', count:cntCartItems, sub:'กดเปิดเพื่อตรวจ', icon:'🛒', color:'#9B6FFF', bg:'rgba(155,111,255,.1)', action:"nav('queue');setTimeout(openConfirmCart,200)"});
+  if(cntNeedApprove > 0)
+    chips.push({label:'รออนุมัติงาน', count:cntNeedApprove, sub:'pending workers', icon:'🔵', color:'var(--accent2)', bg:'rgba(0,180,255,.08)', action:"nav('queue');setQueueFilter('pending',document.getElementById('qst-pending'))"});
+  if(cntDeadlineToday > 0)
+    chips.push({label:'Deadline วันนี้', count:cntDeadlineToday, sub:'ส่งงานวันนี้', icon:'🔴', color:'var(--red)', bg:'rgba(255,64,64,.1)', action:"nav('projects')"});
+  if(cntDeadlineSoon > 0)
+    chips.push({label:'Deadline ใน 3 วัน', count:cntDeadlineSoon, sub:'ใกล้ครบกำหนด', icon:'🔥', color:'var(--orange)', bg:'rgba(255,158,0,.1)', action:"nav('projects')"});
+
+  if(chips.length === 0){
+    el.innerHTML = `<div style="padding:14px 18px;background:rgba(0,223,160,.06);border:1px solid rgba(0,223,160,.25);border-radius:12px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:22px">🎉</span>
+      <div>
+        <div style="font-size:13.5px;font-weight:700;color:var(--green)">เคลียร์งานครบแล้ว · ไม่มีอะไรค้างดำเนินการ</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">เปิดหน้าโปรเจกต์/คิวจ่ายเงิน เพื่อจัดการต่อ</div>
+      </div>
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:13.5px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px">🎯 สิ่งที่ต้องดำเนินการ <span style="background:rgba(155,111,255,.2);color:#9B6FFF;font-size:11px;font-weight:700;padding:2px 8px;border-radius:9px">${chips.length}</span></div>
+      <div style="font-size:11px;color:var(--text2)">กดที่รายการเพื่อไปจัดการต่อ</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+      ${chips.map(c => `<div onclick="${c.action}" style="cursor:pointer;background:${c.bg};border:1px solid ${c.color}55;border-radius:10px;padding:11px 13px;transition:transform .12s,box-shadow .12s" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 14px rgba(0,0,0,.25)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:17px">${c.icon}</span>
+          <span style="font-size:11.5px;color:var(--text2);font-weight:700">${c.label}</span>
+        </div>
+        <div style="font-size:22px;font-weight:800;color:${c.color};line-height:1">${c.count}</div>
+        <div style="font-size:10.5px;color:var(--text2);margin-top:3px">${c.sub}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
 }
 
 // ══════════════════════════════════════════════
@@ -12527,6 +12686,82 @@ function renderMyDash(){
     </tr>`;
     }).join('');
   }
+  // 📋 Render "ที่ต้องทำตอนนี้" widget — additive (ไม่กระทบสรุปเดิม)
+  try { _renderMyPriority(projs, allItems); } catch(e){ console.warn('my priority:', e); }
+}
+
+// ══════════════════════════════════════════════
+// 📋 STAFF DASHBOARD PRIORITY WIDGET
+//   - แสดงสิ่งที่ staff ต้องทำตอนนี้: ใบยืนยันรอ, deadline ใกล้, เงินพร้อมโอน
+//   - กดได้ → พาไปจัดการต่อ
+// ══════════════════════════════════════════════
+function _renderMyPriority(projs, allItems){
+  const el = document.getElementById('my-priority');
+  if(!el) return;
+  // นับ items ของฉันแต่ละหมวด
+  let cntPendingConfirm = 0;       // ใบยืนยันยอดที่รอฉันยืนยัน
+  let cntRejected = 0;              // ใบที่ฉันปฏิเสธไป (รอ admin แก้)
+  let cntReadyToReceive = 0;        // ลูกค้าจ่ายแล้ว · รอ admin โอนให้ฉัน
+  let cntDeadlineToday = 0;         // งานที่ deadline วันนี้
+  let cntDeadlineSoon = 0;          // 1-3 วัน
+  let cntOverdue = 0;               // เลย deadline แต่ยังไม่ paid
+  const today = new Date(); today.setHours(0,0,0,0);
+  (projs||[]).forEach(p => {
+    if(p.projStatus === 'cancelled') return;
+    (p.workers||[]).forEach(w => {
+      if(w.id !== currentUser?.staffId) return;
+      const cs = (typeof getWorkerConfirmStatus === 'function') ? getWorkerConfirmStatus(w) : (w.confirmStatus || 'none');
+      if(cs === 'sent') cntPendingConfirm++;
+      if(cs === 'rejected') cntRejected++;
+      const cp = !!ls('client_paid_'+p.id);
+      if(cp && w.status === 'approved') cntReadyToReceive++;
+    });
+  });
+  // Deadline counts จาก allItems (มี myDeadline แล้ว)
+  (allItems||[]).forEach(it => {
+    if(it.projStatus === 'cancelled' || it.projStatus === 'done') return;
+    if(it.status === 'paid') return;
+    if(!it.myDeadline) return;
+    const dl = new Date(it.myDeadline); dl.setHours(0,0,0,0);
+    const diff = Math.ceil((dl - today)/(864e5));
+    if(diff < 0) cntOverdue++;
+    else if(diff === 0) cntDeadlineToday++;
+    else if(diff <= 3) cntDeadlineSoon++;
+  });
+  const chips = [];
+  if(cntPendingConfirm > 0)
+    chips.push({label:'ใบยืนยันรอคุณ', count:cntPendingConfirm, sub:'กดเปิดเพื่อยืนยัน', icon:'💰', color:'#9B6FFF', bg:'rgba(155,111,255,.1)', action:"openStaffConfirmInbox()"});
+  if(cntOverdue > 0)
+    chips.push({label:'เลย Deadline', count:cntOverdue, sub:'ที่ยังไม่จ่าย', icon:'🔴', color:'var(--red)', bg:'rgba(255,64,64,.1)', action:"window.scrollTo(0,document.querySelector('#my-proj-table')?.getBoundingClientRect()?.top+window.scrollY-80||0)"});
+  if(cntDeadlineToday > 0)
+    chips.push({label:'Deadline วันนี้', count:cntDeadlineToday, sub:'ส่งงานวันนี้', icon:'⚠️', color:'var(--orange)', bg:'rgba(255,158,0,.1)', action:"window.scrollTo(0,document.querySelector('#my-proj-table')?.getBoundingClientRect()?.top+window.scrollY-80||0)"});
+  if(cntDeadlineSoon > 0)
+    chips.push({label:'Deadline ใน 3 วัน', count:cntDeadlineSoon, sub:'ใกล้ครบกำหนด', icon:'🔥', color:'var(--orange)', bg:'rgba(255,158,0,.08)', action:"window.scrollTo(0,document.querySelector('#my-proj-table')?.getBoundingClientRect()?.top+window.scrollY-80||0)"});
+  if(cntReadyToReceive > 0)
+    chips.push({label:'เงินกำลังมา', count:cntReadyToReceive, sub:'ลูกค้าจ่าย · รอ admin โอน', icon:'🟢', color:'var(--green)', bg:'rgba(0,223,160,.08)', action:""});
+  if(cntRejected > 0)
+    chips.push({label:'คุณปฏิเสธไว้', count:cntRejected, sub:'รอ admin แก้ยอด', icon:'❌', color:'var(--red)', bg:'rgba(255,64,64,.08)', action:"openStaffConfirmInbox()"});
+
+  if(chips.length === 0){
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = `<div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:13.5px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px">📋 ที่ต้องทำตอนนี้ <span style="background:rgba(155,111,255,.2);color:#9B6FFF;font-size:11px;font-weight:700;padding:2px 8px;border-radius:9px">${chips.length}</span></div>
+      <div style="font-size:11px;color:var(--text2)">สรุปสิ่งที่ต้องสนใจก่อน</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">
+      ${chips.map(c => `<div ${c.action?`onclick="${c.action}" style="cursor:pointer;`:'style="'}background:${c.bg};border:1px solid ${c.color}55;border-radius:10px;padding:11px 13px;transition:transform .12s,box-shadow .12s" ${c.action?`onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 14px rgba(0,0,0,.25)'" onmouseout="this.style.transform='';this.style.boxShadow=''"`:''}>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:17px">${c.icon}</span>
+          <span style="font-size:11.5px;color:var(--text2);font-weight:700">${c.label}</span>
+        </div>
+        <div style="font-size:22px;font-weight:800;color:${c.color};line-height:1">${c.count}</div>
+        <div style="font-size:10.5px;color:var(--text2);margin-top:3px">${c.sub}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
 }
 
 // Format deadline ของสต๊าฟ + เหลือกี่วัน
