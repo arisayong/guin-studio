@@ -2660,7 +2660,13 @@ body.sidebar-collapsed .main-content{
    </div>
    <div id="st-appr-history"></div>
   </div>
-  <div class="modal-foot"><button class="btn btn-outline" onclick="closeModal('modal-addstaff')">ยกเลิก</button><button class="btn btn-blue" onclick="saveStaff()">💾 บันทึก</button></div>
+  <div class="modal-foot" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+   <button id="st-delete-btn" class="btn" style="display:none;background:rgba(255,64,64,.12);border:1px solid rgba(255,64,64,.4);color:var(--red);font-weight:700" onclick="deleteStaffFromEditModal()">🗑️ ลบสมาชิก</button>
+   <div style="display:flex;gap:8px;margin-left:auto">
+    <button class="btn btn-outline" onclick="closeModal('modal-addstaff')">ยกเลิก</button>
+    <button class="btn btn-blue" onclick="saveStaff()">💾 บันทึก</button>
+   </div>
+  </div>
  </div>
 </div>
 
@@ -2892,14 +2898,28 @@ function toggleMobileMenu(){
   // Mobile (≤768px): เปิด/ปิด drawer พร้อม backdrop
   // Desktop (>768px): ยุบ/ขยาย sidebar แบบ YouTube (main expand)
   if(window.innerWidth <= 768){
+    const wasOpen = document.body.classList.contains('mobile-menu-open');
     document.body.classList.toggle('mobile-menu-open');
+    if(!wasOpen){
+      _backPush('mobile-menu', ()=>{ document.body.classList.remove('mobile-menu-open'); });
+    } else {
+      _backPop('mobile-menu');
+    }
   } else {
     document.body.classList.toggle('sidebar-collapsed');
     try{ localStorage.setItem('app_sidebar_collapsed', document.body.classList.contains('sidebar-collapsed') ? '1' : '0'); }catch(e){}
   }
 }
-function openMobileMenu(){ document.body.classList.add('mobile-menu-open'); }
-function closeMobileMenu(){ document.body.classList.remove('mobile-menu-open'); }
+function openMobileMenu(){
+  document.body.classList.add('mobile-menu-open');
+  if(window.innerWidth <= 768){
+    _backPush('mobile-menu', ()=>{ document.body.classList.remove('mobile-menu-open'); });
+  }
+}
+function closeMobileMenu(){
+  document.body.classList.remove('mobile-menu-open');
+  _backPop('mobile-menu');
+}
 
 // ── Profile dropdown menu (v4 YouTube-style top-bar) ──
 // Apply sidebar-collapsed state that was saved (FOUC-proof via documentElement attr)
@@ -2997,11 +3017,17 @@ function toggleNotifPanel(ev){
   if(isOpen){
     panel.style.display='none';
     document.body.classList.remove('notif-open');
+    _backPop('notif-panel');
     return;
   }
   panel.style.display='block';
   document.body.classList.add('notif-open');
   closeProfileMenu();
+  _backPush('notif-panel', ()=>{
+    const p = document.getElementById('notif-panel');
+    if(p){ p.style.display='none'; }
+    document.body.classList.remove('notif-open');
+  });
   // Mark notifications as read after 1.5 sec
   setTimeout(()=>{
     const unread = _notifCache.filter(n => !n.read);
@@ -3017,6 +3043,7 @@ function closeNotifPanel(){
   const panel = document.getElementById('notif-panel');
   if(panel){ panel.style.display='none'; }
   document.body.classList.remove('notif-open');
+  _backPop('notif-panel');
 }
 
 document.addEventListener('click', function(e){
@@ -3535,7 +3562,17 @@ async function saveUserProfile(uid,data){ await fbSaveUserProfile(uid,data); }
 // ══════════════════════════════════════════════
 function fmtDate(d){if(!d)return'—';if(typeof d==='string'&&/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d))return d;try{return new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'})}catch{return String(d)}}
 function fmtB(n){return'฿'+(n||0).toLocaleString()}
-function openModal(id){if(id==='modal-admin-inbox')renderAdminInbox();document.getElementById(id).classList.remove('hidden')}
+function openModal(id){
+  if(id==='modal-admin-inbox')renderAdminInbox();
+  document.getElementById(id).classList.remove('hidden');
+  _backPush('modal:'+id, ()=>{
+    const el=document.getElementById(id);
+    if(el && !el.classList.contains('hidden')){
+      el.classList.add('hidden');
+      if(id==='modal-project'){ try{saveDraft();stopDraftAutosave();releasePresence();}catch(e){} }
+    }
+  });
+}
 function closeModal(id){
   document.getElementById(id).classList.add('hidden');
   // ─ เมื่อปิด modal-project → release presence + หยุด autosave ─
@@ -3548,7 +3585,46 @@ function closeModal(id){
       releasePresence();
     }catch(e){}
   }
+  _backPop('modal:'+id);
 }
+
+// ══════════════════════════════════════════════
+// 📱 BACK-BUTTON STACK — ปิด overlay/หน้าแทนออกเว็บ
+//   ทุกครั้งที่เปิด modal/menu → push history state
+//   เมื่อ user กดย้อนกลับมือถือ → ปิด overlay ชั้นบนสุดแทน
+// ══════════════════════════════════════════════
+const _backStack = [];     // [{key, close: fn}]
+let _backNavSilent = 0;    // จำนวน popstate ที่ต้อง "เพิกเฉย" (ตอนเราเรียก history.back เอง)
+
+function _backPush(key, closeFn){
+  // กันซ้อน: ถ้า key เดิมอยู่บนสุดแล้วไม่ต้อง push ใหม่
+  if(_backStack.length && _backStack[_backStack.length-1].key === key) return;
+  _backStack.push({key, close: closeFn});
+  try { history.pushState({_bk: _backStack.length, key}, ''); } catch(e){}
+}
+function _backPop(key){
+  // ค้นจากบนลงล่าง — เผื่อมี overlay ใหม่เปิดทับอยู่
+  let idx = -1;
+  for(let i=_backStack.length-1; i>=0; i--){
+    if(_backStack[i].key === key){ idx = i; break; }
+  }
+  if(idx < 0) return;
+  const removed = _backStack.length - idx;
+  _backStack.splice(idx, removed);
+  _backNavSilent += removed;
+  try { history.go(-removed); } catch(e){}
+}
+window.addEventListener('popstate', function(){
+  if(_backNavSilent > 0){ _backNavSilent--; return; }
+  // user กดย้อนกลับ → ปิด overlay ชั้นบนสุด
+  const top = _backStack.pop();
+  if(top){
+    try { top.close(); } catch(e){ console.warn('back close error:', e); }
+  }
+  // ถ้า stack ว่าง → ปล่อย browser พาออกเว็บตามปกติ (push เพิ่ม history state เผื่อ trap รอบหน้า)
+});
+// Seed: หลังโหลดหน้า push state เปล่าไว้ 1 ชั้นเพื่อ trap back ครั้งแรก
+try { history.replaceState({_bk: 0, key:'_root'}, ''); } catch(e){}
 function toast(msg,type='info'){
   const wrap=document.getElementById('toastWrap');const el=document.createElement('div');
   el.className=`toast ${type}`;const ic={success:'✅',error:'❌',info:'ℹ️',warn:'⚠️'};
@@ -3562,10 +3638,13 @@ document.querySelectorAll('.modal-overlay').forEach(ov=>{
   ov.addEventListener('mousedown', e=>{ _mdownOnOv = (e.target === ov); });
   ov.addEventListener('mouseup', e=>{
     if(e.target === ov && _mdownOnOv){
-      ov.classList.add('hidden');
-      // ถ้าปิด modal-project ผ่านการคลิก overlay → cleanup
-      if(ov.id === 'modal-project'){
-        try{ saveDraft(); stopDraftAutosave(); releasePresence(); }catch(e){}
+      // ใช้ closeModal() เพื่อให้ back-stack sync — ถ้า modal นี้ใช้ closeProfileModal/อื่นๆ ให้ fallback
+      if(ov.id === 'modal-profile' && typeof closeProfileModal === 'function'){
+        closeProfileModal();
+      } else if(ov.id){
+        try { closeModal(ov.id); } catch(_){ ov.classList.add('hidden'); }
+      } else {
+        ov.classList.add('hidden');
       }
     }
     _mdownOnOv = false;
@@ -3775,10 +3854,18 @@ function openProfileModal(){
     const bankSection = document.getElementById('profile-bank-section'); if(bankSection) bankSection.style.display = 'none';
   }
   m.classList.remove('hidden');
+  _backPush('modal:modal-profile', ()=>{
+    const el=document.getElementById('modal-profile');
+    if(el && !el.classList.contains('hidden')){
+      el.classList.add('hidden');
+      window._profilePendingPhoto = null;
+    }
+  });
 }
 function closeProfileModal(){
   const m = document.getElementById('modal-profile'); if(m) m.classList.add('hidden');
   window._profilePendingPhoto = null;
+  _backPop('modal:modal-profile');
 }
 function handleProfilePhotoUpload(ev){
   const file = ev.target.files?.[0]; if(!file) return;
@@ -8668,6 +8755,7 @@ function downloadReceiptHTML(){
 let queueFilter = 'all';
 let queueCycleFilter='all';
 let queueConfirmFilter = 'all'; // all | none | sent | confirmed | rejected
+let _selectedProjIds = new Set(); // ── Multi-select: เก็บ projId ที่ admin ติ๊กเลือกเพื่อส่งใบยืนยันรวม ──
 
 function setQueueConfirmFilter(filter, el){
   queueConfirmFilter = filter;
@@ -9069,13 +9157,27 @@ function renderQueue() {
 
     const borderColor = allPaid ? 'rgba(0,223,160,.3)' : anyApproved ? 'rgba(0,180,255,.3)' : 'var(--border2)';
 
-    return `<div class="qgroup-card" style="background:var(--card);border:1px solid ${borderColor};border-radius:var(--r);margin-bottom:12px;overflow:hidden">
+    // ── Multi-select checkbox: แสดงเฉพาะ project ที่มี worker ส่งใบยืนยันได้ ──
+    const hasEligible = _projHasEligibleConfirm(p);
+    const isSelected = _selectedProjIds.has(p.id);
+    const checkboxHTML = hasEligible
+      ? `<div onclick="event.stopPropagation();toggleProjSelect('${p.id}',event)"
+              title="${isSelected?'ยกเลิกเลือก':'เลือกโปรเจกต์นี้เพื่อส่งใบยืนยันยอดทั้งทีมรวมกัน'}"
+              style="width:24px;height:24px;border-radius:6px;border:2px solid ${isSelected?'#9B6FFF':'rgba(255,255,255,.25)'};background:${isSelected?'#9B6FFF':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s">
+           ${isSelected ? '<span style="color:#fff;font-size:14px;font-weight:800;line-height:1">✓</span>' : ''}
+         </div>`
+      : `<div style="width:24px;height:24px;flex-shrink:0" title="ไม่มีคนต้องส่งใบยืนยัน"></div>`;
+    const selectedBorder = isSelected ? 'rgba(155,111,255,.7)' : borderColor;
+    const selectedBg = isSelected ? 'rgba(155,111,255,.04)' : 'var(--card)';
+
+    return `<div class="qgroup-card" style="background:${selectedBg};border:1px solid ${selectedBorder};border-radius:var(--r);margin-bottom:12px;overflow:hidden;transition:all .15s">
       <!-- Group header (desktop: flat row · mobile: 3 stacked rows) -->
       <div class="qgroup-header" style="display:flex;align-items:center;gap:14px;padding:14px 18px;cursor:pointer;transition:background .2s"
            onclick="toggleQueueGroup('${groupId}')"
            onmouseover="this.style.background='rgba(255,255,255,.02)'"
            onmouseout="this.style.background=''">
         <div class="qgroup-r1" style="display:contents">
+          ${checkboxHTML}
           <div class="qgroup-title" style="flex:1">
             <div style="font-weight:800;font-size:15px">${p.name}</div>
             <div style="font-size:11px;color:var(--text2);margin-top:3px">
@@ -9125,7 +9227,59 @@ function renderQueue() {
     </div>`;
   }).join('');
 
-  el.innerHTML = summaryBar + groupCards;
+  // ── Multi-project bulk confirm bar ──
+  // นับโปรเจกต์ที่มี eligible (approved + ยังไม่ส่งใบยืนยัน)
+  const eligibleProjs = groups.filter(g => _projHasEligibleConfirm(g.proj));
+  const selectedProjs = groups.filter(g => _selectedProjIds.has(g.proj.id));
+  // จำนวนคน + ยอดที่จะส่งใบยืนยันถ้ากดส่ง
+  const targetCount = selectedProjs.reduce((a,g) =>
+    a + g.workers.filter(w => w.status==='approved' && getWorkerConfirmStatus(w)==='none').length, 0);
+  const targetSum = selectedProjs.reduce((a,g) =>
+    a + g.workers.filter(w => w.status==='approved' && getWorkerConfirmStatus(w)==='none').reduce((s,w)=>s+(w.amount||0),0), 0);
+  // unique staff ที่จะรับ
+  const targetStaffSet = new Set();
+  selectedProjs.forEach(g => g.workers.forEach(w => {
+    if(w.status==='approved' && getWorkerConfirmStatus(w)==='none') targetStaffSet.add(w.id);
+  }));
+
+  let bulkBar = '';
+  if(eligibleProjs.length > 0){
+    if(_selectedProjIds.size === 0){
+      // โหมด "ยังไม่ได้เลือก" — เชิญชวนให้กด
+      bulkBar = `<div style="position:sticky;top:0;z-index:30;margin:0 0 12px;padding:11px 14px;background:rgba(155,111,255,.07);border:1px dashed rgba(155,111,255,.4);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;backdrop-filter:blur(6px)">
+        <div style="font-size:12px;color:var(--text)">
+          💡 ติ๊กช่องโปรเจกต์ที่ต้องการ → กด "ส่งใบยืนยัน" รวมในใบเดียว · มี <strong style="color:#9B6FFF">${eligibleProjs.length}</strong> โปรเจกต์รอส่ง
+        </div>
+        <button onclick="selectAllEligibleProjs()" class="btn btn-xs" style="background:rgba(155,111,255,.15);border:1px solid rgba(155,111,255,.45);color:#9B6FFF;font-weight:700">✓ เลือกทุกโปรเจกต์ที่ส่งได้</button>
+      </div>`;
+    } else {
+      // โหมด "เลือกแล้ว" — แสดงสรุป + ปุ่มส่ง
+      bulkBar = `<div style="position:sticky;top:0;z-index:30;margin:0 0 12px;padding:13px 16px;background:linear-gradient(135deg,rgba(155,111,255,.22),rgba(155,111,255,.08));border:2px solid rgba(155,111,255,.65);border-radius:11px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:0 6px 18px rgba(155,111,255,.18);backdrop-filter:blur(6px)">
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column">
+            <div style="font-size:11px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">เลือกแล้ว</div>
+            <div style="font-size:18px;font-weight:800;color:#fff">${_selectedProjIds.size} โปรเจกต์</div>
+          </div>
+          <div style="width:1px;height:36px;background:rgba(255,255,255,.15)"></div>
+          <div style="display:flex;flex-direction:column">
+            <div style="font-size:11px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">จะส่งให้</div>
+            <div style="font-size:18px;font-weight:800;color:#fff">${targetStaffSet.size} คน <span style="font-size:11px;color:var(--text2);font-weight:600">(${targetCount} รายการ)</span></div>
+          </div>
+          <div style="width:1px;height:36px;background:rgba(255,255,255,.15)"></div>
+          <div style="display:flex;flex-direction:column">
+            <div style="font-size:11px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">ยอดรวม</div>
+            <div style="font-size:18px;font-weight:800;color:var(--green)">${fmtB(targetSum)}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button onclick="clearProjSelect()" class="btn btn-xs btn-outline" style="font-weight:700">ล้าง</button>
+          <button onclick="bulkSendConfirmSelected()" class="btn" style="background:#9B6FFF;color:#fff;border:none;font-weight:800;padding:9px 18px;font-size:13px;${targetCount===0?'opacity:.55;cursor:not-allowed':''}" ${targetCount===0?'disabled':''}>📤 ส่งใบยืนยันยอด (${targetCount})</button>
+        </div>
+      </div>`;
+    }
+  }
+
+  el.innerHTML = summaryBar + bulkBar + groupCards;
 
   } catch(e){console.error('renderQueue failed:',e); toast('queue error: '+e.message,'error');}
 }
@@ -9428,6 +9582,149 @@ async function askBulkSendConfirm(projId){
   renderQueue();
 }
 
+// ════════════════════════════════════════════════════════════
+// 📤 MULTI-PROJECT BULK CONFIRM — เลือกหลายโปรเจกต์แล้วส่งใบยืนยันให้ทีมทั้งทีม
+//    ทีมแต่ละคน = ได้ notification 1 ฉบับสรุปทุกโปรเจกต์ที่ต้องยืนยัน
+// ════════════════════════════════════════════════════════════
+function _projHasEligibleConfirm(p){
+  return (p?.workers||[]).some(w => w.status === 'approved' && getWorkerConfirmStatus(w) === 'none');
+}
+function toggleProjSelect(projId, ev){
+  if(ev){ ev.stopPropagation(); }
+  if(_selectedProjIds.has(projId)){
+    _selectedProjIds.delete(projId);
+  } else {
+    _selectedProjIds.add(projId);
+  }
+  renderQueue();
+}
+function clearProjSelect(){
+  _selectedProjIds.clear();
+  renderQueue();
+}
+function selectAllEligibleProjs(){
+  // เลือกทุกโปรเจกต์ที่ "มองเห็นในรายการตอนนี้" และมี worker ที่ยังไม่ได้ส่งใบยืนยัน
+  // (อ้างอิงตาม filter เดือน/ปี ที่ใช้ในหน้านี้)
+  try {
+    const monthSel = document.getElementById('q-month-sel');
+    const yearSel  = document.getElementById('q-year-sel');
+    const selectedMonth = monthSel ? monthSel.value : '';
+    const selectedQYear = yearSel  ? yearSel.value  : '';
+    getProjects().forEach(p => {
+      const _ref = p.startDate || p.deadline;
+      if(selectedQYear && _ref && new Date(_ref).getFullYear() !== parseInt(selectedQYear)) return;
+      if(selectedMonth && _ref){
+        const d = new Date(_ref);
+        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        if(key !== selectedMonth) return;
+      }
+      if(queueCycleFilter !== 'all' && _ref){
+        const day = new Date(_ref).getDate();
+        if(queueCycleFilter === '1' && day > 15) return;
+        if(queueCycleFilter === '2' && day <= 15) return;
+      }
+      if(_projHasEligibleConfirm(p)) _selectedProjIds.add(p.id);
+    });
+  } catch(e){ console.warn('selectAll:', e); }
+  renderQueue();
+}
+
+async function bulkSendConfirmSelected(){
+  if(!_selectedProjIds.size){ toast('ยังไม่ได้เลือกโปรเจกต์','warn'); return; }
+  const projs = getProjects();
+  const allTargets = []; // [{p, w}]
+  _selectedProjIds.forEach(projId => {
+    const p = projs.find(x => x.id === projId);
+    if(!p) return;
+    (p.workers||[]).forEach(w => {
+      if(w.status === 'approved' && getWorkerConfirmStatus(w) === 'none'){
+        allTargets.push({p, w});
+      }
+    });
+  });
+  if(!allTargets.length){
+    toast('ไม่มีคนที่ต้องส่งใบยืนยันในโปรเจกต์ที่เลือก','info');
+    return;
+  }
+  // จัดกลุ่มตาม staffId เพื่อนับและส่ง notification 1 ฉบับต่อคน
+  const byStaff = {}; // staffId → [{p, w}]
+  allTargets.forEach(({p, w}) => {
+    (byStaff[w.id] = byStaff[w.id] || []).push({p, w});
+  });
+  const staffCount = Object.keys(byStaff).length;
+  const projCount  = _selectedProjIds.size;
+  const totalAmt   = allTargets.reduce((a, {w}) => a + (w.amount||0), 0);
+  // Build preview
+  const previewLines = Object.entries(byStaff).slice(0,6).map(([sid, items]) => {
+    const s = getStaffById(sid);
+    const sum = items.reduce((a,{w})=>a+(w.amount||0),0);
+    return `• ${s?.nickname || sid} — ${items.length} โปรเจกต์ · ${fmtB(sum)}`;
+  });
+  const more = Object.keys(byStaff).length > 6 ? `\n...และอีก ${Object.keys(byStaff).length-6} คน` : '';
+
+  if(!confirm(
+    `📤 ส่งใบยืนยันยอดให้ทีม\n\n` +
+    `โปรเจกต์ที่เลือก: ${projCount} โปรเจกต์\n` +
+    `ทีมที่จะได้รับ: ${staffCount} คน\n` +
+    `รายการรวม: ${allTargets.length} รายการ\n` +
+    `ยอดรวมทั้งหมด: ${fmtB(totalAmt)}\n\n` +
+    `รายชื่อ:\n${previewLines.join('\n')}${more}\n\n` +
+    `→ ทีมแต่ละคนจะได้ notification 1 ฉบับ รวมทุกโปรเจกต์ที่ต้องยืนยัน`
+  )) return;
+
+  toast(`📤 กำลังส่ง ${allTargets.length} รายการ...`,'info');
+
+  // 1. อัปเดต confirmStatus ทุก worker
+  let updateOk = 0, updateFail = 0;
+  for(const {p, w} of allTargets){
+    try {
+      const ok = await _updateWorkerConfirm(p.id, w.id, w.slot, {
+        confirmStatus: 'sent',
+        confirmSentAt: new Date().toISOString(),
+        confirmAmount: w.amount || 0,
+        confirmRespondedAt: null,
+        confirmRejectReason: null,
+      });
+      if(ok) updateOk++; else updateFail++;
+    } catch(e){ updateFail++; console.warn('bulk multi update:', e); }
+  }
+
+  // 2. ส่ง notification 1 ฉบับต่อ staff (สรุปทุก project)
+  try {
+    const allUsersSnap = await _fbDatabase.ref('users').get();
+    if(allUsersSnap.exists()){
+      const allUsers = allUsersSnap.val();
+      const staffUids = {}; // staffId → [uid]
+      Object.entries(allUsers).forEach(([uid, u]) => {
+        if(u && u.staffId){
+          (staffUids[u.staffId] = staffUids[u.staffId] || []).push(uid);
+        }
+      });
+      for(const staffId of Object.keys(byStaff)){
+        const uids = staffUids[staffId] || [];
+        if(!uids.length) continue; // ไม่มี account → skip notif (ข้อมูลใน inbox ยังเห็น)
+        const items = byStaff[staffId];
+        const sumAmt = items.reduce((a,{w}) => a+(w.amount||0), 0);
+        const projNames = items.slice(0,3).map(({p}) => p.name).join(' · ');
+        const moreP = items.length > 3 ? ` +${items.length-3} โปรเจกต์` : '';
+        const title = `💰 ใบยืนยันยอด · ${items.length} รายการ`;
+        const text = `รวม ${fmtB(sumAmt)} · ${projNames}${moreP} · กดเพื่อยืนยัน`;
+        await Promise.all(uids.map(uid =>
+          addNotification({type:'payment', title, text, projId: items[0].p.id, recipientUid: uid})
+        ));
+      }
+    }
+  } catch(e){ console.warn('multi-proj notify:', e); }
+
+  _selectedProjIds.clear();
+  if(updateFail > 0){
+    toast(`📤 ส่งสำเร็จ ${updateOk} · ล้มเหลว ${updateFail} · ${staffCount} คน`,'warn');
+  } else {
+    toast(`📤 ส่งใบยืนยัน ${updateOk} รายการ → ${staffCount} คนแล้ว`,'success');
+  }
+  renderQueue();
+}
+
 // Admin → ส่งซ้ำ
 async function askResendConfirm(projId, workerId, slot){
   const s = getStaffById(workerId);
@@ -9619,7 +9916,7 @@ function _renderStaffConfirmList(items){
     const paidNote = isPaid ? `<div style="margin-top:6px;font-size:11px;color:var(--green);font-weight:700">💰 โอนแล้ว · เลขที่ ${w.voucherNo||'-'}</div>` : '';
 
     // === Breakdown box — ให้ Staff ตรวจรายละเอียดได้ตรงจุด ===
-    const myStaff = getStaffById(workerId);
+    const myStaff = getStaffById(w.id);
     const finalAmount = w.confirmAmount || w.amount || 0;
     const rate = w.ratePerUnit || 0;
     const unit = w.unit || 'เหมา';
@@ -10713,6 +11010,7 @@ function toggleStaffBody(id){
 }
 function openAddStaff(){
   editingStaffId=null;editingStaffCat=null;_iwStaffId='';_iaStaffId='';document.getElementById('addstaff-title').textContent='➕ เพิ่มสมาชิกใหม่';const _ws=document.getElementById('st-warn-section');if(_ws)_ws.classList.add('hidden');const _wa=document.getElementById('st-appr-section');if(_wa)_wa.classList.add('hidden');
+  const _db=document.getElementById('st-delete-btn'); if(_db) _db.style.display='none';
   ['st-name','st-nick','st-bank','st-account','st-promptpay','st-email','st-qr-url'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   _previewStQr('');
   document.getElementById('st-gender').selectedIndex=0;
@@ -10733,6 +11031,7 @@ function _previewStQr(url){
 function openEditStaff(id,cat){
   editingStaffId=id;editingStaffCat=cat;const data=getStaffData();const s=(data[cat]||[]).find(x=>x.id===id);if(!s)return;
   document.getElementById('addstaff-title').textContent='✏️ แก้ไขสมาชิก';
+  const _db=document.getElementById('st-delete-btn'); if(_db) _db.style.display='inline-flex';
   // Show role toggle for users who have accounts
   const roleToggleEl = document.getElementById('st-role-toggle');
   if(roleToggleEl){
@@ -10824,6 +11123,17 @@ function saveStaff(){
     data[cat].push({...baseStaff,category:cat});
   });
   saveStaffData(data);if(editingStaffId)saveStaffRoleIfChanged(editingStaffId);closeModal('modal-addstaff');renderStaff();toast(editingStaffId?'อัพเดทแล้ว ✅':'เพิ่มสมาชิกแล้ว ✅','success');
+}
+// เรียกจากปุ่ม "ลบสมาชิก" ในหน้า edit modal — ลบแล้วปิด modal ให้เลย
+async function deleteStaffFromEditModal(){
+  if(!editingStaffId){ toast('ไม่พบรหัสสมาชิก','error'); return; }
+  const id = editingStaffId;
+  const cat = editingStaffCat || (getStaffById(id)?.category) || '';
+  await deleteStaff(id, cat);
+  // ถ้าลบสำเร็จ → สมาชิกจะไม่อยู่ใน data อีกแล้ว → ปิด modal
+  if(!getStaffById(id)){
+    closeModal('modal-addstaff');
+  }
 }
 async function deleteStaff(id,cat){
   const staff = getStaffById(id);
