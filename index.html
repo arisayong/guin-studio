@@ -8983,16 +8983,6 @@ function renderQueue() {
   const cntConfirmConfirmed = allWorkers.filter(w => getWorkerConfirmStatus(w) === 'confirmed').length;
   const cntConfirmTotal = cntConfirmSent + cntConfirmRejected + cntConfirmConfirmed; // ใบที่ส่งไปแล้วทั้งหมด
 
-  // === Per-staff breakdown: รวมทุก worker ที่มี confirmStatus !== 'none' จัดกลุ่มตาม staffId ===
-  const perStaffStats = {}; // staffId → {sent, confirmed, rejected, total}
-  allWorkers.forEach(w => {
-    const cs = getWorkerConfirmStatus(w);
-    if(cs === 'none') return;
-    if(!perStaffStats[w.id]) perStaffStats[w.id] = {sent:0, confirmed:0, rejected:0, total:0};
-    perStaffStats[w.id][cs]++;
-    perStaffStats[w.id].total++;
-  });
-
   if (!groups.length) {
     el.innerHTML = '<div style="text-align:center;padding:56px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">ไม่มีรายการในเงื่อนไขนี้</div>';
     return;
@@ -9047,46 +9037,27 @@ function renderQueue() {
       :`<div class="stat-card" style="padding:12px;opacity:.55"><div class="stat-label">❌ Staff ปฏิเสธ</div><div style="font-size:22px;font-weight:800;margin-top:4px;color:var(--text2)">— ไม่มี —</div></div>`
     }
   </div>
-  ${(()=>{
-    // === Per-staff breakdown: เรียงตาม "ยังไม่ตอบเยอะสุด" ก่อน ===
-    const staffEntries = Object.entries(perStaffStats);
-    if(!staffEntries.length) return '';
-    staffEntries.sort((a,b) => (b[1].sent + b[1].rejected*2) - (a[1].sent + a[1].rejected*2));
-    const rowsHTML = staffEntries.map(([sid, st]) => {
-      const s = getStaffById(sid);
-      const nick = s?.nickname || s?.name || sid;
-      const av = (nick[0]||'?').toUpperCase();
-      // status pill
-      let statusPill = '';
-      if(st.sent > 0){
-        statusPill = `<span style="padding:2px 9px;border-radius:8px;background:rgba(155,111,255,.18);color:#9B6FFF;font-size:11px;font-weight:700">⏳ รอ ${st.sent}</span>`;
-      }
-      if(st.confirmed > 0){
-        statusPill += `${statusPill?'<span style="margin:0 3px"></span>':''}<span style="padding:2px 9px;border-radius:8px;background:rgba(0,223,160,.15);color:var(--green);font-size:11px;font-weight:700">✅ ยืนยัน ${st.confirmed}</span>`;
-      }
-      if(st.rejected > 0){
-        statusPill += `${statusPill?'<span style="margin:0 3px"></span>':''}<span style="padding:2px 9px;border-radius:8px;background:rgba(255,64,64,.15);color:var(--red);font-size:11px;font-weight:700">❌ ปฏิเสธ ${st.rejected}</span>`;
-      }
-      const pctConfirmed = st.total > 0 ? Math.round((st.confirmed/st.total)*100) : 0;
-      const allDone = st.sent === 0 && st.rejected === 0 && st.confirmed > 0;
-      const borderCol = allDone ? 'rgba(0,223,160,.35)' : st.rejected > 0 ? 'rgba(255,64,64,.35)' : st.sent > 0 ? 'rgba(155,111,255,.35)' : 'var(--border2)';
-      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--bg2);border:1px solid ${borderCol};border-radius:9px;flex-shrink:0;min-width:240px">
-        <div style="width:28px;height:28px;border-radius:50%;background:rgba(0,180,255,.18);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0">${av}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nick}</div>
-          <div style="display:flex;gap:3px;margin-top:3px;align-items:center">${statusPill||'<span style="color:var(--text2);font-size:10px">ไม่มีใบ</span>'}</div>
-        </div>
-        <div style="font-size:11px;color:var(--text2);font-weight:600;white-space:nowrap">${pctConfirmed}%</div>
-      </div>`;
-    }).join('');
-    return `<div style="background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:12px 14px;margin-bottom:18px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
-        <div style="font-size:12.5px;color:var(--text);font-weight:700">👥 สถานะรายคน <span style="color:var(--text2);font-weight:500;font-size:11px">· ${staffEntries.length} คน</span></div>
-        <div style="font-size:10.5px;color:var(--text2)">เรียงตาม "ยังไม่ตอบเยอะสุด"</div>
-      </div>
-      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory">${rowsHTML}</div>
-    </div>`;
-  })()}`;
+  `;
+
+  // === Update count badges บนแท็บ confirm filter (qcf-*) ===
+  //   ทำตรงนี้แทนการ render เพราะ tab markup ฝังใน HTML ตายตัว
+  try {
+    const cntConfirmNone = allWorkers.filter(w => getWorkerConfirmStatus(w) === 'none').length;
+    const cntAll = allWorkers.length;
+    const _setTabLabel = (id, base, n, color) => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      const badge = n > 0
+        ? ` <span style="display:inline-block;min-width:18px;padding:1px 6px;border-radius:9px;background:${color||'rgba(155,111,255,.25)'};color:${color?'#fff':'#9B6FFF'};font-size:10px;font-weight:800;margin-left:3px;line-height:1.4">${n>99?'99+':n}</span>`
+        : '';
+      el.innerHTML = base + badge;
+    };
+    _setTabLabel('qcf-all',       '📋 ใบยืนยัน:ทั้งหมด', cntAll);
+    _setTabLabel('qcf-none',      '⚪ ยังไม่ส่ง',         cntConfirmNone);
+    _setTabLabel('qcf-sent',      '⏳ รอ Staff',          cntConfirmSent,      '#9B6FFF');
+    _setTabLabel('qcf-confirmed', '✅ ยืนยันแล้ว',         cntConfirmConfirmed, 'var(--green)');
+    _setTabLabel('qcf-rejected',  '❌ ปฏิเสธ',            cntConfirmRejected,  'var(--red)');
+  } catch(e){ console.warn('update tab badges:', e); }
 
   /* ── step dot helpers ── */
   function stepDot(active, done) {
