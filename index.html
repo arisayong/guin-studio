@@ -1120,8 +1120,7 @@ body.sidebar-collapsed .main-content{
     <div class="page-title">🏠 ภาพรวมระบบ</div>
     <div class="page-subtitle">GuinStudio — อัปเดต ณ วันนี้</div>
    </div>
-   <!-- 🎯 สิ่งที่ต้องดำเนินการ (admin priority box) -->
-   <div id="dash-priority" style="margin-bottom:18px"></div>
+   <div id="dash-priority" style="display:none"></div>
    <!-- Quick Actions Bar — ทำบ่อย ๆ คลิกเดียวถึง -->
    <div id="quick-actions" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:18px">
     <button class="qa-btn qa-blue" onclick="nav('projects');setTimeout(()=>openNewProject(),100)">
@@ -1866,9 +1865,6 @@ body.sidebar-collapsed .main-content{
      <div id="my-confirm-inbox-btn-wrap"></div>
     </div>
    </div>
-
-   <!-- 📋 ที่ต้องทำตอนนี้ (staff priority box) -->
-   <div id="my-priority" style="margin-bottom:14px"></div>
 
    <!-- Summary cards: 4 statuses -->
    <div id="my-summary-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px"></div>
@@ -5375,11 +5371,11 @@ function renderDash(){
      <div class="stat-value">${projs.length}</div>
      <div class="stat-delta up">${projActive} ดำเนินการ${projCancelled?' · '+projCancelled+' ยกเลิก':''}</div>
     </div>
-    <div class="stat-card" title="รวม budget ของโปรเจกต์ที่ลูกค้าจ่ายเงินเข้ามาแล้ว">
+    <div class="stat-card" onclick="openRevenueBreakdown()" style="cursor:pointer" title="กดเพื่อดูรายโปรเจกต์ที่รับเงินแล้ว + กำไรแยกตามวัน">
      <span class="stat-icon">💰</span>
      <div class="stat-label">รายได้รับแล้ว</div>
      <div class="stat-value" style="color:var(--green)">${fmtB(revenue)}</div>
-     <div class="stat-delta up">ลูกค้าจ่ายเข้ามาแล้ว</div>
+     <div class="stat-delta up">กดดูรายละเอียด →</div>
     </div>
     <div class="stat-card" title="รวม budget ของโปรเจกต์ที่ลูกค้ายังไม่จ่าย">
      <span class="stat-icon">📋</span>
@@ -5413,8 +5409,6 @@ function renderDash(){
   projTb.innerHTML=pendingWorkers.length?pendingWorkers.slice(0,8).map(({proj:p,worker:w})=>{const s=getStaffById(w.id);if(!s)return'';
     return`<tr><td><strong>${s.nickname}</strong></td><td style="font-size:12px;color:var(--text2)">${p.name}</td><td style="color:var(--accent2);font-weight:700">${fmtB(w.amount)}</td><td>${statusBadge(w.status, p.id)}</td></tr>`}).join('')
     :'<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:20px">🎉 ไม่มีค้างจ่าย</td></tr>';
-  // 🎯 Render "สิ่งที่ต้องดำเนินการ" widget (additive · ไม่กระทบ stats เดิม)
-  try { _renderDashPriority(projs, today); } catch(e){ console.warn('dash priority:', e); }
 }
 
 // ══════════════════════════════════════════════
@@ -5496,6 +5490,171 @@ function _renderDashPriority(projs, today){
       </div>`).join('')}
     </div>
   </div>`;
+}
+
+// ══════════════════════════════════════════════
+// 💰 รายได้รับแล้ว — ดูรายโปรเจกต์ + กำไรแยกตามวันที่กดยืนยันรับเงิน
+//   - กดที่ card "รายได้รับแล้ว" ในหน้า dashboard → เปิด modal นี้
+//   - แสดงทุกโปรเจกต์ที่ client_paid = true · group by client_paid_date
+//   - แต่ละโปรเจกต์: budget (รายรับ), ค่าจ้างทีม (รายจ่าย), กำไร
+//   - ดูได้ทันทีว่าวันไหนรับเงินไปกี่โปรเจกต์ + ได้กำไรเท่าไหร่
+// ══════════════════════════════════════════════
+function openRevenueBreakdown(){
+  const modalId = 'modal-revenue-breakdown';
+  let modal = document.getElementById(modalId);
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal-overlay hidden';
+    modal.innerHTML = `
+      <div class="modal" style="width:820px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column">
+        <div class="modal-head" style="padding:14px 18px">
+          <div class="modal-title">💰 รายได้รับแล้ว — รายโปรเจกต์</div>
+          <button class="btn-close" onclick="closeModal('${modalId}')">✕</button>
+        </div>
+        <div class="modal-body" id="revenue-breakdown-body" style="padding:14px 18px;overflow-y:auto;flex:1"></div>
+        <div class="modal-foot" style="padding:12px 18px;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-outline" onclick="closeModal('${modalId}')">ปิด</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  renderRevenueBreakdown();
+  openModal(modalId);
+}
+
+function renderRevenueBreakdown(){
+  const body = document.getElementById('revenue-breakdown-body');
+  if(!body) return;
+  // เก็บโปรเจกต์ที่ลูกค้าจ่ายแล้ว + แยกตามวันที่จ่าย
+  const projs = getProjects();
+  const items = []; // {p, budget, cost, profit, paidDate}
+  let totalRevenue = 0, totalCost = 0;
+  projs.forEach(p => {
+    if(p.projStatus === 'cancelled') return;
+    const cp = !!ls('client_paid_'+p.id);
+    if(!cp) return; // เฉพาะโปรเจกต์ที่รับเงินแล้ว
+    const budget = p.budget || 0;
+    const cost = (p.workers||[]).reduce((a,w)=>a+(w.amount||0), 0);
+    const profit = budget - cost;
+    const paidDate = ls('client_paid_date_'+p.id) || '— ไม่ระบุวันที่ —';
+    items.push({p, budget, cost, profit, paidDate});
+    totalRevenue += budget;
+    totalCost += cost;
+  });
+  const totalProfit = totalRevenue - totalCost;
+
+  if(!items.length){
+    body.innerHTML = `<div style="text-align:center;padding:48px 20px;color:var(--text2)">
+      <div style="font-size:42px;margin-bottom:10px">💰</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text)">ยังไม่มีโปรเจกต์ที่รับเงินจากลูกค้า</div>
+      <div style="font-size:11.5px;color:var(--text2);margin-top:6px">กดปุ่ม "✅ รับเงินแล้ว" ในหน้าคิวจ่ายเงินเพื่อบันทึก</div>
+    </div>`;
+    return;
+  }
+
+  // จัดกลุ่มตามวันที่
+  const byDate = new Map();
+  items.forEach(it => {
+    if(!byDate.has(it.paidDate)) byDate.set(it.paidDate, []);
+    byDate.get(it.paidDate).push(it);
+  });
+  // เรียงวันที่ใหม่ → เก่า
+  const dateEntries = Array.from(byDate.entries()).sort((a,b) => {
+    // วันที่อยู่ในรูป "30 พ.ค. 2569" → parse ผ่าน Date(b) อาจไม่ได้ ตรง ๆ → ใช้ string sort เป็น fallback
+    const da = _parseThaiDateLoose(a[0]);
+    const db = _parseThaiDateLoose(b[0]);
+    if(da && db) return db.getTime() - da.getTime();
+    return String(b[0]).localeCompare(String(a[0]));
+  });
+
+  // สรุปด้านบน
+  const profitColor = totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
+  const summaryHTML = `<div style="background:linear-gradient(135deg,rgba(0,223,160,.1),rgba(0,223,160,.03));border:1.5px solid rgba(0,223,160,.4);border-radius:11px;padding:13px 16px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:10.5px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">โปรเจกต์</div>
+          <div style="font-size:18px;font-weight:800;color:#fff">${items.length}</div>
+        </div>
+        <div style="width:1px;height:34px;background:rgba(255,255,255,.15)"></div>
+        <div>
+          <div style="font-size:10.5px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">รายรับรวม</div>
+          <div style="font-size:18px;font-weight:800;color:var(--green)">${fmtB(totalRevenue)}</div>
+        </div>
+        <div style="width:1px;height:34px;background:rgba(255,255,255,.15)"></div>
+        <div>
+          <div style="font-size:10.5px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">ค่าจ้างทีม</div>
+          <div style="font-size:18px;font-weight:800;color:var(--orange)">${fmtB(totalCost)}</div>
+        </div>
+        <div style="width:1px;height:34px;background:rgba(255,255,255,.15)"></div>
+        <div>
+          <div style="font-size:10.5px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">กำไรรวม</div>
+          <div style="font-size:18px;font-weight:800;color:${profitColor}">${fmtB(totalProfit)}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  // กลุ่มตามวัน
+  const groupsHTML = dateEntries.map(([dateKey, group]) => {
+    const gRev = group.reduce((a,it)=>a+it.budget, 0);
+    const gCost = group.reduce((a,it)=>a+it.cost, 0);
+    const gProfit = gRev - gCost;
+    const gProfitColor = gProfit >= 0 ? 'var(--green)' : 'var(--red)';
+    const rows = group.map(it => {
+      const pColor = it.profit >= 0 ? 'var(--green)' : 'var(--red)';
+      return `<div onclick="closeModal('modal-revenue-breakdown');openProjDetail('${it.p.id}')" style="cursor:pointer;display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:10px;padding:9px 12px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.04);border-radius:7px;margin-top:5px;align-items:center;transition:background .15s" onmouseover="this.style.background='rgba(0,180,255,.06)'" onmouseout="this.style.background='rgba(0,0,0,.18)'">
+        <div style="min-width:0">
+          <div style="font-size:12.5px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.p.name}</div>
+          <div style="font-size:10.5px;color:var(--text2);margin-top:2px">${it.p.client || '— ไม่ระบุลูกค้า —'}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:9.5px;color:var(--text2);font-weight:600;letter-spacing:.5px;text-transform:uppercase">รายรับ</div>
+          <div style="font-size:13px;font-weight:700;color:var(--green)">${fmtB(it.budget)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:9.5px;color:var(--text2);font-weight:600;letter-spacing:.5px;text-transform:uppercase">รายจ่าย</div>
+          <div style="font-size:13px;font-weight:700;color:var(--orange)">${fmtB(it.cost)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:9.5px;color:var(--text2);font-weight:600;letter-spacing:.5px;text-transform:uppercase">กำไร</div>
+          <div style="font-size:13.5px;font-weight:800;color:${pColor}">${fmtB(it.profit)}</div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div style="background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:15px">📅</span>
+          <div style="font-size:13.5px;font-weight:800;color:var(--accent2)">${dateKey}</div>
+          <span style="font-size:11px;color:var(--text2);font-weight:600">· ${group.length} โปรเจกต์</span>
+        </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px">
+          <span style="color:var(--text2)">รายรับ <strong style="color:var(--green)">${fmtB(gRev)}</strong></span>
+          <span style="color:var(--text2)">รายจ่าย <strong style="color:var(--orange)">${fmtB(gCost)}</strong></span>
+          <span style="color:var(--text2)">กำไร <strong style="color:${gProfitColor}">${fmtB(gProfit)}</strong></span>
+        </div>
+      </div>
+      ${rows}
+    </div>`;
+  }).join('');
+
+  body.innerHTML = summaryHTML + `<div style="font-size:11px;color:var(--text2);margin-bottom:8px">💡 กดที่ชื่อโปรเจกต์เพื่อดูรายละเอียดเต็ม · เรียงตามวันที่กดยืนยันรับเงิน (ใหม่ → เก่า)</div>` + groupsHTML;
+}
+
+// แปลงวันที่ไทยเช่น "30 พ.ค. 2569" → Date · ถ้าแปลงไม่ได้คืน null
+function _parseThaiDateLoose(s){
+  if(!s) return null;
+  const TM = {'ม.ค.':0,'ก.พ.':1,'มี.ค.':2,'เม.ย.':3,'พ.ค.':4,'มิ.ย.':5,'ก.ค.':6,'ส.ค.':7,'ก.ย.':8,'ต.ค.':9,'พ.ย.':10,'ธ.ค.':11};
+  const m = String(s).match(/(\d{1,2})\s+(\S+)\s+(\d{4})/);
+  if(!m) return null;
+  const day = parseInt(m[1]);
+  const mon = TM[m[2]];
+  let year = parseInt(m[3]);
+  if(year > 2400) year -= 543; // พ.ศ. → ค.ศ.
+  if(mon === undefined) return null;
+  return new Date(year, mon, day);
 }
 
 // ══════════════════════════════════════════════
@@ -12686,82 +12845,6 @@ function renderMyDash(){
     </tr>`;
     }).join('');
   }
-  // 📋 Render "ที่ต้องทำตอนนี้" widget — additive (ไม่กระทบสรุปเดิม)
-  try { _renderMyPriority(projs, allItems); } catch(e){ console.warn('my priority:', e); }
-}
-
-// ══════════════════════════════════════════════
-// 📋 STAFF DASHBOARD PRIORITY WIDGET
-//   - แสดงสิ่งที่ staff ต้องทำตอนนี้: ใบยืนยันรอ, deadline ใกล้, เงินพร้อมโอน
-//   - กดได้ → พาไปจัดการต่อ
-// ══════════════════════════════════════════════
-function _renderMyPriority(projs, allItems){
-  const el = document.getElementById('my-priority');
-  if(!el) return;
-  // นับ items ของฉันแต่ละหมวด
-  let cntPendingConfirm = 0;       // ใบยืนยันยอดที่รอฉันยืนยัน
-  let cntRejected = 0;              // ใบที่ฉันปฏิเสธไป (รอ admin แก้)
-  let cntReadyToReceive = 0;        // ลูกค้าจ่ายแล้ว · รอ admin โอนให้ฉัน
-  let cntDeadlineToday = 0;         // งานที่ deadline วันนี้
-  let cntDeadlineSoon = 0;          // 1-3 วัน
-  let cntOverdue = 0;               // เลย deadline แต่ยังไม่ paid
-  const today = new Date(); today.setHours(0,0,0,0);
-  (projs||[]).forEach(p => {
-    if(p.projStatus === 'cancelled') return;
-    (p.workers||[]).forEach(w => {
-      if(w.id !== currentUser?.staffId) return;
-      const cs = (typeof getWorkerConfirmStatus === 'function') ? getWorkerConfirmStatus(w) : (w.confirmStatus || 'none');
-      if(cs === 'sent') cntPendingConfirm++;
-      if(cs === 'rejected') cntRejected++;
-      const cp = !!ls('client_paid_'+p.id);
-      if(cp && w.status === 'approved') cntReadyToReceive++;
-    });
-  });
-  // Deadline counts จาก allItems (มี myDeadline แล้ว)
-  (allItems||[]).forEach(it => {
-    if(it.projStatus === 'cancelled' || it.projStatus === 'done') return;
-    if(it.status === 'paid') return;
-    if(!it.myDeadline) return;
-    const dl = new Date(it.myDeadline); dl.setHours(0,0,0,0);
-    const diff = Math.ceil((dl - today)/(864e5));
-    if(diff < 0) cntOverdue++;
-    else if(diff === 0) cntDeadlineToday++;
-    else if(diff <= 3) cntDeadlineSoon++;
-  });
-  const chips = [];
-  if(cntPendingConfirm > 0)
-    chips.push({label:'ใบยืนยันรอคุณ', count:cntPendingConfirm, sub:'กดเปิดเพื่อยืนยัน', icon:'💰', color:'#9B6FFF', bg:'rgba(155,111,255,.1)', action:"openStaffConfirmInbox()"});
-  if(cntOverdue > 0)
-    chips.push({label:'เลย Deadline', count:cntOverdue, sub:'ที่ยังไม่จ่าย', icon:'🔴', color:'var(--red)', bg:'rgba(255,64,64,.1)', action:"window.scrollTo(0,document.querySelector('#my-proj-table')?.getBoundingClientRect()?.top+window.scrollY-80||0)"});
-  if(cntDeadlineToday > 0)
-    chips.push({label:'Deadline วันนี้', count:cntDeadlineToday, sub:'ส่งงานวันนี้', icon:'⚠️', color:'var(--orange)', bg:'rgba(255,158,0,.1)', action:"window.scrollTo(0,document.querySelector('#my-proj-table')?.getBoundingClientRect()?.top+window.scrollY-80||0)"});
-  if(cntDeadlineSoon > 0)
-    chips.push({label:'Deadline ใน 3 วัน', count:cntDeadlineSoon, sub:'ใกล้ครบกำหนด', icon:'🔥', color:'var(--orange)', bg:'rgba(255,158,0,.08)', action:"window.scrollTo(0,document.querySelector('#my-proj-table')?.getBoundingClientRect()?.top+window.scrollY-80||0)"});
-  if(cntReadyToReceive > 0)
-    chips.push({label:'เงินกำลังมา', count:cntReadyToReceive, sub:'ลูกค้าจ่าย · รอ admin โอน', icon:'🟢', color:'var(--green)', bg:'rgba(0,223,160,.08)', action:""});
-  if(cntRejected > 0)
-    chips.push({label:'คุณปฏิเสธไว้', count:cntRejected, sub:'รอ admin แก้ยอด', icon:'❌', color:'var(--red)', bg:'rgba(255,64,64,.08)', action:"openStaffConfirmInbox()"});
-
-  if(chips.length === 0){
-    el.innerHTML = '';
-    return;
-  }
-  el.innerHTML = `<div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px 16px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-      <div style="font-size:13.5px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px">📋 ที่ต้องทำตอนนี้ <span style="background:rgba(155,111,255,.2);color:#9B6FFF;font-size:11px;font-weight:700;padding:2px 8px;border-radius:9px">${chips.length}</span></div>
-      <div style="font-size:11px;color:var(--text2)">สรุปสิ่งที่ต้องสนใจก่อน</div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">
-      ${chips.map(c => `<div ${c.action?`onclick="${c.action}" style="cursor:pointer;`:'style="'}background:${c.bg};border:1px solid ${c.color}55;border-radius:10px;padding:11px 13px;transition:transform .12s,box-shadow .12s" ${c.action?`onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 14px rgba(0,0,0,.25)'" onmouseout="this.style.transform='';this.style.boxShadow=''"`:''}>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-          <span style="font-size:17px">${c.icon}</span>
-          <span style="font-size:11.5px;color:var(--text2);font-weight:700">${c.label}</span>
-        </div>
-        <div style="font-size:22px;font-weight:800;color:${c.color};line-height:1">${c.count}</div>
-        <div style="font-size:10.5px;color:var(--text2);margin-top:3px">${c.sub}</div>
-      </div>`).join('')}
-    </div>
-  </div>`;
 }
 
 // Format deadline ของสต๊าฟ + เหลือกี่วัน
