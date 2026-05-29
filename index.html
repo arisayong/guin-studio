@@ -11961,16 +11961,23 @@ function openMyProjDetail(projId, slot){
   const suf = (myW.slot||'').includes('main') ? ' · หลัก' : (myW.slot||'').includes('-sub') ? ' · รอง' : '';
   const roleLbl = (lblMap[preSlot]||'') + suf;
   // Deadline formatting
+  // หลักการ: ถ้างานส่งไปแล้ว (status != pending) → ไม่ขู่ "เลยมา X วัน" สีแดง
+  //          แค่บอกเบา ๆ ว่า "ทำไว้ตั้งแต่ X วันที่แล้ว" สีเทาเล็ก ๆ
   const now = new Date(); now.setHours(0,0,0,0);
   let dlHtml = '<span style="color:var(--text2)">— ยังไม่กำหนด —</span>';
   if(ph.deadline){
     const dl = new Date(ph.deadline); dl.setHours(0,0,0,0);
     const diff = Math.floor((dl - now)/(1000*60*60*24));
     const timeStr = ph.submitTime ? ' · '+ph.submitTime+(formatThaiTimeLabel?(' ('+formatThaiTimeLabel(ph.submitTime)+')'):'') : '';
+    const submittedAlready = myW.status !== 'pending';
     let status = '';
     if(myW.status === 'paid'){
       status = '<span style="color:var(--green);font-weight:700;margin-left:6px">✅ ส่งแล้ว + จ่ายแล้ว</span>';
+    } else if(submittedAlready && diff < 0){
+      // งานส่งไปแล้ว · deadline ผ่านมาแล้ว → แสดงเบา ๆ ไม่เป็นสีแดง
+      status = `<span style="color:var(--text2);font-weight:500;margin-left:6px;font-size:12px">· ทำไว้ตั้งแต่ ${Math.abs(diff)} วันที่แล้ว</span>`;
     } else if(diff < 0){
+      // ยังไม่ส่งงาน + เลย deadline → แดงเตือน
       status = `<span style="color:var(--red);font-weight:700;margin-left:6px">🔴 เลยมา ${Math.abs(diff)} วัน</span>`;
     } else if(diff === 0){
       status = `<span style="color:var(--orange);font-weight:700;margin-left:6px">⚠️ วันนี้!</span>`;
@@ -12092,7 +12099,7 @@ function openMyProjDetail(projId, slot){
           ${timeline}
         </div>
         <div style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.7">
-          💡 ถ้าคุณเห็นสถานะ <strong style="color:var(--orange)">"รอลูกค้าจ่าย"</strong> เป็นเวลานาน = ลูกค้ายังไม่โอนเงินเข้าสตูดิโอ · สตูดิโอจะโอนให้คุณทันทีที่ลูกค้าจ่าย · ถ้าเกิน 30 วันติดต่อแอดมินได้
+          💡 ถ้าคุณเห็นสถานะ <strong style="color:var(--orange)">"รอลูกค้าจ่าย"</strong> = ลูกค้ายังไม่โอนเงินเข้าสตูดิโอ · สตูดิโอจะโอนให้คุณทันทีที่ลูกค้าจ่าย
         </div>
       </div>
 
