@@ -8666,7 +8666,13 @@ async function savePayAmt(){
     if(w){ w.amount = amt; w.note = note; }
   });
   if(!result.ok){ toast('บันทึกไม่สำเร็จ: '+(result.error?.message||''),'error'); return; }
-  closeModal('modal-payamt');renderProjDetail();toast('บันทึกยอดแล้ว ✅','success');
+  closeModal('modal-payamt');
+  // Refresh ทุกหน้าที่เกี่ยวข้อง — เพราะ admin อาจอยู่ที่ project-detail / queue / mgr-projects
+  try { renderProjDetail(); } catch(e){}
+  try { renderQueue(); } catch(e){}
+  try { updateQueueBadge(); } catch(e){}
+  try { renderMgrProjects(); } catch(e){}
+  toast('บันทึกยอดแล้ว ✅','success');
 }
 
 // SLIP / PAYMENT
@@ -8822,6 +8828,7 @@ let queueFilter = 'all';
 let queueCycleFilter='all';
 let queueConfirmFilter = 'all'; // all | none | sent | confirmed | rejected
 let _selectedProjIds = new Set(); // ── Multi-select: เก็บ projId ที่ admin ติ๊กเลือกเพื่อส่งใบยืนยันรวม ──
+let _expandedQueueGroups = new Set(); // ── เก็บ groupId ของ project card ที่ "ขยาย" อยู่ · กันยุบเองตอน re-render ──
 
 function setQueueConfirmFilter(filter, el){
   queueConfirmFilter = filter;
@@ -8985,6 +8992,47 @@ function renderQueue() {
   const cntConfirmRejected = allWorkers.filter(w => getWorkerConfirmStatus(w) === 'rejected').length;
   const cntConfirmConfirmed = allWorkers.filter(w => getWorkerConfirmStatus(w) === 'confirmed').length;
   const cntConfirmTotal = cntConfirmSent + cntConfirmRejected + cntConfirmConfirmed; // ใบที่ส่งไปแล้วทั้งหมด
+
+  // === Build rejection banner: list ทุก worker ที่ถูกปฏิเสธ — แสดงเด่น ๆ ด้านบน ===
+  const rejectedItems = [];
+  groups.forEach(g => {
+    g.workers.forEach(w => {
+      if(getWorkerConfirmStatus(w) === 'rejected'){
+        rejectedItems.push({p: g.proj, w});
+      }
+    });
+  });
+  const rejectionBanner = rejectedItems.length > 0
+    ? `<div style="background:linear-gradient(135deg,rgba(255,64,64,.15),rgba(255,64,64,.05));border:2px solid rgba(255,64,64,.55);border-radius:12px;padding:14px 18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(255,64,64,.18)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:${rejectedItems.length>0?'10px':'0'};flex-wrap:wrap">
+          <div style="font-size:22px;line-height:1">❌</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:800;color:var(--red)">มี Staff ปฏิเสธยอด ${rejectedItems.length} ใบ — ต้องแก้ก่อนถึงจะจ่ายได้</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:2px">กดปุ่ม "แก้ + ส่งใหม่" เพื่อปรับยอดและส่งใบยืนยันให้สตาฟใหม่</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${rejectedItems.slice(0,8).map(({p,w})=>{
+            const s = getStaffById(w.id);
+            const nick = s?.nickname || s?.name || w.id;
+            const reason = (w.confirmRejectReason||'').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+            const reasonShort = reason.length > 60 ? reason.slice(0,60)+'…' : reason;
+            return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(0,0,0,.25);border:1px solid rgba(255,64,64,.2);border-radius:8px;flex-wrap:wrap">
+              <div style="flex:1;min-width:200px">
+                <div style="font-size:12.5px;font-weight:700"><strong>${nick}</strong> — ${fmtB(w.confirmAmount || w.amount || 0)} · ${p.name}</div>
+                ${reasonShort ? `<div style="font-size:11px;color:#FFB0B0;margin-top:2px"><strong>เหตุผล:</strong> ${reasonShort}</div>` : '<div style="font-size:11px;color:var(--text2);margin-top:2px;font-style:italic">(ไม่ระบุเหตุผล)</div>'}
+              </div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap">
+                <button class="btn btn-xs btn-outline" onclick="viewRejectReason('${p.id}','${w.id}','${w.slot}')" title="ดูเหตุผลเต็ม">📋 ดูเต็ม</button>
+                <button class="btn btn-xs" style="background:rgba(0,180,255,.15);border:1px solid rgba(0,180,255,.4);color:var(--accent2)" onclick="openPayAmt('${p.id}','${w.id}','${w.slot}')" title="แก้ยอด">💰 แก้ยอด</button>
+                <button class="btn btn-xs" style="background:#9B6FFF;color:#fff;border:none;font-weight:700" onclick="askSendConfirmRequest('${p.id}','${w.id}','${w.slot}')" title="ส่งใบยืนยันใหม่">📤 ส่งใหม่</button>
+              </div>
+            </div>`;
+          }).join('')}
+          ${rejectedItems.length>8?`<div style="font-size:11px;color:var(--text2);text-align:center;padding:4px">...และอีก ${rejectedItems.length-8} ใบ (เลื่อนดูในรายการด้านล่าง)</div>`:''}
+        </div>
+      </div>`
+    : '';
 
   if (!groups.length) {
     el.innerHTML = '<div style="text-align:center;padding:56px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">ไม่มีรายการในเงื่อนไขนี้</div>';
@@ -9318,10 +9366,10 @@ function renderQueue() {
           <div class="qgroup-client">${clientPaidBtn}</div>
           <div class="qgroup-action" style="margin-left:4px">${headerStatus}</div>
         </div>
-        <div class="qgroup-chevron" style="font-size:12px;color:var(--text2);margin-left:6px;transition:transform .2s" id="${groupId}-chevron">▶</div>
+        <div class="qgroup-chevron" style="font-size:12px;color:var(--text2);margin-left:6px;transition:transform .2s" id="${groupId}-chevron">${_expandedQueueGroups.has(groupId)?'▼':'▶'}</div>
       </div>
-      <!-- Worker rows (collapsible — default hidden, expand on click) -->
-      <div id="${groupId}" style="display:none">
+      <!-- Worker rows (collapsible — default hidden, expand on click) ─ คงสถานะตอน re-render ─ -->
+      <div id="${groupId}" style="display:${_expandedQueueGroups.has(groupId)?'block':'none'}">
         <!-- Bulk action bar -->
         ${(()=>{
           // คนที่ "approved" + ยังไม่ส่งใบยืนยัน ทั้งหมดในโปรเจกต์นี้
@@ -9404,7 +9452,7 @@ function renderQueue() {
   else { el.classList.remove('has-bulk-bar'); }
 
   // groupCards อยู่ใน list ปกติ · bulkBar เป็น fixed → append ทีหลัง
-  el.innerHTML = summaryBar + groupCards + bulkBar;
+  el.innerHTML = rejectionBanner + summaryBar + groupCards + bulkBar;
 
   } catch(e){console.error('renderQueue failed:',e); toast('queue error: '+e.message,'error');}
 }
@@ -9416,6 +9464,9 @@ function toggleQueueGroup(id) {
   const hidden = el.style.display === 'none';
   el.style.display = hidden ? 'block' : 'none';
   if (ch) ch.textContent = hidden ? '▼' : '▶';
+  // เก็บสถานะ → กันยุบเองตอน re-render
+  if(hidden) _expandedQueueGroups.add(id);
+  else _expandedQueueGroups.delete(id);
 }
 
 function toggleClientPaid(projId) {
@@ -10195,14 +10246,34 @@ async function qWaitingClient(projId, workerId, slot) {
 
 /* ย้อนกลับ: waiting_client/approved → pending (ถ้ากดผิด) */
 async function qRevert(projId, workerId, slot) {
+  // เช็คก่อนว่ามี confirmStatus อยู่ไหม → ถ้ามี ให้ confirm ก่อน reset (เพราะมีผลต่อ staff)
+  const _p_chk = getProjects().find(x=>x.id===projId);
+  const _w_chk = _p_chk?.workers.find(x=>x.id===workerId && x.slot===slot);
+  const hadConfirm = _w_chk && getWorkerConfirmStatus(_w_chk) !== 'none';
+  if(hadConfirm){
+    const cs = getWorkerConfirmStatus(_w_chk);
+    const label = cs === 'confirmed' ? 'ยืนยันแล้ว' : cs === 'sent' ? 'รอ Staff ยืนยัน' : 'ปฏิเสธ';
+    if(!confirm(`↩️ ย้อนกลับ + ล้างใบยืนยัน?\n\nสถานะปัจจุบัน: ${label}\n\n• เปลี่ยน worker.status → "รอจ่าย"\n• ล้าง confirmStatus → "ยังไม่ส่ง"\n\nหลังจากนี้คุณสามารถแก้ยอดและส่งใบยืนยันใหม่ได้`)){
+      return;
+    }
+  }
   const result = await saveProjectMerge(projId, (p)=>{
     const w = (p.workers||[]).find(x => x.id === workerId && x.slot === slot);
-    if(w){ w.status = 'pending'; delete w.waitingClientSince; }
+    if(w){
+      w.status = 'pending';
+      delete w.waitingClientSince;
+      // 🔑 ล้าง confirmStatus เพื่อให้ admin แก้ยอด + ส่งใบยืนยันใหม่ได้
+      w.confirmStatus = 'none';
+      delete w.confirmSentAt;
+      delete w.confirmRespondedAt;
+      delete w.confirmRejectReason;
+      delete w.confirmAmount;
+    }
   });
   if(!result.ok){ toast('บันทึกไม่สำเร็จ: '+(result.error?.message||''),'error'); return; }
   updateQueueBadge();
   renderQueue();
-  toast('↩️ ย้อนกลับเป็น "รอจ่าย"','info');
+  toast(hadConfirm ? '↩️ ย้อนกลับ + ล้างใบยืนยันแล้ว · พร้อมแก้ยอด' : '↩️ ย้อนกลับเป็น "รอจ่าย"','info');
 }
 
 /* เปิด modal จ่าย — ทำงานจาก pending หรือ approved ก็ได้ */
@@ -14496,6 +14567,22 @@ function startFirebaseSync() {
       if(pg&&!pg.classList.contains('hidden')) try{renderProjects();}catch(e){}
       const pgD = document.getElementById('page-dashboard');
       if(pgD&&!pgD.classList.contains('hidden')) try{renderDash();}catch(e){}
+      // 🔑 Refresh queue page เมื่อมี project update → admin จะเห็น staff confirm/reject ทันที
+      const pgQ = document.getElementById('page-queue');
+      if(pgQ&&!pgQ.classList.contains('hidden')) try{renderQueue();}catch(e){}
+      // Refresh project-detail ถ้าเปิดอยู่
+      const pgPD = document.getElementById('page-project-detail');
+      if(pgPD&&!pgPD.classList.contains('hidden')) try{renderProjDetail();}catch(e){}
+      // Refresh team-earnings ถ้าเปิดอยู่
+      const pgTE = document.getElementById('page-team-earnings');
+      if(pgTE&&!pgTE.classList.contains('hidden')) try{renderTeamEarnings();}catch(e){}
+      // Manager pages refresh
+      if(currentUser&&currentUser.role==='manager'){
+        const pgMP=document.getElementById('page-mgr-projects');
+        if(pgMP&&!pgMP.classList.contains('hidden')) try{renderMgrProjects();}catch(e){}
+        const pgMT=document.getElementById('page-mgr-track');
+        if(pgMT&&!pgMT.classList.contains('hidden')) try{renderMgrTrack();}catch(e){}
+      }
       // Staff pages sync (only for staff users)
       if(currentUser&&currentUser.role==='staff'){
         const pgMD=document.getElementById('page-my-dashboard');
