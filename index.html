@@ -3041,15 +3041,15 @@ function toggleNotifPanel(ev){
     if(p){ p.style.display='none'; }
     document.body.classList.remove('notif-open');
   });
-  // Mark notifications as read after 1.5 sec
-  setTimeout(()=>{
-    const unread = _notifCache.filter(n => !n.read);
-    if(unread.length > 0 && _fbDatabase && currentUser?.uid){
-      const updates = {};
-      unread.forEach(n => { updates[`notifications/${currentUser.uid}/${n.id}/read`] = true; });
-      _fbDatabase.ref().update(updates).catch(()=>{});
-    }
-  }, 1500);
+  // ⚠️ ไม่ auto-mark-as-read — แจ้งเตือนจะค้างจนกว่า user จะกด "อ่านทั้งหมด" หรือคลิกที่ notification นั้น ๆ
+}
+
+// Mark single notification as read (เรียกจากการคลิก notification 1 รายการ)
+function markOneNotifRead(notifId){
+  if(!_fbDatabase || !currentUser?.uid || !notifId) return;
+  const cached = _notifCache.find(n => n.id === notifId);
+  if(!cached || cached.read) return;
+  _fbDatabase.ref(`notifications/${currentUser.uid}/${notifId}/read`).set(true).catch(()=>{});
 }
 
 function closeNotifPanel(){
@@ -3140,11 +3140,18 @@ function _renderNotifList(){
     const unreadStyle = n.read ? '' : 'background:rgba(0,180,255,.06)';
     const unreadDot = n.read ? '' : '<span style="width:6px;height:6px;border-radius:50%;background:var(--accent2);margin-top:7px;flex-shrink:0;align-self:flex-start"></span>';
     // Click handler: ถ้าเป็น payment notification และ user เป็น staff → เปิด confirm inbox
+    //                  ถ้าเป็น admin + payment → เปิดหน้าคิวจ่ายเงิน (เพื่อดูสถานะ confirm)
+    // ทุกการคลิก → mark notification นี้เป็น read
     let clickHandler = '';
+    const markCmd = `markOneNotifRead('${n.id}');`;
     if(n.type === 'payment' && currentUser?.role !== 'admin' && currentUser?.staffId){
-      clickHandler = `onclick="closeNotifPanel();openStaffConfirmInbox()" style="cursor:pointer"`;
+      clickHandler = `onclick="${markCmd}closeNotifPanel();openStaffConfirmInbox()" style="cursor:pointer"`;
+    } else if(n.type === 'payment' && currentUser?.role === 'admin'){
+      clickHandler = `onclick="${markCmd}closeNotifPanel();nav('queue')" style="cursor:pointer"`;
     } else if(n.projId){
-      clickHandler = `onclick="closeNotifPanel();if(typeof openProjDetail===\\'function\\')openProjDetail(\\'${n.projId}\\')" style="cursor:pointer"`;
+      clickHandler = `onclick="${markCmd}closeNotifPanel();if(typeof openProjDetail===\\'function\\')openProjDetail(\\'${n.projId}\\')" style="cursor:pointer"`;
+    } else {
+      clickHandler = `onclick="${markCmd}" style="cursor:pointer"`;
     }
     return `<div ${clickHandler} style="padding:11px 14px;border-bottom:1px solid var(--border2);display:flex;gap:10px;${unreadStyle}">
       ${unreadDot}
@@ -8973,11 +8980,39 @@ function renderQueue() {
   // Confirm-related counts (สำหรับ summary "อย่าให้เอกสารหล่น")
   const cntConfirmSent = allWorkers.filter(w => getWorkerConfirmStatus(w) === 'sent').length;
   const cntConfirmRejected = allWorkers.filter(w => getWorkerConfirmStatus(w) === 'rejected').length;
+  const cntConfirmConfirmed = allWorkers.filter(w => getWorkerConfirmStatus(w) === 'confirmed').length;
+  const cntConfirmTotal = cntConfirmSent + cntConfirmRejected + cntConfirmConfirmed; // ใบที่ส่งไปแล้วทั้งหมด
+
+  // === Per-staff breakdown: รวมทุก worker ที่มี confirmStatus !== 'none' จัดกลุ่มตาม staffId ===
+  const perStaffStats = {}; // staffId → {sent, confirmed, rejected, total}
+  allWorkers.forEach(w => {
+    const cs = getWorkerConfirmStatus(w);
+    if(cs === 'none') return;
+    if(!perStaffStats[w.id]) perStaffStats[w.id] = {sent:0, confirmed:0, rejected:0, total:0};
+    perStaffStats[w.id][cs]++;
+    perStaffStats[w.id].total++;
+  });
 
   if (!groups.length) {
     el.innerHTML = '<div style="text-align:center;padding:56px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">ไม่มีรายการในเงื่อนไขนี้</div>';
     return;
   }
+
+  // === Progress bar รวม: ส่งไปแล้วเท่าไหร่ → ยืนยันแล้วเท่าไหร่ ===
+  const confirmPct = cntConfirmTotal > 0 ? Math.round((cntConfirmConfirmed/cntConfirmTotal)*100) : 0;
+  const progressBar = cntConfirmTotal > 0
+    ? `<div style="background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:12px 16px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:12px;color:var(--text);font-weight:700">📊 สถานะใบยืนยันยอดรวม</div>
+          <div style="font-size:11px;color:var(--text2)">ยืนยันแล้ว <strong style="color:var(--green)">${cntConfirmConfirmed}</strong>/<strong>${cntConfirmTotal}</strong> ใบ (${confirmPct}%)</div>
+        </div>
+        <div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:rgba(255,255,255,.05)">
+          ${cntConfirmConfirmed>0?`<div style="width:${(cntConfirmConfirmed/cntConfirmTotal)*100}%;background:var(--green)" title="ยืนยันแล้ว ${cntConfirmConfirmed} ใบ"></div>`:''}
+          ${cntConfirmSent>0?`<div style="width:${(cntConfirmSent/cntConfirmTotal)*100}%;background:#9B6FFF" title="รอยืนยัน ${cntConfirmSent} ใบ"></div>`:''}
+          ${cntConfirmRejected>0?`<div style="width:${(cntConfirmRejected/cntConfirmTotal)*100}%;background:var(--red)" title="ปฏิเสธ ${cntConfirmRejected} ใบ"></div>`:''}
+        </div>
+      </div>`
+    : '';
 
   const summaryBar = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">
     <div class="stat-card" style="padding:14px"><div class="stat-label">โปรเจกต์</div><div style="font-size:24px;font-weight:800;margin-top:6px">${groups.length}</div></div>
@@ -8985,24 +9020,73 @@ function renderQueue() {
     <div class="stat-card" style="padding:14px;border-color:rgba(0,180,255,.35)"><div class="stat-label">🔵 อนุมัติแล้ว</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--cyan)">${cntApproved}</div></div>
     <div class="stat-card" style="padding:14px;border-color:rgba(0,223,160,.35)"><div class="stat-label">💰 รอโอนรวม</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--green)">${fmtB(totalUnpaid)}</div></div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:18px">
+  ${progressBar}
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
     ${cntConfirmSent>0
       ?`<div class="stat-card" style="padding:12px;border-color:rgba(155,111,255,.4);background:rgba(155,111,255,.05);cursor:pointer" onclick="setQueueConfirmFilter('sent',document.getElementById('qcf-sent'))">
           <div class="stat-label">⏳ รอ Staff ยืนยัน</div>
-          <div style="font-size:20px;font-weight:800;margin-top:4px;color:#9B6FFF">${cntConfirmSent} ใบ</div>
+          <div style="font-size:22px;font-weight:800;margin-top:4px;color:#9B6FFF">${cntConfirmSent} ใบ</div>
           <div style="font-size:10px;color:var(--text2);margin-top:2px">คลิกเพื่อกรอง →</div>
         </div>`
-      :`<div class="stat-card" style="padding:12px;opacity:.55"><div class="stat-label">⏳ รอ Staff ยืนยัน</div><div style="font-size:20px;font-weight:800;margin-top:4px;color:var(--text2)">— ไม่มี —</div></div>`
+      :`<div class="stat-card" style="padding:12px;opacity:.55"><div class="stat-label">⏳ รอ Staff ยืนยัน</div><div style="font-size:22px;font-weight:800;margin-top:4px;color:var(--text2)">— ไม่มี —</div></div>`
+    }
+    ${cntConfirmConfirmed>0
+      ?`<div class="stat-card" style="padding:12px;border-color:rgba(0,223,160,.4);background:rgba(0,223,160,.05);cursor:pointer" onclick="setQueueConfirmFilter('confirmed',document.getElementById('qcf-confirmed'))">
+          <div class="stat-label">✅ Staff ยืนยันแล้ว</div>
+          <div style="font-size:22px;font-weight:800;margin-top:4px;color:var(--green)">${cntConfirmConfirmed} ใบ</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">พร้อมจ่ายเงิน →</div>
+        </div>`
+      :`<div class="stat-card" style="padding:12px;opacity:.55"><div class="stat-label">✅ Staff ยืนยันแล้ว</div><div style="font-size:22px;font-weight:800;margin-top:4px;color:var(--text2)">— ไม่มี —</div></div>`
     }
     ${cntConfirmRejected>0
       ?`<div class="stat-card" style="padding:12px;border-color:rgba(255,64,64,.4);background:rgba(255,64,64,.05);cursor:pointer" onclick="setQueueConfirmFilter('rejected',document.getElementById('qcf-rejected'))">
           <div class="stat-label">❌ Staff ปฏิเสธ — ต้องแก้</div>
-          <div style="font-size:20px;font-weight:800;margin-top:4px;color:var(--red)">${cntConfirmRejected} ใบ</div>
+          <div style="font-size:22px;font-weight:800;margin-top:4px;color:var(--red)">${cntConfirmRejected} ใบ</div>
           <div style="font-size:10px;color:var(--text2);margin-top:2px">คลิกเพื่อกรอง →</div>
         </div>`
-      :`<div class="stat-card" style="padding:12px;opacity:.55"><div class="stat-label">❌ Staff ปฏิเสธ</div><div style="font-size:20px;font-weight:800;margin-top:4px;color:var(--text2)">— ไม่มี —</div></div>`
+      :`<div class="stat-card" style="padding:12px;opacity:.55"><div class="stat-label">❌ Staff ปฏิเสธ</div><div style="font-size:22px;font-weight:800;margin-top:4px;color:var(--text2)">— ไม่มี —</div></div>`
     }
-  </div>`;
+  </div>
+  ${(()=>{
+    // === Per-staff breakdown: เรียงตาม "ยังไม่ตอบเยอะสุด" ก่อน ===
+    const staffEntries = Object.entries(perStaffStats);
+    if(!staffEntries.length) return '';
+    staffEntries.sort((a,b) => (b[1].sent + b[1].rejected*2) - (a[1].sent + a[1].rejected*2));
+    const rowsHTML = staffEntries.map(([sid, st]) => {
+      const s = getStaffById(sid);
+      const nick = s?.nickname || s?.name || sid;
+      const av = (nick[0]||'?').toUpperCase();
+      // status pill
+      let statusPill = '';
+      if(st.sent > 0){
+        statusPill = `<span style="padding:2px 9px;border-radius:8px;background:rgba(155,111,255,.18);color:#9B6FFF;font-size:11px;font-weight:700">⏳ รอ ${st.sent}</span>`;
+      }
+      if(st.confirmed > 0){
+        statusPill += `${statusPill?'<span style="margin:0 3px"></span>':''}<span style="padding:2px 9px;border-radius:8px;background:rgba(0,223,160,.15);color:var(--green);font-size:11px;font-weight:700">✅ ยืนยัน ${st.confirmed}</span>`;
+      }
+      if(st.rejected > 0){
+        statusPill += `${statusPill?'<span style="margin:0 3px"></span>':''}<span style="padding:2px 9px;border-radius:8px;background:rgba(255,64,64,.15);color:var(--red);font-size:11px;font-weight:700">❌ ปฏิเสธ ${st.rejected}</span>`;
+      }
+      const pctConfirmed = st.total > 0 ? Math.round((st.confirmed/st.total)*100) : 0;
+      const allDone = st.sent === 0 && st.rejected === 0 && st.confirmed > 0;
+      const borderCol = allDone ? 'rgba(0,223,160,.35)' : st.rejected > 0 ? 'rgba(255,64,64,.35)' : st.sent > 0 ? 'rgba(155,111,255,.35)' : 'var(--border2)';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--bg2);border:1px solid ${borderCol};border-radius:9px;flex-shrink:0;min-width:240px">
+        <div style="width:28px;height:28px;border-radius:50%;background:rgba(0,180,255,.18);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0">${av}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nick}</div>
+          <div style="display:flex;gap:3px;margin-top:3px;align-items:center">${statusPill||'<span style="color:var(--text2);font-size:10px">ไม่มีใบ</span>'}</div>
+        </div>
+        <div style="font-size:11px;color:var(--text2);font-weight:600;white-space:nowrap">${pctConfirmed}%</div>
+      </div>`;
+    }).join('');
+    return `<div style="background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:12px 14px;margin-bottom:18px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+        <div style="font-size:12.5px;color:var(--text);font-weight:700">👥 สถานะรายคน <span style="color:var(--text2);font-weight:500;font-size:11px">· ${staffEntries.length} คน</span></div>
+        <div style="font-size:10.5px;color:var(--text2)">เรียงตาม "ยังไม่ตอบเยอะสุด"</div>
+      </div>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory">${rowsHTML}</div>
+    </div>`;
+  })()}`;
 
   /* ── step dot helpers ── */
   function stepDot(active, done) {
@@ -9870,6 +9954,8 @@ async function openStaffConfirmInbox(){
       </div>`;
     document.body.appendChild(modal);
   }
+  // เปิด modal ใหม่ → reset filter เป็น "ทั้งหมด" เสมอ
+  _staffConfirmTabFilter = 'all';
   await renderStaffConfirmInbox();
   openModal(modalId);
 }
@@ -9909,33 +9995,31 @@ async function renderStaffConfirmInbox(){
   const cntConfirmed = myItems.filter(x=>x.w.confirmStatus==='confirmed').length;
   const cntRejected = myItems.filter(x=>x.w.confirmStatus==='rejected').length;
 
-  // Tabs
-  const tabsHTML = `<div style="display:flex;gap:6px;margin-bottom:14px;background:var(--bg2);padding:4px;border-radius:10px">
-    <button onclick="_setStaffConfirmTab('all',this)" data-tab="all" class="active" style="flex:1;padding:8px 14px;border-radius:7px;border:none;cursor:pointer;font-family:Kanit;font-weight:700;font-size:12px;background:var(--card);color:var(--text)">ทั้งหมด (${myItems.length})</button>
-    <button onclick="_setStaffConfirmTab('sent',this)" data-tab="sent" style="flex:1;padding:8px 14px;border-radius:7px;border:none;cursor:pointer;font-family:Kanit;font-weight:700;font-size:12px;background:transparent;color:var(--text2)">⏳ รอยืนยัน (${cntSent})</button>
-    <button onclick="_setStaffConfirmTab('confirmed',this)" data-tab="confirmed" style="flex:1;padding:8px 14px;border-radius:7px;border:none;cursor:pointer;font-family:Kanit;font-weight:700;font-size:12px;background:transparent;color:var(--text2)">✅ ยืนยันแล้ว (${cntConfirmed})</button>
-    <button onclick="_setStaffConfirmTab('rejected',this)" data-tab="rejected" style="flex:1;padding:8px 14px;border-radius:7px;border:none;cursor:pointer;font-family:Kanit;font-weight:700;font-size:12px;background:transparent;color:var(--text2)">❌ ปฏิเสธ (${cntRejected})</button>
+  // Tabs — สร้าง active state จาก _staffConfirmTabFilter ปัจจุบัน (ไม่ reset)
+  const f = _staffConfirmTabFilter;
+  const tabStyle = (key, color) => {
+    const active = f === key;
+    return `flex:1;padding:8px 14px;border-radius:7px;border:none;cursor:pointer;font-family:Kanit;font-weight:700;font-size:12px;`
+      + (active
+          ? `background:${color||'var(--card)'};color:${color?'#fff':'var(--text)'};box-shadow:0 2px 8px rgba(0,0,0,.25)`
+          : `background:transparent;color:var(--text2)`);
+  };
+  const tabsHTML = `<div style="display:flex;gap:6px;margin-bottom:14px;background:var(--bg2);padding:4px;border-radius:10px;flex-wrap:wrap">
+    <button onclick="_setStaffConfirmTab('all')" data-tab="all" style="${tabStyle('all')}">ทั้งหมด (${myItems.length})</button>
+    <button onclick="_setStaffConfirmTab('sent')" data-tab="sent" style="${tabStyle('sent','#9B6FFF')}">⏳ รอยืนยัน (${cntSent})</button>
+    <button onclick="_setStaffConfirmTab('confirmed')" data-tab="confirmed" style="${tabStyle('confirmed','var(--green)')}">✅ ยืนยันแล้ว (${cntConfirmed})</button>
+    <button onclick="_setStaffConfirmTab('rejected')" data-tab="rejected" style="${tabStyle('rejected','var(--red)')}">❌ ปฏิเสธ (${cntRejected})</button>
   </div>
   <div id="staff-confirm-inbox-list"></div>`;
   body.innerHTML = tabsHTML;
-  _staffConfirmTabFilter = 'all';
+  // ⚠️ ไม่ reset filter ที่นี่ — ให้คงค่าที่ user เลือกไว้ผ่าน _setStaffConfirmTab
   _renderStaffConfirmList(myItems);
 }
 
 let _staffConfirmTabFilter = 'all';
-function _setStaffConfirmTab(tab, btn){
+function _setStaffConfirmTab(tab){
   _staffConfirmTabFilter = tab;
-  // Update tab visual
-  document.querySelectorAll('#staff-confirm-inbox-body [data-tab]').forEach(b=>{
-    b.style.background = 'transparent';
-    b.style.color = 'var(--text2)';
-    b.classList.remove('active');
-  });
-  if(btn){
-    btn.style.background = 'var(--card)';
-    btn.style.color = 'var(--text)';
-    btn.classList.add('active');
-  }
+  // render ใหม่ทั้งหมด — tabs จะอัพเดท active state จาก _staffConfirmTabFilter เอง
   renderStaffConfirmInbox();
 }
 
