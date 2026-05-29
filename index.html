@@ -8652,9 +8652,18 @@ async function lockSnapshot(){
 
 // PAY AMOUNT
 function openPayAmt(projId,workerId,slot){
-  payAmtTarget={projId,workerId,slot};const p=getProjects().find(x=>x.id===projId);const w=p?.workers.find(x=>x.id===workerId&&x.slot===slot);const s=getStaffById(workerId);if(!s)return;
-  document.getElementById('payamt-info').innerHTML=`<div style="padding:12px;background:var(--bg2);border-radius:10px"><div style="font-weight:700">${s.name} (${s.nickname})</div><div style="font-size:12px;color:var(--text2)">${(()=>{const pre=(allSlots[0]||'').split('-')[0];const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return lbl[pre]||CATS[s.category]?.label||'';})()}} | ${s.bank} ${s.account}</div></div>`;
-  document.getElementById('payamt-val').value=w?.amount||0;document.getElementById('payamt-note').value=w?.note||'';
+  payAmtTarget={projId,workerId,slot};
+  const p=getProjects().find(x=>x.id===projId);
+  const w=p?.workers.find(x=>x.id===workerId&&x.slot===slot);
+  const s=getStaffById(workerId);
+  if(!s){ toast('ไม่พบข้อมูลทีมงาน','error'); return; }
+  // 🔧 Fix: ใช้ slot ที่ส่งเข้ามาเป็น parameter (เดิมอ้าง allSlots[0] ที่ไม่มีอยู่ → ทำให้ฟังก์ชันล้ม)
+  const slotKey = (slot||'').split('-')[0];
+  const slotLbl = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+  const roleLabel = slotLbl[slotKey] || CATS[s.category]?.label || '';
+  document.getElementById('payamt-info').innerHTML=`<div style="padding:12px;background:var(--bg2);border-radius:10px"><div style="font-weight:700">${s.name} (${s.nickname})</div><div style="font-size:12px;color:var(--text2)">${roleLabel} | ${s.bank||''} ${s.account||''}</div></div>`;
+  document.getElementById('payamt-val').value=w?.amount||0;
+  document.getElementById('payamt-note').value=w?.note||'';
   openModal('modal-payamt');
 }
 async function savePayAmt(){
@@ -8947,30 +8956,42 @@ function renderQueue() {
   const selectedMonth = monthSel ? monthSel.value : '';
   const selectedQYear = yearSel  ? yearSel.value  : '';
 
-  // Build project groups that match filters
-  const groups = [];
-  projs.forEach(p => {
-    // FIX: รอบจ่ายอ้างอิงจาก startDate (วันเริ่มงาน) ไม่ใช่ deadline
+  // === Step 1: Filter projects by เดือน/ปี/รอบ (date filters only) ===
+  //   inScopeProjs = projects ที่อยู่ในช่วงเวลาที่เลือก (ก่อนกรอง status/confirm)
+  const inScopeProjs = projs.filter(p => {
     const _ref = p.startDate || p.deadline;
     if (selectedQYear && _ref) {
-      if (new Date(_ref).getFullYear() !== parseInt(selectedQYear)) return;
+      if (new Date(_ref).getFullYear() !== parseInt(selectedQYear)) return false;
     }
     if (selectedMonth && _ref) {
       const d = new Date(_ref);
       const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      if (key !== selectedMonth) return;
+      if (key !== selectedMonth) return false;
     }
     if (queueCycleFilter !== 'all' && _ref) {
       const day = new Date(_ref).getDate();
-      if (queueCycleFilter === '1' && day > 15) return;
-      if (queueCycleFilter === '2' && day <= 15) return;
+      if (queueCycleFilter === '1' && day > 15) return false;
+      if (queueCycleFilter === '2' && day <= 15) return false;
     }
+    return true;
+  });
+
+  // === Step 2: "All workers in scope" — ใช้นับ badges (ไม่กรอง status/confirm) ===
+  //   เพื่อให้ badge counts ขึ้นตลอด ไม่หายเมื่อกดกรอง
+  const allWorkers = [];
+  inScopeProjs.forEach(p => {
+    (p.workers||[]).forEach(w => {
+      if(getStaffById(w.id)) allWorkers.push(w);
+    });
+  });
+
+  // === Step 3: Build display groups — apply status + confirm filter ===
+  const groups = [];
+  inScopeProjs.forEach(p => {
     const workers = (p.workers||[]).filter(w => {
-      // แสดงทุก worker แม้จะหา staff profile ไม่เจอ
       const s = getStaffById(w.id);
       if(!s) return false;
       if(queueFilter !== 'all' && w.status !== queueFilter) return false;
-      // Confirm filter
       if(queueConfirmFilter !== 'all'){
         const cs = getWorkerConfirmStatus(w);
         if(cs !== queueConfirmFilter) return false;
@@ -8980,8 +9001,7 @@ function renderQueue() {
     if (workers.length) groups.push({ proj: p, workers });
   });
 
-  // Grand totals
-  const allWorkers = groups.flatMap(g => g.workers);
+  // Grand totals — based on allWorkers (in-scope, unfiltered) ให้ badge ค้างตลอด
   const cntPending  = allWorkers.filter(w => w.status === 'pending').length;
   const cntApproved = allWorkers.filter(w => w.status === 'approved').length;
   const cntPaid     = allWorkers.filter(w => w.status === 'paid').length;
@@ -8994,11 +9014,12 @@ function renderQueue() {
   const cntConfirmTotal = cntConfirmSent + cntConfirmRejected + cntConfirmConfirmed; // ใบที่ส่งไปแล้วทั้งหมด
 
   // === Build rejection banner: list ทุก worker ที่ถูกปฏิเสธ — แสดงเด่น ๆ ด้านบน ===
+  //   ใช้ inScopeProjs (unfiltered by status/confirm) — banner ขึ้นตลอด ไม่ว่าจะกดกรองอะไร
   const rejectedItems = [];
-  groups.forEach(g => {
-    g.workers.forEach(w => {
-      if(getWorkerConfirmStatus(w) === 'rejected'){
-        rejectedItems.push({p: g.proj, w});
+  inScopeProjs.forEach(p => {
+    (p.workers||[]).forEach(w => {
+      if(getStaffById(w.id) && getWorkerConfirmStatus(w) === 'rejected'){
+        rejectedItems.push({p, w});
       }
     });
   });
@@ -12868,7 +12889,7 @@ function onVcProjChange() {
       <div style="width:32px;height:32px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">${s.nickname[0]}</div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:13px">${s.name} <span style="color:var(--text2);font-size:11px">(${s.nickname})</span></div>
-        <div style="font-size:11px;color:${color}">${(()=>{const pre=(allSlots[0]||'').split('-')[0];const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return lbl[pre]||CATS[s.category]?.label||'';})()}</div>
+        <div style="font-size:11px;color:${color}">${(()=>{const pre=(w.slot||'').split('-')[0];const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return lbl[pre]||CATS[s.category]?.label||'';})()}</div>
       </div>
       ${s.qrUrl?`<div style="flex-shrink:0" title="QR โอนเงิน">${_qrImgHtml(s.qrUrl,'thumb',{staffName:s.nickname||s.name,clickToView:true})}</div>`:''}
       <div style="text-align:right">
