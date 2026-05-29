@@ -12587,11 +12587,14 @@ function renderMyDash(){
   const f = window._myFilter;
   const q = (document.getElementById('my-search')?.value || '').toLowerCase();
 
-  // === 🧠 Smart Identity Matching ===
-  // คนเดียวกัน ก็ต่อเมื่อ:
-  //   • id ตรง (เคสปกติ), หรือ
-  //   • email ตรง (email ไม่ซ้ำกันในระบบ), หรือ
-  //   • ชื่อเล่น + ชื่อจริง + นามสกุล ตรงกันหมดทั้ง 3 (กันชื่อซ้ำ)
+  // === 🧠 Smart Identity Matching (ผ่อนปรนขึ้น — รองรับ staff รับงานเข้ามาก่อนสมัครบัญชี) ===
+  //   ลำดับการเช็ค:
+  //   (1) id ตรง (เคสปกติ)
+  //   (2) email ตรง
+  //   (3) ชื่อเล่น+ชื่อ+นามสกุล ครบ 3
+  //   (4) ชื่อเล่น+ชื่อ ตรง (กรณีไม่มี lastName)
+  //   (5) ชื่อเล่นตรง + เป็นคนเดียวในระบบที่ใช้ชื่อเล่นนี้
+  //   (6) ชื่อตรง + เป็นคนเดียวในระบบที่ใช้ชื่อนี้
   const norm = (str) => (str||'').toString().trim().toLowerCase().replace(/\s+/g,' ');
   const allStaffData = getAllStaff() || [];
 
@@ -12603,12 +12606,24 @@ function renderMyDash(){
   myEmailRaw.forEach(e => myEmails.add(e.toLowerCase()));
   if(currentUser.email) myEmails.add(String(currentUser.email).trim().toLowerCase());
 
-  // ชื่อทั้ง 3 ของเรา (ต้องครบทั้ง 3)
+  // ชื่อของเรา (จาก staff record · เก็บแยกเพื่อ partial match)
   const myNick = norm(s.nickname);
   const myName = norm(s.name);
   const myLast = norm(s.lastName);
   const myHasAll3Names = myNick && myName && myLast;
   const my3Key = myHasAll3Names ? `${myNick}|${myName}|${myLast}` : null;
+
+  // นับว่าใน staff DB มีกี่คนที่ใช้ชื่อเล่น/ชื่อเดียวกับเรา — ใช้ตัดสินว่าจะ match แบบหลวมได้ไหม
+  let _sameNickCount = 0, _sameNameCount = 0;
+  if(myNick){
+    allStaffData.forEach(x => { if(norm(x.nickname) === myNick) _sameNickCount++; });
+  }
+  if(myName){
+    allStaffData.forEach(x => { if(norm(x.name) === myName) _sameNameCount++; });
+  }
+  // ถ้านับรวมตัวเองด้วยและเหลือคนอื่นอีก → ไม่ unique
+  const myNickIsUnique = myNick && _sameNickCount <= 1;
+  const myNameIsUnique = myName && _sameNameCount <= 1;
 
   function _workerIsMe(w){
     if(!w) return false;
@@ -12633,23 +12648,48 @@ function renderMyDash(){
       }
     }
 
-    // (3) ชื่อเล่น+ชื่อจริง+นามสกุล ตรงครบทั้ง 3 (ทำได้เฉพาะเมื่อเรามี 3 field ครบ)
-    if(my3Key){
-      const target = wStaff || w;
-      const tNick = norm(target.nickname);
-      const tName = norm(target.name);
-      const tLast = norm(target.lastName);
-      if(tNick && tName && tLast){
-        const t3 = `${tNick}|${tName}|${tLast}`;
-        if(t3 === my3Key) return true;
-      }
+    const target = wStaff || w;
+    const tNick = norm(target.nickname);
+    const tName = norm(target.name);
+    const tLast = norm(target.lastName);
+
+    // (3) ครบทั้ง 3 ตรงกัน
+    if(my3Key && tNick && tName && tLast){
+      if(`${tNick}|${tName}|${tLast}` === my3Key) return true;
     }
+
+    // (4) ชื่อเล่น+ชื่อ ตรงกัน (ครอบกรณีไม่มี lastName)
+    if(myNick && myName && tNick && tName){
+      if(tNick === myNick && tName === myName) return true;
+    }
+
+    // (5) ชื่อเล่นตรง + เป็น unique → safe match
+    //     (กันสับสน: เช็คว่าทั้งใน staff DB มีแค่คนเดียวที่ใช้ชื่อเล่นนี้)
+    if(myNickIsUnique && tNick && tNick === myNick) return true;
+
+    // (6) ชื่อจริงตรง + เป็น unique → safe match
+    if(myNameIsUnique && tName && tName === myName) return true;
 
     return false;
   }
 
   // Collect all items
   const projs = getProjects();
+  // === Diagnostic: นับจำนวน workers ทั้งหมดในระบบ (เพื่อ debug ถ้าเจอ 0) ===
+  let _totalWorkersInSystem = 0;
+  projs.forEach(p => { _totalWorkersInSystem += (p.workers||[]).length; });
+  window._myDashDebug = {
+    staffId: currentUser?.staffId,
+    email: currentUser?.email,
+    staffNick: s?.nickname,
+    staffName: s?.name,
+    staffLast: s?.lastName,
+    myIds: Array.from(myIds),
+    myEmails: Array.from(myEmails),
+    totalWorkers: _totalWorkersInSystem,
+    sameNickCount: _sameNickCount,
+    sameNameCount: _sameNameCount,
+  };
   const allItems = [];
   projs.forEach(p => {
     const myWs = (p.workers||[]).filter(_workerIsMe);
@@ -12809,7 +12849,32 @@ function renderMyDash(){
   const tb = document.getElementById('my-proj-table');
   if(!tb) return;
   if(!filtered.length){
-    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:30px">' + (allItems.length?'ไม่พบรายการตามเงื่อนไข — ลองเปลี่ยน filter':'ยังไม่มีงาน') + '</td></tr>';
+    // ถ้าไม่มีรายการ + ระบบมี workers อยู่ → แสดงข้อความช่วยเหลือพร้อม info สำหรับ admin
+    let emptyMsg;
+    if(allItems.length){
+      emptyMsg = 'ไม่พบรายการตามเงื่อนไข — ลองเปลี่ยน filter';
+    } else if((window._myDashDebug?.totalWorkers||0) > 0){
+      // ระบบมีงานแต่ของฉันไม่เจอ → น่าจะ identity mismatch
+      const dbg = window._myDashDebug;
+      emptyMsg = `<div style="text-align:left;max-width:600px;margin:0 auto">
+        <div style="font-size:14px;font-weight:700;color:var(--orange);margin-bottom:8px">⚠️ ยังไม่พบงานของคุณในระบบ</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:10px">
+          ถ้าคุณเคยทำงานแล้วแต่ไม่เห็นยอด อาจเป็นเพราะบัญชีของคุณยังไม่ได้เชื่อมโยงกับข้อมูลทีมในระบบ<br>
+          กรุณาส่งข้อมูลด้านล่างนี้ให้แอดมินเพื่อแก้ไข:
+        </div>
+        <div style="background:rgba(0,0,0,.3);padding:10px 12px;border-radius:8px;font-family:monospace;font-size:11px;color:var(--text);text-align:left">
+          <div>• Staff ID: <strong>${dbg.staffId || '(ไม่มี)'}</strong></div>
+          <div>• Email: <strong>${dbg.email || '(ไม่มี)'}</strong></div>
+          <div>• ชื่อเล่น: <strong>${dbg.staffNick || '(ไม่มี)'}</strong></div>
+          <div>• ชื่อจริง: <strong>${dbg.staffName || '(ไม่มี)'}</strong></div>
+          <div>• นามสกุล: <strong>${dbg.staffLast || '(ไม่มี)'}</strong></div>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:10px">💡 แอดมินสามารถใช้ "ซ่อม staffId" ในหน้าตั้งค่าเพื่อแก้ไขได้</div>
+      </div>`;
+    } else {
+      emptyMsg = 'ยังไม่มีงาน';
+    }
+    tb.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:30px">${emptyMsg}</td></tr>`;
     return;
   }
   if(isMobile){
@@ -17083,9 +17148,13 @@ function startCalcDraftsSync(){
     const pg = document.getElementById('page-calc');
     if(pg && !pg.classList.contains('hidden')) try{renderCalcList();}catch(e){}
   }, err => {
-    // Error callback (สำคัญ! Firebase listener ต้องมี error handler ไม่งั้นเงียบหาย)
-    console.error('[calcDrafts] realtime listener FAILED:', err);
-    toast('⚠️ ฟัง real-time แบบร่างไม่ได้: ' + (err.message||err.code||'unknown') + ' · ตรวจสอบ Firebase Rules','error');
+    // ─ calcDrafts ใช้สำหรับ "หน้าคำนวนราคา" (admin only) — staff ไม่ต้องเข้าถึง ─
+    //   ถ้า permission_denied สำหรับ staff ก็เป็นเรื่องปกติ ไม่ต้องโชว์ toast รบกวน
+    console.warn('[calcDrafts] listener disabled (permission):', err?.code || err?.message);
+    // โชว์ toast เฉพาะ admin ที่ควรเข้าถึงได้แต่กลับ deny
+    if(currentUser?.role === 'admin'){
+      toast('⚠️ ฟัง real-time แบบร่างไม่ได้: ' + (err.message||err.code||'unknown'),'warn');
+    }
   });
 }
 
