@@ -10311,7 +10311,7 @@ function renderConfirmCart(){
       const slotLbl = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', mgr:'🗂️ Manager'}[slotKey] || slotKey;
       const slotSuf = (item.slot||'').includes('main') ? ' · หลัก' : (item.slot||'').includes('-sub') ? ' · รอง' : '';
       return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.04);border-radius:8px;margin-top:6px;flex-wrap:wrap">
-        <input type="checkbox" data-cart-item="${key}" data-cart-staff-of="${staffId}" checked style="cursor:pointer;width:16px;height:16px;accent-color:#9B6FFF;flex-shrink:0">
+        <input type="checkbox" data-cart-item="${key}" data-cart-staff-of="${staffId}" checked onchange="_updateCartTotals()" style="cursor:pointer;width:16px;height:16px;accent-color:#9B6FFF;flex-shrink:0">
         <div style="flex:1;min-width:140px">
           <div style="font-size:12.5px;font-weight:700;color:var(--text)">${projName}</div>
           <div style="font-size:10.5px;color:var(--text2);margin-top:2px">${slotLbl}${slotSuf}</div>
@@ -10337,32 +10337,32 @@ function renderConfirmCart(){
           <div style="font-size:11px;color:var(--text2);margin-top:2px">${s?.bank||'—'} ${s?.account||''}${s?.promptpay?' · 📱 '+s.promptpay:''}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:10.5px;color:var(--text2)">${items.length} โปรเจกต์</div>
-          <div style="font-size:17px;font-weight:800;color:var(--green)">${fmtB(subTotal)}</div>
+          <div style="font-size:10.5px;color:var(--text2)" data-staff-count="${staffId}">${items.length} โปรเจกต์</div>
+          <div style="font-size:17px;font-weight:800;color:var(--green)" data-staff-subtotal="${staffId}">${fmtB(subTotal)}</div>
         </div>
       </div>
       ${itemsHTML}
     </div>`;
   }).join('');
 
-  // Header สรุปรวม + bulk actions
+  // Header สรุปรวม + bulk actions  — ใส่ ID ให้อัพเดท live ตอน toggle checkbox
   body.innerHTML = `
     <div style="background:linear-gradient(135deg,rgba(155,111,255,.13),rgba(155,111,255,.04));border:1.5px solid rgba(155,111,255,.4);border-radius:11px;padding:12px 14px;margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
           <div>
-            <div style="font-size:10.5px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">สมาชิก</div>
-            <div style="font-size:17px;font-weight:800;color:#fff">${staffEntries.length} คน</div>
+            <div style="font-size:10.5px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">เลือก (สมาชิก)</div>
+            <div style="font-size:17px;font-weight:800;color:#fff"><span id="cart-total-people">${staffEntries.length}</span> คน</div>
           </div>
           <div style="width:1px;height:32px;background:rgba(255,255,255,.15)"></div>
           <div>
-            <div style="font-size:10.5px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">รายการ</div>
-            <div style="font-size:17px;font-weight:800;color:#fff">${totalItems}</div>
+            <div style="font-size:10.5px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">เลือก (รายการ)</div>
+            <div style="font-size:17px;font-weight:800;color:#fff" id="cart-total-items">${totalItems}</div>
           </div>
           <div style="width:1px;height:32px;background:rgba(255,255,255,.15)"></div>
           <div>
-            <div style="font-size:10.5px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">ยอดรวม</div>
-            <div style="font-size:17px;font-weight:800;color:var(--green)">${fmtB(totalAmt)}</div>
+            <div style="font-size:10.5px;color:var(--text2);font-weight:700;letter-spacing:.5px;text-transform:uppercase">ยอดรวมที่จะส่ง</div>
+            <div style="font-size:17px;font-weight:800;color:var(--green)" id="cart-total-amount">${fmtB(totalAmt)}</div>
           </div>
         </div>
       </div>
@@ -10384,9 +10384,65 @@ function renderConfirmCart(){
 
 function toggleCartStaffCheck(staffId, checked){
   document.querySelectorAll(`[data-cart-staff-of="${staffId}"]`).forEach(el => { el.checked = checked; });
+  _updateCartTotals();
 }
 function cartSelectAll(checked){
-  document.querySelectorAll('[data-cart-item], [data-cart-staff]').forEach(el => { el.checked = checked; });
+  document.querySelectorAll('[data-cart-item], [data-cart-staff]').forEach(el => { el.checked = checked; el.indeterminate = false; });
+  _updateCartTotals();
+}
+
+// 🛒 Live recalc — อ่าน checkbox state จาก DOM แล้วอัพเดทยอดรวม/ต่อคน
+function _updateCartTotals(){
+  let totalItems = 0, totalAmt = 0;
+  const staffStats = new Map(); // staffId → {items, sum}
+  document.querySelectorAll('[data-cart-item]').forEach(cb => {
+    if(!cb.checked) return;
+    const key = cb.dataset.cartItem;
+    const item = _confirmCart.get(key);
+    if(!item) return;
+    const amt = Number(item.customAmount) || 0;
+    totalItems++;
+    totalAmt += amt;
+    if(!staffStats.has(item.workerId)) staffStats.set(item.workerId, {items:0, sum:0});
+    const st = staffStats.get(item.workerId);
+    st.items++;
+    st.sum += amt;
+  });
+  // อัพเดท Header
+  const peopleEl = document.getElementById('cart-total-people');
+  const itemsEl = document.getElementById('cart-total-items');
+  const amtEl = document.getElementById('cart-total-amount');
+  if(peopleEl) peopleEl.textContent = String(staffStats.size);
+  if(itemsEl) itemsEl.textContent = String(totalItems);
+  if(amtEl) amtEl.textContent = fmtB(totalAmt);
+  // อัพเดท per-staff subtotal + count (ทั้งคนที่มี/ไม่มี item ติ๊ก)
+  document.querySelectorAll('[data-staff-subtotal]').forEach(el => {
+    const sid = el.dataset.staffSubtotal;
+    const data = staffStats.get(sid);
+    el.textContent = fmtB(data?.sum || 0);
+  });
+  document.querySelectorAll('[data-staff-count]').forEach(el => {
+    const sid = el.dataset.staffCount;
+    const data = staffStats.get(sid);
+    el.textContent = (data?.items || 0) + ' โปรเจกต์';
+  });
+  // ปรับสถานะ master checkbox ของแต่ละคน (all/none/indeterminate)
+  document.querySelectorAll('[data-cart-staff]').forEach(masterCb => {
+    const sid = masterCb.dataset.cartStaff;
+    const items = document.querySelectorAll(`[data-cart-staff-of="${sid}"]`);
+    if(!items.length) return;
+    const checkedCount = Array.from(items).filter(i => i.checked).length;
+    if(checkedCount === items.length){
+      masterCb.checked = true;
+      masterCb.indeterminate = false;
+    } else if(checkedCount === 0){
+      masterCb.checked = false;
+      masterCb.indeterminate = false;
+    } else {
+      masterCb.checked = false;
+      masterCb.indeterminate = true;
+    }
+  });
 }
 function updateCartItemAmount(key, val){
   const item = _confirmCart.get(key);
