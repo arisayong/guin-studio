@@ -9797,15 +9797,23 @@ function askRevertWaiting(projId, workerId, slot){
 // ════════════════════════════════════════════════════════════
 
 // Helper: หา worker + เก็บ confirm fields
+// 🔧 ใช้ saveProjectMerge เพื่อ fetch ล่าสุดจาก Firebase ก่อนแก้ → กัน race condition ตอน bulk confirm
 async function _updateWorkerConfirm(projId, workerId, slot, updates){
-  const projs = getProjects();
-  const idx = projs.findIndex(x => x.id === projId);
-  if(idx < 0){ toast('ไม่พบโปรเจกต์','error'); return false; }
-  const p = projs[idx];
-  const wIdx = (p.workers||[]).findIndex(x => x.id === workerId && x.slot === slot);
-  if(wIdx < 0){ toast('ไม่พบทีมงาน','error'); return false; }
-  Object.assign(p.workers[wIdx], updates);
-  await saveProjectDB(p);
+  let workerFound = true;
+  const result = await saveProjectMerge(projId, (p)=>{
+    const w = (p.workers||[]).find(x => x.id === workerId && x.slot === slot);
+    if(!w){ workerFound = false; return; }
+    Object.assign(w, updates);
+  });
+  if(!result.ok){
+    console.warn('_updateWorkerConfirm save failed:', result.error);
+    toast('บันทึกไม่สำเร็จ: '+(result.error?.message||''),'error');
+    return false;
+  }
+  if(!workerFound){
+    toast('ไม่พบทีมงาน (slot อาจเปลี่ยน)','error');
+    return false;
+  }
   return true;
 }
 
@@ -10135,25 +10143,43 @@ async function staffConfirmAllPending(){
   if(!confirm(`✅ ยืนยันยอดทั้งหมด ${items.length} รายการ?\n\nยอดรวม: ${fmtB(sum)}\n\nรายการ:\n${preview}${more}\n\nเมื่อยืนยันแล้ว Admin จะโอนเงินให้คุณตามยอดเหล่านี้`)) return;
   toast(`✅ กำลังยืนยัน ${items.length} รายการ...`,'info');
   let ok = 0;
+  const failed = []; // {p, w, err}
   for(const {p,w} of items){
-    const success = await _updateWorkerConfirm(p.id, w.id, w.slot, {
-      confirmStatus: 'confirmed',
-      confirmRespondedAt: new Date().toISOString(),
-      confirmRejectReason: null,
-    });
-    if(success) ok++;
+    try {
+      const success = await _updateWorkerConfirm(p.id, w.id, w.slot, {
+        confirmStatus: 'confirmed',
+        confirmRespondedAt: new Date().toISOString(),
+        confirmRejectReason: null,
+      });
+      if(success) ok++;
+      else failed.push({p, w, err: 'update returned false'});
+    } catch(e){
+      console.warn('confirm item error:', p.id, w.slot, e);
+      failed.push({p, w, err: e.message});
+    }
   }
-  // แจ้ง admin 1 ฉบับ (รวม)
-  try {
-    const s = getStaffById(currentUser.staffId);
-    await addNotificationToAdmins({
-      type:'payment',
-      title:`✅ Staff ยืนยันยอด ${ok} รายการ`,
-      text:`${s?.nickname || currentUser.staffId} ยืนยันรวม ${fmtB(sum)} · ${ok} โปรเจกต์`,
-      projId: items[0].p.id,
-    });
-  } catch(e){}
-  toast(`✅ ยืนยัน ${ok} รายการแล้ว — Admin จะดำเนินการโอน`,'success');
+  // แจ้ง admin 1 ฉบับ (รวม) — เฉพาะที่สำเร็จ
+  if(ok > 0){
+    try {
+      const s = getStaffById(currentUser.staffId);
+      const okItems = items.filter(({p,w}) => !failed.find(f => f.p.id===p.id && f.w.slot===w.slot));
+      const okSum = okItems.reduce((a,{w})=>a+(w.confirmAmount||w.amount||0),0);
+      await addNotificationToAdmins({
+        type:'payment',
+        title:`✅ Staff ยืนยันยอด ${ok} รายการ`,
+        text:`${s?.nickname || currentUser.staffId} ยืนยันรวม ${fmtB(okSum)} · ${ok} โปรเจกต์`,
+        projId: okItems[0]?.p.id || items[0].p.id,
+      });
+    } catch(e){ console.warn('notify admins:', e); }
+  }
+  // รายงานผล — ถ้ามี fail แสดงรายการชัด ๆ
+  if(failed.length > 0){
+    const failList = failed.slice(0,5).map(f => `• ${f.p?.name || f.p?.id || '?'}: ${f.err}`).join('\n');
+    toast(`⚠️ ยืนยันสำเร็จ ${ok}/${items.length} รายการ · ล้มเหลว ${failed.length} (กดยืนยันใหม่อีกครั้ง)`,'warn');
+    console.warn('Failed items:\n'+failList);
+  } else {
+    toast(`✅ ยืนยัน ${ok} รายการแล้ว — Admin จะดำเนินการโอน`,'success');
+  }
   await renderStaffConfirmInbox();
 }
 
@@ -10212,26 +10238,40 @@ async function _submitRejectAllReason(){
   closeModal('modal-reject-all-reason');
   toast(`❌ กำลังปฏิเสธ ${items.length} รายการ...`,'info');
   let ok = 0;
+  const failed = [];
   for(const {p,w} of items){
-    const success = await _updateWorkerConfirm(p.id, w.id, w.slot, {
-      confirmStatus: 'rejected',
-      confirmRespondedAt: new Date().toISOString(),
-      confirmRejectReason: reason,
-    });
-    if(success) ok++;
+    try {
+      const success = await _updateWorkerConfirm(p.id, w.id, w.slot, {
+        confirmStatus: 'rejected',
+        confirmRespondedAt: new Date().toISOString(),
+        confirmRejectReason: reason,
+      });
+      if(success) ok++;
+      else failed.push({p, w, err: 'update returned false'});
+    } catch(e){
+      console.warn('reject item error:', p.id, w.slot, e);
+      failed.push({p, w, err: e.message});
+    }
   }
-  // แจ้ง admin 1 ฉบับรวม
-  try {
-    const s = getStaffById(currentUser.staffId);
-    const sum = items.reduce((a,{w})=>a+(w.confirmAmount||w.amount||0),0);
-    await addNotificationToAdmins({
-      type:'payment',
-      title:`❌ Staff ปฏิเสธยอด ${ok} รายการ`,
-      text:`${s?.nickname || currentUser.staffId} ปฏิเสธรวม ${fmtB(sum)}${reason?' · "'+reason.slice(0,40)+(reason.length>40?'...':'')+'"':''}`,
-      projId: items[0].p.id,
-    });
-  } catch(e){}
-  toast(`❌ ส่งคำปฏิเสธ ${ok} รายการแล้ว`,'info');
+  // แจ้ง admin 1 ฉบับรวม — เฉพาะที่สำเร็จ
+  if(ok > 0){
+    try {
+      const s = getStaffById(currentUser.staffId);
+      const okItems = items.filter(({p,w}) => !failed.find(f => f.p.id===p.id && f.w.slot===w.slot));
+      const okSum = okItems.reduce((a,{w})=>a+(w.confirmAmount||w.amount||0),0);
+      await addNotificationToAdmins({
+        type:'payment',
+        title:`❌ Staff ปฏิเสธยอด ${ok} รายการ`,
+        text:`${s?.nickname || currentUser.staffId} ปฏิเสธรวม ${fmtB(okSum)}${reason?' · "'+reason.slice(0,40)+(reason.length>40?'...':'')+'"':''}`,
+        projId: okItems[0]?.p.id || items[0].p.id,
+      });
+    } catch(e){ console.warn('notify admins reject:', e); }
+  }
+  if(failed.length > 0){
+    toast(`⚠️ ปฏิเสธสำเร็จ ${ok}/${items.length} รายการ · ล้มเหลว ${failed.length} (กดปฏิเสธอีกครั้ง)`,'warn');
+  } else {
+    toast(`❌ ส่งคำปฏิเสธ ${ok} รายการแล้ว`,'info');
+  }
   await renderStaffConfirmInbox();
 }
 
