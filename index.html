@@ -1916,6 +1916,7 @@ body.sidebar-collapsed .main-content{
    <div class="tabs" id="docs-main-tabs">
     <div class="tab active" onclick="switchDocsMain('client',this)">📋 ใบเสนอราคา</div>
     <div class="tab" onclick="switchDocsMain('invoice',this)">🧾 ใบแจ้งหนี้</div>
+    <div class="tab" onclick="switchDocsMain('worker',this)">💸 ใบสำคัญจ่ายทีม</div>
     <div class="tab" onclick="switchDocsMain('history',this)">📁 ประวัติเอกสาร</div>
    </div>
 
@@ -13307,6 +13308,14 @@ function switchDocsMain(tab, el) {
   if (tab === 'history') renderDocsHistory();
   if (tab === 'client') { try{renderQtDocNoBar();}catch(e){} }
   if (tab === 'invoice') { initInvItems(); renderAdminSigWidget(); initInvPayChips(); try{renderInvDocNoBar();}catch(e){} const _id=document.getElementById('inv-date'); if(_id&&!_id.value) _id.value=isoToThai(new Date().toISOString().split('T')[0]); }
+  // 💸 Worker tab: populate dropdown + set default date + render byperson list
+  if (tab === 'worker') {
+    try { populateDocsProjSelects(); } catch(e){}
+    const _vd = document.getElementById('vc-date');
+    if(_vd && !_vd.value) _vd.value = isoToThai(new Date().toISOString().split('T')[0]);
+    // sync mode toggle visual + render byperson เริ่มต้น (โหมด default จาก _vcMode)
+    try { setVcMode(_vcMode || 'byproj'); } catch(e){}
+  }
 }
 function populateDocsProjSelects() {
   // qt-proj and inv-proj dropdowns removed — both now use multi-select pickers
