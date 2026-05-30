@@ -9694,6 +9694,7 @@ function renderQueue() {
     if (status === 'paid') return `
       <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
         <span style="font-size:11px;color:var(--green);font-weight:700">✅ โอนแล้ว</span>
+        <button class="btn btn-xs btn-outline" style="color:var(--orange);border-color:rgba(255,158,0,.45);font-size:10px;padding:3px 7px" onclick="unpayWorker('${pid}','${wid}','${slot}')" title="ยกเลิกการจ่าย (กรณีจ่ายผิด/ออกใบผิด)">↩️ ยกเลิก</button>
       </div>`;
     if (status === 'waiting_client') return `
       <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
@@ -14003,6 +14004,9 @@ function buildMultiVoucherHTML(opts){
       <td style="padding:12px 14px;text-align:right;font-weight:600;color:#111827">฿${(it.amount||0).toLocaleString()}</td>
     </tr>`;
   }).join('');
+  // ─ QR Code — รองรับหลายชื่อ field (qrUrl, qrCode, qr, paymentQR, qr_url) + normalize Google Drive ─
+  const rawQr = opts.staff.qrUrl || opts.staff.qrCode || opts.staff.qr || opts.staff.paymentQR || opts.staff.qr_url || opts.staff['QR Code สำหรับรับเงิน'] || opts.staff['QR Code'] || '';
+  const qrSrc = rawQr ? (typeof _normalizeQrUrl === 'function' ? _normalizeQrUrl(rawQr) : rawQr) : '';
   // Bank info section (ของผู้รับ — ฝั่งทีมงาน)
   const bankCardHTML = `<div style="padding:0 30px 18px">
     <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:9px;font-weight:700">💳 ช่องทางรับเงิน</div>
@@ -14017,7 +14021,7 @@ function buildMultiVoucherHTML(opts){
         <div style="font-size:11px;color:#6b7280;margin-top:2px">ชื่อบัญชี: <strong style="color:#374151">${opts.staff.name||opts.staff.nickname||'—'}</strong></div>
         ${opts.staff.promptpay?`<div style="font-size:11px;color:#6b7280;margin-top:2px">📱 พร้อมเพย์: <strong style="color:#374151">${opts.staff.promptpay}</strong></div>`:''}
       </div>
-      ${opts.staff.qrUrl?`<img src="${opts.staff.qrUrl}" style="width:88px;height:88px;object-fit:contain;background:#fff;border:1px solid #e5e7eb;border-radius:6px;flex-shrink:0">`:''}
+      ${qrSrc ? `<img src="${qrSrc}" alt="QR" style="width:96px;height:96px;object-fit:contain;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:3px;flex-shrink:0" onerror="this.onerror=null;this.style.display='none';this.nextElementSibling&&(this.nextElementSibling.style.display='inline-flex')"><a href="${String(rawQr).replace(/"/g,'&quot;')}" target="_blank" rel="noopener" style="display:none;width:96px;height:96px;flex-shrink:0;background:#E3F2FF;border:1px solid #1565FF;border-radius:6px;color:#1565FF;font-size:11px;text-decoration:none;font-weight:700;align-items:center;justify-content:center;text-align:center;padding:6px">🔗 เปิด<br>QR</a>` : ''}
     </div>
   </div>`;
   return `<div id="printable-voucher" data-vno="${opts.vNo}" style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:620px;margin:0 auto;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb">
@@ -14122,7 +14126,8 @@ function previewPersonVoucher(staffId){
   downloadDocHTML(html, 'preview-voucher-'+(s.nickname||staffId));
 }
 
-async function issuePersonVoucher(staffId){
+// 👁️ STEP 1: เปิด Preview Modal — ยังไม่ commit ใด ๆ · admin ตรวจก่อน
+function issuePersonVoucher(staffId){
   const items = _vcGetPersonItems(staffId);
   const sel = _vcByPersonSelected.get(staffId) || new Set();
   const selectedItems = items.filter(it => sel.has(`${it.p.id}|${it.w.slot}`));
@@ -14131,11 +14136,58 @@ async function issuePersonVoucher(staffId){
   const totalAmt = selectedItems.reduce((sum, it) => sum + (it.w.amount||0), 0);
   const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
   const note = document.getElementById('vc-note')?.value.trim() || '';
-  const lineList = selectedItems.slice(0,5).map(it => `• ${it.p.name} — ${fmtB(it.w.amount||0)}`).join('\n');
-  const moreLine = selectedItems.length > 5 ? `\n... +${selectedItems.length-5} งาน` : '';
+  // สร้าง preview HTML
+  const previewHtml = buildMultiVoucherHTML({
+    vNo: 'PREVIEW · ยังไม่ออกจริง',
+    staff: s,
+    items: selectedItems.map(it => ({projName: it.p.name, slot: it.w.slot, amount: it.w.amount||0})),
+    totalAmt, date, note,
+  });
+  // เปิด preview modal
+  const old = document.getElementById('vc-preview-modal');
+  if(old) old.remove();
+  const div = document.createElement('div');
+  div.id = 'vc-preview-modal';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);overflow-y:auto';
+  div.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;width:780px;max-width:98vw;max-height:95vh;display:flex;flex-direction:column">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:10px">'+
+        '<div>'+
+          '<div style="font-size:17px;font-weight:800">👁️ ตรวจสอบใบสำคัญจ่ายก่อนออก</div>'+
+          '<div style="font-size:11.5px;color:var(--text2);margin-top:2px">ตรวจ <strong>ยอด · รายการ · บัญชี · ชื่อ</strong> ให้ครบถ้วนก่อนกด "ออกจริง" · ถ้ายอดผิด → ปิดแล้วไปแก้ในหน้าคิว</div>'+
+        '</div>'+
+        '<button class="btn-close" onclick="_vcClosePreview()" title="ปิด (ไม่บันทึก)">✕</button>'+
+      '</div>'+
+      '<div style="flex:1;overflow-y:auto;background:#e5e7eb;padding:14px;border-radius:10px;margin-bottom:12px">'+previewHtml+'</div>'+
+      '<div style="background:rgba(255,158,0,.1);border:1.5px solid rgba(255,158,0,.4);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:var(--orange);font-weight:600">'+
+        '⚠️ <strong>ยังไม่ได้บันทึก</strong> · กดปิดถ้ายอดผิด · กด "ออกจริง" เพื่อทำเครื่องหมาย "จ่ายแล้ว" + ส่งใบ'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-outline" style="flex:1;min-width:160px" onclick="_vcClosePreview()">✗ ปิด · ไปแก้ยอด</button>'+
+        '<button class="btn btn-blue" style="flex:1.4;min-width:200px;font-weight:800;background:#9B6FFF;border:none" onclick="_vcCommitIssueVoucher(\''+staffId+'\')">✅ ออกจริง + เปิด Gmail</button>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(div);
+}
+function _vcClosePreview(){
+  const m = document.getElementById('vc-preview-modal');
+  if(m) m.remove();
+  toast('ℹ️ ยังไม่ได้ออกใบ · ไปแก้ยอดที่หน้าคิวจ่ายเงินได้','info');
+}
+
+// ✅ STEP 2: Commit จริง — มาร์ค paid + บันทึก voucher + เปิด Gmail modal
+async function _vcCommitIssueVoucher(staffId){
+  // re-gather ที่นี่ (กันข้อมูลเปลี่ยนระหว่างเปิด preview)
+  const items = _vcGetPersonItems(staffId);
+  const sel = _vcByPersonSelected.get(staffId) || new Set();
+  const selectedItems = items.filter(it => sel.has(`${it.p.id}|${it.w.slot}`));
+  if(!selectedItems.length){ toast('ไม่มีงานที่เลือก','warn'); _vcClosePreview(); return; }
+  const s = selectedItems[0].s;
+  const totalAmt = selectedItems.reduce((sum, it) => sum + (it.w.amount||0), 0);
+  const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
+  const note = document.getElementById('vc-note')?.value.trim() || '';
   const hasEmail = !!(s.email && s.email.includes('@'));
-  if(!confirm(`💸 ออกใบสำคัญจ่าย 1 ใบ ให้ ${s.nickname || s.name}?\n\n` +
-    `จำนวน: ${selectedItems.length} งาน\nยอดรวม: ${fmtB(totalAmt)}\nบัญชี: ${s.bank||'—'} ${s.account||''}\nEmail: ${hasEmail?s.email:'(ไม่มี)'}\n\nรายการ:\n${lineList}${moreLine}\n\nระบบจะ:\n• ออกใบสำคัญจ่าย 1 ใบ (เลขที่เดียวกัน)\n• ทำเครื่องหมายงานทั้ง ${selectedItems.length} ชิ้นเป็น "จ่ายแล้ว"${hasEmail?'\n• เปิด Gmail พร้อมเนื้อหา (คุณจะแนบไฟล์ + กดส่งเอง)':''}\n\n💡 หากต้องการยกเลิก: ไปที่ "ประวัติเอกสาร" กดปุ่ม "↩️ ยกเลิก" ของใบนั้น`)) return;
+  _vcClosePreview();
   const vNo = nextVoucherNo();
   const nowIso = new Date().toISOString();
   toast(`💸 กำลังออกใบ ${selectedItems.length} งาน...`,'info');
@@ -14206,22 +14258,33 @@ function showVoucherSendModal(ctx){
   const div = document.createElement('div');
   div.id = 'vc-send-modal';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
+  // คลิกพื้นหลังนอก modal = ปิด
+  div.onclick = function(e){ if(e.target === div) _vcCloseSendModal(); };
   div.innerHTML =
-    '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:520px;max-width:98vw">'+
-    '<div style="font-size:17px;font-weight:800;margin-bottom:4px">💸 ส่งใบสำคัญจ่าย</div>'+
-    '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">ถึง: <strong>'+(staff.nickname||staff.name)+'</strong> ('+staff.email+')</div>'+
-    '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">เลขที่: <strong>'+vNo+'</strong> · ยอด <strong style="color:var(--green)">'+fmtB(totalAmt)+'</strong> · '+items.length+' งาน</div>'+
-    '<div style="font-size:12px;background:rgba(0,180,255,.1);border:1px solid rgba(0,180,255,.3);border-radius:8px;padding:7px 12px;margin-bottom:16px;color:var(--accent2)">📤 จาก: <strong>penguinstudiovoice@gmail.com</strong></div>'+
-    '<div style="background:rgba(255,158,0,.08);border:1px solid rgba(255,158,0,.3);border-radius:8px;padding:9px 12px;margin-bottom:14px;font-size:12px;color:var(--orange)">💡 <strong>ขั้นตอน:</strong> (1) ดาวน์โหลด PDF ใบสำคัญ → (2) แนบไฟล์ + รูปสลิป → (3) เปิด Gmail → (4) แนบไฟล์ใน Gmail แล้วกดส่งเอง</div>'+
-    '<div style="display:flex;gap:8px;margin-bottom:14px">'+
-    '<button class="btn btn-outline btn-sm" style="flex:1" onclick="_vcDownloadVoucherPDF(\''+vNo+'\')">📥 ดาวน์โหลด PDF</button>'+
-    '<button class="btn btn-outline btn-sm" style="flex:1" onclick="_vcPreviewVoucherInModal(\''+vNo+'\')">👁️ ดูใบ</button>'+
-    '</div>'+
-    '<div style="display:flex;gap:8px">'+
-    '<button class="btn btn-outline btn-sm" style="flex:1" onclick="document.getElementById(\'vc-send-modal\').remove()">ปิด (ส่งทีหลังก็ได้)</button>'+
-    '<button class="btn btn-blue btn-sm" style="flex:1.4" onclick="_vcOpenGmailForVoucher(\''+vNo+'\')">📧 เปิด Gmail พร้อมเนื้อหา</button>'+
-    '</div></div>';
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:24px 24px 22px;width:540px;max-width:98vw;position:relative">'+
+      // ✕ ปุ่มปิดมุมขวา (ใหญ่ ชัด)
+      '<button onclick="_vcCloseSendModal()" title="ปิด — ส่งทีหลังได้" style="position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;background:rgba(255,64,64,.12);border:1px solid rgba(255,64,64,.35);color:#FF6060;font-size:16px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>'+
+      '<div style="font-size:17px;font-weight:800;margin-bottom:4px;padding-right:40px">💸 ส่งใบสำคัญจ่าย</div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">ถึง: <strong>'+(staff.nickname||staff.name)+'</strong> ('+(staff.email||'(ไม่มี email)')+')</div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">เลขที่: <strong>'+vNo+'</strong> · ยอด <strong style="color:var(--green)">'+fmtB(totalAmt)+'</strong> · '+items.length+' งาน</div>'+
+      '<div style="font-size:12px;background:rgba(0,180,255,.1);border:1px solid rgba(0,180,255,.3);border-radius:8px;padding:7px 12px;margin-bottom:16px;color:var(--accent2)">📤 จาก: <strong>penguinstudiovoice@gmail.com</strong></div>'+
+      '<div style="background:rgba(255,158,0,.08);border:1px solid rgba(255,158,0,.3);border-radius:8px;padding:9px 12px;margin-bottom:14px;font-size:12px;color:var(--orange)">💡 <strong>ขั้นตอน:</strong> (1) ดาวน์โหลด PDF → (2) เปิด Gmail → (3) แนบไฟล์ PDF + สลิป → (4) กดส่งใน Gmail</div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:14px">'+
+        '<button class="btn btn-outline btn-sm" style="flex:1" onclick="_vcDownloadVoucherPDF(\''+vNo+'\')">📥 ดาวน์โหลด PDF</button>'+
+        '<button class="btn btn-outline btn-sm" style="flex:1" onclick="_vcPreviewVoucherInModal(\''+vNo+'\')">👁️ ดูใบ</button>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button class="btn btn-outline btn-sm" style="flex:1" onclick="_vcCloseSendModal()">⏸️ ปิด (ส่งทีหลัง)</button>'+
+        '<button class="btn btn-sm" style="flex:1.4;background:#9B6FFF;color:#fff;border:none;font-weight:700" onclick="_vcOpenGmailForVoucher(\''+vNo+'\')">📧 เปิด Gmail</button>'+
+      '</div>'+
+      '<div style="font-size:10.5px;color:var(--text2);text-align:center;margin-top:10px">💡 หาใบที่ออกแล้วได้ใน <strong>"ประวัติเอกสาร"</strong> · กดยกเลิกได้ถ้าผิด</div>'+
+    '</div>';
   document.body.appendChild(div);
+}
+function _vcCloseSendModal(){
+  const m = document.getElementById('vc-send-modal');
+  if(m) m.remove();
+  toast('ℹ️ ปิดแล้ว · ใบนี้อยู่ใน "ประวัติเอกสาร" แล้ว · เปิดส่ง/ยกเลิกได้จากที่นั่น','info');
 }
 
 // ดาวน์โหลด PDF (HTML print) ของ voucher
@@ -14293,6 +14356,36 @@ function _vcOpenGmailForVoucher(vNo){
 // ↩️ REVERT VOUCHER — คืนสถานะงาน + ลบใบ
 //   ใช้กรณีออกใบผิด · ส่ง email ผิด · ต้องการแก้
 // ──────────────────────────────────────────────
+// ─ ยกเลิกการจ่ายของ worker เดี่ยว ๆ (กรณี voucher record หายแล้ว / จ่ายผิด) ─
+//   ใช้กรณี admin หา voucher ในประวัติไม่เจอ แต่ worker ยังโชว์ "จ่ายแล้ว" ค้าง
+async function unpayWorker(projId, workerId, slot){
+  const p = getProjects().find(x => x.id === projId);
+  const w = p?.workers.find(x => x.id === workerId && x.slot === slot);
+  if(!p || !w){ toast('ไม่พบข้อมูล worker','error'); return; }
+  if(w.status !== 'paid'){ toast('คนนี้ไม่ใช่สถานะ "จ่ายแล้ว"','warn'); return; }
+  const s = getStaffById(workerId);
+  const nick = s?.nickname || s?.name || workerId;
+  const cs = (typeof getWorkerConfirmStatus === 'function') ? getWorkerConfirmStatus(w) : 'confirmed';
+  if(!confirm(`↩️ ยกเลิกการจ่ายของ "${nick}"?\n\n` +
+    `โปรเจกต์: ${p.name}\nยอด: ${fmtB(w.amount||0)}\nเลขที่ใบสำคัญ: ${w.voucherNo||'(ไม่มี)'}\n` +
+    `จ่ายเมื่อ: ${w.paidAt?new Date(w.paidAt).toLocaleString('th-TH'):'—'}\n\n` +
+    `ระบบจะ:\n• คืนสถานะ "จ่ายแล้ว" → "อนุมัติแล้ว"\n• ลบเลขที่ใบ + วันที่จ่าย\n• คงสถานะ ${cs==='confirmed'?'"staff ยืนยันแล้ว"':'confirm เดิม'} ไว้\n• คนนี้กลับไปอยู่ใน "ตามคน" รอออกใบใหม่ได้\n\n` +
+    `⚠️ ใช้กรณี "จ่ายผิด" / "ออกใบผิด" เท่านั้น — ถ้าโอนเงินจริงแล้วอย่ายกเลิก`)) return;
+  const result = await saveProjectMerge(projId, (proj)=>{
+    const w2 = (proj.workers||[]).find(x => x.id === workerId && x.slot === slot);
+    if(w2){
+      w2.status = 'approved';
+      delete w2.voucherNo;
+      delete w2.paidAt;
+    }
+  });
+  if(!result.ok){ toast('บันทึกไม่สำเร็จ: '+(result.error?.message||''),'error'); return; }
+  toast(`↩️ ยกเลิกการจ่าย "${nick}" แล้ว · คืนเข้ารายการ "ตามคน" รอออกใบใหม่`,'success');
+  try { renderQueue(); } catch(_){}
+  try { updateQueueBadge(); } catch(_){}
+  try { if(_vcMode === 'byperson') renderVcByPerson(); } catch(_){}
+}
+
 async function revertVoucher(docNo){
   const all = getDocsStore('vouchers') || [];
   const voucher = all.find(d => d.docNo === docNo);
