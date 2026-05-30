@@ -2072,13 +2072,13 @@ body.sidebar-collapsed .main-content{
    <div id="docs-worker" class="hidden">
     <div class="section-card" style="margin-bottom:14px">
      <div class="section-title">💸 ออกใบสำคัญจ่าย</div>
-     <!-- 🔀 Mode toggle: ตามโปรเจกต์ (เดิม) / ตามคน (ใหม่ - 1 ใบ รวมหลายงานของคนเดียวกัน) -->
+     <!-- 🔀 Mode toggle: ตามคน (default) / ตามโปรเจกต์ -->
      <div class="tabs" style="margin:0 0 14px">
-      <div class="tab" id="vc-mode-byperson" onclick="setVcMode('byperson')" style="font-size:13px;padding:8px 14px">👤 ตามคน (รวมหลายงาน)</div>
-      <div class="tab active" id="vc-mode-byproj" onclick="setVcMode('byproj')" style="font-size:13px;padding:8px 14px">📁 ตามโปรเจกต์</div>
+      <div class="tab active" id="vc-mode-byperson" onclick="setVcMode('byperson')" style="font-size:13px;padding:8px 14px">👤 ตามคน (รวมหลายงาน)</div>
+      <div class="tab" id="vc-mode-byproj" onclick="setVcMode('byproj')" style="font-size:13px;padding:8px 14px">📁 ตามโปรเจกต์</div>
      </div>
      <!-- ═════ MODE: ตามโปรเจกต์ (เดิม) ═════ -->
-     <div id="vc-byproj-section">
+     <div id="vc-byproj-section" class="hidden">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
        <div class="form-group" style="margin:0">
         <label class="form-label">เลือกโปรเจกต์</label>
@@ -2117,8 +2117,8 @@ body.sidebar-collapsed .main-content{
        <button class="btn btn-outline" onclick="downloadVouchers()">⬇️ ดาวน์โหลด PDF ทั้งหมด</button>
       </div>
      </div>
-     <!-- ═════ MODE: ตามคน (ใหม่ — 1 ใบ × หลายงาน) ═════ -->
-     <div id="vc-byperson-section" class="hidden">
+     <!-- ═════ MODE: ตามคน (default — 1 ใบ × หลายงาน) ═════ -->
+     <div id="vc-byperson-section">
       <div style="background:rgba(155,111,255,.06);border:1px solid rgba(155,111,255,.2);border-radius:10px;padding:11px 14px;margin-bottom:12px;font-size:12.5px;color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
        <span style="font-size:17px">💡</span>
        <div>1 ใบสำคัญจ่าย = 1 คน <strong>(รวมหลายงานในใบเดียว)</strong> · เห็นเฉพาะคนที่ <strong style="color:#9B6FFF">staff ยืนยันยอดแล้ว</strong> และ <strong style="color:var(--green)">ยังไม่ได้จ่าย</strong></div>
@@ -13810,7 +13810,7 @@ function downloadQuotation() {
 //   - แสดงเฉพาะคนที่ staff ยืนยันยอดแล้ว + ยังไม่ได้จ่าย
 //   - กดเข้าไปเลือกงานที่จะรวมในใบเดียว → ออกใบ + ส่ง email
 // ══════════════════════════════════════════════
-let _vcMode = 'byproj'; // 'byproj' | 'byperson'
+let _vcMode = 'byperson'; // 'byperson' (default) | 'byproj'
 const _vcByPersonSelected = new Map(); // staffId → Set("projId|slot")
 const _vcByPersonExpanded = new Set();  // staffId ที่ขยายอยู่
 
