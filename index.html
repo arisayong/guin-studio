@@ -898,6 +898,29 @@ body.sidebar-collapsed .main-content{
   box-shadow:0 4px 14px rgba(15,30,58,0.12);
 }
 [data-theme="light"] .mobile-backdrop{background:rgba(15,30,58,0.35)}
+
+/* ═══════════════════════════════════════════════════════════
+   📱 DYNAMIC POPUPS (createElement overlays) — auto-managed
+   ปรับให้ป็อปอัพที่สร้างด้วย JS (ส่งเมล/แนบไฟล์/ยืนยัน/พรีวิว)
+   เลื่อนอ่านได้ครบ + เป็น bottom-sheet บนมือถือ
+   (คลาส .m-dyn-overlay ถูกเติมอัตโนมัติด้วย MutationObserver)
+   ═══════════════════════════════════════════════════════════ */
+/* Desktop: ถ้าเนื้อหาสูงเกินจอ ให้ scroll ทั้ง overlay (กันข้อความถูกตัด) */
+.m-dyn-overlay{overflow-y:auto!important;-webkit-overflow-scrolling:touch}
+.m-dyn-overlay > div{max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+@media (max-width:768px){
+  /* บนมือถือ: ป็อปอัพกลายเป็น bottom-sheet เต็มกว้าง เลื่อนอ่านได้ */
+  .m-dyn-overlay{align-items:flex-end!important;justify-content:center!important;padding:0!important}
+  .m-dyn-overlay > div{
+    width:100vw!important;max-width:100vw!important;
+    max-height:92vh!important;overflow-y:auto!important;
+    border-radius:18px 18px 0 0!important;
+    padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))!important;
+    animation:slideUp .25s ease;
+  }
+  /* ปุ่มแอ็กชันแถวล่าง — สูงพอให้นิ้วแตะง่าย (ยกเว้นปุ่มเล็ก/ปุ่มกลม ✕) */
+  .m-dyn-overlay .btn:not(.btn-xs){min-height:44px}
+}
 </style>
   <!-- Firebase SDK (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -2122,6 +2145,9 @@ body.sidebar-collapsed .main-content{
       <div style="background:rgba(155,111,255,.06);border:1px solid rgba(155,111,255,.2);border-radius:10px;padding:11px 14px;margin-bottom:12px;font-size:12.5px;color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
        <span style="font-size:17px">💡</span>
        <div>1 ใบสำคัญจ่าย = 1 คน <strong>(รวมหลายงานในใบเดียว)</strong> · เห็นเฉพาะคนที่ <strong style="color:#9B6FFF">staff ยืนยันยอดแล้ว</strong> และ <strong style="color:var(--green)">ยังไม่ได้จ่าย</strong></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+       <button id="vc-show-paid-toggle" class="btn btn-xs btn-outline" onclick="toggleVcShowPaid()">🕓 แสดงคนที่จ่ายแล้ว (ออกเอกสารย้อนหลัง)</button>
       </div>
       <div id="vc-byperson-list"></div>
      </div>
@@ -3685,6 +3711,81 @@ window.addEventListener('popstate', function(){
 });
 // Seed: หลังโหลดหน้า push state เปล่าไว้ 1 ชั้นเพื่อ trap back ครั้งแรก
 try { history.replaceState({_bk: 0, key:'_root'}, ''); } catch(e){}
+
+// ══════════════════════════════════════════════
+// 📱 AUTO-MANAGE DYNAMIC POPUPS (additive · ไม่ต้องแก้ทุก popup)
+//   ป็อปอัพที่สร้างด้วย createElement+appendChild (ส่งเมล/แนบไฟล์/ยืนยัน/พรีวิว)
+//   เดิมไม่ได้ผูกกับ back-stack → กดย้อนกลับมือถือเลยออกทั้งเว็บ
+//   ตรงนี้จะ: (1) ผูกเข้า back-stack ให้กดย้อน = ปิดป็อปอัพ
+//            (2) เติมคลาส .m-dyn-overlay ให้ CSS ทำเป็น bottom-sheet เลื่อนอ่านได้
+// ══════════════════════════════════════════════
+(function autoManageDynamicPopups(){
+  if(!('MutationObserver' in window)) return;
+  const _tracked = new Map(); // overlayEl → backKey
+  let _seq = 0;
+
+  function _isDynOverlay(el){
+    if(!el || el.nodeType !== 1) return false;
+    if(el.parentNode !== document.body) return false;
+    if(el.classList.contains('modal-overlay')) return false;           // static modal — มี handler เดิมแล้ว
+    if(el.classList.contains('m-dyn-overlay')) return false;            // ผูกแล้ว
+    if(['app-splash','app-layout','toastWrap'].includes(el.id)) return false;
+    let cs; try { cs = getComputedStyle(el); } catch(_){ return false; }
+    if(cs.position !== 'fixed') return false;
+    const r = el.getBoundingClientRect();
+    // ต้องเป็น overlay ที่คลุมเกือบเต็มจอ (กัน dropdown/เมนูเล็ก ๆ)
+    return r.width >= window.innerWidth * 0.9 && r.height >= window.innerHeight * 0.85;
+  }
+
+  // อัปเดต closeFn ของ entry เดิมใน back-stack (ใช้ตอน "แทนที่" ป็อปอัพ — ไม่ churn history)
+  function _rebindBack(key, fn){
+    for(let i=_backStack.length-1; i>=0; i--){
+      if(_backStack[i].key === key){ _backStack[i].close = fn; return true; }
+    }
+    return false;
+  }
+
+  function _bindClose(el, key){
+    el.classList.add('m-dyn-overlay');
+    _tracked.set(el, key);
+    return function(){ el._closingViaBack = true; try { el.remove(); } catch(_){} };
+  }
+
+  function _register(el){
+    const key = 'dynpopup:' + (++_seq);
+    _backPush(key, _bindClose(el, key));   // push history state → trap ปุ่มย้อนกลับ
+  }
+
+  const obs = new MutationObserver(function(muts){
+    const removed = [], added = [];
+    for(const m of muts){
+      m.removedNodes && m.removedNodes.forEach(n => { if(n.nodeType===1 && _tracked.has(n)) removed.push(n); });
+      m.addedNodes   && m.addedNodes.forEach(n   => { if(_isDynOverlay(n)) added.push(n); });
+    }
+    if(!removed.length && !added.length) return;
+
+    // 1) ป็อปอัพที่ถูกปิดด้วย "ปุ่มย้อนกลับ" — history ถอยให้แล้ว แค่เลิก track
+    removed.filter(n => n._closingViaBack).forEach(n => _tracked.delete(n));
+
+    // 2) ป็อปอัพที่ปิดตัวเอง (ปุ่มในป็อปอัพ) — ถ้ามีอันใหม่มาแทนในชุดเดียวกัน
+    //    ให้ "ยืม" history slot เดิม (กันกดย้อนกลับเพี้ยน/ออกเว็บ), ไม่งั้นถอย history 1 ชั้น
+    let ai = 0;
+    removed.filter(n => !n._closingViaBack).forEach(oldEl => {
+      const key = _tracked.get(oldEl);
+      _tracked.delete(oldEl);
+      if(ai < added.length){
+        const newEl = added[ai++];
+        _rebindBack(key, _bindClose(newEl, key));   // โอน slot เดิมให้ป็อปอัพใหม่
+      } else {
+        try { _backPop(key); } catch(_){}            // ไม่มีตัวแทน → ถอย history
+      }
+    });
+
+    // 3) ป็อปอัพใหม่ที่เหลือ (เปิดสด ไม่ใช่การแทนที่) → ผูกใหม่
+    for(; ai < added.length; ai++) _register(added[ai]);
+  });
+  obs.observe(document.body, { childList: true });
+})();
 function toast(msg,type='info'){
   const wrap=document.getElementById('toastWrap');const el=document.createElement('div');
   el.className=`toast ${type}`;const ic={success:'✅',error:'❌',info:'ℹ️',warn:'⚠️'};
@@ -13828,6 +13929,140 @@ function downloadQuotation() {
 let _vcMode = 'byperson'; // 'byperson' (default) | 'byproj'
 const _vcByPersonSelected = new Map(); // staffId → Set("projId|slot")
 const _vcByPersonExpanded = new Set();  // staffId ที่ขยายอยู่
+let _vcShowPaid = false; // toggle: แสดงคนที่ "จ่ายแล้ว" เพื่อออกใบย้อนหลัง
+
+// ── คิวส่งอีเมลทีละใบ (ใช้ตอนออกหลายใบจาก "ตามโปรเจกต์") — เปิด Gmail ทีละคน กันโดน block ──
+function _vcEnqueueSend(vNoList){
+  window._vcSendQueue = Array.isArray(vNoList) ? vNoList.slice() : [];
+  _vcDequeueSend();
+}
+function _vcDequeueSend(){
+  const q = window._vcSendQueue || [];
+  if(!q.length) return false;
+  const vNo = q.shift();
+  const d = (getDocsStore('vouchers')||[]).find(x => x.docNo === vNo);
+  if(!d) return _vcDequeueSend();
+  const s = d.staffId ? (getStaffById(d.staffId) || {name:d.staffName, nickname:d.staffNickname, bank:d.bank, account:d.account, email:d.email}) : {name:d.staffName, nickname:d.staffNickname, bank:d.bank, account:d.account, email:d.email};
+  const items = d.items || [{projName:d.projName, slot:d.slot, amount:d.amount}];
+  showVoucherSendModal({ vNo:d.docNo, staff:s, items, totalAmt:d.totalAmount||d.amount||0, date:d.date, note:d.note||'' });
+  return true;
+}
+
+// ── ออกเอกสารย้อนหลัง: หา "งานที่จ่ายแล้ว แต่ยังไม่มีใบสำคัญจ่าย" ──
+function _vcCoveredSet(){
+  const set = new Set();
+  (getDocsStore('vouchers')||[]).forEach(v => {
+    const items = (v.multiItem && Array.isArray(v.items)) ? v.items : [{projId:v.projId, slot:v.slot}];
+    items.forEach(it => set.add(`${v.staffId}|${it.projId}|${it.slot}`));
+  });
+  return set;
+}
+function _vcGetRetroByPerson(){
+  const covered = _vcCoveredSet();
+  const byPerson = new Map();
+  getProjects().forEach(p => {
+    if(p.projStatus === 'cancelled') return;
+    (p.workers||[]).forEach(w => {
+      if(w.status !== 'paid') return;
+      if(covered.has(`${w.id}|${p.id}|${w.slot}`)) return; // มีใบแล้ว → ข้าม
+      const s = getStaffById(w.id); if(!s) return;
+      if(!byPerson.has(w.id)) byPerson.set(w.id, []);
+      byPerson.get(w.id).push({p, w, s});
+    });
+  });
+  return byPerson;
+}
+function toggleVcShowPaid(){
+  _vcShowPaid = !_vcShowPaid;
+  const b = document.getElementById('vc-show-paid-toggle');
+  if(b){
+    b.textContent = _vcShowPaid ? '✖ ซ่อนคนที่จ่ายแล้ว' : '🕓 แสดงคนที่จ่ายแล้ว (ออกเอกสารย้อนหลัง)';
+    b.classList.toggle('btn-blue', _vcShowPaid);
+    b.classList.toggle('btn-outline', !_vcShowPaid);
+  }
+  renderVcByPerson();
+}
+function _vcRenderRetroSection(){
+  const byPerson = _vcGetRetroByPerson();
+  let inner;
+  if(byPerson.size === 0){
+    inner = `<div style="text-align:center;padding:22px;color:var(--text2);font-size:12.5px">ไม่มีงานที่ "จ่ายแล้ว" แต่ยังไม่มีใบสำคัญจ่าย</div>`;
+  } else {
+    const entries = Array.from(byPerson.entries()).sort((a,b)=>{
+      const sa=a[1].reduce((s,it)=>s+(it.w.amount||0),0), sb=b[1].reduce((s,it)=>s+(it.w.amount||0),0);
+      return sb-sa;
+    });
+    inner = entries.map(([staffId, items])=>{
+      const s = items[0].s;
+      const totalAmt = items.reduce((sum,it)=>sum+(it.w.amount||0),0);
+      const hasEmail = !!(s.email && s.email.includes('@'));
+      const projLines = items.map(it=>{
+        const slotKey=(it.w.slot||'').split('-')[0];
+        const slotLbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'}[slotKey]||slotKey;
+        return `<div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text2);padding:2px 0"><span>${it.p.name} · ${slotLbl}</span><span>${fmtB(it.w.amount||0)}</span></div>`;
+      }).join('');
+      return `<div style="background:var(--card);border:1px solid rgba(255,158,0,.35);border-radius:11px;padding:13px 16px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="width:34px;height:34px;border-radius:50%;background:rgba(255,158,0,.2);color:var(--orange);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px">${String((s.nickname||s.name||'?')[0]).toUpperCase()}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:800;color:var(--text)">${s.name||s.nickname}${(s.nickname && s.name!==s.nickname)?` <span style="color:var(--text2);font-weight:500;font-size:12px">(${s.nickname})</span>`:''} <span style="font-size:10px;background:rgba(0,223,160,.15);color:var(--green);padding:1px 8px;border-radius:8px;font-weight:700">✅ จ่ายแล้ว</span></div>
+            <div style="font-size:11px;color:var(--text2);margin-top:2px">🏦 ${s.bank||'—'} ${s.account||''}${hasEmail?(' · 📧 '+s.email):' · <span style="color:var(--orange)">⚠️ ไม่มี email</span>'}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:10.5px;color:var(--text2)">${items.length} งาน · รวม</div>
+            <div style="font-size:16px;font-weight:800;color:var(--green)">${fmtB(totalAmt)}</div>
+          </div>
+        </div>
+        <div style="margin:8px 0 10px;padding:8px 10px;background:rgba(0,0,0,.18);border-radius:7px">${projLines}</div>
+        <div style="display:flex;justify-content:flex-end">
+          <button class="btn btn-xs" style="background:var(--orange);color:#fff;border:none;font-weight:700" onclick="_vcIssueRetro('${staffId}')">📄 ออกใบย้อนหลัง + เปิด Gmail</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  return `<div style="margin-top:18px">
+    <div style="font-size:12px;font-weight:800;color:var(--orange);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">🕓 ออกเอกสารย้อนหลัง · จ่ายแล้วแต่ยังไม่มีใบ</div>
+    ${inner}
+  </div>`;
+}
+async function _vcIssueRetro(staffId){
+  const byPerson = _vcGetRetroByPerson();
+  const items = byPerson.get(staffId);
+  if(!items || !items.length){ toast('ไม่มีงานที่ต้องออกย้อนหลัง','warn'); renderVcByPerson(); return; }
+  const s = items[0].s;
+  const totalAmt = items.reduce((a,it)=>a+(it.w.amount||0),0);
+  const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
+  const note = document.getElementById('vc-note')?.value.trim() || '';
+  const vNo = nextVoucherNo();
+  const nowIso = new Date().toISOString();
+  toast(`📄 กำลังออกใบย้อนหลัง ${items.length} งาน...`,'info');
+  // ใส่เลขที่ใบให้ worker (ไม่แตะสถานะ — ยังเป็น "จ่ายแล้ว" เหมือนเดิม)
+  for(const it of items){
+    try{
+      await saveProjectMerge(it.p.id, (p)=>{
+        const w = (p.workers||[]).find(x => x.id===it.w.id && x.slot===it.w.slot);
+        if(w && !w.voucherNo){ w.voucherNo = vNo; }
+      });
+    }catch(e){ console.warn('retro mark:', e); }
+  }
+  const saved = getDocsStore('vouchers') || [];
+  saved.push({
+    type:'voucher', docNo:vNo, staffId, staffName:s.name, staffLastName:s.lastName||'', staffNickname:s.nickname,
+    items: items.map(it=>({projId:it.p.id, projName:it.p.name, slot:it.w.slot, amount:it.w.amount||0})),
+    amount: totalAmt, totalAmount: totalAmt, multiItem:true,
+    bank:s.bank||'', account:s.account||'', email:s.email||'',
+    date, note, createdAt: nowIso, retro:true,
+  });
+  saveDocsStore('vouchers', saved);
+  toast(`✅ ออกใบสำคัญจ่ายย้อนหลัง ${vNo} (${items.length} งาน · ${fmtB(totalAmt)})`,'success');
+  renderVcByPerson();
+  try{ renderDocsHistory(); }catch(_){}
+  if(s.email && s.email.includes('@')){
+    showVoucherSendModal({ vNo, staff:s, items: items.map(it=>({projName:it.p.name, slot:it.w.slot, amount:it.w.amount||0})), totalAmt, date, note });
+  } else {
+    toast('ℹ️ ไม่มี email · ดาวน์โหลดใบได้ใน "ประวัติเอกสาร"','info');
+  }
+}
 
 function setVcMode(mode){
   _vcMode = mode;
@@ -13873,12 +14108,13 @@ function renderVcByPerson(){
       byPerson.get(w.id).push({p, w, s});
     });
   });
+  const _retroHtml = _vcShowPaid ? _vcRenderRetroSection() : '';
   if(byPerson.size === 0){
-    listEl.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--text2)">
+    listEl.innerHTML = (_vcShowPaid ? '' : `<div style="text-align:center;padding:40px 20px;color:var(--text2)">
       <div style="font-size:36px;margin-bottom:8px">✅</div>
       <div style="font-size:14px;font-weight:700;color:var(--text)">ไม่มีรายการที่รอออกใบสำคัญจ่าย</div>
       <div style="font-size:11.5px;color:var(--text2);margin-top:6px">ทีมงานที่ staff ยืนยันยอดแล้วและยังไม่ได้จ่าย จะปรากฏที่นี่</div>
-    </div>`;
+    </div>`) + _retroHtml;
     return;
   }
   // เรียงตามยอดรวมจากมาก → น้อย
@@ -13954,7 +14190,7 @@ function renderVcByPerson(){
       </div>
       ${expandedSection}
     </div>`;
-  }).join('');
+  }).join('') + _retroHtml;
 }
 
 function toggleVcPersonExpand(staffId){
@@ -14310,6 +14546,7 @@ function showVoucherSendModal(ctx){
 function _vcCloseSendModal(){
   const m = document.getElementById('vc-send-modal');
   if(m) m.remove();
+  if((window._vcSendQueue||[]).length){ _vcDequeueSend(); return; }
   toast('ℹ️ ปิดแล้ว · ใบนี้อยู่ใน "ประวัติเอกสาร" แล้ว · เปิดส่ง/ยกเลิกได้จากที่นั่น','info');
 }
 
@@ -14376,6 +14613,8 @@ function _vcOpenGmailForVoucher(vNo){
   const sendModal = document.getElementById('vc-send-modal');
   if(sendModal) sendModal.remove();
   toast('📧 เปิด Gmail แล้ว · แนบไฟล์ PDF + สลิป แล้วกดส่งใน Gmail','info');
+  // ถ้ามีใบรออยู่ในคิว (ออกหลายใบจาก "ตามโปรเจกต์") → เปิดใบถัดไป
+  if((window._vcSendQueue||[]).length){ setTimeout(_vcDequeueSend, 400); }
 }
 
 // ──────────────────────────────────────────────
@@ -14648,41 +14887,92 @@ function previewVouchers() {
   if (!selected.length){toast('กรุณาเลือกทีมงานอย่างน้อย 1 คน','error');return;}
   const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
   const note = document.getElementById('vc-note')?.value.trim()||'';
-  let html = '';
+  // รวมงานของแต่ละคนเป็น 1 ใบ + ใช้ template เดียวกับโหมด "ตามคน"
+  const byPerson = new Map();
   selected.forEach(({workerId,slot,w,s,p}) => {
-    const vNo = nextVoucherNo();
-    html += buildVoucherHTML(p.id, workerId, slot, vNo, date, note);
+    if(!byPerson.has(workerId)) byPerson.set(workerId, {s, p, works:[]});
+    byPerson.get(workerId).works.push(w);
   });
-  // Wrap all vouchers
-  const wrapped = `<div style="padding:10px">${html}</div>`;
+  let html = '';
+  for(const [wid, {s, p, works}] of byPerson){
+    html += buildMultiVoucherHTML({
+      vNo:'PREVIEW', staff:s,
+      items: works.map(w=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
+      totalAmt: works.reduce((a,w)=>a+(w.amount||0),0),
+      date, note,
+    }) + '<div style="height:20px"></div>';
+  }
   const el = document.getElementById('receipt-body');
-  if(el) el.innerHTML = wrapped;
+  if(el) el.innerHTML = `<div style="padding:10px">${html}</div>`;
   window._lastReceiptCtx = { staffId:null, vNo:'VOUCHERS', type:'voucher', email:'' };
   openModal('modal-receipt');
 }
 function downloadVouchers() {
   const selected = getSelectedVcWorkers();
   if (!selected.length){toast('กรุณาเลือกทีมงานอย่างน้อย 1 คน','error');return;}
-  // เปิด preview แรกอย่างเดียว ให้ user print เป็น PDF เอง
-  previewVouchers();
-}
-function issueAndSendVouchers() {
-  const selected = getSelectedVcWorkers();
-  if (!selected.length){toast('กรุณาเลือกทีมงาน','error');return;}
   const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
   const note = document.getElementById('vc-note')?.value.trim()||'';
-  let noEmail=0;
-  selected.forEach(function(item){
-    const {workerId,slot,w,s,p} = item;
-    const vNo = nextVoucherNo();
-    const saved = getDocsStore('vouchers')||[];
-    saved.push({type:'voucher',docNo:vNo,staffId:workerId,projId:p.id,projName:p.name,staffName:s.name,amount:w.amount||0,date,createdAt:new Date().toISOString()});
-    saveDocsStore('vouchers', saved);
-    if(!s.email) noEmail++;
+  const byPerson = new Map();
+  selected.forEach(({workerId,slot,w,s,p}) => {
+    if(!byPerson.has(workerId)) byPerson.set(workerId, {s, p, works:[]});
+    byPerson.get(workerId).works.push(w);
   });
-  if(noEmail) toast('⚠️ '+noEmail+' คนไม่มี email','warn');
-  toast('✅ บันทึกรายการแล้ว — กดปุ่ม 📧 ที่แต่ละคนเพื่อส่งอีเมล','success');
-  renderDocsHistory();
+  for(const [wid, {s, p, works}] of byPerson){
+    const html = buildMultiVoucherHTML({
+      vNo: nextVoucherNo(), staff:s,
+      items: works.map(w=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
+      totalAmt: works.reduce((a,w)=>a+(w.amount||0),0),
+      date, note,
+    });
+    downloadDocHTML(html, 'voucher-'+(s.nickname||wid));
+  }
+}
+async function issueAndSendVouchers() {
+  const selected = getSelectedVcWorkers();
+  if (!selected.length){toast('กรุณาเลือกทีมงาน','error');return;}
+  // รวมงานของแต่ละคนเป็น 1 ใบ (เหมือนโหมด "ตามคน") — ใบเดียวกัน วิธีส่งเดียวกัน
+  const byPerson = new Map();
+  selected.forEach(({workerId,slot,w,s,p}) => {
+    if(!byPerson.has(workerId)) byPerson.set(workerId, {s, p, works:[]});
+    byPerson.get(workerId).works.push(w);
+  });
+  if(!byPerson.size){ toast('ไม่พบข้อมูลทีมงาน','error'); return; }
+  if(!confirm(`💸 ออกใบสำคัญจ่าย ${byPerson.size} ใบ (1 ใบ/คน · รวมหลายงาน) + เปิด Gmail ส่งทีละคน?\n\nระบบจะออกใบและทำเครื่องหมาย "จ่ายแล้ว"`)) return;
+  const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
+  const note = document.getElementById('vc-note')?.value.trim()||'';
+  const issuedVNos = [];
+  let failCount = 0;
+  for(const [wid, {s, p, works}] of byPerson){
+    const vNo = nextVoucherNo();
+    const nowIso = new Date().toISOString();
+    let okAny = false;
+    for(const w of works){
+      const res = await saveProjectMerge(p.id, (proj)=>{
+        const w2 = (proj.workers||[]).find(x => x.id===wid && x.slot===w.slot);
+        if(w2){ w2.status='paid'; w2.voucherNo=vNo; w2.paidAt=nowIso; }
+      });
+      if(res.ok) okAny = true; else failCount++;
+    }
+    if(!okAny) continue;
+    const totalAmt = works.reduce((a,w)=>a+(w.amount||0),0);
+    const saved = getDocsStore('vouchers') || [];
+    saved.push({
+      type:'voucher', docNo:vNo, staffId:wid, staffName:s.name, staffLastName:s.lastName||'', staffNickname:s.nickname,
+      items: works.map(w=>({projId:p.id, projName:p.name, slot:w.slot, amount:w.amount||0})),
+      amount: totalAmt, totalAmount: totalAmt, multiItem:true,
+      bank:s.bank||'', account:s.account||'', email:s.email||'',
+      date, note, createdAt: nowIso,
+    });
+    saveDocsStore('vouchers', saved);
+    issuedVNos.push(vNo);
+  }
+  toast(`✅ ออกใบ ${issuedVNos.length} ใบ${failCount?(' · ล้มเหลว '+failCount):''}`,'success');
+  onVcProjChange();
+  try{ renderQueue(); }catch(_){}
+  try{ updateQueueBadge(); }catch(_){}
+  try{ renderDocsHistory(); }catch(_){}
+  // เปิด modal ส่งอีเมลทีละใบ (เหมือนโหมด "ตามคน")
+  if(issuedVNos.length) _vcEnqueueSend(issuedVNos);
 }
 
 /* ══════════════════════
