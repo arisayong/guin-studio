@@ -14134,8 +14134,8 @@ async function issuePersonVoucher(staffId){
   const lineList = selectedItems.slice(0,5).map(it => `• ${it.p.name} — ${fmtB(it.w.amount||0)}`).join('\n');
   const moreLine = selectedItems.length > 5 ? `\n... +${selectedItems.length-5} งาน` : '';
   const hasEmail = !!(s.email && s.email.includes('@'));
-  if(!confirm(`📧 ออกใบสำคัญจ่าย 1 ใบ ให้ ${s.nickname || s.name}?\n\n` +
-    `จำนวน: ${selectedItems.length} งาน\nยอดรวม: ${fmtB(totalAmt)}\nบัญชี: ${s.bank||'—'} ${s.account||''}\nEmail: ${hasEmail?s.email:'(ไม่มี — จะข้ามการส่ง email)'}\n\nรายการ:\n${lineList}${moreLine}\n\nระบบจะ:\n• ออกใบสำคัญจ่าย 1 ใบ (เลขที่เดียวกัน)\n• ทำเครื่องหมายงานทั้ง ${selectedItems.length} ชิ้นเป็น "จ่ายแล้ว"${hasEmail?'\n• ส่ง email พร้อมรายละเอียดใบสำคัญ':''}`)) return;
+  if(!confirm(`💸 ออกใบสำคัญจ่าย 1 ใบ ให้ ${s.nickname || s.name}?\n\n` +
+    `จำนวน: ${selectedItems.length} งาน\nยอดรวม: ${fmtB(totalAmt)}\nบัญชี: ${s.bank||'—'} ${s.account||''}\nEmail: ${hasEmail?s.email:'(ไม่มี)'}\n\nรายการ:\n${lineList}${moreLine}\n\nระบบจะ:\n• ออกใบสำคัญจ่าย 1 ใบ (เลขที่เดียวกัน)\n• ทำเครื่องหมายงานทั้ง ${selectedItems.length} ชิ้นเป็น "จ่ายแล้ว"${hasEmail?'\n• เปิด Gmail พร้อมเนื้อหา (คุณจะแนบไฟล์ + กดส่งเอง)':''}\n\n💡 หากต้องการยกเลิก: ไปที่ "ประวัติเอกสาร" กดปุ่ม "↩️ ยกเลิก" ของใบนั้น`)) return;
   const vNo = nextVoucherNo();
   const nowIso = new Date().toISOString();
   toast(`💸 กำลังออกใบ ${selectedItems.length} งาน...`,'info');
@@ -14166,9 +14166,9 @@ async function issuePersonVoucher(staffId){
       projId: it.p.id, projName: it.p.name,
       slot: it.w.slot, amount: it.w.amount||0,
     })),
-    amount: totalAmt, // for backward compat กับ history view
+    amount: totalAmt,
     totalAmount: totalAmt,
-    multiItem: true, // flag ว่าเป็น multi-item voucher
+    multiItem: true,
     bank: s.bank||'',
     account: s.account||'',
     email: s.email||'',
@@ -14176,36 +14176,154 @@ async function issuePersonVoucher(staffId){
     createdAt: nowIso,
   });
   saveDocsStore('vouchers', saved);
-  // 3. ล้าง selection
   _vcByPersonSelected.delete(staffId);
-  // 4. ส่ง email (ถ้ามี)
-  if(hasEmail){
-    try {
-      const subject = `ใบสำคัญจ่ายเลขที่ ${vNo} — Guin Home Studio`;
-      const lines = selectedItems.map(it => `• ${it.p.name}: ${fmtB(it.w.amount||0)}`).join('\n');
-      const message = `เรียน คุณ${s.nickname || s.name}\n\n` +
-        `สตูดิโอได้โอนเงินค่าตอบแทนให้คุณตามรายการต่อไปนี้:\n\n${lines}\n\n` +
-        `ยอดรวมทั้งสิ้น: ${fmtB(totalAmt)}\n` +
-        `วันที่: ${fmtDate(date)}\n` +
-        `บัญชี: ${s.bank||'—'} ${s.account||''}\n` +
-        `เลขที่ใบสำคัญ: ${vNo}\n` +
-        (note ? `\nหมายเหตุ: ${note}\n` : '') +
-        `\nขอบคุณค่ะ\nGuin Home Studio`;
-      const sent = await sendEmailJS(s.email, subject, message);
-      if(sent) toast(`📧 ส่ง email ใบสำคัญ ${vNo} ให้ ${s.nickname||s.name} แล้ว`,'success');
-    } catch(e){ console.warn('email voucher:', e); toast('⚠️ ส่ง email ไม่สำเร็จ · แต่ออกใบเรียบร้อย','warn'); }
-  }
-  // 5. รายงานผล
+  // 3. รายงานผลการออกใบ
   if(failCount > 0){
     toast(`⚠️ ออกใบ ${vNo} · บันทึก paid สำเร็จ ${okCount}/${selectedItems.length} · ล้มเหลว ${failCount}`,'warn');
   } else {
     toast(`✅ ออกใบสำคัญจ่าย ${vNo} (${selectedItems.length} งาน · ${fmtB(totalAmt)}) แล้ว`,'success');
   }
-  // 6. refresh ทุกที่ที่เกี่ยวข้อง
+  // 4. refresh queue/history
   renderVcByPerson();
   try { renderQueue(); } catch(_){}
   try { updateQueueBadge(); } catch(_){}
   try { renderDocsHistory(); } catch(_){}
+  // 5. ─── เปิด Gmail compose modal (ให้ admin แนบไฟล์ + กดส่งเอง) ───
+  //   ⚠️ ไม่ auto-send อีกต่อไป — เลียนแบบ flow ใบแจ้งหนี้
+  if(hasEmail){
+    showVoucherSendModal({ vNo, staff: s, items: selectedItems, totalAmt, date, note });
+  } else {
+    toast('ℹ️ ไม่มี email · คุณสามารถดาวน์โหลดใบใน "ประวัติเอกสาร" ได้','info');
+  }
+}
+
+// ───── Modal เลียนแบบใบแจ้งหนี้: ให้ admin แนบไฟล์ → เปิด Gmail เอง ─────
+function showVoucherSendModal(ctx){
+  const { vNo, staff, items, totalAmt, date, note } = ctx;
+  const old = document.getElementById('vc-send-modal');
+  if(old) old.remove();
+  const div = document.createElement('div');
+  div.id = 'vc-send-modal';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
+  div.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:520px;max-width:98vw">'+
+    '<div style="font-size:17px;font-weight:800;margin-bottom:4px">💸 ส่งใบสำคัญจ่าย</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">ถึง: <strong>'+(staff.nickname||staff.name)+'</strong> ('+staff.email+')</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">เลขที่: <strong>'+vNo+'</strong> · ยอด <strong style="color:var(--green)">'+fmtB(totalAmt)+'</strong> · '+items.length+' งาน</div>'+
+    '<div style="font-size:12px;background:rgba(0,180,255,.1);border:1px solid rgba(0,180,255,.3);border-radius:8px;padding:7px 12px;margin-bottom:16px;color:var(--accent2)">📤 จาก: <strong>penguinstudiovoice@gmail.com</strong></div>'+
+    '<div style="background:rgba(255,158,0,.08);border:1px solid rgba(255,158,0,.3);border-radius:8px;padding:9px 12px;margin-bottom:14px;font-size:12px;color:var(--orange)">💡 <strong>ขั้นตอน:</strong> (1) ดาวน์โหลด PDF ใบสำคัญ → (2) แนบไฟล์ + รูปสลิป → (3) เปิด Gmail → (4) แนบไฟล์ใน Gmail แล้วกดส่งเอง</div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:14px">'+
+    '<button class="btn btn-outline btn-sm" style="flex:1" onclick="_vcDownloadVoucherPDF(\''+vNo+'\')">📥 ดาวน์โหลด PDF</button>'+
+    '<button class="btn btn-outline btn-sm" style="flex:1" onclick="_vcPreviewVoucherInModal(\''+vNo+'\')">👁️ ดูใบ</button>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn btn-outline btn-sm" style="flex:1" onclick="document.getElementById(\'vc-send-modal\').remove()">ปิด (ส่งทีหลังก็ได้)</button>'+
+    '<button class="btn btn-blue btn-sm" style="flex:1.4" onclick="_vcOpenGmailForVoucher(\''+vNo+'\')">📧 เปิด Gmail พร้อมเนื้อหา</button>'+
+    '</div></div>';
+  document.body.appendChild(div);
+}
+
+// ดาวน์โหลด PDF (HTML print) ของ voucher
+function _vcDownloadVoucherPDF(vNo){
+  const d = (getDocsStore('vouchers')||[]).find(x => x.docNo === vNo);
+  if(!d){ toast('ไม่พบใบ','error'); return; }
+  const s = d.staffId ? (getStaffById(d.staffId) || {name:d.staffName, nickname:d.staffNickname, bank:d.bank, account:d.account, promptpay:'', qrUrl:''}) : {name:d.staffName, nickname:d.staffNickname, bank:d.bank, account:d.account, promptpay:'', qrUrl:''};
+  const html = buildMultiVoucherHTML({
+    vNo: d.docNo, staff: s,
+    items: d.items || [{projName: d.projName, slot: d.slot, amount: d.amount}],
+    totalAmt: d.totalAmount || d.amount || 0,
+    date: d.date, note: d.note || '',
+  });
+  downloadDocHTML(html, 'voucher-'+vNo+'-'+(s.nickname||s.name||'').replace(/\s+/g,'_'));
+}
+function _vcPreviewVoucherInModal(vNo){
+  const d = (getDocsStore('vouchers')||[]).find(x => x.docNo === vNo);
+  if(!d){ toast('ไม่พบใบ','error'); return; }
+  const s = d.staffId ? (getStaffById(d.staffId) || {name:d.staffName, nickname:d.staffNickname, bank:d.bank, account:d.account, promptpay:'', qrUrl:''}) : {name:d.staffName, nickname:d.staffNickname, bank:d.bank, account:d.account, promptpay:'', qrUrl:''};
+  const html = buildMultiVoucherHTML({
+    vNo: d.docNo, staff: s,
+    items: d.items || [{projName: d.projName, slot: d.slot, amount: d.amount}],
+    totalAmt: d.totalAmount || d.amount || 0,
+    date: d.date, note: d.note || '',
+  });
+  const el = document.getElementById('receipt-body');
+  if(el) el.innerHTML = html;
+  window._lastReceiptCtx = {staffId: d.staffId, vNo: d.docNo, type:'voucher', email: d.email||''};
+  openModal('modal-receipt');
+}
+function _vcOpenGmailForVoucher(vNo){
+  const d = (getDocsStore('vouchers')||[]).find(x => x.docNo === vNo);
+  if(!d){ toast('ไม่พบใบ','error'); return; }
+  const nick = d.staffNickname || d.staffName || '';
+  const items = d.items || [{projName: d.projName, slot: d.slot, amount: d.amount}];
+  const lines = items.map(it => `• ${it.projName}: ${fmtB(it.amount||0)}`).join('\n');
+  const subject = encodeURIComponent('ใบสำคัญจ่าย '+vNo+' — Guin Home Studio');
+  const body = encodeURIComponent(
+    'เรียน คุณ'+nick+'\n\n'+
+    'สตูดิโอได้โอนเงินค่าตอบแทนให้คุณตามรายการต่อไปนี้:\n\n'+lines+'\n\n'+
+    'ยอดรวมทั้งสิ้น: '+fmtB(d.totalAmount||d.amount||0)+'\n'+
+    'วันที่: '+(d.date||'')+'\n'+
+    'บัญชี: '+(d.bank||'—')+' '+(d.account||'')+'\n'+
+    'เลขที่ใบสำคัญ: '+vNo+'\n'+
+    (d.note ? '\nหมายเหตุ: '+d.note+'\n' : '')+
+    '\nกรุณาตรวจสอบใบสำคัญจ่ายและสลิปการโอนเงินในไฟล์แนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio'
+  );
+  window.open(
+    'https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm'+
+    '&to='+encodeURIComponent(d.email||'')+
+    '&su='+subject+
+    '&body='+body,
+    '_blank'
+  );
+  toast('📧 เปิด Gmail แล้ว · แนบไฟล์ PDF + สลิป แล้วกดส่งใน Gmail','info');
+}
+
+// ──────────────────────────────────────────────
+// ↩️ REVERT VOUCHER — คืนสถานะงาน + ลบใบ
+//   ใช้กรณีออกใบผิด · ส่ง email ผิด · ต้องการแก้
+// ──────────────────────────────────────────────
+async function revertVoucher(docNo){
+  const all = getDocsStore('vouchers') || [];
+  const voucher = all.find(d => d.docNo === docNo);
+  if(!voucher){ toast('ไม่พบใบสำคัญจ่าย '+docNo,'error'); return; }
+  const items = voucher.multiItem && Array.isArray(voucher.items)
+    ? voucher.items
+    : [{projId: voucher.projId, slot: voucher.slot, amount: voucher.amount, projName: voucher.projName}];
+  const nick = voucher.staffNickname || voucher.staffName || voucher.staffId;
+  const totalAmt = voucher.totalAmount || voucher.amount || 0;
+  if(!confirm(`↩️ ยกเลิกใบสำคัญจ่าย ${docNo}?\n\n` +
+    `ผู้รับ: ${nick}\nยอด: ${fmtB(totalAmt)}\nรายการ: ${items.length} งาน\n\n` +
+    `ระบบจะ:\n• คืนสถานะงานทั้งหมดเป็น "อนุมัติแล้ว" (จากเดิม "จ่ายแล้ว")\n• คงสถานะ "staff ยืนยันแล้ว" ไว้ (ไม่ต้องส่งใบยืนยันใหม่)\n• ลบใบสำคัญนี้ออกจากระบบ\n\n` +
+    `⚠️ ใช้กรณีออกผิด/ส่งผิด — ถ้าโอนเงินจริงแล้วอย่ายกเลิก`)) return;
+  toast(`↩️ กำลังคืนสถานะ ${items.length} รายการ...`,'info');
+  let okCount = 0, failCount = 0;
+  for(const it of items){
+    if(!it.projId) { failCount++; continue; }
+    try {
+      const res = await saveProjectMerge(it.projId, (p)=>{
+        const w = (p.workers||[]).find(x => x.id === voucher.staffId && x.slot === it.slot);
+        if(w && w.voucherNo === docNo){
+          w.status = 'approved'; // คืนเป็น approved (เพราะ confirmStatus='confirmed' ยังคงอยู่)
+          delete w.voucherNo;
+          delete w.paidAt;
+        }
+      });
+      if(res.ok) okCount++; else failCount++;
+    } catch(e){ console.warn('revert voucher:', e); failCount++; }
+  }
+  // ลบ voucher record
+  const filtered = all.filter(d => d.docNo !== docNo);
+  saveDocsStore('vouchers', filtered);
+  if(failCount > 0){
+    toast(`⚠️ ยกเลิกใบ ${docNo} · คืนสถานะ ${okCount}/${items.length} · ล้มเหลว ${failCount}`,'warn');
+  } else {
+    toast(`✅ ยกเลิกใบ ${docNo} · คืนสถานะ ${okCount} รายการแล้ว`,'success');
+  }
+  // refresh
+  try { renderDocsHistory(); } catch(_){}
+  try { renderQueue(); } catch(_){}
+  try { updateQueueBadge(); } catch(_){}
+  try { if(_vcMode === 'byperson') renderVcByPerson(); } catch(_){}
 }
 
 function onVcProjChange() {
@@ -14521,11 +14639,13 @@ function renderDocsHistory() {
       <td style="font-size:12px;color:var(--text2)">${projDisplay}</td>
       <td style="font-weight:700;color:var(--accent2)">${d.total||d.amount?fmtB(d.total||d.amount):'—'}</td>
       <td style="font-size:12px;color:var(--text2)">${fmtDate(d.date||d.createdAt)}</td>
-      <td><div style="display:flex;gap:5px">
+      <td><div style="display:flex;gap:5px;flex-wrap:wrap">
         <button class="btn btn-xs btn-outline" onclick="repreviewDoc('${d.type}','${d.docNo}')">👁️ ดู</button>
         ${d.type==='invoice'?'<button class="btn btn-xs" style="background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.35);color:var(--accent2)" onclick="editInvoice(\''+d.docNo+'\')">✏️ แก้ไข</button>':''}
         ${d.type==='quotation'?'<button class="btn btn-xs" style="background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.35);color:var(--accent2)" onclick="editQuotation(\''+d.docNo+'\')">✏️ แก้ไข</button>':''}
-        <button class="btn btn-xs" style="background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.3);color:#FF6060" onclick="deleteDoc('${d.type}','${d.docNo}')">🗑️</button>
+        ${d.type==='voucher'?'<button class="btn btn-xs" style="background:rgba(155,111,255,.12);border:1px solid rgba(155,111,255,.35);color:#9B6FFF;font-weight:700" onclick="_vcOpenGmailForVoucher(\''+d.docNo+'\')" title="เปิด Gmail พร้อมเนื้อหา">📧 ส่ง</button>':''}
+        ${d.type==='voucher'?'<button class="btn btn-xs" style="background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.35);color:var(--orange);font-weight:700" onclick="revertVoucher(\''+d.docNo+'\')" title="ยกเลิกใบนี้ + คืนสถานะงานเป็น \'อนุมัติแล้ว\'">↩️ ยกเลิก</button>':''}
+        <button class="btn btn-xs" style="background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.3);color:#FF6060" onclick="deleteDoc('${d.type}','${d.docNo}')" title="ลบเฉพาะ record (ไม่คืนสถานะ)">🗑️</button>
       </div></td>
     </tr>`;
   }).join('')+'</tbody></table></div>';
