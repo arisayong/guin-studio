@@ -14584,11 +14584,21 @@ body{font-family:'Kanit',sans-serif;background:#fff;padding:20px;-webkit-print-c
   body{background:#e5e7eb;padding:24px 0;min-height:100vh}
   body > div[id^="printable-"]{box-shadow:0 4px 24px rgba(0,0,0,.15)}
 }
-/* ─ Print: ตัดขอบทั้งหมด เอกสารเต็มหน้า ─ */
+/* ─ Print: ตัดขอบทั้งหมด เอกสารเต็มหน้า + footer ติดล่างกระดาษ ─ */
 @media print{
   html,body{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;background:#fff!important}
   body{padding:0;margin:0}
-  body > div[id^="printable-"]{box-shadow:none!important;border:none!important;border-radius:0!important;max-width:100%!important;margin:0!important}
+  /* container เอกสาร: เต็มหน้า + ใช้ flex เพื่อดัน footer ลงล่าง */
+  body > div[id^="printable-"]{
+    box-shadow:none!important;border:none!important;border-radius:0!important;
+    max-width:100%!important;margin:0!important;
+    min-height:100vh!important;
+    display:flex!important;flex-direction:column!important;
+  }
+  /* แถบ footer (child สุดท้าย) ดันลงท้ายกระดาษ */
+  body > div[id^="printable-"] > *:last-child{
+    margin-top:auto!important;
+  }
   .no-print{display:none!important}
   /* ─ เซ็ตหน้ากระดาษ: ไม่มี margin · จะตัดทุกขอบ ─ */
   @page{margin:0;size:A4}
