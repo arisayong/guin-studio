@@ -14161,6 +14161,7 @@ async function issuePersonVoucher(staffId){
     docNo: vNo,
     staffId,
     staffName: s.name,
+    staffLastName: s.lastName || '',
     staffNickname: s.nickname,
     items: selectedItems.map(it => ({
       projId: it.p.id, projName: it.p.name,
@@ -14234,7 +14235,10 @@ function _vcDownloadVoucherPDF(vNo){
     totalAmt: d.totalAmount || d.amount || 0,
     date: d.date, note: d.note || '',
   });
-  downloadDocHTML(html, 'voucher-'+vNo+'-'+(s.nickname||s.name||'').replace(/\s+/g,'_'));
+  // ─ ชื่อไฟล์: ชื่อ_นามสกุล (เต็ม) · fallback ไป nickname ถ้าไม่มีชื่อ ─
+  const fullName = ((s.name||'').trim() + (s.lastName ? ' '+s.lastName.trim() : '')).trim();
+  const fileLabel = (fullName || s.nickname || 'staff').replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_');
+  downloadDocHTML(html, 'voucher-'+vNo+'-'+fileLabel);
 }
 function _vcPreviewVoucherInModal(vNo){
   const d = (getDocsStore('vouchers')||[]).find(x => x.docNo === vNo);
@@ -14254,12 +14258,16 @@ function _vcPreviewVoucherInModal(vNo){
 function _vcOpenGmailForVoucher(vNo){
   const d = (getDocsStore('vouchers')||[]).find(x => x.docNo === vNo);
   if(!d){ toast('ไม่พบใบ','error'); return; }
-  const nick = d.staffNickname || d.staffName || '';
+  // ใช้ "ชื่อต้น" สำหรับขึ้นต้นอีเมล (ตัดนามสกุล) · fallback: nickname
+  const liveStaff = d.staffId ? getStaffById(d.staffId) : null;
+  const fullName = (liveStaff?.name || d.staffName || '').trim();
+  const lastName = (liveStaff?.lastName || d.staffLastName || '').trim();
+  const firstName = fullName ? fullName.split(/\s+/)[0] : (d.staffNickname||'');
   const items = d.items || [{projName: d.projName, slot: d.slot, amount: d.amount}];
   const lines = items.map(it => `• ${it.projName}: ${fmtB(it.amount||0)}`).join('\n');
   const subject = encodeURIComponent('ใบสำคัญจ่าย '+vNo+' — Guin Home Studio');
   const body = encodeURIComponent(
-    'เรียน คุณ'+nick+'\n\n'+
+    'เรียน คุณ'+firstName+'\n\n'+
     'สตูดิโอได้โอนเงินค่าตอบแทนให้คุณตามรายการต่อไปนี้:\n\n'+lines+'\n\n'+
     'ยอดรวมทั้งสิ้น: '+fmtB(d.totalAmount||d.amount||0)+'\n'+
     'วันที่: '+(d.date||'')+'\n'+
@@ -14275,6 +14283,9 @@ function _vcOpenGmailForVoucher(vNo){
     '&body='+body,
     '_blank'
   );
+  // 🔒 ปิด modal ส่งใบหลังเปิด Gmail (ตามที่ Yu บอก)
+  const sendModal = document.getElementById('vc-send-modal');
+  if(sendModal) sendModal.remove();
   toast('📧 เปิด Gmail แล้ว · แนบไฟล์ PDF + สลิป แล้วกดส่งใน Gmail','info');
 }
 
@@ -14568,17 +14579,39 @@ function downloadDocHTML(bodyHtml, filename) {
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}
 body{font-family:'Kanit',sans-serif;background:#fff;padding:20px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+/* ─ Screen preview: เอกสารวาง center พื้นเทาอ่อนเพื่อแยกขอบ ─ */
+@media screen{
+  body{background:#e5e7eb;padding:24px 0;min-height:100vh}
+  body > div[id^="printable-"]{box-shadow:0 4px 24px rgba(0,0,0,.15)}
+}
+/* ─ Print: ตัดขอบทั้งหมด เอกสารเต็มหน้า ─ */
 @media print{
-  html,body{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
-  body{padding:0}
+  html,body{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;background:#fff!important}
+  body{padding:0;margin:0}
+  body > div[id^="printable-"]{box-shadow:none!important;border:none!important;border-radius:0!important;max-width:100%!important;margin:0!important}
   .no-print{display:none!important}
-  @page{margin:12mm;size:A4}
+  /* ─ เซ็ตหน้ากระดาษ: ไม่มี margin · จะตัดทุกขอบ ─ */
+  @page{margin:0;size:A4}
+  /* พยายามซ่อน browser default header/footer (รองรับบางเบราว์เซอร์) */
+  @page{
+    @top-left{content:""}
+    @top-center{content:""}
+    @top-right{content:""}
+    @bottom-left{content:""}
+    @bottom-center{content:""}
+    @bottom-right{content:""}
+  }
 }
 </style>
 </head><body>${bodyHtml}
-<div class="no-print" style="text-align:center;margin:24px 0">
+<div class="no-print" style="max-width:680px;margin:24px auto;padding:0 20px;text-align:center">
   <button onclick="window.print()" style="padding:12px 32px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF</button>
-  <p style="margin-top:8px;font-size:12px;color:#666">💡 ใน popup Print → เปิด <strong>"More settings"</strong> → ติ๊ก <strong>"Background graphics"</strong> เพื่อให้สีขึ้นครบ</p>
+  <div style="margin-top:12px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;text-align:left;font-size:12px;color:#374151;line-height:1.8">
+    <div style="font-weight:700;color:#111827;margin-bottom:6px">💡 ใน popup Print → กด "More settings":</div>
+    <div>1️⃣ <strong>ติ๊ก "Background graphics"</strong> — ให้สีพื้นและรูปขึ้นครบ</div>
+    <div>2️⃣ <strong>ยกเลิกติ๊ก "Headers and footers"</strong> — ตัดวันที่/URL บน-ล่าง</div>
+    <div>3️⃣ <strong>"Margins" → เลือก "None"</strong> — ตัดขอบขาวให้เอกสารเต็มหน้า</div>
+  </div>
 </div>
 </body></html>`;
   const w = window.open('','_blank');
