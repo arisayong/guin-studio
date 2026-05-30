@@ -1937,9 +1937,9 @@ body.sidebar-collapsed .main-content{
     <div class="page-subtitle">ออกใบเสนอราคาสำหรับลูกค้า · ออกใบสำคัญจ่ายสำหรับทีมงาน</div>
    </div>
    <div class="tabs" id="docs-main-tabs">
-    <div class="tab active" onclick="switchDocsMain('client',this)">📋 ใบเสนอราคา</div>
+    <div class="tab active" onclick="switchDocsMain('worker',this)">💸 ใบสำคัญจ่ายทีม</div>
+    <div class="tab" onclick="switchDocsMain('client',this)">📋 ใบเสนอราคา</div>
     <div class="tab" onclick="switchDocsMain('invoice',this)">🧾 ใบแจ้งหนี้</div>
-    <div class="tab" onclick="switchDocsMain('worker',this)">💸 ใบสำคัญจ่ายทีม</div>
     <div class="tab" onclick="switchDocsMain('history',this)">📁 ประวัติเอกสาร</div>
    </div>
 
@@ -13408,8 +13408,8 @@ function renderDocs() {
   const _vcd=document.getElementById('vc-date');if(_vcd&&!_vcd.value)_vcd.value=_td;
   // Fix: preserve last-viewed tab (ไม่บังคับกลับไปที่ใบเสนอราคาทุกครั้ง)
   const activeTab = document.querySelector('#docs-main-tabs .tab.active') || document.querySelector('#docs-main-tabs .tab');
-  const activeName = activeTab ? (((activeTab.getAttribute('onclick')||'').match(/switchDocsMain\('([^']+)'/)||[])[1]) : 'client';
-  switchDocsMain(activeName || 'client', activeTab);
+  const activeName = activeTab ? (((activeTab.getAttribute('onclick')||'').match(/switchDocsMain\('([^']+)'/)||[])[1]) : 'worker';
+  switchDocsMain(activeName || 'worker', activeTab);
   populateDocsProjSelects();
   initQtItems();
   try{renderQtDocNoBar();renderInvDocNoBar();}catch(e){}
@@ -13958,19 +13958,28 @@ function _vcCoveredSet(){
   return set;
 }
 function _vcGetRetroByPerson(){
+  // คืน "ทุกคนที่จ่ายแล้ว" (ไม่ตัดคนที่มีใบแล้วทิ้ง) เพื่อไม่ให้ใครหายไปจากหน้านี้
+  // แต่ละ item ติด flag .hasDoc ว่างานนั้นมีใบสำคัญจ่ายแล้วหรือยัง
   const covered = _vcCoveredSet();
   const byPerson = new Map();
   getProjects().forEach(p => {
     if(p.projStatus === 'cancelled') return;
     (p.workers||[]).forEach(w => {
       if(w.status !== 'paid') return;
-      if(covered.has(`${w.id}|${p.id}|${w.slot}`)) return; // มีใบแล้ว → ข้าม
       const s = getStaffById(w.id); if(!s) return;
+      const hasDoc = covered.has(`${w.id}|${p.id}|${w.slot}`) || !!w.voucherNo;
       if(!byPerson.has(w.id)) byPerson.set(w.id, []);
-      byPerson.get(w.id).push({p, w, s});
+      byPerson.get(w.id).push({p, w, s, hasDoc});
     });
   });
   return byPerson;
+}
+// หา voucher ล่าสุดของ staff (ใช้กับปุ่ม "ส่งอีกครั้ง")
+function _vcLatestVoucherNo(staffId){
+  const vs = (getDocsStore('vouchers')||[]).filter(v => v.staffId === staffId);
+  if(!vs.length) return null;
+  vs.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  return vs[0].docNo;
 }
 function toggleVcShowPaid(){
   _vcShowPaid = !_vcShowPaid;
@@ -13986,7 +13995,7 @@ function _vcRenderRetroSection(){
   const byPerson = _vcGetRetroByPerson();
   let inner;
   if(byPerson.size === 0){
-    inner = `<div style="text-align:center;padding:22px;color:var(--text2);font-size:12.5px">ไม่มีงานที่ "จ่ายแล้ว" แต่ยังไม่มีใบสำคัญจ่าย</div>`;
+    inner = `<div style="text-align:center;padding:22px;color:var(--text2);font-size:12.5px">ยังไม่มีคนที่ "จ่ายแล้ว"</div>`;
   } else {
     const entries = Array.from(byPerson.entries()).sort((a,b)=>{
       const sa=a[1].reduce((s,it)=>s+(it.w.amount||0),0), sb=b[1].reduce((s,it)=>s+(it.w.amount||0),0);
@@ -13996,16 +14005,30 @@ function _vcRenderRetroSection(){
       const s = items[0].s;
       const totalAmt = items.reduce((sum,it)=>sum+(it.w.amount||0),0);
       const hasEmail = !!(s.email && s.email.includes('@'));
+      const nNoDoc = items.filter(it=>!it.hasDoc).length;   // งานที่ยังไม่มีใบ
+      const allHaveDoc = nNoDoc === 0;                       // ออกใบครบแล้วทุกงาน
+      const latestVNo = _vcLatestVoucherNo(staffId);
       const projLines = items.map(it=>{
         const slotKey=(it.w.slot||'').split('-')[0];
         const slotLbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'}[slotKey]||slotKey;
-        return `<div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text2);padding:2px 0"><span>${it.p.name} · ${slotLbl}</span><span>${fmtB(it.w.amount||0)}</span></div>`;
+        const tag = it.hasDoc ? '<span style="color:var(--green)">✓ มีใบ</span>' : '<span style="color:var(--orange)">• ยังไม่มีใบ</span>';
+        return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--text2);padding:2px 0"><span>${it.p.name} · ${slotLbl} ${tag}</span><span>${fmtB(it.w.amount||0)}</span></div>`;
       }).join('');
-      return `<div style="background:var(--card);border:1px solid rgba(255,158,0,.35);border-radius:11px;padding:13px 16px;margin-bottom:10px">
+      // ปุ่มแอ็กชัน: ถ้ายังมีงานที่ไม่มีใบ → ออกใบย้อนหลัง · ถ้าครบแล้ว → ส่งอีกครั้ง
+      const actionBtn = allHaveDoc
+        ? (latestVNo
+            ? `<button class="btn btn-xs" style="background:#9B6FFF;color:#fff;border:none;font-weight:700" onclick="showVoucherSendModalByVNo('${latestVNo}')">📧 ส่งอีกครั้ง</button>`
+            : '')
+        : `<button class="btn btn-xs" style="background:var(--orange);color:#fff;border:none;font-weight:700" onclick="_vcIssueRetro('${staffId}')">📄 ออกใบย้อนหลัง${nNoDoc<items.length?` (${nNoDoc} งาน)`:''} + เปิด Gmail</button>`;
+      const statusBadge = allHaveDoc
+        ? '<span style="font-size:10px;background:rgba(0,223,160,.15);color:var(--green);padding:1px 8px;border-radius:8px;font-weight:700">✅ จ่ายแล้ว · ออกใบครบ</span>'
+        : '<span style="font-size:10px;background:rgba(255,158,0,.15);color:var(--orange);padding:1px 8px;border-radius:8px;font-weight:700">✅ จ่ายแล้ว · ยังไม่มีใบ</span>';
+      const borderC = allHaveDoc ? 'rgba(0,223,160,.3)' : 'rgba(255,158,0,.35)';
+      return `<div style="background:var(--card);border:1px solid ${borderC};border-radius:11px;padding:13px 16px;margin-bottom:10px">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <div style="width:34px;height:34px;border-radius:50%;background:rgba(255,158,0,.2);color:var(--orange);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px">${String((s.nickname||s.name||'?')[0]).toUpperCase()}</div>
           <div style="flex:1;min-width:0">
-            <div style="font-size:14px;font-weight:800;color:var(--text)">${s.name||s.nickname}${(s.nickname && s.name!==s.nickname)?` <span style="color:var(--text2);font-weight:500;font-size:12px">(${s.nickname})</span>`:''} <span style="font-size:10px;background:rgba(0,223,160,.15);color:var(--green);padding:1px 8px;border-radius:8px;font-weight:700">✅ จ่ายแล้ว</span></div>
+            <div style="font-size:14px;font-weight:800;color:var(--text)">${s.name||s.nickname}${(s.nickname && s.name!==s.nickname)?` <span style="color:var(--text2);font-weight:500;font-size:12px">(${s.nickname})</span>`:''} ${statusBadge}</div>
             <div style="font-size:11px;color:var(--text2);margin-top:2px">🏦 ${s.bank||'—'} ${s.account||''}${hasEmail?(' · 📧 '+s.email):' · <span style="color:var(--orange)">⚠️ ไม่มี email</span>'}</div>
           </div>
           <div style="text-align:right">
@@ -14014,21 +14037,29 @@ function _vcRenderRetroSection(){
           </div>
         </div>
         <div style="margin:8px 0 10px;padding:8px 10px;background:rgba(0,0,0,.18);border-radius:7px">${projLines}</div>
-        <div style="display:flex;justify-content:flex-end">
-          <button class="btn btn-xs" style="background:var(--orange);color:#fff;border:none;font-weight:700" onclick="_vcIssueRetro('${staffId}')">📄 ออกใบย้อนหลัง + เปิด Gmail</button>
-        </div>
+        <div style="display:flex;justify-content:flex-end">${actionBtn}</div>
       </div>`;
     }).join('');
   }
   return `<div style="margin-top:18px">
-    <div style="font-size:12px;font-weight:800;color:var(--orange);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">🕓 ออกเอกสารย้อนหลัง · จ่ายแล้วแต่ยังไม่มีใบ</div>
+    <div style="font-size:12px;font-weight:800;color:var(--orange);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">🕓 คนที่จ่ายแล้ว · ออก/ส่งเอกสารย้อนหลัง</div>
     ${inner}
   </div>`;
 }
+// เปิด modal ส่งใบจากเลขที่ voucher (ใช้ปุ่ม "ส่งอีกครั้ง")
+function showVoucherSendModalByVNo(vNo){
+  const d = (getDocsStore('vouchers')||[]).find(x => x.docNo === vNo);
+  if(!d){ toast('ไม่พบใบ '+vNo,'error'); return; }
+  const s = d.staffId ? (getStaffById(d.staffId) || {name:d.staffName, nickname:d.staffNickname, bank:d.bank, account:d.account, email:d.email}) : {name:d.staffName, nickname:d.staffNickname, bank:d.bank, account:d.account, email:d.email};
+  const items = d.items || [{projName:d.projName, slot:d.slot, amount:d.amount}];
+  showVoucherSendModal({ vNo:d.docNo, staff:s, items, totalAmt:d.totalAmount||d.amount||0, date:d.date, note:d.note||'' });
+}
 async function _vcIssueRetro(staffId){
   const byPerson = _vcGetRetroByPerson();
-  const items = byPerson.get(staffId);
-  if(!items || !items.length){ toast('ไม่มีงานที่ต้องออกย้อนหลัง','warn'); renderVcByPerson(); return; }
+  const all = byPerson.get(staffId);
+  // ออกใบเฉพาะงานที่ "ยังไม่มีใบ" (กันออกซ้ำงานที่มีใบแล้ว)
+  const items = (all||[]).filter(it => !it.hasDoc);
+  if(!items.length){ toast('งานทั้งหมดมีใบแล้ว','info'); renderVcByPerson(); return; }
   const s = items[0].s;
   const totalAmt = items.reduce((a,it)=>a+(it.w.amount||0),0);
   const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
@@ -14688,7 +14719,7 @@ async function revertVoucher(docNo){
   } else {
     toast(`✅ ยกเลิกใบ ${docNo} · คืนสถานะ ${okCount} รายการแล้ว`,'success');
   }
-  // refresh
+  // refresh — เปิดแผง "จ่ายแล้ว" ค้างไว้ ไม่ให้คนหายไปจากหน้าใบสำคัญจ่ายทีม
   try { renderDocsHistory(); } catch(_){}
   try { renderQueue(); } catch(_){}
   try { updateQueueBadge(); } catch(_){}
