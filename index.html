@@ -12327,19 +12327,33 @@ function _normalizeQrUrl(url){
   if(!url) return '';
   const u = String(url).trim();
   if(!u) return '';
-  // Google Drive: https://drive.google.com/file/d/XXXXXX/view?usp=sharing
+  // ─ Google Drive: ใช้ thumbnail endpoint (rendered as image · reliable hotlink) ─
+  //   ❌ uc?export=view มัก redirect / โดน block สำหรับ hotlink
+  //   ✅ thumbnail?id=XXX&sz=w800 = direct image (PNG/JPG) ที่ <img> โหลดได้แน่นอน
+  let id = null;
   let m = u.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/);
-  if(m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
-  // Google Drive: https://drive.google.com/open?id=XXXXXX
-  m = u.match(/drive\.google\.com\/open\?id=([^&]+)/);
-  if(m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
-  // Google Drive: https://drive.google.com/uc?id=XXXXXX (เพิ่ม export=view ถ้าไม่มี)
-  m = u.match(/drive\.google\.com\/uc\?(?:export=\w+&)?id=([^&]+)/);
-  if(m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
-  // Dropbox: แปลง ?dl=0 เป็น ?raw=1
+  if(m) id = m[1];
+  if(!id){ m = u.match(/drive\.google\.com\/open\?id=([^&]+)/); if(m) id = m[1]; }
+  if(!id){ m = u.match(/drive\.google\.com\/uc\?(?:export=\w+&)?id=([^&]+)/); if(m) id = m[1]; }
+  if(!id){ m = u.match(/drive\.google\.com\/thumbnail\?id=([^&]+)/); if(m) id = m[1]; }
+  if(id) return `https://drive.google.com/thumbnail?id=${id}&sz=w800`;
+  // Dropbox: แปลง ?dl=0 → ?raw=1
   if(u.includes('dropbox.com') && u.includes('?dl=0')) return u.replace('?dl=0','?raw=1');
-  // อื่น ๆ (imgur, direct image links ฯลฯ) — ใช้ตรง ๆ
+  // imgur, direct .png/.jpg/.webp ฯลฯ — ใช้ตรง ๆ
   return u;
+}
+
+// ── Fallback alternative URL — ใช้กับ onerror ของ <img> ──
+//   ถ้า thumbnail ไม่ขึ้น → ลอง lh3.googleusercontent (CDN behind Drive)
+function _qrFallbackUrl(url){
+  if(!url) return '';
+  const u = String(url).trim();
+  let id = null;
+  let m = u.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/);
+  if(m) id = m[1];
+  if(!id){ m = u.match(/[?&]id=([^&]+)/); if(m) id = m[1]; }
+  if(id) return `https://lh3.googleusercontent.com/d/${id}=w800`;
+  return '';
 }
 
 // Render QR thumbnail with graceful fallback link if image fails
@@ -14006,7 +14020,19 @@ function buildMultiVoucherHTML(opts){
   }).join('');
   // ─ QR Code — รองรับหลายชื่อ field (qrUrl, qrCode, qr, paymentQR, qr_url) + normalize Google Drive ─
   const rawQr = opts.staff.qrUrl || opts.staff.qrCode || opts.staff.qr || opts.staff.paymentQR || opts.staff.qr_url || opts.staff['QR Code สำหรับรับเงิน'] || opts.staff['QR Code'] || '';
-  const qrSrc = rawQr ? (typeof _normalizeQrUrl === 'function' ? _normalizeQrUrl(rawQr) : rawQr) : '';
+  const qrPrimary = rawQr ? (typeof _normalizeQrUrl === 'function' ? _normalizeQrUrl(rawQr) : rawQr) : '';
+  const qrFallback = rawQr ? (typeof _qrFallbackUrl === 'function' ? _qrFallbackUrl(rawQr) : '') : '';
+  const safeRawQr = String(rawQr).replace(/"/g,'&quot;').replace(/'/g,"\\'");
+  const safeFallback = String(qrFallback).replace(/"/g,'&quot;').replace(/'/g,"\\'");
+  // ─ Cascading fallback: thumbnail → lh3.googleusercontent → link button ─
+  //   img.onerror ลอง src ตัวที่ 2 ก่อน · ถ้ายังพังก็ซ่อนแล้วโชว์ปุ่มลิงก์
+  const qrHTML = qrPrimary ? `
+    <img src="${qrPrimary}" alt="QR Code" data-qr-fallback="${safeFallback}" data-qr-tried="0"
+         style="width:96px;height:96px;object-fit:contain;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:3px;flex-shrink:0"
+         onerror="(function(img){var tried=parseInt(img.getAttribute('data-qr-tried')||'0');var fb=img.getAttribute('data-qr-fallback')||'';if(tried===0&&fb){img.setAttribute('data-qr-tried','1');img.src=fb;}else{img.style.display='none';var a=img.nextElementSibling;if(a)a.style.display='inline-flex';}})(this)">
+    <a href="${safeRawQr}" target="_blank" rel="noopener"
+       style="display:none;width:96px;height:96px;flex-shrink:0;background:#E3F2FF;border:1px solid #1565FF;border-radius:6px;color:#1565FF;font-size:11px;text-decoration:none;font-weight:700;align-items:center;justify-content:center;text-align:center;padding:6px;line-height:1.4">🔗 เปิด<br>QR</a>
+  ` : '';
   // Bank info section (ของผู้รับ — ฝั่งทีมงาน)
   const bankCardHTML = `<div style="padding:0 30px 18px">
     <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:9px;font-weight:700">💳 ช่องทางรับเงิน</div>
@@ -14021,7 +14047,7 @@ function buildMultiVoucherHTML(opts){
         <div style="font-size:11px;color:#6b7280;margin-top:2px">ชื่อบัญชี: <strong style="color:#374151">${opts.staff.name||opts.staff.nickname||'—'}</strong></div>
         ${opts.staff.promptpay?`<div style="font-size:11px;color:#6b7280;margin-top:2px">📱 พร้อมเพย์: <strong style="color:#374151">${opts.staff.promptpay}</strong></div>`:''}
       </div>
-      ${qrSrc ? `<img src="${qrSrc}" alt="QR" style="width:96px;height:96px;object-fit:contain;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:3px;flex-shrink:0" onerror="this.onerror=null;this.style.display='none';this.nextElementSibling&&(this.nextElementSibling.style.display='inline-flex')"><a href="${String(rawQr).replace(/"/g,'&quot;')}" target="_blank" rel="noopener" style="display:none;width:96px;height:96px;flex-shrink:0;background:#E3F2FF;border:1px solid #1565FF;border-radius:6px;color:#1565FF;font-size:11px;text-decoration:none;font-weight:700;align-items:center;justify-content:center;text-align:center;padding:6px">🔗 เปิด<br>QR</a>` : ''}
+      ${qrHTML}
     </div>
   </div>`;
   return `<div id="printable-voucher" data-vno="${opts.vNo}" style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:620px;margin:0 auto;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb">
