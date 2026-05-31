@@ -3392,7 +3392,26 @@ async function nextVoucherNoAsync(){
   }
   return nextVoucherNo();
 }
-function nextVoucherNo(){voucherSeq++;ls('voucher_seq',String(voucherSeq));const y=new Date().getFullYear()+543;return`GS-${y}-${_todayDDMM()}-${String(voucherSeq).padStart(4,'0')}`}
+// หาเลข running สูงสุดที่เคยใช้จริงใน docs_vouchers (กันเลขซ้ำข้ามเครื่อง/ตอน seq ค้าง)
+function _maxVoucherSeqInStore(){
+  let mx = 0;
+  try {
+    (ls('docs_vouchers')||[]).forEach(v=>{
+      const m = String(v.docNo||'').match(/-(\d{3,})$/);
+      if(m){ const n = parseInt(m[1],10); if(n>mx) mx = n; }
+    });
+  } catch(_){}
+  return mx;
+}
+function nextVoucherNo(){
+  // ⚠️ กันเลขใบซ้ำ: ใช้ค่ามากสุดของ (in-memory, localStorage, เลขที่เคยออกจริง) แล้ว +1
+  //    ป้องกันเคส 2 เครื่อง/ตอน seq ในหน่วยความจำค้าง → ออกเลขชนกัน → lookup ผิดคน
+  const lsSeq = parseInt(ls('voucher_seq')||'0',10) || 0;
+  voucherSeq = Math.max(voucherSeq||0, lsSeq, _maxVoucherSeqInStore()) + 1;
+  ls('voucher_seq',String(voucherSeq));
+  const y=new Date().getFullYear()+543;
+  return`GS-${y}-${_todayDDMM()}-${String(voucherSeq).padStart(4,'0')}`;
+}
 
 // Helpers for date-embedded document numbers: PREFIX-YYYYbuddhist-DDMM-NNN
 function _todayDDMM(){
@@ -5056,7 +5075,11 @@ async function enterApp(){
       if(snapD.exists()){
         const d=snapD.val();
         if(d.quotations)ls('docs_quotations',d.quotations);
-        if(d.voucherSeq)ls('voucher_seq',d.voucherSeq);
+        // 🔧 โหลดใบสำคัญจ่าย + ใบแจ้งหนี้จาก Firebase ตอนเปิดเครื่อง (เดิมไม่ได้โหลด → ประวัติว่างในเครื่องอื่น)
+        if(d.vouchers)ls('docs_vouchers',d.vouchers);
+        if(d.invoices)ls('docs_invoices',d.invoices);
+        if(d.history)ls('docs_history',d.history);
+        if(d.voucherSeq){ ls('voucher_seq',d.voucherSeq); const n=parseInt(d.voucherSeq,10); if(!isNaN(n)) voucherSeq=Math.max(voucherSeq||0,n); }
       }
     }
   } catch(e) {}
@@ -16448,7 +16471,19 @@ function startFirebaseSync() {
       const d=snap.val();
       if(d.quotations)ls('docs_quotations',d.quotations);
       if(d.history)ls('docs_history',d.history);
-      if(d.voucherSeq)ls('voucher_seq',d.voucherSeq);
+      // 🔧 sync ใบสำคัญจ่าย + ใบแจ้งหนี้ ลงเครื่องนี้ด้วย (เดิมไม่ได้ทำ → ประวัติ/รายการไม่ขึ้นข้ามเครื่อง)
+      if(d.vouchers)ls('docs_vouchers',d.vouchers);
+      if(d.invoices)ls('docs_invoices',d.invoices);
+      // 🔧 อัปเดต seq ทั้ง localStorage และตัวแปรในหน่วยความจำ (กันออกเลขใบซ้ำข้ามเครื่อง)
+      if(d.voucherSeq){
+        ls('voucher_seq',d.voucherSeq);
+        const n=parseInt(d.voucherSeq,10); if(!isNaN(n)) voucherSeq=Math.max(voucherSeq||0,n);
+      }
+      // refresh หน้าที่เปิดอยู่ให้เห็นข้อมูลล่าสุดทันที
+      if(window._currentPage==='docs'){
+        try{ renderDocsHistory(); }catch(_){}
+        try{ if(typeof renderVcByPerson==='function' && _vcMode==='byperson') renderVcByPerson(); }catch(_){}
+      }
     }
   });
   // Sync misc (client paid, slips)
