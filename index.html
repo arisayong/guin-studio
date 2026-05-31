@@ -13990,7 +13990,10 @@ function _vcGetRetroByPerson(){
     (p.workers||[]).forEach(w => {
       if(w.status !== 'paid') return;
       const s = getStaffById(w.id); if(!s) return;
-      const hasDoc = covered.has(`${w.id}|${p.id}|${w.slot}`) || !!w.voucherNo;
+      // hasDoc = "มีใบสำคัญจ่ายในระบบจริง" (อิงจาก record เท่านั้น)
+      // ⚠️ ไม่ใช้ w.voucherNo เพราะถ้า record หาย/เลขชน worker อาจค้าง voucherNo เก่า
+      //    แต่ใบจริงไม่มี → ต้องให้ออกใบย้อนหลังใหม่ได้
+      const hasDoc = covered.has(`${w.id}|${p.id}|${w.slot}`);
       if(!byPerson.has(w.id)) byPerson.set(w.id, []);
       byPerson.get(w.id).push({p, w, s, hasDoc});
     });
@@ -14091,11 +14094,12 @@ async function _vcIssueRetro(staffId){
   const nowIso = new Date().toISOString();
   toast(`📄 กำลังออกใบย้อนหลัง ${items.length} งาน...`,'info');
   // ใส่เลขที่ใบให้ worker (ไม่แตะสถานะ — ยังเป็น "จ่ายแล้ว" เหมือนเดิม)
+  // เขียนทับ voucherNo เสมอ ให้ตรงกับใบที่ออกใหม่ (กันค้างเลขเก่าที่ใบหาย)
   for(const it of items){
     try{
       await saveProjectMerge(it.p.id, (p)=>{
         const w = (p.workers||[]).find(x => x.id===it.w.id && x.slot===it.w.slot);
-        if(w && !w.voucherNo){ w.voucherNo = vNo; }
+        if(w){ w.voucherNo = vNo; }
       });
     }catch(e){ console.warn('retro mark:', e); }
   }
