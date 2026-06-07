@@ -2103,11 +2103,19 @@ body.sidebar-collapsed .main-content{
      <!-- ═════ MODE: ตามโปรเจกต์ (เดิม) ═════ -->
      <div id="vc-byproj-section" class="hidden">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
-       <div class="form-group" style="margin:0">
-        <label class="form-label">เลือกโปรเจกต์</label>
-        <select class="form-input form-select" id="vc-proj" onchange="onVcProjChange()">
-         <option value="">— เลือกโปรเจกต์ —</option>
-        </select>
+       <div class="form-group" style="margin:0;position:relative">
+        <label class="form-label">เลือกโปรเจกต์ <span style="color:var(--text2);font-weight:400">(ติ๊กได้หลายอัน)</span></label>
+        <div class="form-input form-select" id="vc-proj-btn" onclick="toggleVcProjPicker()" style="cursor:pointer;display:flex;align-items:center;min-height:42px" title="เลือกโปรเจกต์ได้หลายอัน">
+         <span id="vc-proj-label" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">— เลือกโปรเจกต์ —</span>
+        </div>
+        <div id="vc-proj-panel" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:50;background:var(--card);border:1px solid var(--accent2);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);max-height:340px;flex-direction:column;overflow:hidden">
+         <input type="text" id="vc-proj-search" placeholder="🔍 ค้นหาโปรเจกต์..." oninput="renderVcProjOptions(this.value)" style="width:100%;padding:9px 12px;background:var(--bg2);border:none;border-bottom:1px solid var(--border2);color:var(--text);font-family:Kanit;font-size:13px;outline:none;flex-shrink:0">
+         <div id="vc-proj-options" style="overflow-y:auto;padding:4px;flex:1"></div>
+         <div style="flex-shrink:0;padding:7px 12px;border-top:1px solid var(--border2);background:var(--bg2);display:flex;justify-content:space-between;align-items:center">
+          <span id="vc-proj-pickcount" style="font-size:11px;color:var(--text2)">ยังไม่ได้เลือก</span>
+          <button class="btn btn-blue btn-xs" onclick="closeVcProjPicker()">เสร็จ</button>
+         </div>
+        </div>
        </div>
        <div class="form-group" style="margin:0">
         <label class="form-label">วันที่ออกใบ</label>
@@ -2118,7 +2126,7 @@ body.sidebar-collapsed .main-content{
         <input class="form-input" id="vc-note" placeholder="ถ้ามี">
        </div>
       </div>
-      <!-- Worker checklist -->
+      <!-- Worker checklist (จัดกลุ่มตามโปรเจกต์) -->
       <div id="vc-workers-wrap" style="margin-bottom:12px">
        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">เลือกทีมงานที่ต้องการออกใบ</div>
        <div id="vc-workers-list" style="display:flex;flex-direction:column;gap:6px">
@@ -2127,6 +2135,7 @@ body.sidebar-collapsed .main-content{
       </div>
       <!-- Summary -->
       <div id="vc-summary" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">
+       <div id="vc-selected-projs" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
         <span style="color:var(--text2)">ผู้รับเงินที่เลือก</span><span id="vc-selected-count" style="font-weight:700">0 คน</span>
        </div>
@@ -13421,7 +13430,8 @@ function myExportPDF(){
 
 let docsHistFilter = 'all';
 let qtItems = []; // [{desc, qty, unit, price}]
-let vcSelectedWorkers = new Set(); // worker slot keys
+let vcSelectedWorkers = new Set(); // keys "projId|workerId|slot" (รองรับหลายโปรเจกต์)
+let vcSelectedProjs = new Set();   // projId ที่ติ๊กเลือกในโหมด "ตามโปรเจกต์"
 
 /* ── nav ── */
 function renderDocs() {
@@ -13457,11 +13467,9 @@ function switchDocsMain(tab, el) {
   }
 }
 function populateDocsProjSelects() {
-  // qt-proj and inv-proj dropdowns removed — both now use multi-select pickers
-  // Only vc-proj (voucher) still uses the dropdown
-  const projs = getProjects();
-  const opts = '<option value="">— เลือกโปรเจกต์ —</option>' + projs.map(p => `<option value="${p.id}">${p.name}${p.client?' · '+p.client:''}</option>`).join('');
-  const vc = document.getElementById('vc-proj'); if(vc) vc.innerHTML = opts;
+  // qt-proj, inv-proj และ vc-proj ใช้ multi-select picker (ติ๊กได้หลายโปรเจกต์)
+  // refresh รายการโปรเจกต์ในตัวเลือกถ้าแผงเปิดอยู่
+  try { if(document.getElementById('vc-proj-panel')?.style.display === 'flex') renderVcProjOptions(document.getElementById('vc-proj-search')?.value||''); } catch(e){}
 }
 
 /* ══════════════════════
@@ -14131,6 +14139,7 @@ function setVcMode(mode){
   if(byProj) byProj.classList.toggle('hidden', mode !== 'byproj');
   if(byPerson) byPerson.classList.toggle('hidden', mode !== 'byperson');
   if(mode === 'byperson') renderVcByPerson();
+  else { try{ updateVcProjLabel(); renderVcWorkerList(); }catch(e){} }
 }
 
 // ดึง list ของ {p, w, s} ของ staff คนนั้นที่ "ยืนยันแล้ว + ยังไม่ paid"
@@ -14753,53 +14762,154 @@ async function revertVoucher(docNo){
   try { if(_vcMode === 'byperson') renderVcByPerson(); } catch(_){}
 }
 
-function onVcProjChange() {
-  const projId = document.getElementById('vc-proj')?.value;
+// ── id ปลอดภัยสำหรับ DOM จาก key "projId|workerId|slot" ──
+function _vcKeyId(key){ return key.replace(/[^a-zA-Z0-9]/g,'_'); }
+
+/* ════ ตัวเลือกโปรเจกต์แบบติ๊กได้หลายอัน ════ */
+function toggleVcProjPicker(){
+  const panel = document.getElementById('vc-proj-panel');
+  if(!panel) return;
+  if(panel.style.display === 'flex'){ closeVcProjPicker(); return; }
+  panel.style.display = 'flex';
+  renderVcProjOptions('');
+  setTimeout(()=>document.getElementById('vc-proj-search')?.focus(),50);
+  // ปิดเมื่อคลิกนอกแผง
+  setTimeout(()=>{
+    window._vcProjOutside = (e)=>{
+      const wrap = document.getElementById('vc-proj-panel');
+      const btn = document.getElementById('vc-proj-btn');
+      if(wrap && !wrap.contains(e.target) && btn && !btn.contains(e.target)) closeVcProjPicker();
+    };
+    document.addEventListener('mousedown', window._vcProjOutside);
+  },0);
+}
+function closeVcProjPicker(){
+  const panel = document.getElementById('vc-proj-panel');
+  if(panel) panel.style.display = 'none';
+  if(window._vcProjOutside){ document.removeEventListener('mousedown', window._vcProjOutside); window._vcProjOutside = null; }
+}
+function renderVcProjOptions(filter){
+  const box = document.getElementById('vc-proj-options');
+  if(!box) return;
+  const q = (filter||'').trim().toLowerCase();
+  let projs = getProjects().filter(p => p.projStatus !== 'cancelled');
+  if(q) projs = projs.filter(p => (p.name||'').toLowerCase().includes(q) || (p.client||'').toLowerCase().includes(q));
+  if(!projs.length){
+    box.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">ไม่พบโปรเจกต์</div>';
+  } else {
+    box.innerHTML = projs.map(p => {
+      const on = vcSelectedProjs.has(p.id);
+      const nTeam = (p.workers||[]).length;
+      return `<div onclick="toggleVcProj('${p.id}')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer;${on?'background:rgba(0,180,255,.1)':''}" onmouseover="this.style.background='rgba(255,255,255,.04)'" onmouseout="this.style.background='${on?'rgba(0,180,255,.1)':'transparent'}'">
+        <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${on?'var(--accent2)':'var(--border)'};background:${on?'var(--accent2)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">${on?'<span style="color:#fff;font-size:11px;font-weight:800">✓</span>':''}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+          <div style="font-size:10.5px;color:var(--text2)">${p.client?p.client+' · ':''}${nTeam} ทีมงาน</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  const cnt = document.getElementById('vc-proj-pickcount');
+  if(cnt) cnt.textContent = vcSelectedProjs.size ? `เลือก ${vcSelectedProjs.size} โปรเจกต์` : 'ยังไม่ได้เลือก';
+}
+function toggleVcProj(projId){
+  if(vcSelectedProjs.has(projId)){
+    vcSelectedProjs.delete(projId);
+    // ลบ worker ที่เลือกไว้ของโปรเจกต์นี้ด้วย
+    [...vcSelectedWorkers].forEach(key => { if(key.split('|')[0] === projId) vcSelectedWorkers.delete(key); });
+  } else {
+    vcSelectedProjs.add(projId);
+  }
+  updateVcProjLabel();
+  renderVcProjOptions(document.getElementById('vc-proj-search')?.value||'');
+  renderVcWorkerList();
+}
+function updateVcProjLabel(){
+  const lbl = document.getElementById('vc-proj-label');
+  if(!lbl) return;
+  if(!vcSelectedProjs.size){ lbl.textContent = '— เลือกโปรเจกต์ —'; lbl.style.color='var(--text2)'; return; }
+  const projs = getProjects();
+  const names = [...vcSelectedProjs].map(id => projs.find(p=>p.id===id)?.name).filter(Boolean);
+  lbl.textContent = names.length === 1 ? names[0] : `${names.length} โปรเจกต์: ${names.join(', ')}`;
+  lbl.style.color = 'var(--text)';
+}
+
+// ── render รายชื่อทีมงาน จัดกลุ่มตามโปรเจกต์ที่เลือก ──
+function renderVcWorkerList() {
   const listEl = document.getElementById('vc-workers-list');
   if (!listEl) return;
-  vcSelectedWorkers = new Set();
-  if (!projId) {
+  const projs = [...vcSelectedProjs].map(id => getProjects().find(x=>x.id===id)).filter(Boolean);
+  if (!projs.length) {
     listEl.innerHTML = '<div style="color:var(--text2);font-size:13px;padding:16px;text-align:center;background:var(--bg2);border-radius:8px">← เลือกโปรเจกต์ก่อน</div>';
     updateVcSummary(); return;
   }
-  const p = getProjects().find(x => x.id === projId);
-  if (!p || !p.workers?.length) {
-    listEl.innerHTML = '<div style="color:var(--text2);font-size:13px;padding:16px;text-align:center;background:var(--bg2);border-radius:8px">โปรเจกต์นี้ยังไม่มีทีมงาน</div>';
-    return;
-  }
   const catColors = {dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
-  listEl.innerHTML = (p.workers||[]).map(w => {
-    const s = getStaffById(w.id); if (!s) return '';
-    const key = `${w.id}|${w.slot}`;
-    const color = catColors[s.category]||'var(--text2)';
-    const stBadge = w.status==='paid'
-      ? `<span style="font-size:10px;color:var(--green);font-weight:700">✅ จ่ายแล้ว</span>`
-      : w.status==='approved'
-        ? `<span style="font-size:10px;color:var(--cyan);font-weight:700">🔵 อนุมัติแล้ว</span>`
-        : `<span style="font-size:10px;color:var(--orange);font-weight:700">⏳ รอจ่าย</span>`;
-    return `<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;cursor:pointer;transition:all .15s"
-         id="vcrow-${key.replace('|','-')}"
-         onclick="toggleVcWorker('${key}',${w.amount||0})"
-         onmouseover="this.style.borderColor='var(--accent2)'"
-         onmouseout="this.style.borderColor='var(--border2)'">
-      <div id="vchk-${key.replace('|','-')}" style="width:20px;height:20px;border-radius:5px;border:2px solid var(--border);background:transparent;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s"></div>
-      <div style="width:32px;height:32px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">${s.nickname[0]}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:700;font-size:13px">${s.name} <span style="color:var(--text2);font-size:11px">(${s.nickname})</span></div>
-        <div style="font-size:11px;color:${color}">${(()=>{const pre=(w.slot||'').split('-')[0];const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return lbl[pre]||CATS[s.category]?.label||'';})()}</div>
+  listEl.innerHTML = projs.map(p => {
+    const workersHtml = (p.workers||[]).map(w => {
+      const s = getStaffById(w.id); if (!s) return '';
+      const key = `${p.id}|${w.id}|${w.slot}`;
+      const kid = _vcKeyId(key);
+      const on = vcSelectedWorkers.has(key);
+      const color = catColors[s.category]||'var(--text2)';
+      const stBadge = w.status==='paid'
+        ? `<span style="font-size:10px;color:var(--green);font-weight:700">✅ จ่ายแล้ว</span>`
+        : w.status==='approved'
+          ? `<span style="font-size:10px;color:var(--cyan);font-weight:700">🔵 อนุมัติแล้ว</span>`
+          : `<span style="font-size:10px;color:var(--orange);font-weight:700">⏳ รอจ่าย</span>`;
+      return `<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--bg2);border:1px solid ${on?'var(--accent2)':'var(--border2)'};border-radius:9px;cursor:pointer;transition:all .15s"
+           id="vcrow-${kid}"
+           onclick="toggleVcWorker('${key}')"
+           onmouseover="this.style.borderColor='var(--accent2)'"
+           onmouseout="this.style.borderColor='${on?'var(--accent2)':'var(--border2)'}'">
+        <div id="vchk-${kid}" style="width:20px;height:20px;border-radius:5px;border:2px solid ${on?'var(--accent2)':'var(--border)'};background:${on?'var(--accent2)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s">${on?'<span style="color:#fff;font-size:11px;font-weight:800">✓</span>':''}</div>
+        <div style="width:32px;height:32px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">${s.nickname[0]}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:13px">${s.name} <span style="color:var(--text2);font-size:11px">(${s.nickname})</span></div>
+          <div style="font-size:11px;color:${color}">${(()=>{const pre=(w.slot||'').split('-')[0];const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return lbl[pre]||CATS[s.category]?.label||'';})()}</div>
+        </div>
+        ${s.qrUrl?`<div style="flex-shrink:0" title="QR โอนเงิน">${_qrImgHtml(s.qrUrl,'thumb',{staffName:s.nickname||s.name,clickToView:true})}</div>`:''}
+        <div style="text-align:right">
+          <div style="font-weight:800;font-size:14px;color:var(--accent2)">${w.amount?fmtB(w.amount):'TBD'}</div>
+          <div style="font-size:10px;color:var(--text2)">${s.bank}</div>
+        </div>
+        <div>${stBadge}</div>
+      </div>`;
+    }).join('');
+    const body = (p.workers||[]).length
+      ? `<div style="display:flex;flex-direction:column;gap:6px">${workersHtml}</div>`
+      : '<div style="color:var(--text2);font-size:12px;padding:10px 14px;background:var(--bg2);border-radius:8px">โปรเจกต์นี้ยังไม่มีทีมงาน</div>';
+    return `<div style="border:1px solid var(--border2);border-radius:11px;padding:12px;background:rgba(0,0,0,.12)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <span style="font-size:12.5px;font-weight:800;color:var(--accent2)">📁 ${p.name}</span>
+          ${p.client?`<span style="font-size:11px;color:var(--text2)">· ${p.client}</span>`:''}
+        </div>
+        <div style="display:flex;gap:5px;flex-shrink:0">
+          <button class="btn btn-xs btn-outline" onclick="selectAllVcProjWorkers('${p.id}')">✓ เลือกทั้งโปรเจกต์</button>
+          <button class="btn btn-xs btn-outline" onclick="clearVcProjWorkers('${p.id}')">✗ ล้าง</button>
+        </div>
       </div>
-      ${s.qrUrl?`<div style="flex-shrink:0" title="QR โอนเงิน">${_qrImgHtml(s.qrUrl,'thumb',{staffName:s.nickname||s.name,clickToView:true})}</div>`:''}
-      <div style="text-align:right">
-        <div style="font-weight:800;font-size:14px;color:var(--accent2)">${w.amount?fmtB(w.amount):'TBD'}</div>
-        <div style="font-size:10px;color:var(--text2)">${s.bank}</div>
-      </div>
-      <div>${stBadge}</div>
+      ${body}
     </div>`;
   }).join('');
+  updateVcSummary();
 }
-function toggleVcWorker(key, amount) {
-  const chkEl = document.getElementById('vchk-' + key.replace('|','-'));
-  const rowEl = document.getElementById('vcrow-' + key.replace('|','-'));
+// alias เดิม (เผื่อมีที่เรียก)
+function onVcProjChange(){ renderVcWorkerList(); }
+
+function selectAllVcProjWorkers(projId){
+  const p = getProjects().find(x=>x.id===projId); if(!p) return;
+  (p.workers||[]).forEach(w => vcSelectedWorkers.add(`${p.id}|${w.id}|${w.slot}`));
+  renderVcWorkerList();
+}
+function clearVcProjWorkers(projId){
+  [...vcSelectedWorkers].forEach(key => { if(key.split('|')[0] === projId) vcSelectedWorkers.delete(key); });
+  renderVcWorkerList();
+}
+function toggleVcWorker(key) {
+  const kid = _vcKeyId(key);
+  const chkEl = document.getElementById('vchk-' + kid);
+  const rowEl = document.getElementById('vcrow-' + kid);
   if (vcSelectedWorkers.has(key)) {
     vcSelectedWorkers.delete(key);
     if (chkEl) { chkEl.style.background='transparent'; chkEl.style.borderColor='var(--border)'; chkEl.innerHTML=''; }
@@ -14815,22 +14925,25 @@ function updateVcSummary() {
   const summaryEl = document.getElementById('vc-summary');
   const countEl = document.getElementById('vc-selected-count');
   const totalEl = document.getElementById('vc-total-amt');
+  const projsEl = document.getElementById('vc-selected-projs');
   if (!summaryEl) return;
-  const projId = document.getElementById('vc-proj')?.value;
-  const p = projId ? getProjects().find(x=>x.id===projId) : null;
+  const selected = getSelectedVcWorkers();
+  if (!selected.length) { summaryEl.style.display='none'; return; }
   let total = 0;
-  vcSelectedWorkers.forEach(key => {
-    const [wid, slot] = key.split('|');
-    const w = p?.workers.find(x=>x.id===wid&&x.slot===slot);
+  const persons = new Set();
+  const projCount = new Map(); // projId → {name, n}
+  selected.forEach(({workerId, w, p}) => {
     total += w?.amount || 0;
+    persons.add(workerId);
+    if(!projCount.has(p.id)) projCount.set(p.id, {name:p.name, n:0});
+    projCount.get(p.id).n++;
   });
-  if (vcSelectedWorkers.size > 0) {
-    summaryEl.style.display='block';
-    if (countEl) countEl.textContent = `${vcSelectedWorkers.size} คน`;
-    if (totalEl) totalEl.textContent = fmtB(total);
-  } else {
-    summaryEl.style.display='none';
-  }
+  summaryEl.style.display='block';
+  if (countEl) countEl.textContent = `${persons.size} คน · ${selected.length} งาน`;
+  if (totalEl) totalEl.textContent = fmtB(total);
+  if (projsEl) projsEl.innerHTML = [...projCount.values()].map(pc =>
+    `<span style="font-size:11px;background:rgba(0,180,255,.12);color:var(--accent2);border:1px solid rgba(0,180,255,.3);padding:2px 9px;border-radius:20px;font-weight:600">📁 ${pc.name} <span style="opacity:.7">· ${pc.n} งาน</span></span>`
+  ).join('');
 }
 
 function buildVoucherHTML(projId, workerId, slot, vNo, issueDate, note) {
@@ -14932,31 +15045,38 @@ function buildVoucherHTML(projId, workerId, slot, vNo, issueDate, note) {
 }
 
 function getSelectedVcWorkers() {
-  const projId = document.getElementById('vc-proj')?.value;
-  const p = projId ? getProjects().find(x=>x.id===projId) : null;
-  if (!p) return [];
+  const projCache = new Map();
   return [...vcSelectedWorkers].map(key => {
-    const [wid, slot] = key.split('|');
-    return { workerId: wid, slot, w: (p.workers||[]).find(x=>x.id===wid&&x.slot===slot), s: getStaffById(wid), p };
-  }).filter(x=>x.w&&x.s);
+    const parts = key.split('|');
+    const projId = parts[0], wid = parts[1], slot = parts.slice(2).join('|');
+    let p = projCache.get(projId);
+    if(p === undefined){ p = getProjects().find(x=>x.id===projId) || null; projCache.set(projId, p); }
+    if(!p) return null;
+    return { projId, workerId: wid, slot, w: (p.workers||[]).find(x=>x.id===wid&&x.slot===slot), s: getStaffById(wid), p };
+  }).filter(x => x && x.w && x.s);
+}
+// รวมงานของแต่ละคนเป็น 1 ใบ — works ของคนเดียวอาจมาจากหลายโปรเจกต์
+function _vcGroupSelectedByPerson(selected){
+  const byPerson = new Map();
+  selected.forEach(({workerId, w, s, p}) => {
+    if(!byPerson.has(workerId)) byPerson.set(workerId, {s, works:[]});
+    byPerson.get(workerId).works.push({w, p});
+  });
+  return byPerson;
 }
 function previewVouchers() {
   const selected = getSelectedVcWorkers();
   if (!selected.length){toast('กรุณาเลือกทีมงานอย่างน้อย 1 คน','error');return;}
   const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
   const note = document.getElementById('vc-note')?.value.trim()||'';
-  // รวมงานของแต่ละคนเป็น 1 ใบ + ใช้ template เดียวกับโหมด "ตามคน"
-  const byPerson = new Map();
-  selected.forEach(({workerId,slot,w,s,p}) => {
-    if(!byPerson.has(workerId)) byPerson.set(workerId, {s, p, works:[]});
-    byPerson.get(workerId).works.push(w);
-  });
+  // รวมงานของแต่ละคนเป็น 1 ใบ (รวมข้ามโปรเจกต์) + ใช้ template เดียวกับโหมด "ตามคน"
+  const byPerson = _vcGroupSelectedByPerson(selected);
   let html = '';
-  for(const [wid, {s, p, works}] of byPerson){
+  for(const [wid, {s, works}] of byPerson){
     html += buildMultiVoucherHTML({
       vNo:'PREVIEW', staff:s,
-      items: works.map(w=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
-      totalAmt: works.reduce((a,w)=>a+(w.amount||0),0),
+      items: works.map(({w,p})=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
+      totalAmt: works.reduce((a,{w})=>a+(w.amount||0),0),
       date, note,
     }) + '<div style="height:20px"></div>';
   }
@@ -14970,16 +15090,12 @@ function downloadVouchers() {
   if (!selected.length){toast('กรุณาเลือกทีมงานอย่างน้อย 1 คน','error');return;}
   const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
   const note = document.getElementById('vc-note')?.value.trim()||'';
-  const byPerson = new Map();
-  selected.forEach(({workerId,slot,w,s,p}) => {
-    if(!byPerson.has(workerId)) byPerson.set(workerId, {s, p, works:[]});
-    byPerson.get(workerId).works.push(w);
-  });
-  for(const [wid, {s, p, works}] of byPerson){
+  const byPerson = _vcGroupSelectedByPerson(selected);
+  for(const [wid, {s, works}] of byPerson){
     const html = buildMultiVoucherHTML({
       vNo: nextVoucherNo(), staff:s,
-      items: works.map(w=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
-      totalAmt: works.reduce((a,w)=>a+(w.amount||0),0),
+      items: works.map(({w,p})=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
+      totalAmt: works.reduce((a,{w})=>a+(w.amount||0),0),
       date, note,
     });
     downloadDocHTML(html, 'voucher-'+(s.nickname||wid));
@@ -14988,23 +15104,19 @@ function downloadVouchers() {
 async function issueAndSendVouchers() {
   const selected = getSelectedVcWorkers();
   if (!selected.length){toast('กรุณาเลือกทีมงาน','error');return;}
-  // รวมงานของแต่ละคนเป็น 1 ใบ (เหมือนโหมด "ตามคน") — ใบเดียวกัน วิธีส่งเดียวกัน
-  const byPerson = new Map();
-  selected.forEach(({workerId,slot,w,s,p}) => {
-    if(!byPerson.has(workerId)) byPerson.set(workerId, {s, p, works:[]});
-    byPerson.get(workerId).works.push(w);
-  });
+  // รวมงานของแต่ละคนเป็น 1 ใบ (เหมือนโหมด "ตามคน") — ใบเดียวกัน รวมข้ามโปรเจกต์ได้
+  const byPerson = _vcGroupSelectedByPerson(selected);
   if(!byPerson.size){ toast('ไม่พบข้อมูลทีมงาน','error'); return; }
-  if(!confirm(`💸 ออกใบสำคัญจ่าย ${byPerson.size} ใบ (1 ใบ/คน · รวมหลายงาน) + เปิด Gmail ส่งทีละคน?\n\nระบบจะออกใบและทำเครื่องหมาย "จ่ายแล้ว"`)) return;
+  if(!confirm(`💸 ออกใบสำคัญจ่าย ${byPerson.size} ใบ (1 ใบ/คน · รวมหลายงาน/หลายโปรเจกต์) + เปิด Gmail ส่งทีละคน?\n\nระบบจะออกใบและทำเครื่องหมาย "จ่ายแล้ว"`)) return;
   const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
   const note = document.getElementById('vc-note')?.value.trim()||'';
   const issuedVNos = [];
   let failCount = 0;
-  for(const [wid, {s, p, works}] of byPerson){
+  for(const [wid, {s, works}] of byPerson){
     const vNo = nextVoucherNo();
     const nowIso = new Date().toISOString();
     let okAny = false;
-    for(const w of works){
+    for(const {w, p} of works){
       const res = await saveProjectMerge(p.id, (proj)=>{
         const w2 = (proj.workers||[]).find(x => x.id===wid && x.slot===w.slot);
         if(w2){ w2.status='paid'; w2.voucherNo=vNo; w2.paidAt=nowIso; }
@@ -15012,11 +15124,11 @@ async function issueAndSendVouchers() {
       if(res.ok) okAny = true; else failCount++;
     }
     if(!okAny) continue;
-    const totalAmt = works.reduce((a,w)=>a+(w.amount||0),0);
+    const totalAmt = works.reduce((a,{w})=>a+(w.amount||0),0);
     const saved = getDocsStore('vouchers') || [];
     saved.push({
       type:'voucher', docNo:vNo, staffId:wid, staffName:s.name, staffLastName:s.lastName||'', staffNickname:s.nickname,
-      items: works.map(w=>({projId:p.id, projName:p.name, slot:w.slot, amount:w.amount||0})),
+      items: works.map(({w,p})=>({projId:p.id, projName:p.name, slot:w.slot, amount:w.amount||0})),
       amount: totalAmt, totalAmount: totalAmt, multiItem:true,
       bank:s.bank||'', account:s.account||'', email:s.email||'',
       date, note, createdAt: nowIso,
@@ -15025,7 +15137,9 @@ async function issueAndSendVouchers() {
     issuedVNos.push(vNo);
   }
   toast(`✅ ออกใบ ${issuedVNos.length} ใบ${failCount?(' · ล้มเหลว '+failCount):''}`,'success');
-  onVcProjChange();
+  // ออกใบแล้ว ล้างที่เลือก + refresh รายการ
+  vcSelectedWorkers = new Set();
+  renderVcWorkerList();
   try{ renderQueue(); }catch(_){}
   try{ updateQueueBadge(); }catch(_){}
   try{ renderDocsHistory(); }catch(_){}
