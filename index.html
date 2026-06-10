@@ -2315,7 +2315,7 @@ body.sidebar-collapsed .main-content{
        <option value="flat">เหมา</option>
        <option value="per-minute">นาที</option>
       </select>
-      <input class="form-input" id="pj-budget" type="number" placeholder="0" min="0" step="any" onwheel="this.blur()" oninput="calcProjSummary()" style="flex:1;min-width:0">
+      <input class="form-input" id="pj-budget" type="number" placeholder="0" min="0" step="any" data-price onwheel="this.blur()" oninput="calcProjSummary()" style="flex:1;min-width:0">
      </div>
      <div id="pj-budget-calc" style="font-size:11px;color:var(--text2);margin-top:4px;display:none"></div>
     </div>
@@ -2328,10 +2328,10 @@ body.sidebar-collapsed .main-content{
     <div class="form-group" style="margin:0"><label class="form-label">วันเริ่มงาน</label>
       <div style="position:relative;display:flex;align-items:center">
        <input class="form-input" id="pj-start" type="text" placeholder="วว/ดด/ปปปป" maxlength="10" style="padding-right:36px"
-         onchange="validateDateThai(this,iso=>{document.getElementById('pj-start-pk').value=iso;syncDeadlineFromStart('pj-start','pj-deadline');syncProjectDatesToPhases()})"
+         onchange="validateDateThai(this,iso=>{document.getElementById('pj-start-pk').value=iso;syncDeadlineFromStart('pj-start','pj-deadline');syncProjectDatesToPhases(true)})"
          oninput="let v=this.value.replace(/[^0-9/]/g,'');if(v.length==2&&!v.includes('/'))v+='/';else if(v.length==5&&v.split('/').length==2)v+='/';this.value=v">
        <input type="date" id="pj-start-pk" tabindex="-1" style="position:absolute;right:0;width:32px;height:100%;opacity:0;cursor:pointer"
-         onchange="document.getElementById('pj-start').value=isoToThai(this.value);document.getElementById('pj-start').style.borderColor='rgba(0,223,160,.4)';syncDeadlineFromStart('pj-start','pj-deadline');syncProjectDatesToPhases()">
+         onchange="document.getElementById('pj-start').value=isoToThai(this.value);document.getElementById('pj-start').style.borderColor='rgba(0,223,160,.4)';syncDeadlineFromStart('pj-start','pj-deadline');syncProjectDatesToPhases(true)">
        <span onclick="const p=document.getElementById('pj-start-pk');p.showPicker?p.showPicker():p.click()" style="position:absolute;right:8px;cursor:pointer;font-size:15px;user-select:none">📅</span>
       </div></div>
     <div class="form-group" style="margin:0"><label class="form-label">Deadline</label>
@@ -2831,6 +2831,25 @@ function fmtWarnDate(d){
 function isoToThai(iso){if(!iso)return'';const p=iso.split('-');if(p.length!==3||p[0].length!==4)return iso;return p[2]+'/'+p[1]+'/'+p[0];}
 function thaiToIso(thai){if(!thai)return'';const p=thai.replace(/-/g,'/').split('/');if(p.length===3&&p[2].length===4)return p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');return '';}
 function validateDateThai(el,onSave){let v=el.value.trim();if(!v){el.style.borderColor='var(--border2)';onSave('');return;}const iso=thaiToIso(v);if(iso){el.value=isoToThai(iso);el.style.borderColor='rgba(0,223,160,.4)';el.style.color='var(--text)';onSave(iso);}else{el.style.borderColor='rgba(255,64,64,.5)';el.style.color='var(--red)';toast('รูปแบบ วว/ดด/ปปปป เช่น 09/04/2026','warn');}}
+// ── ปัดเศษราคา: เศษ .1–.5 ปัดลง, .6 ขึ้นไปปัดขึ้น ──
+// ใช้ Math.floor(|n| + 0.4) → เศษ >= .6 จึงข้ามขึ้นเลขถัดไป (+1e-9 กัน floating-point เพี้ยน)
+function roundPrice(v){
+  const n = parseFloat(v);
+  if(!isFinite(n)) return v;
+  const sign = n < 0 ? -1 : 1;
+  return sign * Math.floor(Math.abs(n) + 0.4 + 1e-9);
+}
+// Listener กลาง: ช่องราคาที่มี data-price ทุกช่อง → ปัดเศษเมื่อคลิกออกจากช่อง (blur)
+// แล้ว dispatch 'input' เพื่อให้ตัวคำนวณเดิม (oninput) อัปเดตยอดรวมตามค่าใหม่
+document.addEventListener('focusout', function(e){
+  const el = e.target;
+  if(!el || el.tagName !== 'INPUT' || !el.hasAttribute('data-price')) return;
+  if(el.value === '' || el.value == null) return;
+  const rounded = roundPrice(el.value);
+  if(String(rounded) === String(el.value)) return;
+  el.value = rounded;
+  el.dispatchEvent(new Event('input', {bubbles:true}));
+});
 // ══════════════════════════════════════════════
 // ══════════════════════════════════════════════
 // FIREBASE — Real Integration (Realtime Database + Auth)
@@ -8156,13 +8175,15 @@ function initFormPhases(){
 }
 
 // Default times: ใช้ startDate/deadline ของโปรเจกต์ เติมให้ทุก phase ที่ยังไม่ได้กำหนด
-function applyProjectDatesToEmptyPhases(){
+//   overrideStart = true → ทับวันเริ่มของทุก phase ด้วยวันเริ่มงานโปรเจกต์ (ผูกติดกันเสมอ)
+//   overrideStart = false/undefined → เติมเฉพาะ phase ที่วันเริ่มยังว่าง (ใช้ตอนเปิดฟอร์ม)
+function applyProjectDatesToEmptyPhases(overrideStart){
   const projStart = document.getElementById('pj-start-pk')?.value || thaiToIso(document.getElementById('pj-start')?.value||'');
   const projDl = document.getElementById('pj-deadline-pk')?.value || thaiToIso(document.getElementById('pj-deadline')?.value||'');
   if(!projStart && !projDl) return;
   ['adp','dub','mix','qc','sub','mgr'].forEach(c=>{
     if(!formPhases[c]) formPhases[c] = { startDate:'', deadline:'', submitTime:'', status:'none' };
-    if(!formPhases[c].startDate && projStart) formPhases[c].startDate = projStart;
+    if(projStart && (overrideStart || !formPhases[c].startDate)) formPhases[c].startDate = projStart;
     if(!formPhases[c].deadline && projDl) formPhases[c].deadline = projDl;
   });
 }
@@ -8237,8 +8258,8 @@ function loadPhasesFromProject(p){
 }
 
 // Hook: ตอน user เปลี่ยนวันเริ่ม/deadline ของโปรเจกต์ → sync ไป phases ที่ยังว่าง
-function syncProjectDatesToPhases(){
-  applyProjectDatesToEmptyPhases();
+function syncProjectDatesToPhases(overrideStart){
+  applyProjectDatesToEmptyPhases(overrideStart);
   populateFormPhasesUI();
 }
 
@@ -8422,7 +8443,7 @@ function renderWorkerList(cat,slot){
     const hasComment = !!(w.comment||'').trim();
     return`<div class="worker-rate-row" style="flex-wrap:wrap">
       <span class="worker-name-badge" style="color:${catColors[cat]||'var(--text)'};cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px" onclick="openReplaceWorker('${cat}','${slot}',${i},event)" title="คลิกเพื่อเปลี่ยนคน">${s.nickname} <span style="font-size:9px;opacity:.55">🔄</span></span>
-      <input type="number" value="${w.amount||''}" placeholder="ราคา" min="0" step="any"
+      <input type="number" value="${w.amount||''}" placeholder="ราคา" min="0" step="any" data-price
         style="flex:1;min-width:80px;padding:6px 9px;background:rgba(0,0,0,.35);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px"
         onwheel="this.blur()"
         oninput="updateSlotAmount('${cat}','${slot}',${i},this.value)">
@@ -13497,7 +13518,7 @@ function renderQtItems() {
             oninput="if(qtItems[${i}])qtItems[${i}].desc=this.value">
         </div>
         <input type="number" class="form-input" style="padding:6px 8px;font-size:13px;text-align:right"
-          value="${item.price===0?'0':item.price||''}" placeholder="ราคา/หน่วย" min="0"
+          value="${item.price===0?'0':item.price||''}" placeholder="ราคา/หน่วย" min="0" data-price
           oninput="if(qtItems[${i}])qtItems[${i}].price=this.value===''?0:parseFloat(this.value)||0;updateQtRowTotal(${i})">
         <input type="number" class="form-input" style="padding:6px 8px;font-size:13px;text-align:center"
           value="${item.qty||1}" min="1" placeholder="จำนวน"
@@ -15101,15 +15122,61 @@ function downloadVouchers() {
     downloadDocHTML(html, 'voucher-'+(s.nickname||wid));
   }
 }
-async function issueAndSendVouchers() {
+// STEP 1: ตรวจสอบใบก่อนออกจริง (เหมือนโหมด "ตามคน") — ยังไม่บันทึก/ยังไม่ส่ง
+function issueAndSendVouchers() {
   const selected = getSelectedVcWorkers();
   if (!selected.length){toast('กรุณาเลือกทีมงาน','error');return;}
-  // รวมงานของแต่ละคนเป็น 1 ใบ (เหมือนโหมด "ตามคน") — ใบเดียวกัน รวมข้ามโปรเจกต์ได้
+  // รวมงานของแต่ละคนเป็น 1 ใบ — ใบเดียวกัน รวมข้ามโปรเจกต์ได้
   const byPerson = _vcGroupSelectedByPerson(selected);
   if(!byPerson.size){ toast('ไม่พบข้อมูลทีมงาน','error'); return; }
-  if(!confirm(`💸 ออกใบสำคัญจ่าย ${byPerson.size} ใบ (1 ใบ/คน · รวมหลายงาน/หลายโปรเจกต์) + เปิด Gmail ส่งทีละคน?\n\nระบบจะออกใบและทำเครื่องหมาย "จ่ายแล้ว"`)) return;
   const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
   const note = document.getElementById('vc-note')?.value.trim()||'';
+  let previewHtml = '', totalAll = 0;
+  const nPersons = byPerson.size;
+  for(const [wid, {s, works}] of byPerson){
+    const totalAmt = works.reduce((a,{w})=>a+(w.amount||0),0);
+    totalAll += totalAmt;
+    previewHtml += buildMultiVoucherHTML({
+      vNo:'PREVIEW · ยังไม่ออกจริง', staff:s,
+      items: works.map(({w,p})=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
+      totalAmt, date, note,
+    }) + '<div style="height:18px"></div>';
+  }
+  const old = document.getElementById('vc-preview-modal'); if(old) old.remove();
+  const div = document.createElement('div');
+  div.id = 'vc-preview-modal';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);overflow-y:auto';
+  div.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;width:780px;max-width:98vw;max-height:95vh;display:flex;flex-direction:column">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:10px">'+
+        '<div>'+
+          '<div style="font-size:17px;font-weight:800">👁️ ตรวจสอบใบสำคัญจ่ายก่อนออก ('+nPersons+' ใบ)</div>'+
+          '<div style="font-size:11.5px;color:var(--text2);margin-top:2px">1 ใบ/คน · รวมทุกโปรเจกต์ที่เลือก · ยอดรวมทั้งหมด <strong style="color:var(--green)">'+fmtB(totalAll)+'</strong> · ตรวจ <strong>ยอด · รายการ · บัญชี · ชื่อ</strong> ให้ครบก่อนกด "ออกจริง"</div>'+
+        '</div>'+
+        '<button class="btn-close" onclick="_vcClosePreview()" title="ปิด (ไม่บันทึก)">✕</button>'+
+      '</div>'+
+      '<div style="flex:1;overflow-y:auto;background:#e5e7eb;padding:14px;border-radius:10px;margin-bottom:12px">'+previewHtml+'</div>'+
+      '<div style="background:rgba(255,158,0,.1);border:1.5px solid rgba(255,158,0,.4);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:var(--orange);font-weight:600">'+
+        '⚠️ <strong>ยังไม่ได้บันทึก</strong> · กดปิดถ้ายอดผิด · กด "ออกจริง" เพื่อทำเครื่องหมาย "จ่ายแล้ว" แล้วเปิดหน้าส่งอีเมล (ดาวน์โหลดใบ + แนบไฟล์ + กดส่งใน Gmail เอง) ทีละคน'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-outline" style="flex:1;min-width:160px" onclick="_vcClosePreview()">✗ ปิด · ไปแก้ยอด</button>'+
+        '<button class="btn btn-blue" style="flex:1.4;min-width:200px;font-weight:800;background:#9B6FFF;border:none" onclick="_vcCommitIssueVouchersByProj()">✅ ออกจริง '+nPersons+' ใบ + เปิด Gmail</button>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(div);
+}
+
+// STEP 2: Commit จริง — มาร์ค paid + บันทึก voucher + เปิดคิวส่งอีเมลทีละใบ (แนบเอง)
+async function _vcCommitIssueVouchersByProj() {
+  const selected = getSelectedVcWorkers();
+  if (!selected.length){ toast('ไม่มีงานที่เลือก','warn'); _vcClosePreview(); return; }
+  const byPerson = _vcGroupSelectedByPerson(selected);
+  if(!byPerson.size){ toast('ไม่พบข้อมูลทีมงาน','error'); _vcClosePreview(); return; }
+  _vcClosePreview();
+  const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
+  const note = document.getElementById('vc-note')?.value.trim()||'';
+  toast(`💸 กำลังออกใบ ${byPerson.size} ใบ...`,'info');
   const issuedVNos = [];
   let failCount = 0;
   for(const [wid, {s, works}] of byPerson){
@@ -15143,7 +15210,7 @@ async function issueAndSendVouchers() {
   try{ renderQueue(); }catch(_){}
   try{ updateQueueBadge(); }catch(_){}
   try{ renderDocsHistory(); }catch(_){}
-  // เปิด modal ส่งอีเมลทีละใบ (เหมือนโหมด "ตามคน")
+  // เปิดคิวส่งอีเมลทีละใบ (showVoucherSendModal — ดาวน์โหลดใบ + แนบ + กดส่งเอง) เหมือนโหมด "ตามคน"
   if(issuedVNos.length) _vcEnqueueSend(issuedVNos);
 }
 
@@ -17983,7 +18050,7 @@ function renderCalcModal(){
             <option value="flat" ${d.budgetType==='flat'?'selected':''}>เหมา</option>
             <option value="per-minute" ${d.budgetType==='per-minute'?'selected':''}>นาที</option>
           </select>
-          <input class="form-input" id="calc-bval" type="number" min="0" placeholder="0" value="${d.budgetRate||''}" style="flex:1" oninput="_calcEditing.budgetRate=parseFloat(this.value)||0;renderCalcSummary()">
+          <input class="form-input" id="calc-bval" type="number" min="0" placeholder="0" value="${d.budgetRate||''}" data-price style="flex:1" oninput="_calcEditing.budgetRate=parseFloat(this.value)||0;renderCalcSummary()">
         </div>
       </div>
       <div class="form-group" style="margin:0">
@@ -18091,7 +18158,7 @@ function _calcSlotInputsHTML(catKey, slotKey, slot, color, labelPrefix){
   return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">
     <div>
       <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">${labelPrefix?labelPrefix+' ราคา':'ราคา'}</label>
-      <input type="number" min="0" value="${s.rate||''}" placeholder="0" style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcSetSlot('${catKey}','${slotKey}','rate',this.value);updateCalcLive('${catKey}','${slotKey}')">
+      <input type="number" min="0" value="${s.rate||''}" placeholder="0" data-price style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcSetSlot('${catKey}','${slotKey}','rate',this.value);updateCalcLive('${catKey}','${slotKey}')">
     </div>
     <div>
       <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">หน่วย</label>
@@ -18397,7 +18464,7 @@ function renderInvItems(){
             oninput="if(invItems[${i}])invItems[${i}].desc=this.value">
         </div>
         <input type="number" class="form-input" style="padding:6px 8px;font-size:13px;text-align:right"
-          value="${item.price===0?'0':item.price||''}" placeholder="ราคา/หน่วย" min="0"
+          value="${item.price===0?'0':item.price||''}" placeholder="ราคา/หน่วย" min="0" data-price
           oninput="if(invItems[${i}])invItems[${i}].price=this.value===''?0:parseFloat(this.value)||0;updateInvRowTotal(${i})">
         <input type="number" class="form-input" style="padding:6px 8px;font-size:13px;text-align:center"
           value="${item.qty||1}" min="1" placeholder="จำนวน"
