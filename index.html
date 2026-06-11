@@ -12319,14 +12319,17 @@ function renderStaffGrid(){
     html+='<div style="padding:12px 18px;background:rgba(255,255,255,.025);font-weight:700;color:'+color+'">';
     html+=cat.label+' <span style="font-size:12px;font-weight:400;color:var(--text2)">('+staff.length+' คน)</span></div>';
     if(staffViewMode==='compact'){
-      html+='<div style="display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px">';
+      // การ์ดย่อ 3 คอลัมน์ (หน้าตาเดียวกับฝั่งเมเนเจอร์) — กดเพื่อแก้ไข/ดูข้อมูลเต็ม
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:8px;padding:12px 16px">';
       staff.forEach(s=>{
-        const av=s.nickname?s.nickname[0]:'?';
-        const fn_=(s.name||'').split(' ')[0]||s.name||'';const disp_=s.nickname?(s.nickname+(fn_&&fn_!==s.nickname?' · '+fn_:'')):fn_;
-        html+='<div onclick="openEditStaff(\''+s.id+'\',\''+key+'\')" style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:var(--bg2);border:1px solid '+color+'44;border-radius:20px;cursor:pointer;font-size:12px">';
-        html+='<span style="width:20px;height:20px;border-radius:50%;background:'+color+'22;color:'+color+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px">'+av+'</span>';
+        const av=(s.nickname||s.name||'?')[0];
         const wc=getWarnings(s.id).length;const ac=(typeof getAppreciations==='function'?getAppreciations(s.id).length:0);
-        html+='<span style="font-weight:700">'+disp_+'</span>'+(wc?'<span style="font-size:10px;color:#FF4040;font-weight:700;margin-left:2px">✉'+wc+'</span>':'')+(ac?'<span style="font-size:10px;color:#FFC700;font-weight:700;margin-left:2px">⭐'+ac+'</span>':'')+' </div>';
+        html+='<div onclick="openEditStaff(\''+s.id+'\',\''+key+'\')" style="display:flex;align-items:center;gap:10px;padding:11px 13px;background:rgba(0,0,0,.2);border:1px solid '+color+'22;border-radius:10px;cursor:pointer" onmouseover="this.style.borderColor=\''+color+'66\'" onmouseout="this.style.borderColor=\''+color+'22\'">';
+        html+='<span style="width:32px;height:32px;border-radius:50%;background:'+color+'22;color:'+color+';display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">'+av+'</span>';
+        html+='<div style="flex:1;min-width:0">';
+        html+='<div style="font-weight:700;color:var(--text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(s.nickname||s.name)+' <span style="font-size:11px;color:var(--text2);font-weight:400">'+(s.name||'')+'</span>'+(wc?'<span style="font-size:10px;color:#FF4040;font-weight:700;margin-left:4px">✉'+wc+'</span>':'')+(ac?'<span style="font-size:10px;color:#FFC700;font-weight:700;margin-left:4px">⭐'+ac+'</span>':'')+'</div>';
+        html+=(s.promptpay?'<div style="font-size:11px;color:var(--text2)">'+s.promptpay+'</div>':'');
+        html+='</div></div>';
       });
       html+='</div>';
     }else{
@@ -12438,18 +12441,31 @@ function openEditStaff(id,cat){
     // หา user account ที่ผูกกับ staff คนนี้ (จาก cache) เพื่อแสดง role ปัจจุบันจริง
     const _uc = ls('mgr_users_cache') || {};
     const _acct = Object.values(_uc).find(u => u && (u.staffId===id || (s.email && u.email && u.email.toLowerCase()===s.email.toLowerCase())));
-    const _curRole = _acct?.role || 'staff';
-    const _hasAcct = !!_acct;
+    const _adminSet = (typeof _adminEmailSet==='function') ? _adminEmailSet() : new Set();
+    const _isAdmin = (s.email && _adminSet.has((s.email||'').toLowerCase())) || _acct?.role==='admin';
+    const _curRole = _isAdmin ? 'admin' : (_acct?.role || 'staff');
+    const _hasAcct = !!_acct || _isAdmin;
     s._userRole = _curRole; // เก็บไว้ให้ saveStaffRoleIfChanged เทียบ
     roleToggleEl.style.display = 'block';
-    roleToggleEl.innerHTML = `<div style="margin-bottom:14px;padding:10px 14px;background:rgba(155,111,255,.07);border:1px solid rgba(155,111,255,.2);border-radius:9px">
-      <label class="form-label">บทบาทในระบบ ${_curRole==='manager'?'<span style="color:#9B6FFF;font-weight:700">· ปัจจุบัน: Manager</span>':''}</label>
-      <select class="form-input form-select" id="st-role-sel" style="margin-top:6px"${_hasAcct?'':' disabled'}>
-        <option value="staff"${_curRole!=='manager'?' selected':''}>🎙️ Staff (ทีมงาน)</option>
-        <option value="manager"${_curRole==='manager'?' selected':''}>🗂️ Manager</option>
-      </select>
-      <div style="font-size:11px;color:${_hasAcct?'var(--text2)':'#FF9E00'};margin-top:5px">${_hasAcct?'เปลี่ยน role จะมีผลตอนสมาชิก login ครั้งถัดไป':'⚠️ สมาชิกนี้ยังไม่มีบัญชีล็อกอิน — ต้องสมัครบัญชีก่อนถึงจะตั้งเป็น Manager ได้'}</div>
-    </div>`;
+    if(_isAdmin){
+      // 👑 แอดมิน — แสดงสถานะ อ่านอย่างเดียว (กำหนดจากอีเมลผู้ดูแลระบบ ไม่เปลี่ยนที่นี่)
+      roleToggleEl.innerHTML = `<div style="margin-bottom:14px;padding:10px 14px;background:rgba(255,80,80,.08);border:1px solid rgba(255,80,80,.25);border-radius:9px">
+        <label class="form-label">บทบาทในระบบ <span style="color:#FF6060;font-weight:700">· 👑 Admin</span></label>
+        <select class="form-input form-select" id="st-role-sel" style="margin-top:6px" disabled>
+          <option value="admin" selected>👑 Admin (ผู้ดูแลระบบ)</option>
+        </select>
+        <div style="font-size:11px;color:var(--text2);margin-top:5px">บัญชีนี้เป็น<strong style="color:#FF6060">แอดมิน</strong> — กำหนดจากอีเมลผู้ดูแลระบบ ไม่สามารถเปลี่ยนที่นี่</div>
+      </div>`;
+    } else {
+      roleToggleEl.innerHTML = `<div style="margin-bottom:14px;padding:10px 14px;background:rgba(155,111,255,.07);border:1px solid rgba(155,111,255,.2);border-radius:9px">
+        <label class="form-label">บทบาทในระบบ ${_curRole==='manager'?'<span style="color:#9B6FFF;font-weight:700">· ปัจจุบัน: Manager</span>':''}</label>
+        <select class="form-input form-select" id="st-role-sel" style="margin-top:6px"${_hasAcct?'':' disabled'}>
+          <option value="staff"${_curRole!=='manager'?' selected':''}>🎙️ Staff (ทีมงาน)</option>
+          <option value="manager"${_curRole==='manager'?' selected':''}>🗂️ Manager</option>
+        </select>
+        <div style="font-size:11px;color:${_hasAcct?'var(--text2)':'#FF9E00'};margin-top:5px">${_hasAcct?'เปลี่ยน role จะมีผลตอนสมาชิก login ครั้งถัดไป':'⚠️ สมาชิกนี้ยังไม่มีบัญชีล็อกอิน — ต้องสมัครบัญชีก่อนถึงจะตั้งเป็น Manager ได้'}</div>
+      </div>`;
+    }
   }
   document.getElementById('st-name').value=s.name||'';document.getElementById('st-nick').value=s.nickname||'';
   document.getElementById('st-bank').value=s.bank||'';document.getElementById('st-account').value=s.account||'';
@@ -20131,6 +20147,7 @@ async function saveStaffRoleIfChanged(staffId) {
   const roleSel = document.getElementById('st-role-sel');
   if (!roleSel || !staffId) return;
   const newRole = roleSel.value;
+  if (newRole!=='staff' && newRole!=='manager') return; // 👑 admin กำหนดจากอีเมล ไม่เปลี่ยนที่นี่
   if (!_fbDatabase) return;
   try {
     // หา user account ที่ผูกกับ staff นี้ — match ด้วย staffId หรือ email (ทนทานกว่า)
@@ -20503,33 +20520,55 @@ function renderMgrTeam() {
   const catOrder=['dubbing','adaptation','mix','qc','subVideo','manager'];
   const suspended=getMgrSuspended();
   const data=(typeof getStaffData==='function')?getStaffData():{};
-  const memberCard=(s,col)=>{
-    const nWarn=(typeof getWarnings==='function'?getWarnings(s.id):[]).length;
-    const isSusp=!!suspended[s.id];
-    const safeName=(s.name||'').replace(/'/g,"\\'");
-    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 13px;background:${isSusp?'rgba(255,158,0,.06)':'rgba(0,0,0,.2)'};border:1px solid ${isSusp?'rgba(255,158,0,.3)':'rgba(255,255,255,.06)'};border-radius:10px">
-      <span style="width:30px;height:30px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${(s.nickname||s.name||'?')[0]}</span>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:700;color:var(--text);font-size:13px">${s.nickname||s.name} <span style="font-size:11px;color:var(--text2);font-weight:400">${s.name||''}</span>
-          ${isSusp?'<span style="padding:1px 8px;border-radius:8px;background:rgba(255,158,0,.18);color:#FF9E00;font-size:10px;font-weight:700;margin-left:4px">⏸️ พักงาน</span>':''}
-          ${nWarn?`<span style="padding:1px 8px;border-radius:8px;background:rgba(255,64,64,.15);color:#FF6060;font-size:10px;font-weight:700;margin-left:4px">⚠️ ${nWarn}</span>`:''}
-        </div>
-        ${s.promptpay?`<div style="font-size:11px;color:var(--text2)">${s.promptpay}</div>`:''}
-      </div>
-      <div style="display:flex;gap:6px;flex-shrink:0">
-        <button class="btn btn-sm btn-outline" style="border-color:rgba(255,64,64,.35);color:#FF6060" onclick="openMgrWarnModal('${s.id}')">✉️ ใบเตือน</button>
-        ${isSusp
-          ? `<button class="btn btn-sm btn-outline" style="border-color:rgba(0,223,160,.35);color:#00DFA0" onclick="mgrUnsuspendStaff('${s.id}','${safeName}')">▶️ คืนงาน</button>`
-          : `<button class="btn btn-sm btn-outline" style="border-color:rgba(255,158,0,.35);color:#FF9E00" onclick="mgrSuspendStaff('${s.id}','${safeName}')">⏸️ พักงาน</button>`}
-      </div>
-    </div>`;
-  };
   // ── สรุปจำนวน + แถบฟิลเตอร์หมวดหมู่ (เหมือนแอดมิน) ──
   const _adminEmails=_adminEmailSet();
   const arrOf=cat=>{
     let a=(Array.isArray(data[cat])?data[cat]:Object.values(data[cat]||{})).filter(Boolean);
     if(cat==='manager') a=a.filter(s=>!(s.email && _adminEmails.has((s.email||'').toLowerCase()))); // แอดมินไม่อยู่หมวด Manager
     return a;
+  };
+  // 🚫 คนยศ Manager ขึ้นไป — Manager ออกใบเตือน/พักงานให้ไม่ได้
+  const _mgrIds=new Set(arrOf('manager').map(s=>s.id).filter(Boolean));
+  const _mgrEmails=new Set(arrOf('manager').map(s=>(s.email||'').toLowerCase()).filter(Boolean));
+  try{ getAllManagerUsers().forEach(u=>{ if(u.staffId)_mgrIds.add(u.staffId); if(u.email)_mgrEmails.add((u.email||'').toLowerCase()); }); }catch(e){}
+  const _rankOf=s=>{
+    const em=(s.email||'').toLowerCase();
+    if(em && _adminEmails.has(em)) return 'admin';
+    if(_mgrIds.has(s.id) || (em && _mgrEmails.has(em)) || (Array.isArray(s.categories)&&s.categories.includes('manager'))) return 'manager';
+    return '';
+  };
+  const memberCard=(s,col)=>{
+    const nWarn=(typeof getWarnings==='function'?getWarnings(s.id):[]).length;
+    const isSusp=!!suspended[s.id];
+    const safeName=(s.name||'').replace(/'/g,"\\'");
+    const prot=_rankOf(s);
+    let actions;
+    if(prot){
+      const bc=prot==='admin'?'#FF6060':'var(--accent2)';
+      const bb=prot==='admin'?'rgba(255,80,80,.15)':'rgba(21,101,255,.15)';
+      const bt=prot==='admin'?'👑 Admin':'🗂️ Manager';
+      actions=`<div style="margin-top:8px"><span style="font-size:10px;padding:2px 9px;border-radius:8px;background:${bb};color:${bc};font-weight:700">${bt} · ออกใบเตือนไม่ได้</span></div>`;
+    } else {
+      actions=`<div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn btn-sm btn-outline" style="flex:1;border-color:rgba(255,64,64,.35);color:#FF6060" onclick="openMgrWarnModal('${s.id}')">✉️ ใบเตือน</button>
+        ${isSusp
+          ? `<button class="btn btn-sm btn-outline" style="flex:1;border-color:rgba(0,223,160,.35);color:#00DFA0" onclick="mgrUnsuspendStaff('${s.id}','${safeName}')">▶️ คืนงาน</button>`
+          : `<button class="btn btn-sm btn-outline" style="flex:1;border-color:rgba(255,158,0,.35);color:#FF9E00" onclick="mgrSuspendStaff('${s.id}','${safeName}')">⏸️ พักงาน</button>`}
+      </div>`;
+    }
+    return `<div style="display:flex;flex-direction:column;padding:11px 13px;background:${isSusp?'rgba(255,158,0,.06)':'rgba(0,0,0,.2)'};border:1px solid ${isSusp?'rgba(255,158,0,.3)':'rgba(255,255,255,.06)'};border-radius:10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="width:32px;height:32px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${(s.nickname||s.name||'?')[0]}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;color:var(--text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.nickname||s.name} <span style="font-size:11px;color:var(--text2);font-weight:400">${s.name||''}</span>
+            ${isSusp?'<span style="padding:1px 7px;border-radius:8px;background:rgba(255,158,0,.18);color:#FF9E00;font-size:10px;font-weight:700;margin-left:4px">⏸️</span>':''}
+            ${nWarn?`<span style="padding:1px 7px;border-radius:8px;background:rgba(255,64,64,.15);color:#FF6060;font-size:10px;font-weight:700;margin-left:4px">⚠️${nWarn}</span>`:''}
+          </div>
+          ${s.promptpay?`<div style="font-size:11px;color:var(--text2)">${s.promptpay}</div>`:''}
+        </div>
+      </div>
+      ${actions}
+    </div>`;
   };
   const totalUniq=new Set(catOrder.flatMap(c=>arrOf(c).map(s=>(s.name||'')+'|'+(s.nickname||'')))).size;
   const sumEl=document.getElementById('mgr-team-sum');
@@ -20561,7 +20600,7 @@ function renderMgrTeam() {
         <span style="font-size:13px;font-weight:800;color:${col}">${catLabels[cat]||cat}</span>
         <span style="font-size:11px;color:var(--text2);background:${col}1a;padding:1px 9px;border-radius:10px">${members.length} คน</span>
       </div>
-      <div style="display:flex;flex-direction:column;gap:8px">${members.map(s=>memberCard(s,col)).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:8px">${members.map(s=>memberCard(s,col)).join('')}</div>
     </div>`;
   });
   // 👑 Admin group (อ่านอย่างเดียว — ไม่มีปุ่มใบเตือน/พักงานสำหรับแอดมิน)
@@ -20574,7 +20613,7 @@ function renderMgrTeam() {
           <span style="font-size:13px;font-weight:800;color:${acol}">👑 Admin</span>
           <span style="font-size:11px;color:var(--text2);background:${acol}1a;padding:1px 9px;border-radius:10px">${admins.length} คน</span>
         </div>
-        <div style="display:flex;flex-direction:column;gap:8px">${admins.map(s=>`
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:8px">${admins.map(s=>`
           <div style="display:flex;align-items:center;gap:10px;padding:9px 13px;background:rgba(0,0,0,.2);border:1px solid ${acol}22;border-radius:10px">
             <span style="width:30px;height:30px;border-radius:50%;background:${acol}22;color:${acol};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${(s.nickname||s.name||'?')[0]}</span>
             <div style="flex:1;min-width:0"><div style="font-weight:700;color:var(--text);font-size:13px">${s.nickname||s.name} <span style="font-size:11px;color:var(--text2);font-weight:400">${s.name||''}</span></div>${s.email?`<div style="font-size:11px;color:var(--text2)">📧 ${s.email}</div>`:''}</div>
