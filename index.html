@@ -2244,15 +2244,13 @@ body.sidebar-collapsed .main-content{
     <div class="page-subtitle" id="mgr-home-welcome">สรุปงานและรายได้ของฉัน</div>
    </div>
    <div class="stats-grid" id="mgr-home-stats" style="margin-bottom:16px"></div>
-   <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px" id="mgr-home-cols">
-    <div class="table-wrap">
-     <div class="table-header"><div class="table-title">📌 งานที่กำลังติดตาม</div><button class="btn btn-outline btn-sm" onclick="nav('mgr-track')">ดูทั้งหมด</button></div>
-     <div id="mgr-home-tracking" style="padding:4px"></div>
-    </div>
-    <div class="table-wrap">
-     <div class="table-header"><div class="table-title">💰 รายได้ของฉัน (แยกตามโปรเจกต์)</div></div>
-     <div id="mgr-home-income" style="padding:4px"></div>
-    </div>
+   <div class="table-wrap" style="margin-bottom:14px">
+    <div class="table-header"><div class="table-title">💰 รายได้ของฉัน (แยกตามโปรเจกต์)</div></div>
+    <div id="mgr-home-income" style="padding:4px"></div>
+   </div>
+   <div class="table-wrap">
+    <div class="table-header"><div class="table-title">📌 งานที่กำลังติดตาม</div><button class="btn btn-outline btn-sm" onclick="nav('mgr-track')">ดูแบบเต็ม</button></div>
+    <div id="mgr-home-tracking" style="padding:4px"></div>
    </div>
   </div>
 
@@ -8162,16 +8160,17 @@ function renderProjList(){
         // Actions column FIRST - always visible
         const actionBtns='<td style="padding:6px;white-space:nowrap" onclick="event.stopPropagation()">'
           +'<div style="display:flex;gap:3px">'
-          +'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();openViewProject(\''+pid+'\')" title="ดูข้อมูล (อ่านอย่างเดียว)">👁️</button>'
           +'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();openEditProject(\''+pid+'\')" title="แก้ไข">✏️</button>'
           +'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();copyProject(\''+pid+'\')" title="คัดลอก">📋</button>'
           +'<button class="btn btn-xs btn-red" onclick="event.stopPropagation();deleteProjConfirm(\''+pid+'\')" title="ลบ">🗑️</button>'
           +'</div></td>';
-        return '<tr style="font-size:12px">'
+        const roleBadges=(typeof projRoleBadges==='function')?projRoleBadges(p):'';
+        return '<tr style="font-size:12px;cursor:pointer" onclick="toggleAdminProjRow(\''+pid+'\')" title="กดเพื่อดู/ซ่อนรายละเอียด">'
           +actionBtns
-          +'<td style="cursor:pointer;max-width:200px;padding:8px 6px" onclick="openProjDetail(\''+pid+'\')">'
+          +'<td style="max-width:220px;padding:8px 6px">'
           +'<div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(p.name||'—')+'</div>'
           +'<div data-presence-proj="'+pid+'" style="margin-top:2px;display:inline-flex;gap:4px;flex-wrap:wrap">'+presenceBadgeHTML(pid)+'</div>'
+          +(roleBadges?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+roleBadges+'</div>':'')
           +(p.note?'<div style="font-size:10px;color:var(--text2)">📝 '+p.note+'</div>':'')
           +'</td>'
           +'<td style="padding:8px 6px;color:var(--text2)">'+(p.client||'—')+'</td>'
@@ -8180,11 +8179,63 @@ function renderProjList(){
           +'<td style="padding:8px 6px;font-weight:700;color:var(--accent2)">'+(p.budget?fmtB(p.budget):'—')+'</td>'
           +'<td style="padding:8px 6px;color:var(--red)">'+fmtB(exp)+'</td>'
           +'<td style="padding:8px 6px;font-weight:700;color:'+(profit>=0?'var(--green)':'var(--red)')+'">'+fmtB(profit)+'</td>'
-          +'<td style="padding:8px 6px">'+statusSel+'</td>'
-          +'</tr>';
+          +'<td style="padding:8px 6px;white-space:nowrap"><div style="display:flex;align-items:center;gap:7px">'+statusSel+'<span id="apchv-'+pid+'" style="color:var(--text2);font-size:10px;transition:transform .2s">▼</span></div></td>'
+          +'</tr>'
+          +'<tr id="apdetail-'+pid+'" style="display:none"><td colspan="9" style="padding:0;background:rgba(0,0,0,.18)">'+adminProjDetailHTML(p)+'</td></tr>';
       } catch(rowErr){console.warn('Row render error:',rowErr);return '';}
     }).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:32px">ไม่พบโปรเจกต์</td></tr>';
   } catch(e){console.error('renderProjList error:',e);}
+}
+
+// ── แถวโปรเจกต์: กดเพื่อขยายอ่านรายละเอียดในตัว (แทนปุ่ม 👁️) ──
+function toggleAdminProjRow(pid){
+  const d=document.getElementById('apdetail-'+pid);
+  const c=document.getElementById('apchv-'+pid);
+  if(!d) return;
+  const open=d.style.display==='none'||!d.style.display;
+  d.style.display=open?'table-row':'none';
+  if(c) c.style.transform=open?'rotate(180deg)':'';
+}
+// สร้าง HTML รายละเอียดโปรเจกต์ (อ่านอย่างเดียว) สำหรับ inline expand
+function adminProjDetailHTML(p){
+  const hideFin = currentUser?.role==='manager'; // manager ไม่เห็นยอดทีม
+  const exp=(typeof getProjExpense==='function')?getProjExpense(p):0;
+  const profit=(p.budget||0)-exp;
+  // ผู้ทำงานแยกตามโรล
+  const workersHTML=(p.workers||[]).map(w=>{
+    const s=(typeof getStaffById==='function')?getStaffById(w.id):null;
+    const pre=(w.slot||'').split('-')[0];
+    const roleLbl=_SLOT_ROLE[pre]||pre||'';
+    const roleCol=_SLOT_COLOR[pre]||'var(--text2)';
+    const paid=w.status==='paid';
+    const amtCell=hideFin?'' :`<span style="font-size:12px;font-weight:700;color:var(--accent2);margin-left:auto">${w.amount?fmtB(w.amount):'TBD'}</span>`;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(0,0,0,.2);border-radius:8px">
+      <span style="padding:1px 7px;border-radius:7px;font-size:9.5px;font-weight:700;background:${roleCol}1e;color:${roleCol};border:1px solid ${roleCol}55;white-space:nowrap">${roleLbl}</span>
+      <span style="font-size:12px;color:var(--text)">${s?(s.nickname||s.name):w.id}</span>
+      ${amtCell}
+      <span style="font-size:10px;padding:1px 8px;border-radius:20px;${paid?'background:rgba(0,223,160,.1);color:#00DFA0':'background:rgba(255,158,0,.12);color:#FF9E00'};${hideFin?'margin-left:auto':''}">${paid?'จ่ายแล้ว':'รอจ่าย'}</span>
+    </div>`;
+  }).join('') || '<div style="font-size:12px;color:var(--text2)">ยังไม่มีผู้ทำงาน</div>';
+  // phase deadlines
+  const phMap={adaptation:'✍️ บท',dubbing:'🎤 พากย์',mix:'🎧 มิกซ์',qc:'✅ QC',subVideo:'🎬 ซับ/วิดีโอ',manager:'🗂️ จัดการ'};
+  const phHTML=Object.entries(p.phases||{}).filter(([k,ph])=>ph&&(ph.deadline||ph.startDate)).map(([k,ph])=>
+    `<span style="font-size:11px;color:var(--text2);background:rgba(0,0,0,.2);padding:3px 9px;border-radius:8px">${phMap[k]||k}: ${ph.deadline?fmtDate(ph.deadline):'—'}</span>`).join(' ');
+  const finBlock=hideFin?'' :`<div style="display:flex;gap:18px;flex-wrap:wrap">
+      <div><div style="font-size:10px;color:var(--text2)">งบลูกค้า</div><div style="font-size:14px;font-weight:700;color:var(--accent2)">${p.budget?fmtB(p.budget):'—'}</div></div>
+      <div><div style="font-size:10px;color:var(--text2)">รายจ่ายทีม</div><div style="font-size:14px;font-weight:700;color:var(--red)">${fmtB(exp)}</div></div>
+      <div><div style="font-size:10px;color:var(--text2)">กำไร</div><div style="font-size:14px;font-weight:700;color:${profit>=0?'var(--green)':'var(--red)'}">${fmtB(profit)}</div></div>
+    </div>`;
+  return `<div style="padding:14px 18px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+      <div><div style="font-size:10px;color:var(--text2)">วันเริ่ม → Deadline</div><div style="font-size:13px;color:var(--text)">${fmtDate(p.startDate)||'—'} → ${fmtDate(p.deadline)||'—'}</div></div>
+      ${p.duration?`<div><div style="font-size:10px;color:var(--text2)">ความยาว</div><div style="font-size:13px;color:var(--text)">${p.duration} นาที</div></div>`:''}
+      ${p.type?`<div><div style="font-size:10px;color:var(--text2)">ประเภท</div><div style="font-size:13px;color:var(--text)">${p.type}</div></div>`:''}
+    </div>
+    ${finBlock}
+    ${phHTML?`<div style="display:flex;gap:6px;flex-wrap:wrap">${phHTML}</div>`:''}
+    <div><div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;letter-spacing:.5px">ผู้ทำงาน (แยกตามโรล)</div><div style="display:flex;flex-direction:column;gap:6px">${workersHTML}</div></div>
+    ${p.note?`<div style="font-size:12px;color:var(--text2);font-style:italic">📝 ${p.note}</div>`:''}
+  </div>`;
 }
 
 // ══════════════════════════════════════════════
@@ -20012,11 +20063,13 @@ function renderMgrProjects() {
              </div>`
           : `<div style="font-size:11px;color:var(--text2)">🔒 ยอดของทีม — ดูได้เฉพาะแอดมิน</div>`);
     return `<div style="background:var(--card);border:1px solid rgba(21,101,255,.2);border-radius:12px;margin-bottom:12px;overflow:hidden">
-      <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;cursor:pointer" onclick="toggleEl('mgr-pbody-${p.id}','mgr-pchv-${p.id}')">
-        <div style="flex:1">
+      <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;cursor:pointer" onclick="toggleEl('mgr-pbody-${p.id}','mgr-pchv-${p.id}')" title="กดเพื่อดู/ซ่อนรายละเอียด">
+        <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:700;color:var(--text)">${p.name} <span style="padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;background:rgba(155,111,255,.15);color:#9B6FFF;border:1px solid rgba(155,111,255,.3)">ของฉัน</span></div>
-          <div style="font-size:11px;color:var(--text2);margin-top:2px">ลูกค้า: ${p.client||'—'} · Deadline: ${fmtDate(p.deadline)||'—'}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">ลูกค้า: ${p.client||'—'} · Deadline: ${fmtDate(p.deadline)||'—'} · งบ <span style="color:var(--accent2);font-weight:700">${p.budget?fmtB(p.budget):'—'}</span></div>
+          ${projRoleBadges(p)?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${projRoleBadges(p)}</div>`:''}
         </div>
+        ${projStatusSelectHTML(p)}
         ${dlBadge}
         <span id="mgr-pchv-${p.id}" style="font-size:11px;color:var(--text2);transition:transform .2s">▼</span>
       </div>
@@ -20263,14 +20316,12 @@ function renderMgrCalendar() {
 function renderMgrTeam() {
   const el=document.getElementById('mgr-team-grid');if(!el)return;
   const q=(document.getElementById('mgr-team-search')?.value||'').toLowerCase();
-  const all=getAllStaff();
-  const filtered=all.filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q));
   const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
   const catLabels={dubbing:'🎤 Dubbing',adaptation:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',subVideo:'🎬 Sub & Video',manager:'🗂️ Manager'};
+  const catOrder=['dubbing','adaptation','mix','qc','subVideo','manager'];
   const suspended=getMgrSuspended();
-  const seen={};
-  el.innerHTML=filtered.filter(s=>{if(seen[s.id])return false;seen[s.id]=1;return true;}).map(s=>{
-    const col=catColors[s.category]||'var(--text2)';
+  const data=(typeof getStaffData==='function')?getStaffData():{};
+  const memberCard=(s,col)=>{
     const nWarn=(typeof getWarnings==='function'?getWarnings(s.id):[]).length;
     const isSusp=!!suspended[s.id];
     const safeName=(s.name||'').replace(/'/g,"\\'");
@@ -20281,7 +20332,7 @@ function renderMgrTeam() {
           ${isSusp?'<span style="padding:1px 8px;border-radius:8px;background:rgba(255,158,0,.18);color:#FF9E00;font-size:10px;font-weight:700;margin-left:4px">⏸️ พักงาน</span>':''}
           ${nWarn?`<span style="padding:1px 8px;border-radius:8px;background:rgba(255,64,64,.15);color:#FF6060;font-size:10px;font-weight:700;margin-left:4px">⚠️ ${nWarn}</span>`:''}
         </div>
-        <div style="font-size:11px;color:var(--text2)">${catLabels[s.category]||''}${s.promptpay?' · '+s.promptpay:''}</div>
+        ${s.promptpay?`<div style="font-size:11px;color:var(--text2)">${s.promptpay}</div>`:''}
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
         <button class="btn btn-sm btn-outline" style="border-color:rgba(255,64,64,.35);color:#FF6060" onclick="openMgrWarnModal('${s.id}')">✉️ ใบเตือน</button>
@@ -20290,7 +20341,22 @@ function renderMgrTeam() {
           : `<button class="btn btn-sm btn-outline" style="border-color:rgba(255,158,0,.35);color:#FF9E00" onclick="mgrSuspendStaff('${s.id}','${safeName}')">⏸️ พักงาน</button>`}
       </div>
     </div>`;
-  }).join('')||'<div style="color:var(--text2);font-size:13px;text-align:center;padding:20px">ไม่พบสมาชิก</div>';
+  };
+  let html='';
+  catOrder.forEach(cat=>{
+    const arr=Array.isArray(data[cat])?data[cat]:Object.values(data[cat]||{});
+    const members=arr.filter(Boolean).filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q));
+    if(!members.length) return;
+    const col=catColors[cat]||'var(--text2)';
+    html+=`<div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid ${col}33">
+        <span style="font-size:13px;font-weight:800;color:${col}">${catLabels[cat]||cat}</span>
+        <span style="font-size:11px;color:var(--text2);background:${col}1a;padding:1px 9px;border-radius:10px">${members.length} คน</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">${members.map(s=>memberCard(s,col)).join('')}</div>
+    </div>`;
+  });
+  el.innerHTML=html||'<div style="color:var(--text2);font-size:13px;text-align:center;padding:20px">ไม่พบสมาชิก</div>';
 }
 
 // ── MGR: Add worker to project → เปิดฟอร์มแก้โปรเจกต์ (มี worker selector ครบ) ──
@@ -20522,6 +20588,33 @@ if(typeof openModal==='function'){
 // ══════════════════════════════════════════════
 function isMgr(){ return currentUser?.role==='manager'; }
 
+// ── Role badge helpers (slot prefix → ป้ายโรลที่ทำในโปรเจกต์) ──
+const _SLOT_ROLE  = {dub:'🎤 พากย์', adp:'✍️ บท', mix:'🎧 มิกซ์', qc:'✅ QC', sub:'🎬 ซับ/วิดีโอ', mgr:'🗂️ จัดการ'};
+const _SLOT_COLOR = {dub:'var(--orange)', adp:'var(--cyan)', mix:'var(--green)', qc:'var(--purple)', sub:'var(--red)', mgr:'var(--accent2)'};
+function _roleBadgeHTML(k){ return `<span style="padding:1px 7px;border-radius:7px;font-size:9.5px;font-weight:700;background:${_SLOT_COLOR[k]}1e;color:${_SLOT_COLOR[k]};border:1px solid ${_SLOT_COLOR[k]}55;white-space:nowrap">${_SLOT_ROLE[k]}</span>`; }
+// ป้ายรวมของโปรเจกต์ (มีโรลอะไรบ้างในงานนี้)
+function projRoleBadges(p){
+  const set=new Set();(p.workers||[]).forEach(w=>{const pre=(w.slot||'').split('-')[0];if(_SLOT_ROLE[pre])set.add(pre);});
+  const order=['dub','adp','mix','qc','sub','mgr'];
+  return order.filter(k=>set.has(k)).map(_roleBadgeHTML).join(' ');
+}
+// ป้ายเฉพาะที่ staff คนหนึ่งทำในโปรเจกต์ (ใช้กับรายได้ของฉัน)
+function staffRoleBadges(p, staffId){
+  const set=new Set();(p.workers||[]).filter(w=>w.id===staffId).forEach(w=>{const pre=(w.slot||'').split('-')[0];if(_SLOT_ROLE[pre])set.add(pre);});
+  const order=['dub','adp','mix','qc','sub','mgr'];
+  return order.filter(k=>set.has(k)).map(_roleBadgeHTML).join(' ');
+}
+// dropdown สถานะงาน (ใช้ร่วมการ์ด manager) — กดแล้วไม่ขยายการ์ด
+function projStatusSelectHTML(p){
+  const st=p.projStatus||'notstarted';
+  return `<select onclick="event.stopPropagation()" onchange="saveProjStatus('${p.id}',this.value)" style="padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;font-family:Kanit;cursor:pointer;background:var(--bg2);border:1px solid var(--border2);color:var(--text);max-width:130px">
+    <option value="notstarted" ${st==='notstarted'?'selected':''}>⬜ ยังไม่เริ่ม</option>
+    <option value="inprogress" ${st==='inprogress'?'selected':''}>⚙️ กำลังทำ</option>
+    <option value="done" ${st==='done'?'selected':''}>✅ เสร็จแล้ว</option>
+    <option value="cancelled" ${st==='cancelled'?'selected':''}>❌ ยกเลิก</option>
+  </select>`;
+}
+
 // รีเฟรชหน้าคำนวนราคาให้ตรง role (admin → calc-list / manager → mgr-calc-list ซ่อนกำไร)
 function refreshCalcList(){
   if(isMgr()) renderCalcList('mgr-calc-list', true);
@@ -20601,7 +20694,7 @@ function renderMgrHome(){
   if(myStaffId){
     getProjects().forEach(p=>{
       const amt=(p.workers||[]).filter(w=>w.id===myStaffId).reduce((a,w)=>a+(w.amount||0),0);
-      if(amt>0){ incomeRows.push({name:p.name, amt}); incomeTotal+=amt; }
+      if(amt>0){ incomeRows.push({name:p.name, amt, badges:staffRoleBadges(p, myStaffId)}); incomeTotal+=amt; }
     });
     incomeRows.sort((a,b)=>b.amt-a.amt);
   }
@@ -20628,8 +20721,9 @@ function renderMgrHome(){
       const pctColor=pct>=80?'#00DFA0':pct>=50?'#00B4FF':'#FF9E00';
       const dl=p.deadline?Math.ceil((new Date(p.deadline)-now)/864e5):null;
       const dlTxt=dl===null?'—':dl<0?`<span style="color:#FF5050">เกิน ${Math.abs(dl)} วัน</span>`:`เหลือ ${dl} วัน`;
+      const rb=projRoleBadges(p);
       return `<div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05)">
-        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:11px;color:var(--text2)">${fmtDate(p.deadline)||'—'} · ${dlTxt}</div></div>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:11px;color:var(--text2)">${fmtDate(p.deadline)||'—'} · ${dlTxt}</div>${rb?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${rb}</div>`:''}</div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><span style="font-size:12px;font-weight:700;color:${pctColor}">${pct}%</span><div style="width:56px;height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pctColor}"></div></div></div>
       </div>`;
     }).join('');
@@ -20640,7 +20734,7 @@ function renderMgrHome(){
     if(!myStaffId){ incomeEl.innerHTML='<div style="text-align:center;padding:28px;color:var(--text2);font-size:12px">บัญชีนี้ยังไม่ผูกกับทีมงาน — ยังไม่มีรายได้ส่วนตัว</div>'; }
     else if(!incomeRows.length){ incomeEl.innerHTML='<div style="text-align:center;padding:28px;color:var(--text2)">ยังไม่มีรายได้จากโปรเจกต์</div>'; }
     else incomeEl.innerHTML=incomeRows.map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05)">
-        <div style="flex:1;min-width:0;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>${r.badges?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">${r.badges}</div>`:''}</div>
         <div style="font-size:13px;font-weight:700;color:#00DFA0;flex-shrink:0">${fmtB(r.amt)}</div>
       </div>`).join('')+
       `<div style="display:flex;align-items:center;gap:10px;padding:11px 10px;margin-top:4px;border-top:1px solid rgba(0,223,160,.2)">
