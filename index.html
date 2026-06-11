@@ -20166,7 +20166,7 @@ function teamMemberCardHTML(s, col, viewer){
   // admin ทำได้กับทุกคนยกเว้น admin · manager ทำได้เฉพาะ staff (ยศต่ำกว่า)
   const canAct = viewer==='admin' ? (rank!=='admin') : (rank==='');
   const safeName=(s.name||'').replace(/'/g,"\\'");
-  const clickAttr = viewer==='admin' ? `onclick="openStaffDetail('${s.id}')" style="cursor:pointer;" title="กดดูข้อมูล/รายได้"` : '';
+  const clickAttr = viewer==='admin' ? `onclick="openStaffDetail('${s.id}')" title="กดดูข้อมูล/รายได้"` : '';
   let actions='';
   if(canAct){
     actions=`<div style="display:flex;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07)">
@@ -20179,7 +20179,7 @@ function teamMemberCardHTML(s, col, viewer){
     const bt=rank==='admin'?'👑 Admin':'🗂️ Manager';
     actions=`<div style="margin-top:8px"><span style="font-size:10px;padding:2px 9px;border-radius:8px;background:${bb};color:${bc};font-weight:700">${bt}${viewer==='manager'?' · ออกใบไม่ได้':''}</span></div>`;
   }
-  return `<div ${clickAttr} style="display:flex;flex-direction:column;padding:12px 14px;background:${isSusp?'rgba(255,158,0,.06)':'var(--bg2)'};border:1px solid ${isSusp?'rgba(255,158,0,.35)':'rgba(255,255,255,.12)'};border-radius:11px;box-shadow:0 1px 3px rgba(0,0,0,.25);${viewer==='admin'?'transition:border-color .12s,transform .12s':''}" ${viewer==='admin'?`onmouseover="this.style.borderColor='${col}88';this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='rgba(255,255,255,.12)';this.style.transform=''"`:''}>
+  return `<div ${clickAttr} style="display:flex;flex-direction:column;padding:12px 14px;background:${isSusp?'rgba(255,158,0,.06)':'var(--bg2)'};border:1px solid ${isSusp?'rgba(255,158,0,.35)':'rgba(255,255,255,.12)'};border-radius:11px;box-shadow:0 1px 3px rgba(0,0,0,.25);${viewer==='admin'?'cursor:pointer;transition:border-color .12s,transform .12s':''}" ${viewer==='admin'?`onmouseover="this.style.borderColor='${col}88';this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='rgba(255,255,255,.12)';this.style.transform=''"`:''}>
     <div style="display:flex;align-items:center;gap:10px">
       <span style="width:32px;height:32px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${(s.nickname||s.name||'?')[0]}</span>
       <div style="flex:1;min-width:0">
