@@ -1594,7 +1594,7 @@ body.sidebar-collapsed .main-content{
    <div class="filter-bar" id="type-filter"></div>
    <div class="table-wrap">
     <table style="width:100%">
-     <thead><tr><th style="width:90px">Actions</th><th>โปรเจกต์</th><th>ลูกค้า</th><th>ประเภท</th><th>Deadline</th><th>Budget</th><th>รายจ่าย</th><th>กำไร</th><th>สถานะ</th></tr></thead>
+     <thead><tr><th style="width:90px">Actions</th><th>โปรเจกต์</th><th>ลูกค้า</th><th>เมเนเจอร์</th><th>ประเภท</th><th>Deadline</th><th>Budget</th><th>รายจ่าย</th><th>กำไร</th><th>สถานะ</th></tr></thead>
      <tbody id="projects-table"></tbody>
     </table>
    </div>
@@ -2969,6 +2969,7 @@ const CAT_MAP = {
 let selectedQYear = 'all';
 let selectedMonth = 'all';
 let selectedClient = 'all';
+let selectedManager = 'all';   // 'all' | 'admin' | <managerUid>
 
 const CATS = {
   adaptation: {label:'✍️ Adaptation', color:'var(--cyan)'},
@@ -8132,7 +8133,13 @@ function renderProjects(){
       <option value="all" ${selectedClient==='all'?'selected':''}>ทุกลูกค้า (${clients.length})</option>
       ${clients.map(c=>`<option value="${c.replace(/"/g,'&quot;')}" ${selectedClient===c?'selected':''}>${c}</option>`).join('')}
     </select>
-    ${(selectedYear!=='all'||selectedMonth!=='all'||selectedClient!=='all'||selectedType!=='all')?`<button class="btn btn-outline btn-sm" style="padding:6px 12px;font-size:11px" onclick="selectedYear='all';selectedMonth='all';selectedClient='all';selectedType='all';renderProjects()">🔄 ล้างตัวกรอง</button>`:''}
+    <label style="font-size:12px;color:var(--text2);font-weight:600;white-space:nowrap;margin-left:6px">🗂️ ผู้ดูแล</label>
+    <select class="form-input form-select" style="padding:7px 32px 7px 12px;font-size:13px;min-width:170px;max-width:240px" onchange="selectedManager=this.value;renderProjects()">
+      <option value="all" ${selectedManager==='all'?'selected':''}>ทุกผู้ดูแล</option>
+      <option value="admin" ${selectedManager==='admin'?'selected':''}>🛠️ แอดมินจัดการเอง</option>
+      ${_projManagerOptions().map(m=>`<option value="${m.uid}" ${selectedManager===m.uid?'selected':''}>🗂️ ${m.label}</option>`).join('')}
+    </select>
+    ${(selectedYear!=='all'||selectedMonth!=='all'||selectedClient!=='all'||selectedType!=='all'||selectedManager!=='all')?`<button class="btn btn-outline btn-sm" style="padding:6px 12px;font-size:11px" onclick="selectedYear='all';selectedMonth='all';selectedClient='all';selectedType='all';selectedManager='all';renderProjects()">🔄 ล้างตัวกรอง</button>`:''}
   </div>`;
   // Build type filter
   const types=[...new Set(projs.map(p=>p.type).filter(Boolean))];
@@ -8141,6 +8148,26 @@ function renderProjects(){
   renderProjList();
 
   } catch(e){ console.error('renderProjects error:', e); }
+}
+// ป้ายผู้ดูแลโปรเจกต์: Admin (จัดการเอง) หรือ Manager (ชื่อเล่น+ชื่อจริง ไม่เอานามสกุล)
+function _projManagerLabel(p){
+  if(!p || !p.managerId) return {isAdmin:true};
+  const uc=ls('mgr_users_cache')||{};
+  const u=uc[p.managerId] || Object.values(uc).find(x=>x && x.uid===p.managerId);
+  if(!u) return {isAdmin:false, name:'Manager'};
+  const first=(u.name||'').trim().split(/\s+/)[0]||'';
+  const nick=u.nickname||'';
+  const label=(nick && first && first!==nick) ? (nick+' '+first) : (nick||first||u.email||'Manager');
+  return {isAdmin:false, name:label};
+}
+// รายชื่อเมเนเจอร์สำหรับ dropdown กรอง (manager-role + ที่ดูแลโปรเจกต์อยู่)
+function _projManagerOptions(){
+  const uc=ls('mgr_users_cache')||{};
+  const map={};
+  Object.values(uc).forEach(u=>{ if(u && u.role==='manager' && u.uid) map[u.uid]=u; });
+  getProjects().forEach(p=>{ if(p.managerId && !map[p.managerId]){ const u=uc[p.managerId]||Object.values(uc).find(x=>x&&x.uid===p.managerId); map[p.managerId]=u||{uid:p.managerId,nickname:'Manager',name:''}; } });
+  return Object.values(map).map(u=>{ const first=(u.name||'').trim().split(/\s+/)[0]||''; const nick=u.nickname||''; return {uid:u.uid, label:((nick&&first&&first!==nick)?(nick+' '+first):(nick||first||u.email||'Manager'))}; })
+    .sort((a,b)=>a.label.localeCompare(b.label,'th'));
 }
 function renderProjList(){
   try {
@@ -8165,6 +8192,9 @@ function renderProjList(){
       }
       // Client filter
       if(selectedClient!=='all' && (p.client||'').trim() !== selectedClient) return false;
+      // Manager filter: admin=จัดการเอง(ไม่มี managerId) · <uid>=เมเนเจอร์คนนั้นดูแล
+      if(selectedManager==='admin' && p.managerId) return false;
+      if(selectedManager!=='all' && selectedManager!=='admin' && p.managerId!==selectedManager) return false;
       // Type filter
       if(selectedType!=='all'&&p.type!==selectedType)return false;
       // Search
@@ -8214,6 +8244,9 @@ function renderProjList(){
           +(p.note?'<div style="font-size:10px;color:var(--text2)">📝 '+p.note+'</div>':'')
           +'</td>'
           +'<td style="padding:8px 6px;color:var(--text2)">'+(p.client||'—')+'</td>'
+          +(function(){const mi=_projManagerLabel(p);return mi.isAdmin
+              ?'<td style="padding:8px 6px"><span style="font-size:10px;padding:2px 9px;border-radius:8px;background:rgba(155,111,255,.12);color:#9B6FFF;border:1px solid rgba(155,111,255,.3);font-weight:700;white-space:nowrap">🛠️ Admin</span></td>'
+              :'<td style="padding:8px 6px"><span style="font-size:10px;padding:2px 9px;border-radius:8px;background:rgba(21,101,255,.15);color:var(--accent2);border:1px solid rgba(21,101,255,.3);font-weight:700;white-space:nowrap">🗂️ '+mi.name+'</span></td>';})()
           +'<td style="padding:8px 6px"><span style="font-size:10px;background:var(--bg2);padding:2px 6px;border-radius:6px;color:var(--text2)">'+(p.type||'—')+'</span></td>'
           +'<td style="padding:8px 6px;white-space:nowrap">'+dlHtml+'</td>'
           +'<td style="padding:8px 6px;font-weight:700;color:var(--accent2)">'+(p.budget?fmtB(p.budget):'—')+'</td>'
@@ -8221,9 +8254,9 @@ function renderProjList(){
           +'<td style="padding:8px 6px;font-weight:700;color:'+(profit>=0?'var(--green)':'var(--red)')+'">'+fmtB(profit)+'</td>'
           +'<td style="padding:8px 6px;white-space:nowrap"><div style="display:flex;align-items:center;gap:7px">'+statusSel+'<span id="apchv-'+pid+'" style="color:var(--text2);font-size:10px;transition:transform .2s">▼</span></div></td>'
           +'</tr>'
-          +'<tr id="apdetail-'+pid+'" style="display:none"><td colspan="9" style="padding:0;background:rgba(0,0,0,.18)">'+adminProjDetailHTML(p)+'</td></tr>';
+          +'<tr id="apdetail-'+pid+'" style="display:none"><td colspan="10" style="padding:0;background:rgba(0,0,0,.18)">'+adminProjDetailHTML(p)+'</td></tr>';
       } catch(rowErr){console.warn('Row render error:',rowErr);return '';}
-    }).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:32px">ไม่พบโปรเจกต์</td></tr>';
+    }).join('')||'<tr><td colspan="10" style="text-align:center;color:var(--text2);padding:32px">ไม่พบโปรเจกต์</td></tr>';
   } catch(e){console.error('renderProjList error:',e);}
 }
 
