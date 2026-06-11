@@ -12401,15 +12401,20 @@ function openEditStaff(id,cat){
   // Show role toggle for users who have accounts
   const roleToggleEl = document.getElementById('st-role-toggle');
   if(roleToggleEl){
-    const userProfile = s._userRole || null;
+    // หา user account ที่ผูกกับ staff คนนี้ (จาก cache) เพื่อแสดง role ปัจจุบันจริง
+    const _uc = ls('mgr_users_cache') || {};
+    const _acct = Object.values(_uc).find(u => u && (u.staffId===id || (s.email && u.email && u.email.toLowerCase()===s.email.toLowerCase())));
+    const _curRole = _acct?.role || 'staff';
+    const _hasAcct = !!_acct;
+    s._userRole = _curRole; // เก็บไว้ให้ saveStaffRoleIfChanged เทียบ
     roleToggleEl.style.display = 'block';
     roleToggleEl.innerHTML = `<div style="margin-bottom:14px;padding:10px 14px;background:rgba(155,111,255,.07);border:1px solid rgba(155,111,255,.2);border-radius:9px">
-      <label class="form-label">บทบาทในระบบ</label>
-      <select class="form-input form-select" id="st-role-sel" style="margin-top:6px">
-        <option value="staff">🎙️ Staff (ทีมงาน)</option>
-        <option value="manager"${(s._userRole==='manager')?' selected':''}>🗂️ Manager</option>
+      <label class="form-label">บทบาทในระบบ ${_curRole==='manager'?'<span style="color:#9B6FFF;font-weight:700">· ปัจจุบัน: Manager</span>':''}</label>
+      <select class="form-input form-select" id="st-role-sel" style="margin-top:6px"${_hasAcct?'':' disabled'}>
+        <option value="staff"${_curRole!=='manager'?' selected':''}>🎙️ Staff (ทีมงาน)</option>
+        <option value="manager"${_curRole==='manager'?' selected':''}>🗂️ Manager</option>
       </select>
-      <div style="font-size:11px;color:var(--text2);margin-top:5px">เปลี่ยน role จะมีผลตอน login ครั้งถัดไป</div>
+      <div style="font-size:11px;color:${_hasAcct?'var(--text2)':'#FF9E00'};margin-top:5px">${_hasAcct?'เปลี่ยน role จะมีผลตอนสมาชิก login ครั้งถัดไป':'⚠️ สมาชิกนี้ยังไม่มีบัญชีล็อกอิน — ต้องสมัครบัญชีก่อนถึงจะตั้งเป็น Manager ได้'}</div>
     </div>`;
   }
   document.getElementById('st-name').value=s.name||'';document.getElementById('st-nick').value=s.nickname||'';
@@ -16933,7 +16938,22 @@ function startFirebaseSync() {
 
   // Sync users/staff profiles
   _fbDatabase.ref('users').on('value', snap => {
-    // profiles update silently
+    // 🔄 อัปเดต cache ผู้ใช้ทั้งหมด (ใช้กับ role/Manager dropdown) แบบ realtime
+    try{
+      if(snap.exists()){
+        ls('mgr_users_cache', snap.val()||{});
+        // ถ้าเปิดฟอร์มโปรเจกต์อยู่ → รีเฟรช dropdown "มอบหมาย Manager" ให้เห็น manager ใหม่ทันที
+        const mgrSel=document.getElementById('pj-manager');
+        const projModal=document.getElementById('modal-project');
+        if(mgrSel && projModal && !projModal.classList.contains('hidden')){
+          const cur=mgrSel.value; const ms=getAllManagerUsers();
+          mgrSel.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+ms.map(m=>`<option value="${m.uid}"${cur===m.uid?' selected':''}>${m.nickname||m.email}</option>`).join('');
+        }
+        // ถ้าเปิดหน้าทีมของ Manager อยู่ → รีเฟรช
+        const mgrTeamPg=document.getElementById('page-mgr-team');
+        if(mgrTeamPg && !mgrTeamPg.classList.contains('hidden')){ try{renderMgrTeam();}catch(e){} }
+      }
+    }catch(e){ console.warn('users listener:', e); }
   });
 
   console.log('🔄 Firebase real-time sync started');
@@ -20009,20 +20029,34 @@ async function saveStaffRoleIfChanged(staffId) {
   const roleSel = document.getElementById('st-role-sel');
   if (!roleSel || !staffId) return;
   const newRole = roleSel.value;
-  // Find user with this staffId
   if (!_fbDatabase) return;
   try {
-    const snap = await _fbDatabase.ref('users').orderByChild('staffId').equalTo(staffId).get();
-    if (snap.exists()) {
-      const entries = Object.entries(snap.val());
-      for (const [uid, user] of entries) {
-        if (user.role !== newRole) {
-          await _fbDatabase.ref('users/'+uid+'/role').set(newRole);
-          toast(`✅ เปลี่ยน role เป็น ${newRole==='manager'?'Manager':'Staff'} แล้ว`, 'success');
-        }
+    // หา user account ที่ผูกกับ staff นี้ — match ด้วย staffId หรือ email (ทนทานกว่า)
+    const staff = getStaffById(staffId);
+    const snapAll = await _fbDatabase.ref('users').get();
+    const all = snapAll.exists() ? (snapAll.val()||{}) : {};
+    const matches = Object.entries(all).filter(([uid,u]) =>
+      u && (u.staffId===staffId || (staff?.email && u.email && u.email.toLowerCase()===staff.email.toLowerCase()))
+    );
+    if (!matches.length) {
+      // ไม่มีบัญชีล็อกอิน → ตั้ง Manager ไม่ได้
+      if (newRole === 'manager') toast('⚠️ ตั้ง Manager ไม่ได้ — สมาชิกนี้ยังไม่มีบัญชีล็อกอิน (ให้สมัครบัญชีก่อน)', 'warn');
+      return;
+    }
+    let changed = false;
+    for (const [uid, user] of matches) {
+      if (user.role !== newRole) {
+        await _fbDatabase.ref('users/'+uid+'/role').set(newRole);
+        all[uid].role = newRole;
+        changed = true;
       }
     }
-  } catch(e) { console.warn('saveStaffRole:', e); }
+    if (changed) {
+      ls('mgr_users_cache', all);            // refresh cache ทันที (ไม่ต้องรอ reload)
+      try{ loadManagerUsers(); }catch(e){}   // sync cache จาก Firebase อีกชั้น
+      toast(`✅ เปลี่ยน role เป็น ${newRole==='manager'?'🗂️ Manager':'🎙️ Staff'} แล้ว — มีผลตอนสมาชิก login ครั้งถัดไป`, 'success');
+    }
+  } catch(e) { console.warn('saveStaffRole:', e); toast('เปลี่ยน role ไม่สำเร็จ: '+(e.message||''), 'error'); }
 }
 
 // ── Render: MGR Projects ──
