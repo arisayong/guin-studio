@@ -2244,13 +2244,15 @@ body.sidebar-collapsed .main-content{
     <div class="page-subtitle" id="mgr-home-welcome">สรุปงานและรายได้ของฉัน</div>
    </div>
    <div class="stats-grid" id="mgr-home-stats" style="margin-bottom:16px"></div>
-   <div class="table-wrap" style="margin-bottom:14px">
-    <div class="table-header"><div class="table-title">💰 รายได้ของฉัน (แยกตามโปรเจกต์)</div></div>
-    <div id="mgr-home-income" style="padding:4px"></div>
-   </div>
-   <div class="table-wrap">
-    <div class="table-header"><div class="table-title">📌 งานที่กำลังติดตาม</div><button class="btn btn-outline btn-sm" onclick="nav('mgr-track')">ดูแบบเต็ม</button></div>
-    <div id="mgr-home-tracking" style="padding:4px"></div>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px" id="mgr-home-cols">
+    <div class="table-wrap">
+     <div class="table-header"><div class="table-title">💰 งานที่ทำ (รายได้ของฉัน)</div></div>
+     <div id="mgr-home-income" style="padding:4px"></div>
+    </div>
+    <div class="table-wrap">
+     <div class="table-header"><div class="table-title">📌 งานที่กำลังติดตาม</div><button class="btn btn-outline btn-sm" onclick="nav('mgr-track')">ดูแบบเต็ม</button></div>
+     <div id="mgr-home-tracking" style="padding:4px"></div>
+    </div>
    </div>
   </div>
 
@@ -20073,7 +20075,7 @@ function renderMgrProjects() {
         ${dlBadge}
         <span id="mgr-pchv-${p.id}" style="font-size:11px;color:var(--text2);transition:transform .2s">▼</span>
       </div>
-      <div id="mgr-pbody-${p.id}" style="padding:14px 16px">
+      <div id="mgr-pbody-${p.id}" style="display:none;padding:14px 16px">
         <div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:500;letter-spacing:.8px">ผู้ทำงาน</div>
         ${workerRows||'<div style="color:var(--text2);font-size:13px;text-align:center;padding:16px">ยังไม่มีผู้ทำงาน</div>'}
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
