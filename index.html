@@ -2269,14 +2269,20 @@ body.sidebar-collapsed .main-content{
 
   <!-- STAFF DETAIL (admin) — ข้อมูล + รายได้/งาน รายคน -->
   <div id="page-staff-detail" class="page hidden">
-   <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
-    <div style="display:flex;align-items:center;gap:10px">
-     <button class="btn btn-outline btn-sm" onclick="nav('staff')">← กลับ</button>
-     <div><div class="page-title" id="sd-title">👤 ข้อมูลทีมงาน</div><div class="page-subtitle" id="sd-sub"></div></div>
-    </div>
-    <div class="page-actions" style="display:flex;gap:6px">
-     <div class="tab active" id="sd-tab-1" onclick="switchStaffDetailTab(1)">📋 ข้อมูล</div>
-     <div class="tab" id="sd-tab-2" onclick="switchStaffDetailTab(2)">💰 รายได้ & งาน</div>
+   <div class="page-header">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+     <div style="display:flex;align-items:flex-start;gap:12px;min-width:0">
+      <button class="btn btn-outline btn-sm" onclick="nav('staff')" style="flex-shrink:0">← กลับ</button>
+      <div style="min-width:0">
+       <div class="page-title" id="sd-title">👤 ข้อมูลทีมงาน</div>
+       <div class="page-subtitle" id="sd-sub"></div>
+       <div style="display:flex;gap:6px;margin-top:11px">
+        <div class="tab active" id="sd-tab-1" onclick="switchStaffDetailTab(1)">📋 ข้อมูล</div>
+        <div class="tab" id="sd-tab-2" onclick="switchStaffDetailTab(2)">💰 รายได้ & งาน</div>
+       </div>
+      </div>
+     </div>
+     <div id="sd-edit-actions" style="display:flex;gap:6px;flex-shrink:0"></div>
     </div>
    </div>
    <div id="sd-body-1"></div>
@@ -20163,12 +20169,9 @@ function teamMemberCardHTML(s, col, viewer){
   const clickAttr = viewer==='admin' ? `onclick="openStaffDetail('${s.id}')" style="cursor:pointer;" title="กดดูข้อมูล/รายได้"` : '';
   let actions='';
   if(canAct){
-    actions=`<div style="display:flex;gap:5px;margin-top:8px">
-      <button class="btn btn-sm btn-outline" style="flex:1;padding:4px 4px;font-size:11px;border-color:rgba(255,64,64,.35);color:#FF6060" onclick="event.stopPropagation();teamWarn('${s.id}')">✉️ เตือน</button>
-      <button class="btn btn-sm btn-outline" style="flex:1;padding:4px 4px;font-size:11px;border-color:rgba(255,199,0,.4);color:#FFC700" onclick="event.stopPropagation();teamAppr('${s.id}')">⭐ ชื่นชม</button>
-      ${isSusp
-        ? `<button class="btn btn-sm btn-outline" style="flex:1;padding:4px 4px;font-size:11px;border-color:rgba(0,223,160,.35);color:#00DFA0" onclick="event.stopPropagation();mgrUnsuspendStaff('${s.id}','${safeName}')">▶️ คืน</button>`
-        : `<button class="btn btn-sm btn-outline" style="flex:1;padding:4px 4px;font-size:11px;border-color:rgba(255,158,0,.35);color:#FF9E00" onclick="event.stopPropagation();mgrSuspendStaff('${s.id}','${safeName}')">⏸️ พัก</button>`}
+    actions=`<div style="display:flex;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07)">
+      <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(255,64,64,.35);color:#FF6060" onclick="event.stopPropagation();teamWarn('${s.id}')">✉️ เตือน</button>
+      <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(255,199,0,.4);color:#FFC700" onclick="event.stopPropagation();teamAppr('${s.id}')">⭐ ชื่นชม</button>
     </div>`;
   } else if(rank){
     const bc=rank==='admin'?'#FF6060':'var(--accent2)';
@@ -20176,7 +20179,7 @@ function teamMemberCardHTML(s, col, viewer){
     const bt=rank==='admin'?'👑 Admin':'🗂️ Manager';
     actions=`<div style="margin-top:8px"><span style="font-size:10px;padding:2px 9px;border-radius:8px;background:${bb};color:${bc};font-weight:700">${bt}${viewer==='manager'?' · ออกใบไม่ได้':''}</span></div>`;
   }
-  return `<div ${clickAttr} style="display:flex;flex-direction:column;padding:11px 13px;background:${isSusp?'rgba(255,158,0,.06)':'rgba(0,0,0,.2)'};border:1px solid ${isSusp?'rgba(255,158,0,.3)':col+'22'};border-radius:10px;${viewer==='admin'?'transition:border-color .12s':''}" ${viewer==='admin'?`onmouseover="this.style.borderColor='${col}66'" onmouseout="this.style.borderColor='${col}22'"`:''}>
+  return `<div ${clickAttr} style="display:flex;flex-direction:column;padding:12px 14px;background:${isSusp?'rgba(255,158,0,.06)':'var(--bg2)'};border:1px solid ${isSusp?'rgba(255,158,0,.35)':'rgba(255,255,255,.12)'};border-radius:11px;box-shadow:0 1px 3px rgba(0,0,0,.25);${viewer==='admin'?'transition:border-color .12s,transform .12s':''}" ${viewer==='admin'?`onmouseover="this.style.borderColor='${col}88';this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='rgba(255,255,255,.12)';this.style.transform=''"`:''}>
     <div style="display:flex;align-items:center;gap:10px">
       <span style="width:32px;height:32px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${(s.nickname||s.name||'?')[0]}</span>
       <div style="flex:1;min-width:0">
@@ -20217,59 +20220,115 @@ function getStaffEarnings(staffId){
 // ── หน้า detail ทีมงาน (admin เท่านั้น) — 2 แท็บ: ข้อมูล / รายได้&งาน ──
 let _detailStaffId='';
 let _sdTab=1;
+let _sdEditing=false;
+const _SD_CAT_ORDER=['dubbing','adaptation','mix','qc','subVideo','manager'];
 function openStaffDetail(id){
   if(currentUser?.role!=='admin') return;
-  _detailStaffId=id; _sdTab=1;
+  _detailStaffId=id; _sdTab=1; _sdEditing=false;
   nav('staff-detail');
 }
-function switchStaffDetailTab(n){ _sdTab=n; renderStaffDetail(); }
+function switchStaffDetailTab(n){ _sdTab=n; _sdEditing=false; renderStaffDetail(); }
+function toggleStaffDetailEdit(){ _sdEditing=!_sdEditing; renderStaffDetail(); }
+function _sdSectionHead(icon,title,color){ return `<div style="display:flex;align-items:center;gap:8px;padding:11px 16px;border-bottom:1px solid var(--border2);background:rgba(255,255,255,.02)"><span style="font-size:14px">${icon}</span><span style="font-size:13px;font-weight:800;color:${color||'var(--text)'};letter-spacing:.3px">${title}</span></div>`; }
 function renderStaffDetail(){
   const s=getStaffById(_detailStaffId);
   const titleEl=document.getElementById('sd-title');
   const subEl=document.getElementById('sd-sub');
   const b1=document.getElementById('sd-body-1');
   const b2=document.getElementById('sd-body-2');
-  if(!s){ if(b1)b1.innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)">ไม่พบข้อมูลสมาชิก</div>'; if(b2)b2.innerHTML=''; return; }
+  const actEl=document.getElementById('sd-edit-actions');
+  if(!s){ if(b1)b1.innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)">ไม่พบข้อมูลสมาชิก</div>'; if(b2)b2.innerHTML=''; if(actEl)actEl.innerHTML=''; return; }
   if(titleEl) titleEl.textContent='👤 '+(s.nickname||s.name||'');
   if(subEl) subEl.textContent=(s.name||'')+(s.promptpay?' · '+s.promptpay:'');
-  // Tab toggle
   const t1=document.getElementById('sd-tab-1'), t2=document.getElementById('sd-tab-2');
   if(t1) t1.classList.toggle('active', _sdTab===1);
   if(t2) t2.classList.toggle('active', _sdTab===2);
   if(b1) b1.style.display=_sdTab===1?'block':'none';
   if(b2) b2.style.display=_sdTab===2?'block':'none';
-  // ── Tab 1: ข้อมูล ──
+  // ── ปุ่มมุมขวาบน: แก้ไข / บันทึก-ยกเลิก (เฉพาะแท็บ 1) ──
+  if(actEl){
+    if(_sdTab===1){
+      actEl.innerHTML=_sdEditing
+        ? `<button class="btn btn-outline btn-sm" onclick="toggleStaffDetailEdit()">ยกเลิก</button><button class="btn btn-blue" onclick="saveStaffDetailInline()">💾 บันทึก</button>`
+        : `<button class="btn btn-blue" onclick="toggleStaffDetailEdit()">✏️ แก้ไขข้อมูล</button>`;
+    } else actEl.innerHTML='';
+  }
+  const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
+  // ── Tab 1: ข้อมูล (อ่าน / แก้ไขในหน้า) ──
   if(b1){
-    const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
-    const catBadges=(s.categories||[s.category]).filter(Boolean).map(c=>{const cl=catColors[c]||'var(--text2)';const lb=(typeof CATS!=='undefined'&&CATS[c])?CATS[c].label:c;return `<span style="font-size:11px;padding:2px 9px;border-radius:10px;border:1px solid ${cl}55;color:${cl};background:${cl}11">${lb}</span>`;}).join(' ');
-    const warns=(typeof getWarnings==='function'?getWarnings(s.id):[]);
-    const apprs=(typeof getAppreciations==='function'?getAppreciations(s.id):[]);
-    const warnList=warns.length?warns.map((w,i)=>`<div style="display:flex;align-items:center;gap:7px;padding:6px 10px;background:rgba(0,0,0,.25);border-radius:7px;margin-bottom:5px"><span style="width:18px;height:18px;border-radius:50%;background:rgba(255,40,40,.2);color:#FF4040;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</span><div style="flex:1;font-size:12px;color:#FF8080">${w.type}${w.projName?' · '+w.projName:''}</div><div style="font-size:10px;color:var(--text2)">${(typeof fmtWarnDate==='function'?fmtWarnDate(w.date):w.date)||''}</div></div>`).join(''):'<div style="font-size:12px;color:var(--text2);text-align:center;padding:8px">ไม่มีใบเตือน</div>';
-    const apprList=apprs.length?apprs.map(a=>`<div style="display:flex;align-items:center;gap:7px;padding:6px 10px;background:rgba(0,0,0,.25);border-radius:7px;margin-bottom:5px"><span style="width:18px;height:18px;border-radius:50%;background:rgba(255,199,0,.22);color:#FFC700;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0">⭐</span><div style="flex:1;font-size:12px;color:#FFD93D">${a.type}${a.projName?' · '+a.projName:''}</div><div style="font-size:10px;color:var(--text2)">${(typeof fmtWarnDate==='function'?fmtWarnDate(a.date):a.date)||''}</div></div>`).join(''):'<div style="font-size:12px;color:var(--text2);text-align:center;padding:8px">ไม่มีใบชื่นชม</div>';
-    const cat0=s.category||s.categories?.[0]||'dubbing';
-    b1.innerHTML=`<div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px">
-      <div class="table-wrap" style="padding:18px">
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-          <div style="width:56px;height:56px;border-radius:50%;background:var(--accent2)22;color:var(--accent2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:24px">${(s.nickname||s.name||'?')[0]}</div>
-          <div><div style="font-size:18px;font-weight:800">${s.name||''}</div><div style="font-size:13px;color:var(--text2)">${s.nickname?'('+s.nickname+')':''} ${s.gender||''}</div><div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">${catBadges}</div></div>
+   if(_sdEditing){
+    // ── โหมดแก้ไข inline ──
+    const _adminSet=_adminEmailSet();
+    const _isAdmin=(s.email && _adminSet.has((s.email||'').toLowerCase()));
+    const _uc=ls('mgr_users_cache')||{};
+    const _acct=Object.values(_uc).find(u=>u && (u.staffId===s.id || (s.email && u.email && u.email.toLowerCase()===s.email.toLowerCase())));
+    const _curRole=_isAdmin?'admin':(_acct?.role||'staff');
+    const field=(lbl,id,val,ph)=>`<div class="form-group" style="margin:0"><label class="form-label">${lbl}</label><input class="form-input" id="${id}" value="${(val||'').replace(/"/g,'&quot;')}" placeholder="${ph||''}"></div>`;
+    const catBoxes=_SD_CAT_ORDER.map(c=>{const cl=catColors[c]||'var(--text2)';const lb=(typeof CATS!=='undefined'&&CATS[c])?CATS[c].label:c;const on=(s.categories||[s.category]).includes(c);return `<label style="display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:9px;border:1px solid ${cl}44;background:${cl}10;cursor:pointer;font-size:12px;font-weight:600;color:${cl}"><input type="checkbox" class="sd-edit-cat" value="${c}" ${on?'checked':''} style="accent-color:${cl}"> ${lb}</label>`;}).join('');
+    const roleBlock=_isAdmin
+      ? `<div class="form-group" style="margin:0"><label class="form-label">บทบาท</label><div style="padding:10px 12px;background:rgba(255,80,80,.08);border:1px solid rgba(255,80,80,.25);border-radius:9px;font-size:13px;color:#FF6060;font-weight:700">👑 Admin (กำหนดจากอีเมล)</div></div>`
+      : `<div class="form-group" style="margin:0"><label class="form-label">บทบาท</label><select class="form-input form-select" id="sd-edit-role"><option value="staff"${_curRole!=='manager'?' selected':''}>🎙️ Staff (ทีมงาน)</option><option value="manager"${_curRole==='manager'?' selected':''}>🗂️ Manager</option></select></div>`;
+    b1.innerHTML=`<div style="max-width:780px;margin:0 auto" class="table-wrap">
+      ${_sdSectionHead('✏️','แก้ไขข้อมูล — '+(s.nickname||s.name||''),'var(--accent2)')}
+      <div style="padding:18px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          ${field('ชื่อจริง *','sd-edit-name',s.name,'ชื่อ-นามสกุล')}
+          ${field('ชื่อเล่น *','sd-edit-nick',s.nickname,'ชื่อเล่น')}
+          <div class="form-group" style="margin:0"><label class="form-label">เพศ</label><select class="form-input form-select" id="sd-edit-gender"><option ${!s.gender?'selected':''} value="">-</option><option ${s.gender==='ชาย'?'selected':''}>ชาย</option><option ${s.gender==='หญิง'?'selected':''}>หญิง</option><option ${s.gender==='อื่นๆ'?'selected':''}>อื่นๆ</option></select></div>
+          ${field('เบอร์ / พร้อมเพย์','sd-edit-promptpay',s.promptpay,'08x-xxx-xxxx')}
+          ${field('ธนาคาร','sd-edit-bank',s.bank,'เช่น ไทยพาณิชย์')}
+          ${field('เลขบัญชี','sd-edit-account',s.account,'')}
+          ${field('อีเมล','sd-edit-email',s.email,'name@email.com')}
+          ${field('ลิงก์รูป QR','sd-edit-qr',s.qrUrl,'https://...')}
         </div>
-        <div style="display:flex;flex-direction:column;gap:7px;font-size:13px">
-          ${s.promptpay?`<div>💸 พร้อมเพย์: <strong>${s.promptpay}</strong></div>`:''}
-          ${s.bank?`<div>🏦 ${s.bank} ${s.account||''}</div>`:''}
-          ${s.email?`<div>📧 ${s.email}</div>`:''}
-          ${s.qrUrl?`<div style="display:flex;align-items:center;gap:8px">📱 QR: ${(typeof _qrImgHtml==='function')?_qrImgHtml(s.qrUrl,'thumb',{staffName:s.nickname||s.name,clickToView:true}):''}</div>`:''}
+        <div class="form-group" style="margin:0 0 12px"><label class="form-label">หมวดงาน (เลือกได้หลายอัน)</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:5px">${catBoxes}</div></div>
+        <div style="display:grid;grid-template-columns:1fr;gap:12px">${roleBlock}</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
+          <button class="btn btn-outline" onclick="toggleStaffDetailEdit()">ยกเลิก</button>
+          <button class="btn btn-blue" onclick="saveStaffDetailInline()">💾 บันทึกข้อมูล</button>
         </div>
-        <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
-          <button class="btn btn-blue btn-sm" onclick="openEditStaff('${s.id}','${cat0}')">✏️ แก้ไขข้อมูล</button>
-          <button class="btn btn-outline btn-sm" style="border-color:rgba(255,64,64,.35);color:#FF6060" onclick="teamWarn('${s.id}')">✉️ ใบเตือน</button>
-          <button class="btn btn-outline btn-sm" style="border-color:rgba(255,199,0,.4);color:#FFC700" onclick="teamAppr('${s.id}')">⭐ ใบชื่นชม</button>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:14px">
-        <div class="table-wrap" style="padding:14px"><div style="font-size:13px;font-weight:700;color:#FF6060;margin-bottom:8px">⚠️ ใบเตือน (${warns.length})</div>${warnList}</div>
-        <div class="table-wrap" style="padding:14px"><div style="font-size:13px;font-weight:700;color:#FFC700;margin-bottom:8px">⭐ ใบชื่นชม (${apprs.length})</div>${apprList}</div>
       </div>
     </div>`;
+   } else {
+    // ── โหมดอ่าน ──
+    const catBadges=(s.categories||[s.category]).filter(Boolean).map(c=>{const cl=catColors[c]||'var(--text2)';const lb=(typeof CATS!=='undefined'&&CATS[c])?CATS[c].label:c;return `<span style="font-size:11px;padding:2px 10px;border-radius:10px;border:1px solid ${cl}55;color:${cl};background:${cl}11;font-weight:600">${lb}</span>`;}).join(' ');
+    const rank=_teamRankOf(s);
+    const rankBadge=rank==='admin'?'<span style="font-size:11px;padding:2px 10px;border-radius:10px;background:rgba(255,80,80,.15);color:#FF6060;font-weight:700">👑 Admin</span>':rank==='manager'?'<span style="font-size:11px;padding:2px 10px;border-radius:10px;background:rgba(21,101,255,.15);color:var(--accent2);font-weight:700">🗂️ Manager</span>':'';
+    const warns=(typeof getWarnings==='function'?getWarnings(s.id):[]);
+    const apprs=(typeof getAppreciations==='function'?getAppreciations(s.id):[]);
+    const warnList=warns.length?warns.map((w,i)=>`<div style="display:flex;align-items:center;gap:7px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.05)"><span style="width:18px;height:18px;border-radius:50%;background:rgba(255,40,40,.2);color:#FF4040;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</span><div style="flex:1;font-size:12px;color:#FF8080">${w.type}${w.projName?' · '+w.projName:''}</div><div style="font-size:10px;color:var(--text2)">${(typeof fmtWarnDate==='function'?fmtWarnDate(w.date):w.date)||''}</div></div>`).join(''):'<div style="font-size:12px;color:var(--text2);text-align:center;padding:14px">ไม่มีใบเตือน</div>';
+    const apprList=apprs.length?apprs.map(a=>`<div style="display:flex;align-items:center;gap:7px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.05)"><span style="width:18px;height:18px;border-radius:50%;background:rgba(255,199,0,.22);color:#FFC700;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0">⭐</span><div style="flex:1;font-size:12px;color:#FFD93D">${a.type}${a.projName?' · '+a.projName:''}</div><div style="font-size:10px;color:var(--text2)">${(typeof fmtWarnDate==='function'?fmtWarnDate(a.date):a.date)||''}</div></div>`).join(''):'<div style="font-size:12px;color:var(--text2);text-align:center;padding:14px">ไม่มีใบชื่นชม</div>';
+    const infoRow=(ic,lbl,val)=>val?`<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.05)"><span style="width:80px;color:var(--text2);font-size:12px;flex-shrink:0">${ic} ${lbl}</span><span style="font-size:13px;font-weight:600;color:var(--text)">${val}</span></div>`:'';
+    b1.innerHTML=`<div style="max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:14px">
+      <div class="table-wrap" style="padding:0;overflow:hidden">
+        <div style="background:linear-gradient(135deg,rgba(21,101,255,.14),rgba(21,101,255,.02));padding:20px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div style="width:60px;height:60px;border-radius:50%;background:rgba(21,101,255,.2);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:26px;flex-shrink:0">${(s.nickname||s.name||'?')[0]}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:20px;font-weight:800">${s.name||''}</div>
+            <div style="font-size:13px;color:var(--text2);margin-top:2px">${s.nickname?'('+s.nickname+')':''} ${s.gender||''}</div>
+            <div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap">${catBadges} ${rankBadge}</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:14px">
+        <div class="table-wrap" style="padding:0;overflow:hidden;align-self:start">
+          ${_sdSectionHead('📇','ข้อมูลติดต่อ & บัญชีรับเงิน')}
+          ${infoRow('💸','พร้อมเพย์',s.promptpay)||'<div style="padding:10px 16px;color:var(--text2);font-size:12px">— ไม่มีพร้อมเพย์ —</div>'}
+          ${infoRow('🏦','ธนาคาร',s.bank?(s.bank+' '+(s.account||'')):'')}
+          ${infoRow('📧','อีเมล',s.email)}
+          ${s.qrUrl?`<div style="display:flex;align-items:center;gap:10px;padding:12px 16px"><span style="width:80px;color:var(--text2);font-size:12px;flex-shrink:0">📱 QR</span>${(typeof _qrImgHtml==='function')?_qrImgHtml(s.qrUrl,'thumb',{staffName:s.nickname||s.name,clickToView:true}):''}</div>`:''}
+          <div style="display:flex;gap:8px;padding:14px 16px;flex-wrap:wrap;border-top:1px solid var(--border2)">
+            <button class="btn btn-outline btn-sm" style="border-color:rgba(255,64,64,.35);color:#FF6060" onclick="teamWarn('${s.id}')">✉️ ออกใบเตือน</button>
+            <button class="btn btn-outline btn-sm" style="border-color:rgba(255,199,0,.4);color:#FFC700" onclick="teamAppr('${s.id}')">⭐ ออกใบชื่นชม</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="table-wrap" style="padding:0;overflow:hidden">${_sdSectionHead('⚠️','ใบเตือน ('+warns.length+')','#FF6060')}${warnList}</div>
+          <div class="table-wrap" style="padding:0;overflow:hidden">${_sdSectionHead('⭐','ใบชื่นชม ('+apprs.length+')','#FFC700')}${apprList}</div>
+        </div>
+      </div>
+    </div>`;
+   }
   }
   // ── Tab 2: รายได้ & งาน (admin เท่านั้น) ──
   if(b2){
@@ -20291,6 +20350,43 @@ function renderStaffDetail(){
         <table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:11px;color:var(--text2)"><th style="text-align:left;padding:8px 6px">โปรเจกต์</th><th style="text-align:left;padding:8px 6px">วันที่</th><th style="text-align:right;padding:8px 6px">ค่าจ้าง</th><th style="text-align:center;padding:8px 6px">สถานะ</th></tr></thead><tbody>${rows}</tbody></table>
       </div>`;
   }
+}
+// บันทึกข้อมูลแบบ inline ในหน้า detail (ไม่ใช้ popup)
+async function saveStaffDetailInline(){
+  const id=_detailStaffId; if(!id) return;
+  const v=i=>(document.getElementById(i)?.value||'').trim();
+  const name=v('sd-edit-name'), nick=v('sd-edit-nick');
+  if(!name||!nick){ toast('กรุณากรอกชื่อจริงและชื่อเล่น','error'); return; }
+  const cats=[...document.querySelectorAll('.sd-edit-cat:checked')].map(b=>b.value);
+  if(!cats.length){ toast('เลือกหมวดงานอย่างน้อย 1','error'); return; }
+  const roleSel=document.getElementById('sd-edit-role');
+  if(roleSel && roleSel.value==='manager' && !cats.includes('manager')) cats.push('manager');
+  const existing=getStaffById(id)||{};
+  const merged={...existing, id, name, nickname:nick,
+    gender:v('sd-edit-gender'), bank:v('sd-edit-bank'), account:v('sd-edit-account'),
+    promptpay:v('sd-edit-promptpay'), email:v('sd-edit-email'), qrUrl:v('sd-edit-qr'),
+    categories:cats };
+  const data=getStaffData();
+  Object.keys(data).forEach(k=>{ data[k]=(Array.isArray(data[k])?data[k]:[]).filter(x=>x.id!==id); });
+  cats.forEach(c=>{ if(!data[c])data[c]=[]; data[c].push({...merged,category:c}); });
+  saveStaffData(data);
+  if(roleSel) { try{ await applyStaffRole(id, roleSel.value); }catch(e){} }
+  _sdEditing=false;
+  renderStaffDetail();
+  toast('💾 บันทึกข้อมูลแล้ว ✅','success');
+}
+// เปลี่ยน role ของ user ที่ผูกกับ staff (ใช้ทั้ง modal เดิม + หน้า detail)
+async function applyStaffRole(staffId, newRole){
+  if(newRole!=='staff' && newRole!=='manager') return;
+  if(!_fbDatabase) return;
+  const staff=getStaffById(staffId);
+  const snapAll=await _fbDatabase.ref('users').get();
+  const all=snapAll.exists()?(snapAll.val()||{}):{};
+  const matches=Object.entries(all).filter(([uid,u])=> u && (u.staffId===staffId || (staff?.email && u.email && u.email.toLowerCase()===staff.email.toLowerCase())));
+  if(!matches.length){ if(newRole==='manager') toast('⚠️ ตั้ง Manager ไม่ได้ — ยังไม่มีบัญชีล็อกอิน','warn'); return; }
+  let changed=false;
+  for(const [uid,user] of matches){ if(user.role!==newRole){ await _fbDatabase.ref('users/'+uid+'/role').set(newRole); all[uid].role=newRole; changed=true; } }
+  if(changed){ ls('mgr_users_cache', all); try{loadManagerUsers();}catch(e){} toast(`✅ บทบาท → ${newRole==='manager'?'🗂️ Manager':'🎙️ Staff'} (มีผลตอน login ครั้งถัดไป)`,'success'); }
 }
 
 async function loadManagerUsers() {
