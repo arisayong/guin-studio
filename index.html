@@ -2234,6 +2234,8 @@ body.sidebar-collapsed .main-content{
     <div class="page-subtitle">รายชื่อสมาชิกทั้งหมด — เพิ่มสมาชิก / ออกใบเตือน / พักงานได้</div>
     <div class="page-actions" style="display:flex;gap:8px;align-items:center"><div class="search-bar" style="margin:0;width:240px"><span class="icon">🔍</span><input id="mgr-team-search" placeholder="ค้นหาชื่อสมาชิก..." oninput="renderMgrTeam()"></div><button class="btn btn-blue" onclick="openAddStaff()">➕ เพิ่มสมาชิก</button></div>
    </div>
+   <div id="mgr-team-sum" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px"></div>
+   <div id="mgr-team-tabs" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px"></div>
    <div id="mgr-team-grid" style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px"></div>
   </div>
 
@@ -20325,6 +20327,8 @@ function renderMgrCalendar() {
 }
 
 // ── Render: MGR Team ──
+let _mgrTeamCat='all';
+function setMgrTeamCat(cat){ _mgrTeamCat=cat; renderMgrTeam(); }
 function renderMgrTeam() {
   const el=document.getElementById('mgr-team-grid');if(!el)return;
   const q=(document.getElementById('mgr-team-search')?.value||'').toLowerCase();
@@ -20354,10 +20358,27 @@ function renderMgrTeam() {
       </div>
     </div>`;
   };
+  // ── สรุปจำนวน + แถบฟิลเตอร์หมวดหมู่ (เหมือนแอดมิน) ──
+  const arrOf=cat=>(Array.isArray(data[cat])?data[cat]:Object.values(data[cat]||{})).filter(Boolean);
+  const totalUniq=new Set(catOrder.flatMap(c=>arrOf(c).map(s=>(s.name||'')+'|'+(s.nickname||'')))).size;
+  const sumEl=document.getElementById('mgr-team-sum');
+  if(sumEl){
+    let chips='';
+    catOrder.forEach(cat=>{const n=arrOf(cat).length;if(!n)return;const col=catColors[cat]||'var(--text2)';chips+=`<div style="background:${col}18;border:1px solid ${col}33;color:${col};padding:4px 11px;border-radius:14px;font-size:12px;font-weight:700">${(catLabels[cat]||cat).split(' ')[0]} ${n}</div>`;});
+    chips+=`<div style="background:var(--dim);border:1px solid var(--border2);color:var(--text2);padding:4px 11px;border-radius:14px;font-size:12px;font-weight:700">👥 รวม ${totalUniq} คน</div>`;
+    sumEl.innerHTML=chips;
+  }
+  const tabsEl=document.getElementById('mgr-team-tabs');
+  if(tabsEl){
+    let tabs=`<div class="tab${_mgrTeamCat==='all'?' active':''}" onclick="setMgrTeamCat('all')">ทั้งหมด ${totalUniq}</div>`;
+    catOrder.forEach(cat=>{const n=arrOf(cat).length;if(!n)return;const col=catColors[cat]||'var(--text2)';const on=_mgrTeamCat===cat;tabs+=`<div class="tab${on?' active':''}" style="color:${on?'var(--text)':col}" onclick="setMgrTeamCat('${cat}')">${catLabels[cat]||cat} ${n}</div>`;});
+    tabsEl.innerHTML=tabs;
+  }
   let html='';
   catOrder.forEach(cat=>{
-    const arr=Array.isArray(data[cat])?data[cat]:Object.values(data[cat]||{});
-    const members=arr.filter(Boolean).filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q));
+    if(_mgrTeamCat!=='all' && _mgrTeamCat!==cat) return;
+    const arr=arrOf(cat);
+    const members=arr.filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q));
     if(!members.length) return;
     const col=catColors[cat]||'var(--text2)';
     html+=`<div style="margin-bottom:16px">
