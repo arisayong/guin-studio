@@ -12234,6 +12234,7 @@ function renderProfit(){
 // ══════════════════════════════════════════════
 function renderStaff(){
   try{
+    try{ syncManagerCategoryFromRoles(); }catch(e){}
     const data=getStaffData();
     const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
     // Deduplicate by name to avoid counting multi-category staff multiple times
@@ -12473,6 +12474,9 @@ function saveStaff(){
   if(!name||!nick){toast('กรุณากรอกชื่อ','error');return}
   const cats=getStaffCatsChecked();
   if(!cats.length){toast('กรุณาเลือกตำแหน่งอย่างน้อย 1 ตำแหน่ง','error');return}
+  // 🔗 ผูก role Manager → หมวด Manager: ตั้ง role=Manager ให้เพิ่มหมวด "manager" อัตโนมัติ (จะได้ขึ้นในรายชื่อ Manager ทั้งแอดมิน/เมเนเจอร์)
+  const _rsel=document.getElementById('st-role-sel');
+  if(_rsel && _rsel.value==='manager' && !cats.includes('manager')) cats.push('manager');
   const data=getStaffData();
   const baseStaff={id:editingStaffId||('S'+Date.now()),name,nickname:nick,gender:document.getElementById('st-gender').value,
     bank:document.getElementById('st-bank').value.trim(),account:document.getElementById('st-account').value.trim(),
@@ -20057,6 +20061,34 @@ async function saveStaffRoleIfChanged(staffId) {
       toast(`✅ เปลี่ยน role เป็น ${newRole==='manager'?'🗂️ Manager':'🎙️ Staff'} แล้ว — มีผลตอนสมาชิก login ครั้งถัดไป`, 'success');
     }
   } catch(e) { console.warn('saveStaffRole:', e); toast('เปลี่ยน role ไม่สำเร็จ: '+(e.message||''), 'error'); }
+}
+
+// 🔗 Reconcile: เพิ่มหมวด "manager" ให้สมาชิกที่ role=manager (จาก users cache) แต่ยังไม่อยู่ในหมวด
+//    ทำให้คนที่ถูกตั้งเป็น Manager โผล่ในรายชื่อ Manager โดยไม่ต้องแก้ซ้ำ (admin เป็นคนเขียน staff data)
+function syncManagerCategoryFromRoles(){
+  if(currentUser?.role!=='admin') return false;
+  const uc = ls('mgr_users_cache')||{};
+  const mgrUsers = Object.values(uc).filter(u=>u && u.role==='manager');
+  if(!mgrUsers.length) return false;
+  const idSet = new Set(mgrUsers.map(u=>u.staffId).filter(Boolean));
+  const emailSet = new Set(mgrUsers.map(u=>(u.email||'').toLowerCase()).filter(Boolean));
+  const data = getStaffData();
+  const byId = {};
+  Object.values(data).forEach(arr=>(Array.isArray(arr)?arr:Object.values(arr||{})).filter(Boolean).forEach(s=>{ if(s.id && !byId[s.id]) byId[s.id]=s; }));
+  let changed=false;
+  Object.values(byId).forEach(s=>{
+    const isMgr = idSet.has(s.id) || (s.email && emailSet.has((s.email||'').toLowerCase()));
+    if(!isMgr) return;
+    const cats = Array.isArray(s.categories)? s.categories.slice() : [];
+    if(cats.includes('manager')) return;
+    cats.push('manager');
+    Object.keys(data).forEach(k=>{ (Array.isArray(data[k])?data[k]:[]).forEach(x=>{ if(x.id===s.id) x.categories=cats; }); });
+    if(!data.manager) data.manager=[];
+    if(!data.manager.find(x=>x.id===s.id)) data.manager.push({...s, categories:cats, category:'manager'});
+    changed=true;
+  });
+  if(changed){ try{ saveStaffData(data); }catch(e){ console.warn('syncMgrCat save:',e); } }
+  return changed;
 }
 
 // ── Render: MGR Projects ──
