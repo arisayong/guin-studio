@@ -12234,7 +12234,7 @@ function renderProfit(){
 // ══════════════════════════════════════════════
 function renderStaff(){
   try{
-    try{ syncManagerCategoryFromRoles(); }catch(e){}
+    try{ syncManagerCategoryFromRoles(); separateAdminsFromManagerCategory(); }catch(e){}
     const data=getStaffData();
     const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
     // Deduplicate by name to avoid counting multi-category staff multiple times
@@ -12249,6 +12249,8 @@ function renderStaff(){
         if(!count)return;
         chips+='<div class="team-sum-chip" style="background:'+catColors[key]+'18;border:1px solid '+catColors[key]+'33;color:'+catColors[key]+'">'+cat.label.split(' ')[0]+' <strong>'+count+'</strong></div>';
       });
+      const _adminN=getAdminMembers().length;
+      if(_adminN) chips+='<div class="team-sum-chip" style="background:rgba(255,80,80,.12);border:1px solid rgba(255,80,80,.3);color:#FF6060">👑 <strong>'+_adminN+'</strong></div>';
       chips+='<div class="team-sum-chip" style="background:var(--dim);border:1px solid var(--border2);color:var(--text2)">👥 รวม <strong>'+total+'</strong> คน</div>';
       sumEl.innerHTML=chips;
     }
@@ -12272,6 +12274,16 @@ function renderStaff(){
         tab.onclick=()=>{activeStaffCat=key;renderStaff();};
         wrap.appendChild(tab);
       });
+      // 👑 Admin tab (แยกจากหมวดงาน)
+      const _adminCount=getAdminMembers().length;
+      if(_adminCount){
+        const aTab=document.createElement('div');
+        aTab.className='tab'+(activeStaffCat==='admin'?' active':'');
+        aTab.style.color=activeStaffCat==='admin'?'var(--text)':'#FF6060';
+        aTab.textContent='👑 Admin '+_adminCount;
+        aTab.onclick=()=>{activeStaffCat='admin';renderStaff();};
+        wrap.appendChild(aTab);
+      }
       const modeWrap=document.createElement('div');
       modeWrap.style.cssText='margin-left:auto;display:flex;gap:4px';
       ['compact','full'].forEach(mode=>{
@@ -12368,6 +12380,27 @@ function renderStaffGrid(){
     }
     html+='</div>';
   });
+  // 👑 Admin group — จาก account role=admin (แยกออกจากหมวดงาน, อ่านอย่างเดียว)
+  if(activeStaffCat==='all'||activeStaffCat==='admin'){
+    const admins=getAdminMembers().filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q)||(s.email||'').toLowerCase().includes(q));
+    if(admins.length){
+      const acol='#FF6060';
+      html+='<div style="margin-bottom:20px;border-left:4px solid '+acol+';border-radius:12px;overflow:hidden;background:var(--card)">';
+      html+='<div style="padding:12px 18px;background:rgba(255,255,255,.025);font-weight:700;color:'+acol+'">👑 Admin <span style="font-size:12px;font-weight:400;color:var(--text2)">('+admins.length+' คน)</span></div>';
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:12px 16px">';
+      admins.forEach(s=>{
+        const av=(s.nickname||s.name||'?')[0];
+        html+='<div style="background:var(--bg2);border:1px solid '+acol+'33;border-radius:10px;padding:14px;display:flex;gap:12px">';
+        html+='<div style="width:40px;height:40px;border-radius:50%;background:'+acol+'22;color:'+acol+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex-shrink:0">'+av+'</div>';
+        html+='<div style="flex:1;min-width:0">';
+        html+='<div style="font-weight:700;font-size:14px">'+s.name+' <span style="font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid '+acol+'55;color:'+acol+';background:'+acol+'11;font-weight:700">👑 Admin</span></div>';
+        if(s.nickname)html+='<div style="font-size:11px;color:var(--text2)">('+s.nickname+')</div>';
+        if(s.email)html+='<div style="font-size:11px;color:var(--text2);margin-top:3px">📧 '+s.email+'</div>';
+        html+='</div></div>';
+      });
+      html+='</div></div>';
+    }
+  }
   el.innerHTML=html||'<div style="padding:32px;text-align:center;color:var(--text2)">ยังไม่มีสมาชิก — กด ➕ เพิ่มสมาชิก</div>';
 }
 function toggleStaffBody(id){
@@ -20016,6 +20049,71 @@ function getAllManagerUsers() {
   return Object.values(usersRaw).filter(u => u.role === 'manager');
 }
 
+// 👑 รายชื่อ Admin — ระบุจาก role=admin ใน account (แยกคนชื่อเล่นซ้ำได้ด้วย email/บัญชี)
+//    + การันตีอีเมลแอดมินหลัก (penguinstudiovoice = หยง-admin, haruyami231 = ไบร์ท)
+const KNOWN_ADMIN_EMAILS = ['penguinstudiovoice@gmail.com','haruyami231@gmail.com'];
+const _ADMIN_LABELS = {'penguinstudiovoice@gmail.com':'หยง','haruyami231@gmail.com':'ไบร์ท'};
+function getAdminMembers() {
+  const uc = ls('mgr_users_cache') || {};
+  const byEmail = {};
+  // 1) จาก account ที่ role=admin
+  Object.values(uc).forEach(u => {
+    if (u && u.role === 'admin') {
+      const key = (u.email||u.uid||'').toLowerCase();
+      byEmail[key] = {
+        id: u.staffId || u.uid || key,
+        uid: u.uid || '',
+        name: u.name || u.nickname || (u.email? u.email.split('@')[0] : 'Admin'),
+        nickname: u.nickname || (u.email? u.email.split('@')[0] : 'Admin'),
+        email: u.email || ''
+      };
+    }
+  });
+  // 2) การันตีอีเมลแอดมินหลักให้ขึ้นเสมอ (ดึงชื่อจาก account ถ้ามี)
+  KNOWN_ADMIN_EMAILS.forEach(em => {
+    const k = em.toLowerCase();
+    if (byEmail[k]) return;
+    const acct = Object.values(uc).find(u => u && (u.email||'').toLowerCase() === k);
+    byEmail[k] = {
+      id: acct?.staffId || acct?.uid || k,
+      uid: acct?.uid || '',
+      name: acct?.name || acct?.nickname || _ADMIN_LABELS[k] || em.split('@')[0],
+      nickname: acct?.nickname || _ADMIN_LABELS[k] || em.split('@')[0],
+      email: em
+    };
+  });
+  return Object.values(byEmail);
+}
+
+// set ของอีเมลแอดมิน (known + role=admin) — ใช้แยกแอดมินออกจากหมวด Manager
+function _adminEmailSet(){
+  const s = new Set();
+  KNOWN_ADMIN_EMAILS.forEach(e=>s.add(e.toLowerCase()));
+  const uc = ls('mgr_users_cache')||{};
+  Object.values(uc).forEach(u=>{ if(u && u.role==='admin' && u.email) s.add((u.email||'').toLowerCase()); });
+  return s;
+}
+
+// 👑 แยกแอดมินออกจากหมวด Manager: เอาคนที่เป็นแอดมินออกจาก data.manager (ยศแอดมิน ≠ Manager)
+//    คงไว้ในหมวดงานจริง (Dubbing/Mix ฯลฯ) — admin เป็นคนเขียน staff data
+function separateAdminsFromManagerCategory(){
+  if(currentUser?.role!=='admin') return false;
+  const adminEmails=_adminEmailSet();
+  const data=getStaffData();
+  if(!Array.isArray(data.manager)||!data.manager.length) return false;
+  let changed=false;
+  const keep=[];
+  data.manager.forEach(s=>{
+    if(s.email && adminEmails.has((s.email||'').toLowerCase())){
+      changed=true;
+      // ลบ 'manager' ออกจาก categories ในทุก entry ของคนนี้
+      Object.keys(data).forEach(k=>{ (Array.isArray(data[k])?data[k]:[]).forEach(x=>{ if(x.id===s.id && Array.isArray(x.categories)) x.categories=x.categories.filter(c=>c!=='manager'); }); });
+    } else keep.push(s);
+  });
+  if(changed){ data.manager=keep; try{ saveStaffData(data); }catch(e){ console.warn('sepAdmin save:',e); } }
+  return changed;
+}
+
 async function loadManagerUsers() {
   if (!_fbDatabase) return;
   try {
@@ -20072,11 +20170,13 @@ function syncManagerCategoryFromRoles(){
   if(!mgrUsers.length) return false;
   const idSet = new Set(mgrUsers.map(u=>u.staffId).filter(Boolean));
   const emailSet = new Set(mgrUsers.map(u=>(u.email||'').toLowerCase()).filter(Boolean));
+  const adminEmails = _adminEmailSet();   // ← กันไม่ให้เพิ่มหมวด manager ให้แอดมิน (กัน churn)
   const data = getStaffData();
   const byId = {};
   Object.values(data).forEach(arr=>(Array.isArray(arr)?arr:Object.values(arr||{})).filter(Boolean).forEach(s=>{ if(s.id && !byId[s.id]) byId[s.id]=s; }));
   let changed=false;
   Object.values(byId).forEach(s=>{
+    if(s.email && adminEmails.has((s.email||'').toLowerCase())) return; // เป็นแอดมิน → ไม่ใส่หมวด manager
     const isMgr = idSet.has(s.id) || (s.email && emailSet.has((s.email||'').toLowerCase()));
     if(!isMgr) return;
     const cats = Array.isArray(s.categories)? s.categories.slice() : [];
@@ -20425,12 +20525,19 @@ function renderMgrTeam() {
     </div>`;
   };
   // ── สรุปจำนวน + แถบฟิลเตอร์หมวดหมู่ (เหมือนแอดมิน) ──
-  const arrOf=cat=>(Array.isArray(data[cat])?data[cat]:Object.values(data[cat]||{})).filter(Boolean);
+  const _adminEmails=_adminEmailSet();
+  const arrOf=cat=>{
+    let a=(Array.isArray(data[cat])?data[cat]:Object.values(data[cat]||{})).filter(Boolean);
+    if(cat==='manager') a=a.filter(s=>!(s.email && _adminEmails.has((s.email||'').toLowerCase()))); // แอดมินไม่อยู่หมวด Manager
+    return a;
+  };
   const totalUniq=new Set(catOrder.flatMap(c=>arrOf(c).map(s=>(s.name||'')+'|'+(s.nickname||'')))).size;
   const sumEl=document.getElementById('mgr-team-sum');
   if(sumEl){
     let chips='';
     catOrder.forEach(cat=>{const n=arrOf(cat).length;if(!n)return;const col=catColors[cat]||'var(--text2)';chips+=`<div style="background:${col}18;border:1px solid ${col}33;color:${col};padding:4px 11px;border-radius:14px;font-size:12px;font-weight:700">${(catLabels[cat]||cat).split(' ')[0]} ${n}</div>`;});
+    const _adminN=getAdminMembers().length;
+    if(_adminN) chips+=`<div style="background:rgba(255,80,80,.12);border:1px solid rgba(255,80,80,.3);color:#FF6060;padding:4px 11px;border-radius:14px;font-size:12px;font-weight:700">👑 ${_adminN}</div>`;
     chips+=`<div style="background:var(--dim);border:1px solid var(--border2);color:var(--text2);padding:4px 11px;border-radius:14px;font-size:12px;font-weight:700">👥 รวม ${totalUniq} คน</div>`;
     sumEl.innerHTML=chips;
   }
@@ -20438,6 +20545,8 @@ function renderMgrTeam() {
   if(tabsEl){
     let tabs=`<div class="tab${_mgrTeamCat==='all'?' active':''}" onclick="setMgrTeamCat('all')">ทั้งหมด ${totalUniq}</div>`;
     catOrder.forEach(cat=>{const n=arrOf(cat).length;if(!n)return;const col=catColors[cat]||'var(--text2)';const on=_mgrTeamCat===cat;tabs+=`<div class="tab${on?' active':''}" style="color:${on?'var(--text)':col}" onclick="setMgrTeamCat('${cat}')">${catLabels[cat]||cat} ${n}</div>`;});
+    const _adminN2=getAdminMembers().length;
+    if(_adminN2){const on=_mgrTeamCat==='admin';tabs+=`<div class="tab${on?' active':''}" style="color:${on?'var(--text)':'#FF6060'}" onclick="setMgrTeamCat('admin')">👑 Admin ${_adminN2}</div>`;}
     tabsEl.innerHTML=tabs;
   }
   let html='';
@@ -20455,6 +20564,25 @@ function renderMgrTeam() {
       <div style="display:flex;flex-direction:column;gap:8px">${members.map(s=>memberCard(s,col)).join('')}</div>
     </div>`;
   });
+  // 👑 Admin group (อ่านอย่างเดียว — ไม่มีปุ่มใบเตือน/พักงานสำหรับแอดมิน)
+  if(_mgrTeamCat==='all'||_mgrTeamCat==='admin'){
+    const admins=getAdminMembers().filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q)||(s.email||'').toLowerCase().includes(q));
+    if(admins.length){
+      const acol='#FF6060';
+      html+=`<div style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid ${acol}33">
+          <span style="font-size:13px;font-weight:800;color:${acol}">👑 Admin</span>
+          <span style="font-size:11px;color:var(--text2);background:${acol}1a;padding:1px 9px;border-radius:10px">${admins.length} คน</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">${admins.map(s=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 13px;background:rgba(0,0,0,.2);border:1px solid ${acol}22;border-radius:10px">
+            <span style="width:30px;height:30px;border-radius:50%;background:${acol}22;color:${acol};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${(s.nickname||s.name||'?')[0]}</span>
+            <div style="flex:1;min-width:0"><div style="font-weight:700;color:var(--text);font-size:13px">${s.nickname||s.name} <span style="font-size:11px;color:var(--text2);font-weight:400">${s.name||''}</span></div>${s.email?`<div style="font-size:11px;color:var(--text2)">📧 ${s.email}</div>`:''}</div>
+            <span style="font-size:10px;padding:1px 8px;border-radius:8px;background:${acol}18;color:${acol};font-weight:700">👑 Admin</span>
+          </div>`).join('')}</div>
+      </div>`;
+    }
+  }
   el.innerHTML=html||'<div style="color:var(--text2);font-size:13px;text-align:center;padding:20px">ไม่พบสมาชิก</div>';
 }
 
