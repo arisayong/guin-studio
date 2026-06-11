@@ -1130,7 +1130,7 @@ body.sidebar-collapsed .main-content{
    <div class="nav-section">ของฉัน</div>
    <div class="nav-item active" onclick="nav('mgr-home')"><span class="nav-icon">🏠</span><span>ภาพรวม</span></div>
    <div class="nav-item" onclick="nav('mgr-projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
-   <div class="nav-item" onclick="nav('mgr-track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
+   <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
    <div class="nav-item" onclick="nav('mgr-calendar')"><span class="nav-icon">🗓️</span><span>ปฏิทิน</span></div>
    <div class="nav-item" onclick="nav('mgr-calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-item" onclick="nav('mgr-team')"><span class="nav-icon">👥</span><span>จัดการทีม</span></div>
@@ -2250,7 +2250,7 @@ body.sidebar-collapsed .main-content{
      <div id="mgr-home-income" style="padding:4px"></div>
     </div>
     <div class="table-wrap">
-     <div class="table-header"><div class="table-title">📌 งานที่กำลังติดตาม</div><button class="btn btn-outline btn-sm" onclick="nav('mgr-track')">ดูแบบเต็ม</button></div>
+     <div class="table-header"><div class="table-title">📌 งานที่กำลังติดตาม</div><button class="btn btn-outline btn-sm" onclick="nav('track')">ดูแบบเต็ม</button></div>
      <div id="mgr-home-tracking" style="padding:4px"></div>
     </div>
    </div>
@@ -5261,7 +5261,7 @@ async function enterApp(){
   const undoBar=document.getElementById('undo-bar');if(undoBar)undoBar.style.display=currentUser.role==='admin'?'flex':'none';
   const _sr2=document.getElementById('sidebar-role');if(_sr2)_sr2.textContent=currentUser.role==='admin'?'Administrator':currentUser.role==='manager'?'🗂️ Manager':'ทีมงาน';
   if(currentUser.role==='admin'){nav('dashboard');renderAdminInboxBell();}
-  else if(currentUser.role==='manager'){nav('mgr-home');}
+  else if(currentUser.role==='manager'){ try{window._trkScope=new Set(getProjects().filter(p=>p.managerId===currentUser.uid).map(p=>p.id));}catch(e){} nav('mgr-home'); }
   else nav('my-dashboard');
   // ═══ SAFETY RETRY: ถ้าเป็นสต๊าฟ + หน้า dashboard — retry อีกครั้งหลัง listener fire ═══
   // ป้องกัน race: first render อาจเรียกก่อน staff_v3/projects พร้อม แม้จะ await แล้ว
@@ -5360,9 +5360,11 @@ async function seedDemo(){
 // ══════════════════════════════════════════════
 const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','profit','staff','team-earnings','docs','calc','payment','settings'];
 const MANAGER_PAGES=['mgr-home','mgr-projects','mgr-track','mgr-calendar','mgr-calc','mgr-team'];
+// Manager เข้าถึงหน้า admin บางหน้าได้ (track = ติดตามงาน แต่กรองเฉพาะโปรเจกต์ที่ดูแล)
+const MGR_ALLOWED_ADMIN_PAGES=['track'];
 function nav(page){
   const role=currentUser?.role||'staff';
-  if(role!=='admin'&&ADMIN_PAGES.includes(page)){toast('ไม่มีสิทธิ์เข้าถึง 🔒','error');return}
+  if(role!=='admin'&&ADMIN_PAGES.includes(page)&&!(role==='manager'&&MGR_ALLOWED_ADMIN_PAGES.includes(page))){toast('ไม่มีสิทธิ์เข้าถึง 🔒','error');return}
   if(role==='staff'&&MANAGER_PAGES.includes(page)){toast('ไม่มีสิทธิ์เข้าถึง 🔒','error');return}
   // ─ ถ้ากำลังออกจาก project-detail และ target ไม่ใช่ project-detail → release presence ─
   if(window._currentPage==='project-detail' && page!=='project-detail' && _presenceAction==='viewing'){
@@ -5896,10 +5898,14 @@ function syncPhasesToTrkCard(projId, phases){
   }catch(e){ console.warn('syncPhasesToTrkCard error:', e); }
 }
 function renderTrack(){
-  // 🔒 Admin guard: track page โชว์ทุกโปรเจกต์ทุกทีม → admin only
-  if(currentUser?.role !== 'admin'){
+  // Admin → เห็นทุกโปรเจกต์ · Manager → เฉพาะโปรเจกต์ที่ดูแล (scope filter) · Staff → ห้าม
+  if(currentUser?.role === 'manager'){
+    window._trkScope = new Set(getMgrProjects().map(p=>p.id));
+  } else if(currentUser?.role === 'admin'){
+    window._trkScope = null;
+  } else {
     const cal = document.getElementById('trk-calendar');
-    if(cal) cal.innerHTML = '<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin เท่านั้น</div>';
+    if(cal) cal.innerHTML = '<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin / Manager เท่านั้น</div>';
     const board = document.getElementById('trk-board');
     if(board) board.innerHTML = '';
     return;
@@ -5919,7 +5925,8 @@ function renderTrkCalendar() {
   /* ── รวม events เฉพาะการ์ดที่ติ๊กเลือก · group by project ── */
   // **ใช้ Map แทน Array** เพื่อ dedupe โปรเจกต์ที่ซ้ำ projId
   const projectGroupsMap = new Map();   // projId → group
-  const checkedOrAll = getTrkCards().filter(c => trkCheckedCards.has(c.id));
+  const _calScope = window._trkScope || null;
+  const checkedOrAll = getTrkCards().filter(c => trkCheckedCards.has(c.id) && (!_calScope || (c.projId && _calScope.has(c.projId))));
   let projColorIdx = 0;
   checkedOrAll.forEach(card => {
     const p = card.projId ? getProjects().find(x => x.id === card.projId) : null;
@@ -6251,8 +6258,11 @@ function trkFilterSet(group, val){
 function renderTrkBoard(){
   const el=document.getElementById('trk-board');if(!el)return;
   let cards=getTrkCards();
-  // ── Auto-ensure: สร้าง card ให้ทุกโปรเจกต์ที่ยังไม่ทำเครื่องหมาย "เสร็จ/ยกเลิก" ──
-  try{
+  // 🗂️ Manager scope: กรองเฉพาะการ์ดของโปรเจกต์ที่ดูแล
+  const _scope = window._trkScope || null;
+  if(_scope){ cards = cards.filter(c=>c.projId && _scope.has(c.projId)); }
+  // ── Auto-ensure: สร้าง card ให้ทุกโปรเจกต์ที่ยังไม่ทำเครื่องหมาย "เสร็จ/ยกเลิก" (admin เท่านั้น) ──
+  if(!_scope) try{
     const allProjs = getProjects() || [];
     const existingProjIds = new Set(cards.filter(c=>c.projId).map(c=>c.projId));
     let createdCount = 0;
