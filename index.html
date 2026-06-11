@@ -1128,9 +1128,11 @@ body.sidebar-collapsed .main-content{
   </nav>
   <nav class="sidebar-nav hidden" id="manager-nav">
    <div class="nav-section">ของฉัน</div>
-   <div class="nav-item active" onclick="nav('mgr-projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
+   <div class="nav-item active" onclick="nav('mgr-home')"><span class="nav-icon">🏠</span><span>ภาพรวม</span></div>
+   <div class="nav-item" onclick="nav('mgr-projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('mgr-track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
    <div class="nav-item" onclick="nav('mgr-calendar')"><span class="nav-icon">🗓️</span><span>ปฏิทิน</span></div>
+   <div class="nav-item" onclick="nav('mgr-calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-item" onclick="nav('mgr-team')"><span class="nav-icon">👥</span><span>จัดการทีม</span></div>
   </nav>
  </aside>
@@ -2182,8 +2184,8 @@ body.sidebar-collapsed .main-content{
   <div id="page-mgr-projects" class="page hidden">
    <div class="page-header">
     <div class="page-title">📁 โปรเจกต์ของฉัน</div>
-    <div class="page-subtitle">โปรเจกต์ที่แอดมินมอบหมาย</div>
-    <div class="page-actions"><div class="search-bar" style="margin:0;width:260px"><span class="icon">🔍</span><input id="mgr-proj-search" placeholder="ค้นหาโปรเจกต์..." oninput="renderMgrProjects()"></div></div>
+    <div class="page-subtitle">จัดการโปรเจกต์ที่ดูแล — แก้เดทไลน์ / ราคา / ทีมงานได้</div>
+    <div class="page-actions" style="display:flex;gap:8px;align-items:center"><div class="search-bar" style="margin:0;width:240px"><span class="icon">🔍</span><input id="mgr-proj-search" placeholder="ค้นหาโปรเจกต์..." oninput="renderMgrProjects()"></div><button class="btn btn-blue" onclick="openNewProject()">➕ สร้างโปรเจกต์</button></div>
    </div>
    <div id="mgr-proj-list"></div>
   </div>
@@ -2229,10 +2231,39 @@ body.sidebar-collapsed .main-content{
   <div id="page-mgr-team" class="page hidden">
    <div class="page-header">
     <div class="page-title">👥</div><div class="page-title" style="display:inline"> จัดการทีม</div>
-    <div class="page-subtitle">รายชื่อสมาชิกทั้งหมด (ชื่อ + เบอร์โทร)</div>
-    <div class="page-actions"><div class="search-bar" style="margin:0;width:260px"><span class="icon">🔍</span><input id="mgr-team-search" placeholder="ค้นหาชื่อสมาชิก..." oninput="renderMgrTeam()"></div></div>
+    <div class="page-subtitle">รายชื่อสมาชิกทั้งหมด — เพิ่มสมาชิก / ออกใบเตือน / พักงานได้</div>
+    <div class="page-actions" style="display:flex;gap:8px;align-items:center"><div class="search-bar" style="margin:0;width:240px"><span class="icon">🔍</span><input id="mgr-team-search" placeholder="ค้นหาชื่อสมาชิก..." oninput="renderMgrTeam()"></div><button class="btn btn-blue" onclick="openAddStaff()">➕ เพิ่มสมาชิก</button></div>
    </div>
-   <div id="mgr-team-grid" style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;display:flex;flex-wrap:wrap;gap:8px"></div>
+   <div id="mgr-team-grid" style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+
+  <!-- MGR HOME / ภาพรวม -->
+  <div id="page-mgr-home" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">🏠 ภาพรวม</div>
+    <div class="page-subtitle" id="mgr-home-welcome">สรุปงานและรายได้ของฉัน</div>
+   </div>
+   <div class="stats-grid" id="mgr-home-stats" style="margin-bottom:16px"></div>
+   <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px" id="mgr-home-cols">
+    <div class="table-wrap">
+     <div class="table-header"><div class="table-title">📌 งานที่กำลังติดตาม</div><button class="btn btn-outline btn-sm" onclick="nav('mgr-track')">ดูทั้งหมด</button></div>
+     <div id="mgr-home-tracking" style="padding:4px"></div>
+    </div>
+    <div class="table-wrap">
+     <div class="table-header"><div class="table-title">💰 รายได้ของฉัน (แยกตามโปรเจกต์)</div></div>
+     <div id="mgr-home-income" style="padding:4px"></div>
+    </div>
+   </div>
+  </div>
+
+  <!-- MGR CALC / คำนวนราคา -->
+  <div id="page-mgr-calc" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">🧮 คำนวนราคา</div>
+    <div class="page-subtitle">แบบร่างคำนวนค่าจ้าง — ไม่กระทบโปรเจกต์จริง</div>
+    <div class="page-actions"><button class="btn btn-blue" onclick="openCalcDraft()">➕ สร้างแบบร่าง</button></div>
+   </div>
+   <div id="mgr-calc-list"></div>
   </div>
 
 
@@ -5093,7 +5124,7 @@ async function enterApp(){
   try { await loadWarningsFromFirebase(); } catch(e) {}
   try { await loadAppreciationsFromFirebase(); } catch(e) {}
   try { await loadCalcDraftsFromFirebase(); } catch(e) {}
-  try { await loadMgrRequests(); await loadManagerUsers(); } catch(e) {}
+  try { await loadMgrRequests(); await loadManagerUsers(); await loadMgrSuspended(); } catch(e) {}
   // Load tracking cards from Firebase
   try {
     if(_fbDatabase){
@@ -5230,7 +5261,7 @@ async function enterApp(){
   const undoBar=document.getElementById('undo-bar');if(undoBar)undoBar.style.display=currentUser.role==='admin'?'flex':'none';
   const _sr2=document.getElementById('sidebar-role');if(_sr2)_sr2.textContent=currentUser.role==='admin'?'Administrator':currentUser.role==='manager'?'🗂️ Manager':'ทีมงาน';
   if(currentUser.role==='admin'){nav('dashboard');renderAdminInboxBell();}
-  else if(currentUser.role==='manager'){nav('mgr-projects');}
+  else if(currentUser.role==='manager'){nav('mgr-home');}
   else nav('my-dashboard');
   // ═══ SAFETY RETRY: ถ้าเป็นสต๊าฟ + หน้า dashboard — retry อีกครั้งหลัง listener fire ═══
   // ป้องกัน race: first render อาจเรียกก่อน staff_v3/projects พร้อม แม้จะ await แล้ว
@@ -5257,6 +5288,7 @@ async function enterApp(){
   startWarningsSync();
   try{startAppreciationsSync();}catch(e){}
   try{startCalcDraftsSync();}catch(e){}
+  try{startMgrSuspendedSync();}catch(e){}
   try{loadPaymentAccountsFromFirebase();startPaymentAccountsSync();}catch(e){}
   } catch(e) {
     console.error('enterApp failed:', e);
@@ -5327,7 +5359,7 @@ async function seedDemo(){
 // NAVIGATION
 // ══════════════════════════════════════════════
 const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','profit','staff','team-earnings','docs','calc','payment','settings'];
-const MANAGER_PAGES=['mgr-projects','mgr-track','mgr-calendar','mgr-team'];
+const MANAGER_PAGES=['mgr-home','mgr-projects','mgr-track','mgr-calendar','mgr-calc','mgr-team'];
 function nav(page){
   const role=currentUser?.role||'staff';
   if(role!=='admin'&&ADMIN_PAGES.includes(page)){toast('ไม่มีสิทธิ์เข้าถึง 🔒','error');return}
@@ -5343,7 +5375,8 @@ function nav(page){
   const renders={
     dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,'team-earnings':renderTeamEarnings,queue:renderQueue,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
     'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar,
-    'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-calendar':renderMgrCalendar,'mgr-team':renderMgrTeam
+    'mgr-home':renderMgrHome,'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-calendar':renderMgrCalendar,'mgr-team':renderMgrTeam,
+    'mgr-calc':()=>renderCalcList('mgr-calc-list',true)
   };
   if(renders[page])renders[page]();
   window._currentPage=page;
@@ -8320,8 +8353,8 @@ async function migrateTrkCardsToPhases(){
   }catch(e){ console.warn('migrateTrkCardsToPhases error:', e); }
 }
 async function openNewProject(){
-  // 🔒 Admin guard: สร้างโปรเจกต์ + กรอก budget → admin only
-  if(currentUser?.role !== 'admin'){
+  // 🔒 Guard: สร้างโปรเจกต์ → admin หรือ manager
+  if(currentUser?.role !== 'admin' && currentUser?.role !== 'manager'){
     toast('🔒 ไม่มีสิทธิ์สร้างโปรเจกต์','error');
     return;
   }
@@ -8592,6 +8625,10 @@ function calcProjSummary(){
   document.getElementById('sum-expense').textContent=fmtB(Math.round(totalExp));
   document.getElementById('sum-deduction').textContent='฿0';
   const pe=document.getElementById('sum-profit');pe.textContent=fmtB(Math.round(profit));pe.style.color=profit>=0?'var(--green)':'var(--red)';
+  // 🔒 Manager: ซ่อนข้อมูลการเงินทีม (รายจ่าย/หัก/กำไร) — เห็นเฉพาะงบลูกค้า (ยอดราย "โปรเจกต์")
+  const _mgrHideFin = currentUser?.role==='manager';
+  ['sum-expense','sum-deduction','sum-profit'].forEach(id=>{const c=document.getElementById(id);if(c&&c.parentElement)c.parentElement.style.display=_mgrHideFin?'none':'';});
+  const _sumGrid=document.getElementById('proj-calc-summary');if(_sumGrid)_sumGrid.style.gridTemplateColumns=_mgrHideFin?'1fr':'repeat(4,1fr)';
   // Update per-worker labels without re-rendering (avoids focus loss)
   const catKeys2=['dub','adp','mix','qc','sub','mgr'];
   catKeys2.forEach(cat=>{
@@ -8630,7 +8667,7 @@ async function saveProject(){
     deadline:thaiToIso(document.getElementById('pj-deadline').value)||document.getElementById('pj-deadline').value,
     cycle:'',
     note:document.getElementById('pj-note')?.value||'',
-    managerId:document.getElementById('pj-manager')?.value||'',
+    managerId:document.getElementById('pj-manager')?.value||(currentUser?.role==='manager'?currentUser.uid:'')||'',
     workers,tax,evidenceLogs:[],snapshot:null,createdAt:new Date(),
     phases: collectFormPhasesForSave()
   };
@@ -8694,6 +8731,11 @@ async function saveProject(){
   closeModal('modal-project');
   releasePresence();
   renderProjects();renderDash();
+  // 🗂️ Manager: แจ้งสำเนาให้แอดมิน + รีเฟรชหน้า manager
+  if(currentUser?.role==='manager'){
+    try{ notifyAdmin(editingProjId?'project-updated':'project-created', {projId:proj.id, projName:proj.name}); }catch(e){}
+    try{ renderMgrProjects(); renderMgrHome(); }catch(e){}
+  }
   toast(editingProjId?'อัพเดทแล้ว ✅':'สร้างโปรเจกต์แล้ว ✅','success');updateQueueBadge();
 
   } catch(e) {
@@ -8710,8 +8752,14 @@ async function deleteProjConfirm(id){
 }
 async function confirmDeleteProj(id,toastEl){
   toastEl?.remove();
-  pushUndo();
+  const _delProj=getProjects().find(x=>x.id===id);
+  if(currentUser?.role==='admin') pushUndo();
   await deleteProjectDB(id);  // ลบจาก Firebase + notify ทุก admin
+  // 🗂️ Manager: แจ้งแอดมิน + รีเฟรชหน้า manager
+  if(currentUser?.role==='manager'){
+    try{ notifyAdmin('project-deleted', {projId:id, projName:_delProj?.name||id}); }catch(e){}
+    try{ renderMgrProjects(); renderMgrHome(); }catch(e){}
+  }
   toast('🗑️ ลบแล้ว','info');
 }
 // ══════════════════════════════════════════════════════════
@@ -8979,8 +9027,8 @@ function closeViewAndEdit(){
 }
 
 async function openEditProject(id){
-  // 🔒 Admin guard: แก้ไขโปรเจกต์ + เห็น budget/cost → admin only
-  if(currentUser?.role !== 'admin'){
+  // 🔒 Guard: แก้ไขโปรเจกต์ → admin หรือ manager
+  if(currentUser?.role !== 'admin' && currentUser?.role !== 'manager'){
     toast('🔒 ไม่มีสิทธิ์แก้ไขโปรเจกต์','error');
     return;
   }
@@ -12375,7 +12423,9 @@ function saveStaff(){
     if(!data[cat])data[cat]=[];
     data[cat].push({...baseStaff,category:cat});
   });
-  saveStaffData(data);if(editingStaffId)saveStaffRoleIfChanged(editingStaffId);closeModal('modal-addstaff');renderStaff();toast(editingStaffId?'อัพเดทแล้ว ✅':'เพิ่มสมาชิกแล้ว ✅','success');
+  saveStaffData(data);if(editingStaffId)saveStaffRoleIfChanged(editingStaffId);closeModal('modal-addstaff');
+  if(currentUser?.role==='manager'){try{renderMgrTeam();}catch(e){}}else{renderStaff();}
+  toast(editingStaffId?'อัพเดทแล้ว ✅':'เพิ่มสมาชิกแล้ว ✅','success');
 }
 // เรียกจากปุ่ม "ลบสมาชิก" ในหน้า edit modal — ลบแล้วปิด modal ให้เลย
 async function deleteStaffFromEditModal(){
@@ -17966,8 +18016,9 @@ function _defaultSlotsFor(catKey){
 
 let _calcEditing = null;
 
-function renderCalcList(){
-  const el = document.getElementById('calc-list'); if(!el) return;
+function renderCalcList(targetId, hideProfit){
+  // hideProfit=true → ซ่อนรายจ่าย/กำไร (สำหรับ Manager — ไม่เห็นการเงินทีม)
+  const el = document.getElementById(targetId||'calc-list'); if(!el) return;
   const drafts = getCalcDrafts();
   if(!drafts.length){
     el.innerHTML = '<div style="text-align:center;padding:56px 20px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)"><div style="font-size:42px;opacity:.3;margin-bottom:8px">🧮</div>ยังไม่มีแบบร่าง — กด ➕ สร้างแบบร่างใหม่<br><span style="font-size:11px;opacity:.7">แบบร่างไม่กระทบโปรเจกต์จริง · แปลงเป็นโปรเจกต์ได้ทีหลัง</span></div>';
@@ -17985,8 +18036,8 @@ function renderCalcList(){
         </div>
         <div style="display:flex;gap:14px;text-align:right;flex-wrap:wrap">
           <div><div style="font-size:10px;color:var(--text2);letter-spacing:1px">งบลูกค้า</div><div style="font-size:15px;font-weight:700;color:var(--accent2)">${fmtB(sum.budget)}</div></div>
-          <div><div style="font-size:10px;color:var(--text2);letter-spacing:1px">รายจ่าย</div><div style="font-size:15px;font-weight:700;color:var(--red)">${fmtB(sum.expense)}</div></div>
-          <div><div style="font-size:10px;color:var(--text2);letter-spacing:1px">กำไร</div><div style="font-size:17px;font-weight:800;color:${sum.profit>=0?'var(--green)':'var(--red)'}">${fmtB(sum.profit)}</div></div>
+          ${hideProfit?'':`<div><div style="font-size:10px;color:var(--text2);letter-spacing:1px">รายจ่าย</div><div style="font-size:15px;font-weight:700;color:var(--red)">${fmtB(sum.expense)}</div></div>
+          <div><div style="font-size:10px;color:var(--text2);letter-spacing:1px">กำไร</div><div style="font-size:17px;font-weight:800;color:${sum.profit>=0?'var(--green)':'var(--red)'}">${fmtB(sum.profit)}</div></div>`}
         </div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
@@ -18305,13 +18356,14 @@ function renderCalcSummary(){
   const budgetCalcNote = _calcEditing.budgetType==='per-minute' && budgetRaw>0
     ? (dur>0 ? `<span style="font-size:10px;color:var(--text2)">(${fmtB(budgetRaw)} × ${dur} นาที)</span>` : '<span style="font-size:10px;color:var(--orange)">⚠️ ใส่นาที</span>')
     : '';
+  const _mgrHideFin = currentUser?.role==='manager';
   el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:11px">
     <div style="text-align:center">
       <div style="font-size:10px;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase">งบลูกค้า</div>
       <div style="font-size:20px;font-weight:800;color:var(--accent2);margin-top:4px">${fmtB(sum.budget)}</div>
       ${budgetCalcNote}
     </div>
-    <div style="text-align:center">
+    ${_mgrHideFin?'':`<div style="text-align:center">
       <div style="font-size:10px;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase">รายจ่ายทีม</div>
       <div style="font-size:20px;font-weight:800;color:var(--red);margin-top:4px">${fmtB(sum.expense)}</div>
     </div>
@@ -18319,7 +18371,7 @@ function renderCalcSummary(){
       <div style="font-size:10px;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase">กำไรสุทธิ</div>
       <div style="font-size:22px;font-weight:800;color:${sum.profit>=0?'var(--green)':'var(--red)'};margin-top:4px">${fmtB(sum.profit)}</div>
       ${sum.budget>0?`<div style="font-size:11px;color:var(--text2);margin-top:2px">(${Math.round(sum.profit/sum.budget*100)}%)</div>`:''}
-    </div>
+    </div>`}
   </div>`;
 }
 
@@ -18332,7 +18384,7 @@ async function saveCalcDraft(){
   else all.unshift(_calcEditing);
   await saveCalcDrafts(all);
   closeModal('modal-calc');
-  renderCalcList();
+  refreshCalcList();
   toast('💾 บันทึกแบบร่างแล้ว','success');
 }
 
@@ -18344,7 +18396,7 @@ async function duplicateCalcDraft(id){
   copy.createdAt = copy.updatedAt = new Date().toISOString();
   const all = getCalcDrafts(); all.unshift(copy);
   await saveCalcDrafts(all);
-  renderCalcList();
+  refreshCalcList();
   toast('📋 คัดลอกแบบร่างแล้ว','success');
 }
 
@@ -18352,7 +18404,7 @@ async function deleteCalcDraft(id){
   if(!confirm('ลบแบบร่างนี้?')) return;
   const all = getCalcDrafts().filter(x=>x.id!==id);
   await saveCalcDrafts(all);
-  renderCalcList();
+  refreshCalcList();
   toast('🗑️ ลบแล้ว','info');
 }
 
@@ -18382,16 +18434,18 @@ async function convertCalcToProject(id){
     evidenceLogs: [], snapshot: null,
     createdAt: new Date().toISOString(),
     projStatus: 'notstarted',
-    fromCalcId: d.id
+    fromCalcId: d.id,
+    managerId: (currentUser?.role==='manager'?currentUser.uid:'')
   };
   await saveProjectDB(proj);
+  if(currentUser?.role==='manager'){ try{ notifyAdmin('project-created',{projId:proj.id, projName:proj.name}); }catch(e){} }
   // ลบ draft ออกจากหน้าคิดราคา (กลายเป็นโปรเจกต์จริงแล้ว)
   try {
     const remaining = getCalcDrafts().filter(x => x.id !== id);
     await saveCalcDrafts(remaining);
   } catch(e){ console.warn('ลบ draft หลัง convert:', e); }
   toast('🚀 แปลงเป็นโปรเจกต์แล้ว — ไปที่หน้าโปรเจกต์เพื่อเลือกคนทำงาน','success');
-  setTimeout(()=>{nav('projects');openEditProject(proj.id);}, 400);
+  setTimeout(()=>{nav(currentUser?.role==='manager'?'mgr-projects':'projects');openEditProject(proj.id);}, 400);
 }
 
 // Force reload calc drafts from Firebase (กรณี realtime listener fail หรือ cache เก่า)
@@ -18406,7 +18460,7 @@ async function forceReloadCalcDrafts(){
     const v = snap.exists() ? snap.val() : [];
     const arr = Array.isArray(v)?v:Object.values(v||{});
     ls('calc_drafts_v1', arr);
-    renderCalcList();
+    refreshCalcList();
     toast(`✅ ดึงสำเร็จ — พบ ${arr.length} แบบร่าง`,'success');
   }catch(e){
     console.error('[calcDrafts] force reload failed:', e);
@@ -18425,7 +18479,9 @@ function startCalcDraftsSync(){
     const v = snap.exists() ? snap.val() : [];
     ls('calc_drafts_v1', Array.isArray(v)?v:Object.values(v||{}));
     const pg = document.getElementById('page-calc');
-    if(pg && !pg.classList.contains('hidden')) try{renderCalcList();}catch(e){}
+    if(pg && !pg.classList.contains('hidden')) try{renderCalcList('calc-list',false);}catch(e){}
+    const pgM = document.getElementById('page-mgr-calc');
+    if(pgM && !pgM.classList.contains('hidden')) try{renderCalcList('mgr-calc-list',true);}catch(e){}
   }, err => {
     // ─ calcDrafts ใช้สำหรับ "หน้าคำนวนราคา" (admin only) — staff ไม่ต้องเข้าถึง ─
     //   ถ้า permission_denied สำหรับ staff ก็เป็นเรื่องปกติ ไม่ต้องโชว์ toast รบกวน
@@ -19970,8 +20026,9 @@ function renderMgrProjects() {
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           ${myAmtFooter}
           <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-blue" onclick="openEditProject('${p.id}')">✏️ แก้ไข</button>
             <button class="btn btn-sm btn-cyan" onclick="openMgrAddWorker('${p.id}')">+ ผู้ทำงาน</button>
-            <button class="btn btn-sm btn-purple" onclick="openMgrRename('${p.id}','${p.name.replace(/'/g,"\'")}')">✏️ ขอเปลี่ยนชื่อ</button>
+            <button class="btn btn-sm btn-red" onclick="deleteProjConfirm('${p.id}')">🗑️ ลบ</button>
           </div>
         </div>
       </div>
@@ -20209,22 +20266,36 @@ function renderMgrTeam() {
   const all=getAllStaff();
   const filtered=all.filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q));
   const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
+  const catLabels={dubbing:'🎤 Dubbing',adaptation:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',subVideo:'🎬 Sub & Video',manager:'🗂️ Manager'};
+  const suspended=getMgrSuspended();
   const seen={};
   el.innerHTML=filtered.filter(s=>{if(seen[s.id])return false;seen[s.id]=1;return true;}).map(s=>{
     const col=catColors[s.category]||'var(--text2)';
-    return `<div style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:${col}18;border:1px solid ${col}44;border-radius:20px;font-size:12px">
-      <span style="width:20px;height:20px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px">${(s.nickname||s.name||'?')[0]}</span>
-      <span style="font-weight:700;color:var(--text)">${s.nickname||s.name}</span>
-      ${s.promptpay?`<span style="font-size:10px;color:var(--text2)">· ${s.promptpay}</span>`:''}
+    const nWarn=(typeof getWarnings==='function'?getWarnings(s.id):[]).length;
+    const isSusp=!!suspended[s.id];
+    const safeName=(s.name||'').replace(/'/g,"\\'");
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 13px;background:${isSusp?'rgba(255,158,0,.06)':'rgba(0,0,0,.2)'};border:1px solid ${isSusp?'rgba(255,158,0,.3)':'rgba(255,255,255,.06)'};border-radius:10px">
+      <span style="width:30px;height:30px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${(s.nickname||s.name||'?')[0]}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;color:var(--text);font-size:13px">${s.nickname||s.name} <span style="font-size:11px;color:var(--text2);font-weight:400">${s.name||''}</span>
+          ${isSusp?'<span style="padding:1px 8px;border-radius:8px;background:rgba(255,158,0,.18);color:#FF9E00;font-size:10px;font-weight:700;margin-left:4px">⏸️ พักงาน</span>':''}
+          ${nWarn?`<span style="padding:1px 8px;border-radius:8px;background:rgba(255,64,64,.15);color:#FF6060;font-size:10px;font-weight:700;margin-left:4px">⚠️ ${nWarn}</span>`:''}
+        </div>
+        <div style="font-size:11px;color:var(--text2)">${catLabels[s.category]||''}${s.promptpay?' · '+s.promptpay:''}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-sm btn-outline" style="border-color:rgba(255,64,64,.35);color:#FF6060" onclick="openMgrWarnModal('${s.id}')">✉️ ใบเตือน</button>
+        ${isSusp
+          ? `<button class="btn btn-sm btn-outline" style="border-color:rgba(0,223,160,.35);color:#00DFA0" onclick="mgrUnsuspendStaff('${s.id}','${safeName}')">▶️ คืนงาน</button>`
+          : `<button class="btn btn-sm btn-outline" style="border-color:rgba(255,158,0,.35);color:#FF9E00" onclick="mgrSuspendStaff('${s.id}','${safeName}')">⏸️ พักงาน</button>`}
+      </div>
     </div>`;
-  }).join('')||'<div style="color:var(--text2);font-size:13px">ไม่พบสมาชิก</div>';
+  }).join('')||'<div style="color:var(--text2);font-size:13px;text-align:center;padding:20px">ไม่พบสมาชิก</div>';
 }
 
-// ── MGR: Add worker to project ──
-let _mgrAddWorkerProjId='';
+// ── MGR: Add worker to project → เปิดฟอร์มแก้โปรเจกต์ (มี worker selector ครบ) ──
 function openMgrAddWorker(projId){
-  _mgrAddWorkerProjId=projId;
-  toast('ฟีเจอร์นี้จะเปิดใช้งานในระบบจริง — เชื่อมกับฟอร์มเพิ่ม worker เดิม','info');
+  openEditProject(projId);
 }
 
 // ── MGR: Rename request ──
@@ -20299,14 +20370,19 @@ function mgrWarnClearProj(){_mgrWarnSelProjId='';document.getElementById('mgr-wa
 async function submitMgrWarnReq(){
   if(!_mgrWarnSelItem){toast('กรุณาเลือกประเภทความผิด','error');return;}
   const p=_mgrWarnSelProjId?getProjects().find(x=>x.id===_mgrWarnSelProjId):null;
-  const req={id:'WREQ'+Date.now(),type:'warning',staffId:_mgrWarnTargetId,
-    warnType:_mgrWarnSelItem,projId:_mgrWarnSelProjId||'',projName:p?p.name:'',
-    note:document.getElementById('mgr-warn-note').value.trim(),
-    managerId:currentUser.uid,managerName:currentUser.nickname||currentUser.email,
-    status:'pending',createdAt:new Date().toISOString()};
-  await saveMgrRequest(req);
+  const note=document.getElementById('mgr-warn-note').value.trim();
+  // 1) ออกใบเตือนจริงทันที — สต๊าฟเห็นเลย
+  const warn={id:'W'+Date.now(),type:_mgrWarnSelItem,projId:_mgrWarnSelProjId||'',projName:p?p.name:'',note,
+    issuedBy:currentUser.nickname||currentUser.email,
+    date:(()=>{const d=new Date();return d.getDate().toString().padStart(2,'0')+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+(d.getFullYear()+543);})(),
+    issuedAt:new Date().toISOString()};
+  await saveWarning(_mgrWarnTargetId,warn);
+  // 2) แจ้งสำเนาให้แอดมิน (info — ไม่ต้องอนุมัติ)
+  const s=getStaffById(_mgrWarnTargetId);
+  notifyAdmin('warning-issued',{staffId:_mgrWarnTargetId,staffName:s?(s.nickname||s.name):_mgrWarnTargetId,warnType:_mgrWarnSelItem,projName:p?p.name:'',note});
   closeModal('modal-mgr-warn');
-  toast('📨 ส่งคำขอใบเตือนไปยังแอดมินแล้ว — รออนุมัติก่อนส่งถึงสต๊าฟ','success');
+  try{renderMgrTeam();}catch(e){}
+  toast('✉️ ออกใบเตือนแล้ว — สต๊าฟเห็นทันที + แจ้งสำเนาให้แอดมิน','success');
 }
 
 // ── Request data store ──
@@ -20355,14 +20431,46 @@ function renderAdminInbox(){
   if(!reqs.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--text2)">ยังไม่มีคำขอ</div>';return;}
   el.innerHTML=[...reqs].reverse().map(r=>{
     const isPend=r.status==='pending';
-    const badge=r.status==='approved'?'<span style="padding:2px 10px;border-radius:20px;font-size:11px;background:rgba(0,223,160,.1);color:#00DFA0;border:1px solid rgba(0,223,160,.2)">อนุมัติแล้ว</span>':r.status==='rejected'?'<span style="padding:2px 10px;border-radius:20px;font-size:11px;background:rgba(255,64,64,.1);color:#FF4040;border:1px solid rgba(255,64,64,.2)">ปฏิเสธ</span>':'<span style="padding:2px 10px;border-radius:20px;font-size:11px;background:rgba(255,158,0,.12);color:#FF9E00;border:1px solid rgba(255,158,0,.25)">รออนุมัติ</span>';
-    const isWarn=r.type==='warning';
-    const detail=isWarn
-      ?`<div style="font-size:12px;color:var(--text2)">ขอออกใบเตือน: <strong style="color:#FF7070">${getStaffById(r.staffId)?.nickname||r.staffId}</strong>${r.projName?' · โปรเจกต์: '+r.projName:''}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">ประเภท: ${r.warnType}</div>`
-      :`<div style="font-size:12px;color:var(--text2)">ขอเปลี่ยนชื่อ: <strong>${r.curName}</strong> → <strong style="color:var(--accent2)">${r.newName}</strong></div>`;
+    const isInfo=r.status==='info';
+    const badge=r.status==='approved'?'<span style="padding:2px 10px;border-radius:20px;font-size:11px;background:rgba(0,223,160,.1);color:#00DFA0;border:1px solid rgba(0,223,160,.2)">อนุมัติแล้ว</span>':r.status==='rejected'?'<span style="padding:2px 10px;border-radius:20px;font-size:11px;background:rgba(255,64,64,.1);color:#FF4040;border:1px solid rgba(255,64,64,.2)">ปฏิเสธ</span>':isInfo?'<span style="padding:2px 10px;border-radius:20px;font-size:11px;background:rgba(0,180,255,.1);color:#00B4FF;border:1px solid rgba(0,180,255,.2)">แจ้งเพื่อทราบ</span>':'<span style="padding:2px 10px;border-radius:20px;font-size:11px;background:rgba(255,158,0,.12);color:#FF9E00;border:1px solid rgba(255,158,0,.25)">รออนุมัติ</span>';
+    // ── หัวข้อ + รายละเอียดตามชนิด ──
+    let head, detail;
+    switch(r.type){
+      case 'warning':
+        head='✉️ ขอออกใบเตือน';
+        detail=`<div style="font-size:12px;color:var(--text2)">ขอออกใบเตือน: <strong style="color:#FF7070">${getStaffById(r.staffId)?.nickname||r.staffId}</strong>${r.projName?' · โปรเจกต์: '+r.projName:''}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">ประเภท: ${r.warnType}</div>`;
+        break;
+      case 'warning-issued':
+        head='✉️ Manager ออกใบเตือนแล้ว';
+        detail=`<div style="font-size:12px;color:var(--text2)">ออกใบเตือนถึง: <strong style="color:#FF7070">${r.staffName||r.staffId}</strong>${r.projName?' · โปรเจกต์: '+r.projName:''}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">ประเภท: ${r.warnType||'-'}</div>`;
+        break;
+      case 'suspend':
+        head='⏸️ Manager พักงานสมาชิก';
+        detail=`<div style="font-size:12px;color:var(--text2)">พักงาน: <strong style="color:#FF9E00">${r.staffName||r.staffId}</strong></div>`;
+        break;
+      case 'unsuspend':
+        head='▶️ Manager คืนงานสมาชิก';
+        detail=`<div style="font-size:12px;color:var(--text2)">คืนงาน: <strong style="color:#00DFA0">${r.staffName||r.staffId}</strong></div>`;
+        break;
+      case 'project-created':
+        head='📁 Manager สร้างโปรเจกต์';
+        detail=`<div style="font-size:12px;color:var(--text2)">โปรเจกต์ใหม่: <strong style="color:var(--accent2)">${r.projName||r.projId}</strong></div>`;
+        break;
+      case 'project-updated':
+        head='✏️ Manager แก้ไขโปรเจกต์';
+        detail=`<div style="font-size:12px;color:var(--text2)">แก้ไข: <strong style="color:var(--accent2)">${r.projName||r.projId}</strong></div>`;
+        break;
+      case 'project-deleted':
+        head='🗑️ Manager ลบโปรเจกต์';
+        detail=`<div style="font-size:12px;color:var(--text2)">ลบ: <strong style="color:#FF7070">${r.projName||r.projId}</strong></div>`;
+        break;
+      default:
+        head='✏️ ขอเปลี่ยนชื่อ';
+        detail=`<div style="font-size:12px;color:var(--text2)">ขอเปลี่ยนชื่อ: <strong>${r.curName}</strong> → <strong style="color:var(--accent2)">${r.newName}</strong></div>`;
+    }
     return `<div style="border-bottom:1px solid rgba(255,255,255,.06);padding:14px 0">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:13px;font-weight:700;color:var(--text)">${isWarn?'✉️ ขอออกใบเตือน':'✏️ ขอเปลี่ยนชื่อ'}</span>
+        <span style="font-size:13px;font-weight:700;color:var(--text)">${head}</span>
         ${badge}
         <span style="font-size:11px;color:var(--text2);margin-left:auto">${r.managerName||'Manager'} · ${fmtWarnDate(r.createdAt?.split('T')[0]||'')}</span>
       </div>
@@ -20409,6 +20517,139 @@ if(typeof openModal==='function'){
   };
 }
 
+// ══════════════════════════════════════════════
+// MANAGER — helpers ใหม่ (dashboard / suspend / notify)
+// ══════════════════════════════════════════════
+function isMgr(){ return currentUser?.role==='manager'; }
+
+// รีเฟรชหน้าคำนวนราคาให้ตรง role (admin → calc-list / manager → mgr-calc-list ซ่อนกำไร)
+function refreshCalcList(){
+  if(isMgr()) renderCalcList('mgr-calc-list', true);
+  else renderCalcList('calc-list', false);
+}
+
+// แจ้งสำเนา/แจ้งเพื่อทราบไปยังแอดมิน (ไม่ต้องอนุมัติ — status:'info')
+function notifyAdmin(type, data){
+  const req=Object.assign({
+    id:'NOTI'+Date.now()+Math.floor(Math.random()*1000),
+    type, status:'info',
+    managerId:currentUser?.uid||'', managerName:currentUser?.nickname||currentUser?.email||'Manager',
+    createdAt:new Date().toISOString()
+  }, data||{});
+  try{ saveMgrRequest(req); }catch(e){ console.warn('notifyAdmin:',e); }
+}
+
+// ── พักงาน (manager-scoped store — ไม่แตะ staff record เดิม) ──
+function getMgrSuspended(){ return ls('mgr_suspended')||{}; }
+async function saveMgrSuspended(map){
+  ls('mgr_suspended', map);
+  if(_fbDatabase){ try{ await _fbDatabase.ref('mgrSuspended').set(map); }catch(e){} }
+}
+async function loadMgrSuspended(){
+  if(!_fbDatabase) return;
+  try{ const snap=await _fbDatabase.ref('mgrSuspended').get(); if(snap.exists()) ls('mgr_suspended', snap.val()||{}); }catch(e){}
+}
+function startMgrSuspendedSync(){
+  if(!_fbDatabase) return;
+  try{
+    _fbDatabase.ref('mgrSuspended').on('value', snap=>{
+      ls('mgr_suspended', snap.exists()?(snap.val()||{}):{});
+      const pg=document.getElementById('page-mgr-team');
+      if(pg && !pg.classList.contains('hidden')) try{ renderMgrTeam(); }catch(e){}
+    }, err=>{ console.warn('[mgrSuspended] listener:', err?.code||err?.message); });
+  }catch(e){}
+}
+async function mgrSuspendStaff(staffId, staffName){
+  if(!confirm(`พักงาน "${staffName||staffId}" ?\n\nสมาชิกจะถูกทำเครื่องหมายพักงานทันที และระบบจะแจ้งแอดมินให้ทราบ\n(การลบสมาชิกทำได้เฉพาะแอดมินเท่านั้น)`)) return;
+  const map=getMgrSuspended();
+  map[staffId]={ by:currentUser?.nickname||currentUser?.email||'Manager', at:new Date().toISOString() };
+  await saveMgrSuspended(map);
+  const s=getStaffById(staffId);
+  notifyAdmin('suspend', { staffId, staffName:s?(s.nickname||s.name):(staffName||staffId) });
+  try{ renderMgrTeam(); }catch(e){}
+  toast('⏸️ พักงานแล้ว — แจ้งแอดมินเรียบร้อย','success');
+}
+async function mgrUnsuspendStaff(staffId, staffName){
+  const map=getMgrSuspended();
+  delete map[staffId];
+  await saveMgrSuspended(map);
+  const s=getStaffById(staffId);
+  notifyAdmin('unsuspend', { staffId, staffName:s?(s.nickname||s.name):(staffName||staffId) });
+  try{ renderMgrTeam(); }catch(e){}
+  toast('▶️ คืนงานแล้ว — แจ้งแอดมินเรียบร้อย','info');
+}
+
+// ── หน้าหลัก Dashboard ของ Manager ──
+function renderMgrHome(){
+  if(!currentUser) return;
+  const welcome=document.getElementById('mgr-home-welcome');
+  if(welcome) welcome.textContent=`สวัสดี ${currentUser.nickname||currentUser.email||''} 👋 — สรุปงานและรายได้ของฉัน`;
+  const myProjs=getMgrProjects();
+  const now=new Date();
+  // สถิติ
+  let inProgress=0, dueSoon=0;
+  myProjs.forEach(p=>{
+    const card=getTrkCards().find(c=>c.projId===p.id);
+    const phases=card?Object.values(card.phases||{}):[];
+    const done=phases.filter(ph=>ph.status==='done').length;
+    if(phases.length && done<phases.length) inProgress++;
+    if(p.deadline){ const dl=Math.ceil((new Date(p.deadline)-now)/864e5); if(dl>=0 && dl<=7) dueSoon++; }
+  });
+  // รายได้ของฉัน แยกตามโปรเจกต์ (เฉพาะที่ตัวเองเป็นผู้ทำงาน)
+  const myStaffId=currentUser.staffId||null;
+  const incomeRows=[]; let incomeTotal=0;
+  if(myStaffId){
+    getProjects().forEach(p=>{
+      const amt=(p.workers||[]).filter(w=>w.id===myStaffId).reduce((a,w)=>a+(w.amount||0),0);
+      if(amt>0){ incomeRows.push({name:p.name, amt}); incomeTotal+=amt; }
+    });
+    incomeRows.sort((a,b)=>b.amt-a.amt);
+  }
+  // การ์ดสถิติ
+  const statsEl=document.getElementById('mgr-home-stats');
+  if(statsEl){
+    const card=(label,val,col)=>`<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value" style="color:${col}">${val}</div></div>`;
+    statsEl.innerHTML=
+      card('โปรเจกต์ที่ดูแล', myProjs.length, 'var(--accent2)')+
+      card('กำลังดำเนินการ', inProgress, '#FF9E00')+
+      card('ใกล้ครบกำหนด (7 วัน)', dueSoon, '#FF5050')+
+      card('รายได้ของฉัน', fmtB(incomeTotal), '#00DFA0');
+  }
+  // งานที่กำลังติดตาม
+  const trackEl=document.getElementById('mgr-home-tracking');
+  if(trackEl){
+    if(!myProjs.length){ trackEl.innerHTML='<div style="text-align:center;padding:28px;color:var(--text2)">ยังไม่มีโปรเจกต์ที่ดูแล</div>'; }
+    else trackEl.innerHTML=myProjs.map(p=>{
+      const trkCard=getTrkCards().find(c=>c.projId===p.id);
+      const phases=trkCard?Object.values(trkCard.phases||{}):[];
+      const done=phases.filter(ph=>ph.status==='done').length;
+      const total=phases.length||1;
+      const pct=phases.length?Math.round(done/total*100):0;
+      const pctColor=pct>=80?'#00DFA0':pct>=50?'#00B4FF':'#FF9E00';
+      const dl=p.deadline?Math.ceil((new Date(p.deadline)-now)/864e5):null;
+      const dlTxt=dl===null?'—':dl<0?`<span style="color:#FF5050">เกิน ${Math.abs(dl)} วัน</span>`:`เหลือ ${dl} วัน`;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:11px;color:var(--text2)">${fmtDate(p.deadline)||'—'} · ${dlTxt}</div></div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><span style="font-size:12px;font-weight:700;color:${pctColor}">${pct}%</span><div style="width:56px;height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pctColor}"></div></div></div>
+      </div>`;
+    }).join('');
+  }
+  // รายได้ของฉัน
+  const incomeEl=document.getElementById('mgr-home-income');
+  if(incomeEl){
+    if(!myStaffId){ incomeEl.innerHTML='<div style="text-align:center;padding:28px;color:var(--text2);font-size:12px">บัญชีนี้ยังไม่ผูกกับทีมงาน — ยังไม่มีรายได้ส่วนตัว</div>'; }
+    else if(!incomeRows.length){ incomeEl.innerHTML='<div style="text-align:center;padding:28px;color:var(--text2)">ยังไม่มีรายได้จากโปรเจกต์</div>'; }
+    else incomeEl.innerHTML=incomeRows.map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="flex:1;min-width:0;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
+        <div style="font-size:13px;font-weight:700;color:#00DFA0;flex-shrink:0">${fmtB(r.amt)}</div>
+      </div>`).join('')+
+      `<div style="display:flex;align-items:center;gap:10px;padding:11px 10px;margin-top:4px;border-top:1px solid rgba(0,223,160,.2)">
+        <div style="flex:1;font-size:12px;color:var(--text2);font-weight:600">รวมรายได้ของฉัน</div>
+        <div style="font-size:16px;font-weight:800;color:#00DFA0">${fmtB(incomeTotal)}</div>
+      </div>`;
+  }
+}
+
 // ── Upgrade role in saveStaff ──
 const _origSaveStaff = window.saveStaff;
 
@@ -20430,7 +20671,7 @@ const _origSaveStaff = window.saveStaff;
 
 <div id="modal-mgr-warn" class="modal-overlay hidden">
  <div class="modal" style="width:500px">
-  <div class="modal-head"><div class="modal-title">✉️ ออกใบเตือน (รออนุมัติ) — <span id="mgr-warn-target" style="color:#FF4040"></span></div><button class="btn-close" onclick="closeModal('modal-mgr-warn')">✕</button></div>
+  <div class="modal-head"><div class="modal-title">✉️ ออกใบเตือน — <span id="mgr-warn-target" style="color:#FF4040"></span></div><button class="btn-close" onclick="closeModal('modal-mgr-warn')">✕</button></div>
   <div class="modal-body">
    <div class="form-group">
     <label class="form-label">หมวดความผิด *</label>
@@ -20450,9 +20691,9 @@ const _origSaveStaff = window.saveStaff;
     <div id="mgr-warn-proj-sel" style="display:none;margin-top:5px;padding:7px 12px;background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.2);border-radius:8px;font-size:13px;color:var(--accent2);display:flex;align-items:center;justify-content:space-between"><span id="mgr-warn-proj-name"></span><span style="font-size:11px;color:var(--text2);cursor:pointer" onclick="mgrWarnClearProj()">✕</span></div>
    </div>
    <div class="form-group"><label class="form-label">หมายเหตุ</label><textarea class="form-input" id="mgr-warn-note" style="height:64px;resize:none" placeholder="ระบุรายละเอียด..."></textarea></div>
-   <div style="padding:9px 12px;background:rgba(155,111,255,.07);border:1px solid rgba(155,111,255,.2);border-radius:8px;font-size:11px;color:#9B6FFF">ใบเตือนนี้จะ<strong>รออนุมัติจากแอดมิน</strong>ก่อน — สต๊าฟจะยังไม่เห็นจนกว่าแอดมินจะอนุมัติ</div>
+   <div style="padding:9px 12px;background:rgba(155,111,255,.07);border:1px solid rgba(155,111,255,.2);border-radius:8px;font-size:11px;color:#9B6FFF">ใบเตือนนี้จะ<strong>มีผลทันที</strong> — สต๊าฟเห็นเลย และระบบจะ<strong>แจ้งสำเนาให้แอดมิน</strong>โดยอัตโนมัติ</div>
   </div>
-  <div class="modal-foot"><button class="btn btn-outline" onclick="closeModal('modal-mgr-warn')">ยกเลิก</button><button class="btn" id="mgr-warn-submit" style="background:rgba(255,40,40,.15);border:1px solid rgba(255,40,40,.35);color:#FF4040" disabled onclick="submitMgrWarnReq()">ส่งคำขอใบเตือน</button></div>
+  <div class="modal-foot"><button class="btn btn-outline" onclick="closeModal('modal-mgr-warn')">ยกเลิก</button><button class="btn" id="mgr-warn-submit" style="background:rgba(255,40,40,.15);border:1px solid rgba(255,40,40,.35);color:#FF4040" disabled onclick="submitMgrWarnReq()">✉️ ออกใบเตือน</button></div>
  </div>
 </div>
 
