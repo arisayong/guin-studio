@@ -1128,7 +1128,7 @@ body.sidebar-collapsed .main-content{
   <nav class="sidebar-nav hidden" id="manager-nav">
    <div class="nav-section">ของฉัน</div>
    <div class="nav-item active" onclick="nav('mgr-home')"><span class="nav-icon">🏠</span><span>ภาพรวม</span></div>
-   <div class="nav-item" onclick="nav('mgr-projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
+   <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
    <div class="nav-item" onclick="nav('mgr-calendar')"><span class="nav-icon">🗓️</span><span>ปฏิทิน</span></div>
    <div class="nav-item" onclick="nav('mgr-calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
@@ -5390,7 +5390,7 @@ async function seedDemo(){
 const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','profit','staff','staff-detail','docs','calc','payment','settings'];
 const MANAGER_PAGES=['mgr-home','mgr-projects','mgr-track','mgr-calendar','mgr-calc','mgr-team'];
 // Manager เข้าถึงหน้า admin บางหน้าได้ (track = ติดตามงาน แต่กรองเฉพาะโปรเจกต์ที่ดูแล)
-const MGR_ALLOWED_ADMIN_PAGES=['track'];
+const MGR_ALLOWED_ADMIN_PAGES=['track','projects'];
 function nav(page){
   const role=currentUser?.role||'staff';
   if(role!=='admin'&&ADMIN_PAGES.includes(page)&&!(role==='manager'&&MGR_ALLOWED_ADMIN_PAGES.includes(page))){toast('ไม่มีสิทธิ์เข้าถึง 🔒','error');return}
@@ -5505,7 +5505,8 @@ function updateQueueBadge(){
 // EXPORT CSV
 // ══════════════════════════════════════════════
 function exportPaymentCSV(){
-  const projs=getProjects();
+  let projs=getProjects();
+  if(currentUser?.role==='manager') projs=projs.filter(p=>p.managerId===currentUser.uid); // scope เฉพาะที่ดูแล
   const rows=[['ชื่อ','นามสกุล','ตำแหน่ง','โปรเจกต์','ลูกค้า','ยอด','สถานะ','Deadline']];
   projs.forEach(p=>(p.workers||[]).forEach(w=>{const s=getStaffById(w.id);if(!s)return;const[first,...rest]=s.name.split(' ');rows.push([first,rest.join(' ')||'-',(()=>{const _p=(w.slot||'').split('-')[0];const _s=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';const _l={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return (_l[_p]||CATS[s.category]?.label||'')+_s;})()||'',p.name,p.client||'-',w.amount||0,w.status,p.deadline||''])}));
   const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -8082,8 +8083,8 @@ function getActivePhasesForProj(p){
 // PROJECTS LIST
 // ══════════════════════════════════════════════
 function renderProjects(){
-  // 🔒 Admin guard: หน้าโปรเจกต์โชว์ budget + ค่าจ้างทีมรวม → admin only
-  if(currentUser?.role !== 'admin'){
+  // Admin → เห็นทุกโปรเจกต์ · Manager → เฉพาะที่ตัวเองดูแล (scope ใน renderProjList) · Staff → ห้าม
+  if(currentUser?.role !== 'admin' && currentUser?.role !== 'manager'){
     const pg = document.getElementById('page-projects');
     if(pg) pg.innerHTML = '<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin เท่านั้น</div>';
     return;
@@ -8133,12 +8134,12 @@ function renderProjects(){
       <option value="all" ${selectedClient==='all'?'selected':''}>ทุกลูกค้า (${clients.length})</option>
       ${clients.map(c=>`<option value="${c.replace(/"/g,'&quot;')}" ${selectedClient===c?'selected':''}>${c}</option>`).join('')}
     </select>
-    <label style="font-size:12px;color:var(--text2);font-weight:600;white-space:nowrap;margin-left:6px">🗂️ ผู้ดูแล</label>
+    ${currentUser?.role==='admin'?`<label style="font-size:12px;color:var(--text2);font-weight:600;white-space:nowrap;margin-left:6px">🗂️ ผู้ดูแล</label>
     <select class="form-input form-select" style="padding:7px 32px 7px 12px;font-size:13px;min-width:170px;max-width:240px" onchange="selectedManager=this.value;renderProjects()">
       <option value="all" ${selectedManager==='all'?'selected':''}>ทุกผู้ดูแล</option>
       <option value="admin" ${selectedManager==='admin'?'selected':''}>🛠️ แอดมินจัดการเอง</option>
       ${_projManagerOptions().map(m=>`<option value="${m.uid}" ${selectedManager===m.uid?'selected':''}>🗂️ ${m.label}</option>`).join('')}
-    </select>
+    </select>`:''}
     ${(selectedYear!=='all'||selectedMonth!=='all'||selectedClient!=='all'||selectedType!=='all'||selectedManager!=='all')?`<button class="btn btn-outline btn-sm" style="padding:6px 12px;font-size:11px" onclick="selectedYear='all';selectedMonth='all';selectedClient='all';selectedType='all';selectedManager='all';renderProjects()">🔄 ล้างตัวกรอง</button>`:''}
   </div>`;
   // Build type filter
@@ -8190,6 +8191,8 @@ function renderProjList(){
         const m = new Date(dl).getMonth();
         if(m !== Number(selectedMonth)) return false;
       }
+      // 🗂️ Manager scope: เห็นเฉพาะโปรเจกต์ที่ตัวเองดูแล
+      if(currentUser?.role==='manager' && p.managerId!==currentUser.uid) return false;
       // Client filter
       if(selectedClient!=='all' && (p.client||'').trim() !== selectedClient) return false;
       // Manager filter: admin=จัดการเอง(ไม่มี managerId) · <uid>=เมเนเจอร์คนนั้นดูแล
@@ -8271,7 +8274,7 @@ function toggleAdminProjRow(pid){
 }
 // สร้าง HTML รายละเอียดโปรเจกต์ (อ่านอย่างเดียว) สำหรับ inline expand
 function adminProjDetailHTML(p){
-  const hideFin = currentUser?.role==='manager'; // manager ไม่เห็นยอดทีม
+  const hideFin = false; // ตารางถูก scope แล้ว (admin=ทุกงาน · manager=เฉพาะที่ดูแล) → เห็นการเงินได้
   const exp=(typeof getProjExpense==='function')?getProjExpense(p):0;
   const profit=(p.budget||0)-exp;
   // ผู้ทำงานแยกตามโรล
@@ -8749,10 +8752,9 @@ function calcProjSummary(){
   document.getElementById('sum-expense').textContent=fmtB(Math.round(totalExp));
   document.getElementById('sum-deduction').textContent='฿0';
   const pe=document.getElementById('sum-profit');pe.textContent=fmtB(Math.round(profit));pe.style.color=profit>=0?'var(--green)':'var(--red)';
-  // 🔒 Manager: ซ่อนข้อมูลการเงินทีม (รายจ่าย/หัก/กำไร) — เห็นเฉพาะงบลูกค้า (ยอดราย "โปรเจกต์")
-  const _mgrHideFin = currentUser?.role==='manager';
-  ['sum-expense','sum-deduction','sum-profit'].forEach(id=>{const c=document.getElementById(id);if(c&&c.parentElement)c.parentElement.style.display=_mgrHideFin?'none':'';});
-  const _sumGrid=document.getElementById('proj-calc-summary');if(_sumGrid)_sumGrid.style.gridTemplateColumns=_mgrHideFin?'1fr':'repeat(4,1fr)';
+  // Manager เห็นการเงินของโปรเจกต์ที่ตัวเองดูแลได้ (รายจ่าย/หัก/กำไร) — เหมือนแอดมิน
+  const _sumGrid=document.getElementById('proj-calc-summary');if(_sumGrid)_sumGrid.style.gridTemplateColumns='repeat(4,1fr)';
+  ['sum-expense','sum-deduction','sum-profit'].forEach(id=>{const c=document.getElementById(id);if(c&&c.parentElement)c.parentElement.style.display='';});
   // Update per-worker labels without re-rendering (avoids focus loss)
   const catKeys2=['dub','adp','mix','qc','sub','mgr'];
   catKeys2.forEach(cat=>{
@@ -8791,7 +8793,7 @@ async function saveProject(){
     deadline:thaiToIso(document.getElementById('pj-deadline').value)||document.getElementById('pj-deadline').value,
     cycle:'',
     note:document.getElementById('pj-note')?.value||'',
-    managerId:document.getElementById('pj-manager')?.value||(currentUser?.role==='manager'?currentUser.uid:'')||'',
+    managerId:(currentUser?.role==='manager')?currentUser.uid:(document.getElementById('pj-manager')?.value||''),
     workers,tax,evidenceLogs:[],snapshot:null,createdAt:new Date(),
     phases: collectFormPhasesForSave()
   };
@@ -20222,6 +20224,7 @@ function teamMemberCardHTML(s, col, viewer){
           ${ac?`<span title="ใบชื่นชม" style="padding:1px 7px;border-radius:8px;background:rgba(255,199,0,.15);color:#FFC700;font-size:10px;font-weight:700;margin-left:4px">⭐${ac}</span>`:''}
         </div>
         ${s.promptpay?`<div style="font-size:11px;color:var(--text2)">${s.promptpay}</div>`:''}
+        ${(rank===''&&s.email)?`<div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${s.email}">📧 ${s.email}</div>`:''}
       </div>
       ${viewer==='admin'?'<span style="color:var(--text2);font-size:14px;flex-shrink:0">›</span>':''}
     </div>
