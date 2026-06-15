@@ -1112,6 +1112,7 @@ body.sidebar-collapsed .main-content{
    <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-section">การเงิน</div>
    <div class="nav-item" onclick="nav('queue')"><span class="nav-icon">💸</span><span>คิวจ่ายเงิน</span><span class="nav-badge hidden" id="queue-badge">0</span></div>
+   <div class="nav-item" onclick="nav('payment-history')"><span class="nav-icon">📜</span><span>ประวัติการจ่ายเงิน</span></div>
    <div class="nav-item" onclick="nav('profit')"><span class="nav-icon">📊</span><span>กำไร-ขาดทุน</span></div>
    <div class="nav-item" onclick="nav('docs')"><span class="nav-icon">🗂️</span><span>เอกสาร</span></div>
    <div class="nav-item" onclick="nav('payment')"><span class="nav-icon">💳</span><span>บัญชีรับเงิน</span></div>
@@ -1124,14 +1125,15 @@ body.sidebar-collapsed .main-content{
    <div class="nav-section">ของฉัน</div>
    <div class="nav-item active" onclick="nav('my-calendar')"><span class="nav-icon">📅</span><span>ปฏิทินงาน</span></div>
    <div class="nav-item" onclick="nav('my-dashboard')"><span class="nav-icon">💰</span><span>งานของฉัน</span></div>
+   <div class="nav-item" onclick="nav('confirm-amount')"><span class="nav-icon">📥</span><span>ยืนยันยอด</span><span class="nav-badge hidden" id="ca-badge-staff">0</span></div>
   </nav>
   <nav class="sidebar-nav hidden" id="manager-nav">
    <div class="nav-section">ของฉัน</div>
    <div class="nav-item active" onclick="nav('mgr-home')"><span class="nav-icon">🏠</span><span>ภาพรวม</span></div>
    <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
-   <div class="nav-item" onclick="nav('mgr-calendar')"><span class="nav-icon">🗓️</span><span>ปฏิทิน</span></div>
    <div class="nav-item" onclick="nav('mgr-calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
+   <div class="nav-item" onclick="nav('confirm-amount')"><span class="nav-icon">📥</span><span>ยืนยันยอด</span><span class="nav-badge hidden" id="ca-badge-mgr">0</span></div>
    <div class="nav-item" onclick="nav('mgr-team')"><span class="nav-icon">👥</span><span>จัดการทีม</span></div>
   </nav>
  </aside>
@@ -1667,6 +1669,17 @@ body.sidebar-collapsed .main-content{
    <!-- Billing cycle section -->
    <div id="billing-cycle-section" class="hidden" style="margin-bottom:14px"></div>
    <div id="queue-list"></div>
+  </div>
+
+  <!-- ── ประวัติการจ่ายเงิน (โปรเจกต์ที่จ่ายครบแล้ว) ── -->
+  <div id="page-payment-history" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">📜 ประวัติการจ่ายเงิน</div>
+    <div class="page-subtitle">โปรเจกต์ที่จ่ายค่าตอบแทนครบทุกคนแล้ว — แยกออกจากคิวที่กำลังดำเนินการ</div>
+    <div class="page-actions"><div class="search-bar" style="margin:0;width:260px"><span class="icon">🔍</span><input id="payhist-search" placeholder="ค้นหาโปรเจกต์/ลูกค้า..." oninput="renderPaymentHistory()"></div></div>
+   </div>
+   <div id="payhist-summary" style="margin-bottom:14px"></div>
+   <div id="payhist-list"></div>
   </div>
 
   <!-- ── PROFIT ── -->
@@ -2287,6 +2300,28 @@ body.sidebar-collapsed .main-content{
    </div>
    <div id="sd-body-1"></div>
    <div id="sd-body-2" style="display:none"></div>
+  </div>
+
+  <!-- ── ยืนยันยอด (staff + manager) — ประวัติใบยืนยันยอด ── -->
+  <div id="page-confirm-amount" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">📥 ยืนยันยอด</div>
+    <div class="page-subtitle">ประวัติใบยืนยันยอด — ใบไหนยืนยันแล้ว / ใบไหนยังไม่ยืนยัน</div>
+    <div class="page-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+     <div class="tabs" style="margin:0" id="ca-tabs">
+      <div class="tab active" id="ca-f-all" onclick="setConfirmAmtFilter('all')">ทั้งหมด</div>
+      <div class="tab" id="ca-f-sent" onclick="setConfirmAmtFilter('sent')">⏳ ยังไม่ยืนยัน</div>
+      <div class="tab" id="ca-f-confirmed" onclick="setConfirmAmtFilter('confirmed')">✅ ยืนยันแล้ว</div>
+      <div class="tab" id="ca-f-rejected" onclick="setConfirmAmtFilter('rejected')">❌ ปฏิเสธ</div>
+     </div>
+     <select class="form-input form-select" id="ca-sort" style="padding:7px 32px 7px 10px;font-size:12px;width:150px" onchange="renderConfirmAmountPage()">
+      <option value="newest">🔽 วันใหม่สุดก่อน</option>
+      <option value="oldest">🔼 วันเก่าสุดก่อน</option>
+     </select>
+    </div>
+   </div>
+   <div id="ca-summary" style="margin-bottom:14px"></div>
+   <div id="ca-list"></div>
   </div>
 
 
@@ -5312,6 +5347,7 @@ async function enterApp(){
   try{ updateTopBarAdminIcons(); }catch(e){}
   try{ loadContactsFromFirebase(); }catch(e){}
   updateQueueBadge();
+  try{ updateConfirmAmtBadge(); }catch(e){}
   // Real-time Firebase sync
   startFirebaseSync();
   startWarningsSync();
@@ -5387,8 +5423,8 @@ async function seedDemo(){
 // ══════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════
-const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','profit','staff','staff-detail','docs','calc','payment','settings'];
-const MANAGER_PAGES=['mgr-home','mgr-projects','mgr-track','mgr-calendar','mgr-calc','mgr-team'];
+const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','payment-history','profit','staff','staff-detail','docs','calc','payment','settings'];
+const MANAGER_PAGES=['mgr-home','mgr-projects','mgr-track','mgr-calc','mgr-team'];
 // Manager เข้าถึงหน้า admin บางหน้าได้ (track = ติดตามงาน แต่กรองเฉพาะโปรเจกต์ที่ดูแล)
 const MGR_ALLOWED_ADMIN_PAGES=['track','projects'];
 function nav(page){
@@ -5404,9 +5440,9 @@ function nav(page){
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
   const renders={
-    dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,'staff-detail':renderStaffDetail,queue:renderQueue,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
-    'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar,
-    'mgr-home':renderMgrHome,'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-calendar':renderMgrCalendar,'mgr-team':renderMgrTeam,
+    dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,'staff-detail':renderStaffDetail,queue:renderQueue,'payment-history':renderPaymentHistory,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
+    'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar,'confirm-amount':renderConfirmAmountPage,
+    'mgr-home':renderMgrHome,'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-team':renderMgrTeam,
     'mgr-calc':()=>renderCalcList('mgr-calc-list',true)
   };
   if(renders[page])renders[page]();
@@ -8799,7 +8835,22 @@ async function saveProject(){
   };
   if(editingProjId){
     const existing=getProjects().find(p=>p.id===editingProjId);
-    if(existing)proj.workers=proj.workers.map(w=>{const ex=(existing.workers||[]).find(x=>x.id===w.id&&x.slot===w.slot);return ex?{...w,status:ex.status,voucherNo:ex.voucherNo,paidAt:ex.paidAt}:w});
+    if(existing)proj.workers=proj.workers.map(w=>{
+      const ex=(existing.workers||[]).find(x=>x.id===w.id&&x.slot===w.slot);
+      if(!ex) return w;
+      const merged={...w, status:ex.status, voucherNo:ex.voucherNo, paidAt:ex.paidAt};
+      // 🔑 คงสถานะยืนยันยอด (confirm) ของคนที่ "ยอดไม่เปลี่ยน" — รีเซ็ตเฉพาะคนที่ยอดเปลี่ยน (ต้องส่งใบใหม่)
+      //    กันบั๊ก: แก้คนเดียวแล้วใบยืนยันทั้งโปรเจกต์ถูกล้าง
+      const amtChanged = (ex.amount||0) !== (w.amount||0);
+      if(!amtChanged){
+        merged.confirmStatus = ex.confirmStatus;
+        merged.confirmSentAt = ex.confirmSentAt;
+        merged.confirmAmount = ex.confirmAmount;
+        merged.confirmRespondedAt = ex.confirmRespondedAt;
+        merged.confirmRejectReason = ex.confirmRejectReason;
+      }
+      return merged;
+    });
     proj.evidenceLogs=existing?.evidenceLogs||[];proj.snapshot=existing?.snapshot||null;
     // Fix: preserve projStatus so editing doesn't reset "เสร็จแล้ว" back to "ยังไม่เริ่ม"
     if(existing && existing.projStatus) proj.projStatus = existing.projStatus;
@@ -9703,6 +9754,41 @@ function setQueueFilter(f, el) {
   renderQueue();
 }
 
+// โปรเจกต์ "จ่ายครบแล้ว" = มีทีมงานอย่างน้อย 1 คน และทุกคนสถานะ paid → ย้ายไปหน้าประวัติ
+function _isProjectFullyPaid(p){
+  const ws=(p.workers||[]).filter(w=>getStaffById(w.id));
+  return ws.length>0 && ws.every(w=>w.status==='paid');
+}
+// 📜 หน้าประวัติการจ่ายเงิน — โปรเจกต์ที่จ่ายครบทุกคนแล้ว
+function renderPaymentHistory(){
+  if(currentUser?.role!=='admin'){ const e=document.getElementById('payhist-list'); if(e)e.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin เท่านั้น</div>'; return; }
+  const el=document.getElementById('payhist-list'); if(!el) return;
+  const sumEl=document.getElementById('payhist-summary');
+  const q=(document.getElementById('payhist-search')?.value||'').toLowerCase();
+  const lastPaid=p=>{ let m=''; (p.workers||[]).forEach(w=>{ if(w.paidAt&&w.paidAt>m)m=w.paidAt; }); return m||p.updatedAt||''; };
+  const paidProjs=getProjects().filter(p=>_isProjectFullyPaid(p)).filter(p=>!q||(p.name||'').toLowerCase().includes(q)||(p.client||'').toLowerCase().includes(q));
+  paidProjs.sort((a,b)=>lastPaid(b).localeCompare(lastPaid(a)));
+  const totalPaid=paidProjs.reduce((a,p)=>a+(p.workers||[]).reduce((s,w)=>s+(w.amount||0),0),0);
+  if(sumEl) sumEl.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">
+    <div class="stat-card"><div class="stat-label">📜 โปรเจกต์จ่ายครบ</div><div style="font-size:24px;font-weight:800;margin-top:4px">${paidProjs.length}</div></div>
+    <div class="stat-card" style="border-color:rgba(0,223,160,.35)"><div class="stat-label">✅ จ่ายทีมรวม</div><div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--green)">${fmtB(totalPaid)}</div></div>
+  </div>`;
+  if(!paidProjs.length){ el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:12px">ยังไม่มีโปรเจกต์ที่จ่ายครบ — เมื่อจ่ายทีมครบทุกคนในโปรเจกต์ จะถูกย้ายมาที่นี่อัตโนมัติ</div>'; return; }
+  el.innerHTML=paidProjs.map(p=>{
+    const ws=(p.workers||[]).filter(w=>getStaffById(w.id));
+    const tot=ws.reduce((a,w)=>a+(w.amount||0),0);
+    const lp=lastPaid(p); const lpTxt=lp?fmtDate(lp):'—';
+    const rows=ws.map(w=>{const s=getStaffById(w.id);const pre=(w.slot||'').split('-')[0];const lbl={dub:'🎤 พากย์',adp:'✍️ บท',mix:'🎧 มิกซ์',qc:'✅ QC',sub:'🎬 ซับ/วิดีโอ',mgr:'🗂️ จัดการ'}[pre]||'';return `<div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-top:1px solid rgba(255,255,255,.05)"><div style="flex:1;font-size:12px">${s.nickname||s.name} <span style="font-size:10px;color:var(--text2)">${lbl}</span></div>${w.voucherNo?`<span style="font-size:10px;color:var(--text2)">${w.voucherNo}</span>`:''}<div style="font-size:13px;font-weight:700;color:var(--accent2)">${fmtB(w.amount||0)}</div><span style="font-size:10px;padding:1px 8px;border-radius:20px;background:rgba(0,223,160,.1);color:#00DFA0;border:1px solid rgba(0,223,160,.2)">จ่ายแล้ว</span></div>`;}).join('');
+    return `<div style="background:var(--card);border:1px solid rgba(0,223,160,.2);border-radius:12px;margin-bottom:10px;overflow:hidden">
+      <div style="padding:13px 16px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="toggleEl('ph-body-${p.id}','ph-chv-${p.id}')">
+        <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">${p.name} <span style="font-size:10px;padding:2px 9px;border-radius:20px;background:rgba(0,223,160,.12);color:#00DFA0;font-weight:700;border:1px solid rgba(0,223,160,.25)">✅ จ่ายครบ</span></div><div style="font-size:11px;color:var(--text2);margin-top:2px">${p.client||'—'} · จ่ายล่าสุด ${lpTxt}</div></div>
+        <div style="text-align:right;flex-shrink:0"><div style="font-size:16px;font-weight:800;color:var(--green)">${fmtB(tot)}</div><div style="font-size:10px;color:var(--text2)">${ws.length} คน</div></div>
+        <span id="ph-chv-${p.id}" style="font-size:11px;color:var(--text2);flex-shrink:0">▼</span>
+      </div>
+      <div id="ph-body-${p.id}" style="display:none">${rows}</div>
+    </div>`;
+  }).join('');
+}
 function renderQueue() {
   // 🔒 Admin guard: คิวจ่ายเงินโชว์ยอดทุกคนในทีม → admin only
   if(currentUser?.role !== 'admin'){
@@ -9740,10 +9826,13 @@ function renderQueue() {
     return true;
   });
 
+  // 📜 ย้ายโปรเจกต์ที่จ่ายครบแล้วออกจากคิว → ไปอยู่หน้า "ประวัติการจ่ายเงิน" (กันปนกับงานที่กำลังทำ)
+  const activeProjs = inScopeProjs.filter(p => !_isProjectFullyPaid(p));
+
   // === Step 2: "All workers in scope" — ใช้นับ badges (ไม่กรอง status/confirm) ===
   //   เพื่อให้ badge counts ขึ้นตลอด ไม่หายเมื่อกดกรอง
   const allWorkers = [];
-  inScopeProjs.forEach(p => {
+  activeProjs.forEach(p => {
     (p.workers||[]).forEach(w => {
       if(getStaffById(w.id)) allWorkers.push(w);
     });
@@ -9751,7 +9840,7 @@ function renderQueue() {
 
   // === Step 3: Build display groups — apply status + confirm filter ===
   const groups = [];
-  inScopeProjs.forEach(p => {
+  activeProjs.forEach(p => {
     const workers = (p.workers||[]).filter(w => {
       const s = getStaffById(w.id);
       if(!s) return false;
@@ -9759,6 +9848,8 @@ function renderQueue() {
       if(queueConfirmFilter !== 'all'){
         const cs = getWorkerConfirmStatus(w);
         if(cs !== queueConfirmFilter) return false;
+        // ✅ "ยืนยันแล้ว" ไม่รวมคนที่จ่ายไปแล้ว (กันสับสน)
+        if(queueConfirmFilter==='confirmed' && w.status==='paid') return false;
       }
       return true;
     });
@@ -9775,16 +9866,16 @@ function renderQueue() {
   //   เก็บทั้งจำนวนคน (peopleXxx) และจำนวนรายการ (cntXxx) เพื่อแสดงคู่กัน
   const cntConfirmSent = allWorkers.filter(w => getWorkerConfirmStatus(w) === 'sent').length;
   const cntConfirmRejected = allWorkers.filter(w => getWorkerConfirmStatus(w) === 'rejected').length;
-  const cntConfirmConfirmed = allWorkers.filter(w => getWorkerConfirmStatus(w) === 'confirmed').length;
+  const cntConfirmConfirmed = allWorkers.filter(w => getWorkerConfirmStatus(w) === 'confirmed' && w.status !== 'paid').length;
   const cntConfirmTotal = cntConfirmSent + cntConfirmRejected + cntConfirmConfirmed;
   // === Unique staff sets ต่อ status (1 คน 1 ใบยืนยัน) ===
   const _staffSent = new Set(), _staffConfirmed = new Set(), _staffRejected = new Set(), _staffAny = new Set();
   allWorkers.forEach(w => {
     const cs = getWorkerConfirmStatus(w);
     if(cs === 'sent') _staffSent.add(w.id);
-    if(cs === 'confirmed') _staffConfirmed.add(w.id);
+    if(cs === 'confirmed' && w.status !== 'paid') _staffConfirmed.add(w.id);
     if(cs === 'rejected') _staffRejected.add(w.id);
-    if(cs !== 'none') _staffAny.add(w.id);
+    if(cs !== 'none' && !(cs==='confirmed' && w.status==='paid')) _staffAny.add(w.id);
   });
   const peopleSent = _staffSent.size;
   const peopleConfirmed = _staffConfirmed.size;
@@ -9878,10 +9969,16 @@ function renderQueue() {
       </div>`
     : '';
 
+  // ── ตัวเลขย่อยใต้การ์ดสรุป ──
+  const totalProjsCount = inScopeProjs.length;
+  const paidProjsCount  = inScopeProjs.filter(_isProjectFullyPaid).length;
+  const sentProjsCount    = activeProjs.filter(p=>(p.workers||[]).some(w=>getStaffById(w.id)&&getWorkerConfirmStatus(w)==='sent')).length;
+  const waitingProjsCount = activeProjs.filter(p=>(p.workers||[]).some(w=>{const s=getStaffById(w.id);if(!s)return false;return w.status==='pending'||(w.status==='approved'&&getWorkerConfirmStatus(w)==='none');})).length;
+  const _subTxt = (t)=>`<div style="font-size:10.5px;color:var(--text2);margin-top:4px;line-height:1.5">${t}</div>`;
   const summaryBar = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">
-    <div class="stat-card" style="padding:14px"><div class="stat-label">โปรเจกต์</div><div style="font-size:24px;font-weight:800;margin-top:6px">${groups.length}</div></div>
-    <div class="stat-card" style="padding:14px;border-color:rgba(255,158,0,.35)"><div class="stat-label">⏳ รอจ่าย</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--orange)">${cntPending}</div></div>
-    <div class="stat-card" style="padding:14px;border-color:rgba(0,180,255,.35)"><div class="stat-label">🔵 อนุมัติแล้ว</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--cyan)">${cntApproved}</div></div>
+    <div class="stat-card" style="padding:14px"><div class="stat-label">โปรเจกต์</div><div style="font-size:24px;font-weight:800;margin-top:6px">${totalProjsCount}</div>${_subTxt(`✅ จ่ายครบแล้ว <strong style="color:var(--green)">${paidProjsCount}</strong> · 🔧 กำลังทำ ${totalProjsCount-paidProjsCount} โปรเจกต์`)}</div>
+    <div class="stat-card" style="padding:14px;border-color:rgba(255,158,0,.35)"><div class="stat-label">⏳ รอจ่าย</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--orange)">${cntPending}</div>${_subTxt(`📤 กำลังจ่าย <strong style="color:#9B6FFF">${sentProjsCount}</strong> · ⏳ รอจ่าย ${waitingProjsCount} โปรเจกต์`)}</div>
+    <div class="stat-card" style="padding:14px;border-color:rgba(0,180,255,.35)"><div class="stat-label">🔵 อนุมัติแล้ว</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--cyan)">${cntApproved}</div>${_subTxt(`⏳ ยังไม่อนุมัติ <strong style="color:var(--orange)">${cntPending}</strong> · 💸 จ่ายแล้ว ${cntPaid} คน`)}</div>
     <div class="stat-card" style="padding:14px;border-color:rgba(0,223,160,.35)"><div class="stat-label">💰 รอโอนรวม</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--green)">${fmtB(totalUnpaid)}</div></div>
   </div>
   ${progressBar}
@@ -10075,6 +10172,12 @@ function renderQueue() {
       headerStatus = `<span style="font-size:11px;font-weight:700;color:var(--orange);padding:6px 12px">⏳ รอดำเนินการ</span>`;
     }
 
+    // 📤 ปุ่ม "ส่งใบยืนยันยอดรวม" — ส่งให้ทุกคนที่ approved + ยังไม่ส่ง ทันที (ไม่ผ่านตะกร้า/ป็อบอัพ)
+    const eligibleSendCount = g.workers.filter(w => w.status==='approved' && getWorkerConfirmStatus(w)==='none').length;
+    const sendAllBtn = eligibleSendCount>0
+      ? `<button onclick="event.stopPropagation();directSendConfirmAll('${p.id}')" style="padding:7px 14px;background:#9B6FFF;border:none;border-radius:8px;color:#fff;font-family:Kanit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap" title="ส่งใบยืนยันยอดให้ทีมทั้งโปรเจกต์ทันที (${eligibleSendCount} คน)">📤 ส่งใบยืนยันยอดรวม (${eligibleSendCount})</button>`
+      : '';
+
     // Worker rows
     const workerRows = g.workers.map(w => {
       const s = getStaffById(w.id); if (!s) return '';
@@ -10197,30 +10300,12 @@ function renderQueue() {
         </div>
         <div class="qgroup-r3" style="display:contents">
           <div class="qgroup-client">${clientPaidBtn}</div>
-          <div class="qgroup-action" style="margin-left:4px">${headerStatus}</div>
+          <div class="qgroup-action" style="margin-left:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${sendAllBtn}${headerStatus}</div>
         </div>
         <div class="qgroup-chevron" style="font-size:12px;color:var(--text2);margin-left:6px;transition:transform .2s" id="${groupId}-chevron">${_expandedQueueGroups.has(groupId)?'▼':'▶'}</div>
       </div>
       <!-- Worker rows (collapsible — default hidden, expand on click) ─ คงสถานะตอน re-render ─ -->
       <div id="${groupId}" style="display:${_expandedQueueGroups.has(groupId)?'block':'none'}">
-        <!-- Bulk action bar -->
-        ${(()=>{
-          // คนที่ "approved" + ยังไม่ส่งใบยืนยัน + ยังไม่อยู่ในตะกร้า
-          const eligible = g.workers.filter(w => w.status === 'approved' && getWorkerConfirmStatus(w) === 'none');
-          const notInCart = eligible.filter(w => !isInConfirmCart(p.id, w.id, w.slot));
-          if(!eligible.length) return '';
-          if(!notInCart.length){
-            return `<div style="padding:10px 18px;background:rgba(155,111,255,.06);border-top:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-              <div style="font-size:12px;color:var(--text);font-weight:600">🛒 ทุกคนในโปรเจกต์นี้อยู่ในตะกร้าแล้ว · กดปุ่ม "🛒 ตะกร้ารอส่ง" ด้านล่างเพื่อตรวจและส่ง</div>
-            </div>`;
-          }
-          return `<div style="padding:10px 18px;background:rgba(155,111,255,.05);border-top:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-            <div style="font-size:12px;color:var(--text);font-weight:600">
-              💡 มี <strong style="color:#9B6FFF">${notInCart.length} คน</strong> ที่ยังไม่อยู่ในตะกร้า
-            </div>
-            <button class="btn btn-xs" style="background:#9B6FFF;color:#fff;border:none;font-weight:700" onclick="askBulkSendConfirm('${p.id}')" title="เพิ่มทุกคนเข้าตะกร้า">🛒 + ทั้งโปรเจกต์ (${notInCart.length})</button>
-          </div>`;
-        })()}
         <!-- sub-header -->
         <div style="display:flex;align-items:center;gap:14px;padding:7px 18px;background:rgba(0,0,0,.15);border-top:1px solid var(--border2)">
           <div style="min-width:170px;font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">ชื่อ-ตำแหน่ง</div>
@@ -10533,6 +10618,40 @@ async function sendConfirmRequest(projId, workerId, slot){
   renderQueue();
 }
 
+// === 📤 ส่งใบยืนยันยอดรวม — ส่งให้ทุกคน (approved + ยังไม่ส่ง) ในโปรเจกต์ทันที (ไม่ผ่านตะกร้า/ป็อบอัพ) ===
+async function directSendConfirmAll(projId){
+  const p = getProjects().find(x=>x.id===projId);
+  if(!p){ toast('ไม่พบโปรเจกต์','error'); return; }
+  const eligible = (p.workers||[]).filter(w => w.status==='approved' && getWorkerConfirmStatus(w)==='none' && getStaffById(w.id));
+  if(!eligible.length){ toast('ไม่มีคนที่ต้องส่งใบยืนยัน (ต้องอนุมัติก่อน หรือส่งไปแล้ว)','info'); return; }
+  const staffCount = new Set(eligible.map(w=>w.id)).size;
+  const sum = eligible.reduce((a,w)=>a+(w.amount||0),0);
+  if(!confirm(`📤 ส่งใบยืนยันยอดรวมให้ทีม ${staffCount} คน (${eligible.length} รายการ) ในโปรเจกต์ "${p.name}"?\n\nยอดรวม ${fmtB(sum)}\n\nสตาฟจะได้รับใบยืนยันให้กดยืนยันยอดทันที`)) return;
+  let sent=0;
+  for(const w of eligible){
+    const ok = await _updateWorkerConfirm(projId, w.id, w.slot, {
+      confirmStatus:'sent', confirmSentAt:new Date().toISOString(),
+      confirmAmount:w.amount||0, confirmRespondedAt:null, confirmRejectReason:null,
+    });
+    if(ok){ sent++; try{ removeFromConfirmCart(projId, w.id, w.slot); }catch(e){} }
+  }
+  // แจ้งเตือน staff (รวมรายการของแต่ละคนเป็น 1 ฉบับ)
+  try{
+    const snap = await _fbDatabase.ref('users').get();
+    const allUsers = snap.exists()?snap.val():{};
+    const byStaff={};
+    eligible.forEach(w=>{ (byStaff[w.id]=byStaff[w.id]||[]).push(w); });
+    for(const [sid, ws] of Object.entries(byStaff)){
+      const uids = Object.entries(allUsers).filter(([uid,u])=>u && u.staffId===sid).map(([uid])=>uid);
+      const tot = ws.reduce((a,w)=>a+(w.amount||0),0);
+      await Promise.all(uids.map(uid => addNotification({type:'payment', title:'💰 ใบยืนยันยอดเงิน — กรุณายืนยัน', text:`${p.name} · ${fmtB(tot)} · กดเพื่อดู`, projId:p.id, recipientUid:uid})));
+    }
+  }catch(e){ console.warn('notify directSend:', e); }
+  updateQueueBadge();
+  renderQueue();
+  toast(`📤 ส่งใบยืนยันยอดรวมแล้ว · ${staffCount} คน (${sent} รายการ)`,'success');
+}
+
 // === Bulk: เพิ่มทุกคนในโปรเจกต์เข้าตะกร้า (ไม่ส่งทันที) ===
 function askBulkSendConfirm(projId){
   const p = getProjects().find(x=>x.id===projId);
@@ -10707,7 +10826,7 @@ async function openStaffConfirmInbox(){
   }
   // เปิด modal ใหม่ → reset filter เป็น "ทั้งหมด" เสมอ
   _staffConfirmTabFilter = 'all';
-  await renderStaffConfirmInbox();
+  _refreshConfirmUI();
   openModal(modalId);
 }
 
@@ -10846,7 +10965,7 @@ async function staffConfirmAllPending(){
   } else {
     toast(`✅ ยืนยัน ${ok} รายการแล้ว — Admin จะดำเนินการโอน`,'success');
   }
-  await renderStaffConfirmInbox();
+  _refreshConfirmUI();
 }
 
 function staffRejectAllPending(){
@@ -10938,7 +11057,7 @@ async function _submitRejectAllReason(){
   } else {
     toast(`❌ ส่งคำปฏิเสธ ${ok} รายการแล้ว`,'info');
   }
-  await renderStaffConfirmInbox();
+  _refreshConfirmUI();
 }
 
 let _staffConfirmTabFilter = 'all';
@@ -11363,6 +11482,116 @@ function _renderStaffConfirmList(items){
   }).join('');
 }
 
+// ════════════════════════════════════════════════════════════
+// 📥 หน้า "ยืนยันยอด" (staff + manager) — ประวัติใบยืนยันยอด + กรอง/เรียงวันที่
+// ════════════════════════════════════════════════════════════
+let _caFilter = 'all';   // all | sent | confirmed | rejected
+function setConfirmAmtFilter(f){
+  _caFilter = f;
+  ['all','sent','confirmed','rejected'].forEach(k=>{const el=document.getElementById('ca-f-'+k);if(el)el.classList.toggle('active',k===f);});
+  renderConfirmAmountPage();
+}
+function _getMyConfirmItems(){
+  const items=[];
+  if(!currentUser?.staffId) return items;
+  (getProjects()||[]).forEach(p=>{
+    (p.workers||[]).forEach(w=>{
+      if(w.id===currentUser.staffId && w.confirmStatus && w.confirmStatus!=='none') items.push({p,w});
+    });
+  });
+  return items;
+}
+function _confirmItemDate(w){ return w.confirmRespondedAt || w.confirmSentAt || ''; }
+// การ์ดใบยืนยัน 1 รายการ (ใช้ในหน้า ยืนยันยอด)
+function _confirmItemCardHTML(p, w){
+  const cs=w.confirmStatus;
+  const sentAt=w.confirmSentAt?new Date(w.confirmSentAt).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'';
+  const respAt=w.confirmRespondedAt?new Date(w.confirmRespondedAt).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'';
+  const pre=(w.slot||'').split('-')[0];
+  const slotLabel={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'}[pre]||pre;
+  const amt=w.confirmAmount||w.amount||0;
+  const isPaid=w.status==='paid';
+  let bg,bd,statusLabel,actions='';
+  if(cs==='sent'){
+    bg='rgba(155,111,255,.06)';bd='rgba(155,111,255,.35)';
+    statusLabel='<span style="padding:3px 9px;border-radius:7px;background:rgba(155,111,255,.15);color:#9B6FFF;font-size:11px;font-weight:700">⏳ ยังไม่ยืนยัน</span>';
+    actions=`<div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="staffConfirmYes('${p.id}','${w.id}','${w.slot}')" style="flex:1;padding:9px;border-radius:8px;background:var(--green);color:#000;border:none;font-family:Kanit;font-weight:800;font-size:13px;cursor:pointer">✅ ยืนยันยอดถูกต้อง</button>
+      <button onclick="staffConfirmNo('${p.id}','${w.id}','${w.slot}')" style="flex:0 0 auto;padding:9px 16px;border-radius:8px;background:transparent;color:var(--red);border:1.5px solid var(--red);font-family:Kanit;font-weight:700;font-size:13px;cursor:pointer">✗ ปฏิเสธ</button>
+    </div>`;
+  } else if(cs==='confirmed'){
+    bg='rgba(0,223,160,.04)';bd='rgba(0,223,160,.25)';
+    statusLabel='<span style="padding:3px 9px;border-radius:7px;background:rgba(0,223,160,.15);color:var(--green);font-size:11px;font-weight:700">✅ ยืนยันแล้ว</span>';
+  } else if(cs==='rejected'){
+    bg='rgba(255,64,64,.04)';bd='rgba(255,64,64,.25)';
+    statusLabel='<span style="padding:3px 9px;border-radius:7px;background:rgba(255,64,64,.15);color:var(--red);font-size:11px;font-weight:700">❌ คุณปฏิเสธ</span>';
+  } else return '';
+  const reasonHTML=(cs==='rejected'&&w.confirmRejectReason)?`<div style="margin-top:8px;padding:8px 12px;background:rgba(255,64,64,.06);border-left:3px solid var(--red);border-radius:6px;font-size:12px"><strong>เหตุผล:</strong> ${(w.confirmRejectReason||'').replace(/</g,'&lt;')}</div>`:'';
+  const paidNote=isPaid?`<div style="margin-top:6px;font-size:11px;color:var(--green);font-weight:700">💰 โอนแล้ว · เลขที่ ${w.voucherNo||'-'}</div>`:'';
+  return `<div style="background:${bg};border:1px solid ${bd};border-radius:10px;padding:14px;margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:800;margin-bottom:2px">${p.name}</div>
+        <div style="font-size:11px;color:var(--text2)">${slotLabel}${p.client?' · '+p.client:''}</div>
+        ${sentAt?`<div style="font-size:10px;color:var(--text2);margin-top:3px">📤 ส่งเมื่อ: ${sentAt}${respAt?` · ตอบกลับ: ${respAt}`:''}</div>`:''}
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--text2)">ยอดที่จะโอน</div>
+        <div style="font-size:22px;font-weight:800;color:var(--green)">${fmtB(amt)}</div>
+        <div style="margin-top:5px">${statusLabel}</div>
+      </div>
+    </div>
+    ${reasonHTML}${paidNote}${actions}
+  </div>`;
+}
+function renderConfirmAmountPage(){
+  const list=document.getElementById('ca-list'); if(!list) return;
+  const sumEl=document.getElementById('ca-summary');
+  if(!currentUser?.staffId){
+    if(sumEl) sumEl.innerHTML='';
+    list.innerHTML='<div style="text-align:center;padding:40px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:12px">บัญชีนี้ยังไม่ผูกกับทีมงาน — ยังไม่มีใบยืนยันยอด</div>';
+    return;
+  }
+  const all=_getMyConfirmItems();
+  const cntSent=all.filter(x=>x.w.confirmStatus==='sent').length;
+  const cntConfirmed=all.filter(x=>x.w.confirmStatus==='confirmed').length;
+  const cntRejected=all.filter(x=>x.w.confirmStatus==='rejected').length;
+  const sumSent=all.filter(x=>x.w.confirmStatus==='sent').reduce((a,{w})=>a+(w.confirmAmount||w.amount||0),0);
+  // tab badges
+  const _tb=(id,base,n,color)=>{const el=document.getElementById(id);if(el)el.innerHTML=base+(n?` <span style="min-width:16px;padding:1px 6px;border-radius:9px;background:${color||'rgba(155,111,255,.25)'};color:${color?'#fff':'#9B6FFF'};font-size:10px;font-weight:800;margin-left:3px">${n}</span>`:'');};
+  _tb('ca-f-all','ทั้งหมด',all.length);
+  _tb('ca-f-sent','⏳ ยังไม่ยืนยัน',cntSent,'#9B6FFF');
+  _tb('ca-f-confirmed','✅ ยืนยันแล้ว',cntConfirmed,'var(--green)');
+  _tb('ca-f-rejected','❌ ปฏิเสธ',cntRejected,'var(--red)');
+  // summary
+  if(sumEl) sumEl.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+    <div class="stat-card" style="border-color:rgba(155,111,255,.35)"><div class="stat-label">⏳ รอคุณยืนยัน</div><div style="font-size:22px;font-weight:800;margin-top:4px;color:#9B6FFF">${cntSent}</div><div style="font-size:11px;color:var(--green)">${fmtB(sumSent)}</div></div>
+    <div class="stat-card" style="border-color:rgba(0,223,160,.35)"><div class="stat-label">✅ ยืนยันแล้ว</div><div style="font-size:22px;font-weight:800;margin-top:4px;color:var(--green)">${cntConfirmed}</div></div>
+    <div class="stat-card" style="border-color:rgba(255,64,64,.35)"><div class="stat-label">❌ ปฏิเสธ</div><div style="font-size:22px;font-weight:800;margin-top:4px;color:var(--red)">${cntRejected}</div></div>
+    ${cntSent>0?`<div class="stat-card" style="display:flex;align-items:center;justify-content:center"><button onclick="staffConfirmAllPending()" class="btn" style="background:var(--green);color:#000;border:none;font-weight:800;padding:10px 14px;width:100%">✅ ยืนยันทั้งหมด (${cntSent})</button></div>`:''}
+  </div>`;
+  // filter + sort
+  let items=_caFilter==='all'?all.slice():all.filter(x=>x.w.confirmStatus===_caFilter);
+  const sort=document.getElementById('ca-sort')?.value||'newest';
+  items.sort((a,b)=>{const da=_confirmItemDate(a.w),db=_confirmItemDate(b.w);return sort==='oldest'?da.localeCompare(db):db.localeCompare(da);});
+  if(!items.length){ list.innerHTML='<div style="text-align:center;padding:40px;color:var(--text2)">ไม่มีรายการในหมวดนี้</div>'; updateConfirmAmtBadge(); return; }
+  list.innerHTML=items.map(({p,w})=>_confirmItemCardHTML(p,w)).join('');
+  updateConfirmAmtBadge();
+}
+function updateConfirmAmtBadge(){
+  try{
+    if(!currentUser?.staffId) return;
+    const n=_getMyConfirmItems().filter(x=>x.w.confirmStatus==='sent').length;
+    ['ca-badge-staff','ca-badge-mgr'].forEach(id=>{const el=document.getElementById(id);if(el){el.textContent=n;el.classList.toggle('hidden',n===0);}});
+  }catch(e){}
+}
+// รีเฟรช UI ยืนยันยอดทั้งหมด (modal + หน้า + badge) หลังกดยืนยัน/ปฏิเสธ
+function _refreshConfirmUI(){
+  try{ renderStaffConfirmInbox(); }catch(e){}
+  try{ if(window._currentPage==='confirm-amount') renderConfirmAmountPage(); }catch(e){}
+  try{ updateConfirmAmtBadge(); }catch(e){}
+}
+
 // Staff: กดยืนยัน (มี confirm dialog)
 async function staffConfirmYes(projId, workerId, slot){
   const p = getProjects().find(x=>x.id===projId);
@@ -11388,7 +11617,7 @@ async function staffConfirmYes(projId, workerId, slot){
     });
   } catch(e){ console.warn(e); }
   toast('✅ ยืนยันแล้ว — Admin จะดำเนินการโอน','success');
-  await renderStaffConfirmInbox();
+  _refreshConfirmUI();
 }
 
 // Staff: กดปฏิเสธ — มี modal กรอกเหตุผล
@@ -11451,7 +11680,7 @@ async function _submitRejectReason(projId, workerId, slot){
     });
   } catch(e){ console.warn(e); }
   toast('✗ ส่งคำปฏิเสธแล้ว','info');
-  await renderStaffConfirmInbox();
+  _refreshConfirmUI();
 }
 
 
@@ -17016,6 +17245,12 @@ function startFirebaseSync() {
       // 🔑 Refresh queue page เมื่อมี project update → admin จะเห็น staff confirm/reject ทันที
       const pgQ = document.getElementById('page-queue');
       if(pgQ&&!pgQ.classList.contains('hidden')) try{renderQueue();}catch(e){}
+      const pgPH = document.getElementById('page-payment-history');
+      if(pgPH&&!pgPH.classList.contains('hidden')) try{renderPaymentHistory();}catch(e){}
+      // 📥 ยืนยันยอด (staff/manager) — refresh badge + หน้า ถ้าเปิดอยู่
+      try{ updateConfirmAmtBadge(); }catch(e){}
+      const pgCA = document.getElementById('page-confirm-amount');
+      if(pgCA&&!pgCA.classList.contains('hidden')) try{renderConfirmAmountPage();}catch(e){}
       // Refresh project-detail ถ้าเปิดอยู่
       const pgPD = document.getElementById('page-project-detail');
       if(pgPD&&!pgPD.classList.contains('hidden')) try{renderProjDetail();}catch(e){}
