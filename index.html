@@ -9974,11 +9974,13 @@ function renderQueue() {
   const paidProjsCount  = inScopeProjs.filter(_isProjectFullyPaid).length;
   const sentProjsCount    = activeProjs.filter(p=>(p.workers||[]).some(w=>getStaffById(w.id)&&getWorkerConfirmStatus(w)==='sent')).length;
   const waitingProjsCount = activeProjs.filter(p=>(p.workers||[]).some(w=>{const s=getStaffById(w.id);if(!s)return false;return w.status==='pending'||(w.status==='approved'&&getWorkerConfirmStatus(w)==='none');})).length;
+  // จ่ายแล้วทั้งหมดในช่วงเวลา (รวมโปรเจกต์ที่จ่ายครบ/อยู่หน้าประวัติด้วย) — ไม่ใช่แค่ใน activeProjs
+  const cntPaidScope = inScopeProjs.reduce((a,p)=>a+(p.workers||[]).filter(w=>getStaffById(w.id)&&w.status==='paid').length,0);
   const _subTxt = (t)=>`<div style="font-size:10.5px;color:var(--text2);margin-top:4px;line-height:1.5">${t}</div>`;
   const summaryBar = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">
     <div class="stat-card" style="padding:14px"><div class="stat-label">โปรเจกต์</div><div style="font-size:24px;font-weight:800;margin-top:6px">${totalProjsCount}</div>${_subTxt(`✅ จ่ายครบแล้ว <strong style="color:var(--green)">${paidProjsCount}</strong> · 🔧 กำลังทำ ${totalProjsCount-paidProjsCount} โปรเจกต์`)}</div>
     <div class="stat-card" style="padding:14px;border-color:rgba(255,158,0,.35)"><div class="stat-label">⏳ รอจ่าย</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--orange)">${cntPending}</div>${_subTxt(`📤 กำลังจ่าย <strong style="color:#9B6FFF">${sentProjsCount}</strong> · ⏳ รอจ่าย ${waitingProjsCount} โปรเจกต์`)}</div>
-    <div class="stat-card" style="padding:14px;border-color:rgba(0,180,255,.35)"><div class="stat-label">🔵 อนุมัติแล้ว</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--cyan)">${cntApproved}</div>${_subTxt(`⏳ ยังไม่อนุมัติ <strong style="color:var(--orange)">${cntPending}</strong> · 💸 จ่ายแล้ว ${cntPaid} คน`)}</div>
+    <div class="stat-card" style="padding:14px;border-color:rgba(0,180,255,.35)"><div class="stat-label">🔵 อนุมัติแล้ว</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--cyan)">${cntApproved}</div>${_subTxt(`⏳ ยังไม่อนุมัติ <strong style="color:var(--orange)">${cntPending}</strong> · 💸 จ่ายแล้ว ${cntPaidScope} คน`)}</div>
     <div class="stat-card" style="padding:14px;border-color:rgba(0,223,160,.35)"><div class="stat-label">💰 รอโอนรวม</div><div style="font-size:24px;font-weight:800;margin-top:6px;color:var(--green)">${fmtB(totalUnpaid)}</div></div>
   </div>
   ${progressBar}
