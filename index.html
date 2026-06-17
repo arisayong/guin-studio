@@ -9550,22 +9550,15 @@ function emailReceipt(){
 
 /* ── Fix 3: Download receipt as printable HTML file ── */
 function downloadReceiptHTML(){
-  const el=document.getElementById('printable-receipt');
-  if(!el){toast('ไม่มีข้อมูลใบเสร็จ','warn');return;}
-  const vNo=el.dataset?.vno||'receipt';
-  const html='<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>'+vNo+'</title>'+
-    '<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&display=swap" rel="stylesheet">'+
-    '<style>*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}body{font-family:Kanit,sans-serif;background:#f5f7fa;display:flex;justify-content:center;padding:32px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}'+
-    '.wrap{background:#fff;border-radius:12px;padding:36px;max-width:520px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.12)}'+
-    '@media print{html,body{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}body{background:#fff;padding:0}.wrap{box-shadow:none}.no-print{display:none}}</style>'+
-    '</head><body><div class="wrap">'+el.outerHTML+
-    '<div class="no-print" style="margin-top:24px;text-align:center">'+
-    '<button onclick="window.print()" style="padding:10px 28px;background:#1565FF;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:14px;font-weight:700;cursor:pointer">🖨️ บันทึกเป็น PDF</button>'+
-    '<div style="margin-top:10px;font-size:12px;color:#6b7280">💡 ใน popup Print → เปิด <strong>"More settings"</strong> → ติ๊ก <strong>"Background graphics"</strong></div>'+
-    '</div></div></body></html>';
-  const w=window.open('','_blank');
-  if(w){w.document.write(html);w.document.close();w.onload=function(){setTimeout(()=>w.print(),800);};}
-  toast('เปิดหน้าใหม่แล้ว — กด "Save as PDF" ครับ','info');
+  const body=document.getElementById('receipt-body');
+  // หาเอกสารที่กำลังแสดง (รองรับทุกประเภท: receipt/quotation/invoice/voucher)
+  const el = document.getElementById('printable-receipt') || (body ? body.querySelector('[id^="printable-"]') : null);
+  const ctx = window._lastReceiptCtx || {};
+  const fname = el?.dataset?.vno || ctx.vNo || 'document';
+  if(el){ downloadDocHTML(el.outerHTML, fname); toast('เปิดหน้าใหม่แล้ว — กด "Save as PDF" ครับ','info'); return; }
+  // fallback: ใช้เนื้อหาทั้ง body ที่แสดงอยู่
+  if(body && body.innerHTML.trim()){ downloadDocHTML(body.innerHTML, fname); toast('เปิดหน้าใหม่แล้ว — กด "Save as PDF" ครับ','info'); return; }
+  toast('ไม่มีข้อมูลเอกสาร','warn');
 }
 
 /* ── Fix 4: Queue month/cycle filter ── */
@@ -10088,6 +10081,7 @@ function renderQueue() {
       if (isSent) {
         return `
           <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+            <button class="btn btn-xs" style="background:rgba(0,223,160,.15);border:1px solid rgba(0,223,160,.4);color:var(--green);font-weight:700" onclick="adminMarkConfirmed('${pid}','${wid}','${slot}')" title="ทำเครื่องหมายว่า Staff ยืนยันแล้ว (กรณียืนยันนอกระบบ หรือใบถูกรีเซ็ตจากบั๊ก)">✓ ยืนยันแทน</button>
             <button class="btn btn-xs btn-outline" onclick="askResendConfirm('${pid}','${wid}','${slot}')" title="ส่ง notification ซ้ำให้ Staff">↻ ส่งซ้ำ</button>
             <button class="btn btn-xs btn-outline" style="color:var(--red);border-color:rgba(255,64,64,.3)" onclick="askCancelConfirm('${pid}','${wid}','${slot}')" title="ยกเลิกใบยืนยัน">🚫 ยกเลิก</button>
           </div>`;
@@ -10652,6 +10646,26 @@ async function directSendConfirmAll(projId){
   updateQueueBadge();
   renderQueue();
   toast(`📤 ส่งใบยืนยันยอดรวมแล้ว · ${staffCount} คน (${sent} รายการ)`,'success');
+}
+
+// === ✓ Admin ทำเครื่องหมาย "Staff ยืนยันแล้ว" แทน (กรณียืนยันนอกระบบ/ใบถูกรีเซ็ตจากบั๊ก) ===
+async function adminMarkConfirmed(projId, workerId, slot){
+  const p=getProjects().find(x=>x.id===projId);
+  const w=p?.workers.find(x=>x.id===workerId && x.slot===slot);
+  const s=getStaffById(workerId);
+  if(!p||!w){ toast('ไม่พบข้อมูล','error'); return; }
+  const amt=w.confirmAmount||w.amount||0;
+  if(!confirm(`✓ ทำเครื่องหมายว่า "${s?.nickname||workerId}" ยืนยันยอด ${fmtB(amt)} แล้ว?\n\nใช้กรณี Staff ยืนยันนอกระบบ หรือใบยืนยันถูกรีเซ็ตจากบั๊ก\nหลังจากนี้จะนับเป็น "✅ ยืนยันแล้ว" พร้อมจ่าย`)) return;
+  const ok=await _updateWorkerConfirm(projId, workerId, slot, {
+    confirmStatus:'confirmed',
+    confirmRespondedAt:new Date().toISOString(),
+    confirmAmount:amt,
+    confirmRejectReason:null,
+  });
+  if(!ok) return;
+  updateQueueBadge();
+  renderQueue();
+  toast(`✅ ทำเครื่องหมายยืนยันแล้ว — ${s?.nickname||workerId} · ${p.name}`,'success');
 }
 
 // === Bulk: เพิ่มทุกคนในโปรเจกต์เข้าตะกร้า (ไม่ส่งทันที) ===
@@ -15764,7 +15778,13 @@ function renderDocsHistory() {
   el.innerHTML='<div class="table-wrap"><table><thead><tr><th>เลขที่</th><th>ประเภท</th><th>สถานะ</th><th>ถึง</th><th>โปรเจกต์</th><th>ยอด</th><th>วันที่</th><th>Action</th></tr></thead><tbody>'+
   all.map(d=>{
     const t=typeInfo[d.type]||typeInfo.quotation;
-    const to=d.type==='voucher'?d.staffName:d.client;
+    let to;
+    if(d.type==='voucher'){
+      const _s=d.staffId?getStaffById(d.staffId):null;
+      const _nick=_s?.nickname || d.staffNickname || '';
+      const _nm=d.staffName || _s?.name || '';
+      to=_nick ? `${_nm} <span style="color:var(--text2);font-weight:400">(${_nick})</span>` : (_nm||'—');
+    } else to=d.client;
     const isDraft = !!d.isDraft;
     const statusBadge = isDraft
       ? '<span style="padding:3px 8px;border-radius:10px;background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.3);font-size:10px;font-weight:700;color:var(--orange)">📝 ดราฟ</span>'
