@@ -3191,6 +3191,7 @@ const NOTIF_TYPES = {
   staff_added: { icon:'➕', bgColor:'rgba(0,180,255,.15)',  color:'var(--accent2)' },
   warning:     { icon:'⚠️', bgColor:'rgba(255,64,64,.15)',  color:'var(--red)' },
   praise:      { icon:'⭐', bgColor:'rgba(255,158,0,.15)',  color:'var(--orange)' },
+  project:     { icon:'🗂️', bgColor:'rgba(77,139,255,.15)', color:'#4d8bff' },
 };
 let _notifCache = [];
 let _notifListenerSet = false;
@@ -8188,7 +8189,7 @@ function renderProjects(){
 }
 // ป้ายผู้ดูแลโปรเจกต์: Admin (จัดการเอง) หรือ Manager (ชื่อเล่น+ชื่อจริง ไม่เอานามสกุล)
 function _projManagerLabel(p){
-  if(!p || !p.managerId) return {isAdmin:true};
+  if(!p || !p.managerId || p.managerId==='undefined') return {isAdmin:true};
   const uc=ls('mgr_users_cache')||{};
   const u=uc[p.managerId] || Object.values(uc).find(x=>x && x.uid===p.managerId);
   if(!u) return {isAdmin:false, name:'Manager'};
@@ -8201,8 +8202,8 @@ function _projManagerLabel(p){
 function _projManagerOptions(){
   const uc=ls('mgr_users_cache')||{};
   const map={};
-  Object.values(uc).forEach(u=>{ if(u && u.role==='manager' && u.uid) map[u.uid]=u; });
-  getProjects().forEach(p=>{ if(p.managerId && !map[p.managerId]){ const u=uc[p.managerId]||Object.values(uc).find(x=>x&&x.uid===p.managerId); map[p.managerId]=u||{uid:p.managerId,nickname:'Manager',name:''}; } });
+  Object.entries(uc).forEach(([uid,u])=>{ if(u && u.role==='manager'){ const id=u.uid||uid; map[id]={...u,uid:id}; } });
+  getProjects().forEach(p=>{ if(p.managerId && p.managerId!=='undefined' && !map[p.managerId]){ const u=uc[p.managerId]||Object.values(uc).find(x=>x&&x.uid===p.managerId); map[p.managerId]=u?{...u,uid:p.managerId}:{uid:p.managerId,nickname:'Manager',name:''}; } });
   return Object.values(map).map(u=>{ const first=(u.name||'').trim().split(/\s+/)[0]||''; const nick=u.nickname||''; return {uid:u.uid, label:((nick&&first&&first!==nick)?(nick+' '+first):(nick||first||u.email||'Manager'))}; })
     .sort((a,b)=>a.label.localeCompare(b.label,'th'));
 }
@@ -8916,6 +8917,20 @@ async function saveProject(){
   if(currentUser?.role==='manager'){
     try{ notifyAdmin(editingProjId?'project-updated':'project-created', {projId:proj.id, projName:proj.name}); }catch(e){}
     try{ renderMgrProjects(); renderMgrHome(); }catch(e){}
+  } else {
+    // 🗂️ Admin มอบหมาย/เปลี่ยน Manager → แจ้งเตือนเมเนเจอร์คนนั้น (เด้งที่กระดิ่ง + เขาจะเห็นโปรเจกต์)
+    try{
+      const prevMgr = existingProj?.managerId || '';
+      if(proj.managerId && proj.managerId!=='undefined' && proj.managerId!==prevMgr){
+        addNotification({
+          type:'project',
+          title:'🗂️ คุณได้รับมอบหมายโปรเจกต์ใหม่',
+          text:`${proj.name} — เข้าไปจัดการทีม / งบแต่ละคน / เดดไลน์แต่ละสายได้เลย`,
+          recipientUid: proj.managerId,
+          projId: proj.id
+        });
+      }
+    }catch(e){ console.warn('notify manager assign:', e); }
   }
   toast(editingProjId?'อัพเดทแล้ว ✅':'สร้างโปรเจกต์แล้ว ✅','success');updateQueueBadge();
   // 📤 ถ้าแก้ยอดของคนที่ส่งใบยืนยันไปแล้ว → ถามแอดมินว่าจะยกเลิกใบเดิม + ส่งใหม่ไหม
@@ -9343,7 +9358,9 @@ function renderProjDetail(){
   if(currentUser?.role !== 'admin') return; // 🔒 double-check
   const p=getProjects().find(x=>x.id===currentProjId);if(!p)return;
   document.getElementById('det-name').textContent=p.name;
-  document.getElementById('det-meta').textContent=`${p.client||''} | ${p.type||''} | ${fmtDate(p.date)} | ${p.cycle||''}`;
+  const _mi=_projManagerLabel(p);
+  const _mgrTxt=_mi.isAdmin?'👑 แอดมินจัดการเอง':('🗂️ ดูแลโดย '+(_mi.name||'Manager'));
+  document.getElementById('det-meta').textContent=`${p.client||''} | ${p.type||''} | ${fmtDate(p.date)} | ${_mgrTxt}`;
   const sb=document.getElementById('det-snapshot');
   if(p.snapshot){sb.style.display='';sb.innerHTML=`🔒 Snapshot ล็อค ${fmtDate(p.snapshot.date)} — ยอดรวม ${fmtB(p.snapshot.total)}`}else sb.style.display='none';
   const el=document.getElementById('det-workers');el.innerHTML='';
@@ -20431,8 +20448,12 @@ function getMgrProjects() {
 
 function getAllManagerUsers() {
   // Read from Firebase users cache (ls)
+  // ⚠️ user records ไม่ได้เก็บ field `uid` ไว้ข้างใน — key ของ object คือ uid จริง
+  //    จึงต้อง map key เข้าไปเป็น uid เสมอ ไม่งั้น dropdown จะได้ value="undefined"
   const usersRaw = ls('mgr_users_cache') || {};
-  return Object.values(usersRaw).filter(u => u.role === 'manager');
+  return Object.entries(usersRaw)
+    .filter(([uid, u]) => u && u.role === 'manager')
+    .map(([uid, u]) => ({ ...u, uid: u.uid || uid }));
 }
 
 // 👑 รายชื่อ Admin — ระบุจาก role=admin ใน account (แยกคนชื่อเล่นซ้ำได้ด้วย email/บัญชี)
