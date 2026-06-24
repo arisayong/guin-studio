@@ -4315,7 +4315,7 @@ async function saveMyNickname(){ return saveMyProfile(); }
 
 const IW_CATS = [
   {items:['ส่งงานล่าช้าโดยไม่แจ้งล่วงหน้า','ไม่แจ้งขยายเวลาก่อนถึง deadline','ละทิ้งงานกลางคัน']},
-  {items:['ไม่อัพเดทสถานะงานระหว่างดำเนินการ','หายจากการสื่อสารโดยไม่แจ้งเหตุผล']},
+  {items:['ไม่อัพเดทสถานะงานระหว่างดำเนินการ','หายจากการสื่อสารโดยไม่แจ้งเหตุผล','ไม่สื่อสารกับเพื่อนร่วมทีม']},
   {items:['ส่งงานไม่ผ่านมาตรฐานซ้ำหลังแก้แล้ว','ไม่ปฏิบัติตามคำแนะนำ QC']},
   {items:['เผยแพร่ไฟล์งานโดยไม่ได้รับอนุญาต','นำงานทีมไปอ้างอิงสร้างความเสียหาย']},
   {items:['ใช้ภาษาหยาบคาย/ก้าวร้าวต่อสมาชิก','ไม่ให้ความร่วมมือโดยไม่มีเหตุผล','ไม่แจ้งปัญหาที่กระทบงานทีม']}
@@ -4491,6 +4491,16 @@ function iaSelSub(el, val) {
   iaChk();
 }
 function iaChk() { document.getElementById('ia-submit-btn').disabled = !_iaSelItem; }
+// ✏️ อื่นๆ — พิมพ์หัวข้อชื่นชมเอง
+function iaSelOther(el){
+  _iaSelItem='';
+  document.querySelectorAll('#ia-cat-tabs button').forEach(b=>{b.classList.remove('btn-blue');b.classList.add('btn-outline');});
+  el.classList.add('btn-blue');el.classList.remove('btn-outline');
+  document.getElementById('ia-sub-list').innerHTML=`<input id="ia-other" class="form-input" placeholder="✏️ พิมพ์หัวข้อชื่นชมเอง..." oninput="_iaSetOther(this.value)" autocomplete="off" style="width:100%">`;
+  iaChk();
+  setTimeout(()=>document.getElementById('ia-other')?.focus(),50);
+}
+function _iaSetOther(v){ _iaSelItem=(v||'').trim(); iaChk(); }
 function iaFilterProj(q) {
   const projs = getProjects();
   const drop = document.getElementById('ia-proj-drop');
@@ -8626,7 +8636,12 @@ function renderWorkerList(cat,slot){
   const dur=parseFloat(document.getElementById('pj-duration')?.value)||0;
   const catColors={dub:'var(--orange)',adp:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',sub:'var(--red)',mgr:'var(--accent2)'};
   el.innerHTML=items.map((w,i)=>{
-    const s=getStaffById(w.staffId);if(!s)return'';
+    const s=getStaffById(w.staffId);
+    const hasPerson=!!s;
+    const col=catColors[cat]||'var(--text)';
+    const nameBadge=hasPerson
+      ? `<span class="worker-name-badge" style="color:${col};cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px" onclick="openReplaceWorker('${cat}','${slot}',${i},event)" title="คลิกเพื่อเปลี่ยนคน">${s.nickname} <span style="font-size:9px;opacity:.55">🔄</span></span>`
+      : `<span class="worker-name-badge" style="color:#FF9E00;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;border:1px dashed rgba(255,158,0,.5);border-radius:7px;padding:3px 9px;background:rgba(255,158,0,.06)" onclick="openReplaceWorker('${cat}','${slot}',${i},event)" title="คลิกเพื่อเลือกคน">👤 + เลือกคน</span>`;
     const isMin=w.unit==='นาที';const calcAmt=isMin&&dur>0?(w.amount||0)*dur:(w.amount||0);
     const tax=parseFloat((document.getElementById(cat+'-tax')||{}).value)||0;
     const afterTax=Math.round(calcAmt*(1-tax/100));
@@ -8639,7 +8654,7 @@ function renderWorkerList(cat,slot){
     const calcHtml = amtLabel;
     const hasComment = !!(w.comment||'').trim();
     return`<div class="worker-rate-row" style="flex-wrap:wrap">
-      <span class="worker-name-badge" style="color:${catColors[cat]||'var(--text)'};cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px" onclick="openReplaceWorker('${cat}','${slot}',${i},event)" title="คลิกเพื่อเปลี่ยนคน">${s.nickname} <span style="font-size:9px;opacity:.55">🔄</span></span>
+      ${nameBadge}
       <input type="number" value="${w.amount||''}" placeholder="ราคา" min="0" step="any" data-price
         style="flex:1;min-width:80px;padding:6px 9px;background:rgba(0,0,0,.35);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px"
         onwheel="this.blur()"
@@ -8651,6 +8666,7 @@ function renderWorkerList(cat,slot){
       </select>
       ${calcHtml}
       <button class="btn btn-xs" style="background:${hasComment?'rgba(155,111,255,.18)':'rgba(255,255,255,.05)'};color:${hasComment?'#9B6FFF':'var(--text2)'};border:1px solid ${hasComment?'rgba(155,111,255,.35)':'var(--border2)'};padding:3px 8px" onclick="toggleWorkerComment('${cat}','${slot}',${i})" title="หมายเหตุ/คอมเมนต์">💬${hasComment?' •':''}</button>
+      <button class="btn btn-xs" style="background:rgba(0,180,255,.1);color:var(--accent2);border:1px solid rgba(0,180,255,.3);padding:3px 8px" onclick="copyWorkerRow('${cat}','${slot}',${i})" title="ก๊อปปี้ค่า (ราคา/หน่วย) เป็นแถวใหม่ แล้วเลือกคนเพิ่ม">📋</button>
       <button class="btn btn-xs btn-red" onclick="removeFromSlot('${cat}','${slot}',${i})">✕</button>
       <div id="wcom-${cat}-${slot}-${i}" style="display:${hasComment?'block':'none'};flex-basis:100%;margin-top:6px">
         <textarea placeholder="หมายเหตุรายบุคคล เช่น หัก 200฿, ตักเตือนการส่งงานช้า, คนแทน..." style="width:100%;min-height:48px;background:rgba(155,111,255,.05);border:1px solid rgba(155,111,255,.2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px;padding:7px 10px;resize:vertical" oninput="updateSlotComment('${cat}','${slot}',${i},this.value)">${(w.comment||'').replace(/</g,'&lt;')}</textarea>
@@ -8659,6 +8675,14 @@ function renderWorkerList(cat,slot){
   }).join('');
 }
 
+// 📋 ก๊อปปี้ค่าของแถว (ราคา/หน่วย/หมายเหตุ) เป็นแถวใหม่ที่ยังไม่ระบุคน → ผู้ใช้เลือกชื่อเอง
+function copyWorkerRow(cat,slot,i){
+  const arr=(formSlots[cat]||{})[slot]; if(!arr||!arr[i])return;
+  const src=arr[i];
+  arr.splice(i+1,0,{staffId:'', amount:src.amount, unit:src.unit, comment:src.comment||''});
+  renderWorkerList(cat,slot); calcProjSummary();
+  toast('📋 ก๊อปปี้ค่าแล้ว — กด "เลือกคน" ที่แถวใหม่','success');
+}
 // Toggle the comment textarea for a worker
 function toggleWorkerComment(cat,slot,i){
   const el=document.getElementById('wcom-'+cat+'-'+slot+'-'+i);
@@ -8810,6 +8834,7 @@ async function saveProject(){
   Object.entries(formSlots).forEach(([cat,slots])=>{
     Object.entries(slots).forEach(([slot,arr])=>{
       arr.forEach(w=>{
+        if(!w.staffId) return; // ข้าม placeholder ที่ยังไม่เลือกคน (ก๊อปปี้ค่าไว้/จาก calc)
         const amt=w.unit==='นาที'&&dur>0?(w.amount||0)*dur:(w.amount||0);
         workers.push({id:w.staffId,slot:cat+'-'+slot,amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'นาที',status:'pending',note:'',comment:w.comment||''});
       });
@@ -18935,8 +18960,25 @@ async function deleteCalcDraft(id){
 
 async function convertCalcToProject(id){
   const d = getCalcDrafts().find(x=>x.id===id); if(!d) return;
-  if(!confirm('แปลงแบบร่างนี้เป็นโปรเจกต์จริง?\n(คุณต้องเลือกคนทำงานจริงในหน้าแก้ไขโปรเจกต์ทีหลัง)')) return;
+  if(!confirm('แปลงแบบร่างนี้เป็นโปรเจกต์จริง?\n(ช่องและยอดจะถูกสร้างให้ตามที่คำนวน — คุณแค่กดเลือกชื่อคนเพิ่ม)')) return;
   const sum = calcDraftSummary(d);
+  const dur = parseFloat(d.duration)||0;
+  // 🔧 สร้างแถว placeholder ตามจำนวนคน + ราคา/หน่วยที่คำนวนไว้ (ยังไม่ระบุชื่อ — ผู้ใช้เลือกเอง)
+  const _cats = _migrateCalcCats(d.cats||{});
+  const _placeholders = [];
+  Object.entries(_cats).forEach(([catKey, c])=>{
+    if(!CALC_CATS.find(x=>x.key===catKey)) return;
+    (c.slots||[]).forEach((sl, slotIdx)=>{
+      const ppl = Math.max(1, parseInt(sl.ppl)||1);
+      const rate = parseFloat(sl.rate)||0;
+      const unit = (sl.unit==='per-minute') ? 'นาที' : 'เหมา';
+      const slotKey = catKey==='dub' ? (slotIdx===0 ? 'main' : 'sub') : 'only';
+      const finalAmt = (unit==='นาที' && dur>0) ? Math.round(rate*dur) : Math.round(rate);
+      for(let n=0;n<ppl;n++){
+        _placeholders.push({ id:'', slot:catKey+'-'+slotKey, amount:finalAmt, ratePerUnit:rate, unit, status:'pending', note:'', comment:'' });
+      }
+    });
+  });
   const proj = {
     id: 'P'+Date.now(),
     name: d.name || '(จากแบบร่าง) '+new Date().toLocaleDateString('th-TH'),
@@ -18950,7 +18992,7 @@ async function convertCalcToProject(id){
     deadline: '',
     cycle: '',
     note: d.note || '',
-    workers: [], // empty - user must select real people
+    workers: _placeholders, // แถวตามที่คำนวน (ยังไม่ระบุชื่อ) — ผู้ใช้เลือกคนเพิ่มในหน้าแก้ไข
     tax: {
       dub: d.cats.dub?.main?.tax || d.cats.dub?.tax || 0,
       adp: d.cats.adp?.tax||0, mix: d.cats.mix?.tax||0,
@@ -21242,7 +21284,7 @@ async function submitMgrRenameReq(){
 // ── MGR: Warning request ──
 const IW_CATS_MGR=[
   {items:['ส่งงานล่าช้าโดยไม่แจ้งล่วงหน้า','ไม่แจ้งขยายเวลาก่อนถึง deadline','ละทิ้งงานกลางคัน']},
-  {items:['ไม่อัพเดทสถานะงานระหว่างดำเนินการ','หายจากการสื่อสารโดยไม่แจ้งเหตุผล']},
+  {items:['ไม่อัพเดทสถานะงานระหว่างดำเนินการ','หายจากการสื่อสารโดยไม่แจ้งเหตุผล','ไม่สื่อสารกับเพื่อนร่วมทีม']},
   {items:['ส่งงานไม่ผ่านมาตรฐานซ้ำหลังแก้แล้ว','ไม่ปฏิบัติตามคำแนะนำ QC']},
   {items:['เผยแพร่ไฟล์งานโดยไม่ได้รับอนุญาต','นำงานทีมไปอ้างอิงสร้างความเสียหาย']},
   {items:['ใช้ภาษาหยาบคาย/ก้าวร้าวต่อสมาชิก','ไม่ให้ความร่วมมือโดยไม่มีเหตุผล','ไม่แจ้งปัญหาที่กระทบงานทีม']}
@@ -21269,6 +21311,19 @@ function mgrWarnSelCat(idx,el){
       <span style="width:8px;height:8px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2)"></span>${it}</div>`
   ).join('');
   document.getElementById('mgr-warn-submit').disabled=true;
+}
+// ✏️ อื่นๆ — พิมพ์หัวข้อเอง
+function mgrWarnSelOther(el){
+  _mgrWarnSelItem='';
+  document.querySelectorAll('#mgr-warn-cats button').forEach(b=>{b.classList.remove('btn-blue');b.classList.add('btn-outline');});
+  el.classList.remove('btn-outline');el.classList.add('btn-blue');
+  document.getElementById('mgr-warn-subs').innerHTML=`<input id="mgr-warn-other" class="form-input" placeholder="✏️ พิมพ์หัวข้อ/เหตุผลเอง..." oninput="_mgrWarnSetOther(this.value)" autocomplete="off" style="width:100%">`;
+  document.getElementById('mgr-warn-submit').disabled=true;
+  setTimeout(()=>document.getElementById('mgr-warn-other')?.focus(),50);
+}
+function _mgrWarnSetOther(v){
+  _mgrWarnSelItem=(v||'').trim();
+  document.getElementById('mgr-warn-submit').disabled=!_mgrWarnSelItem;
 }
 function mgrWarnSelSub(el,val){
   _mgrWarnSelItem=val;
@@ -21635,6 +21690,7 @@ const _origSaveStaff = window.saveStaff;
      <button class="btn btn-outline btn-sm" onclick="mgrWarnSelCat(2,this)">3. คุณภาพงาน</button>
      <button class="btn btn-outline btn-sm" onclick="mgrWarnSelCat(3,this)">4. ความลับ</button>
      <button class="btn btn-outline btn-sm" onclick="mgrWarnSelCat(4,this)">5. พฤติกรรม</button>
+     <button class="btn btn-outline btn-sm" onclick="mgrWarnSelOther(this)">✏️ อื่นๆ</button>
     </div>
     <div id="mgr-warn-subs" style="display:flex;flex-direction:column;gap:5px"></div>
    </div>
@@ -21751,6 +21807,7 @@ const _origSaveStaff = window.saveStaff;
      <button class="btn btn-outline btn-sm" onclick="iaSelCat(2,this)">3. คุณภาพงาน</button>
      <button class="btn btn-outline btn-sm" onclick="iaSelCat(3,this)">4. ความเป็นมืออาชีพ</button>
      <button class="btn btn-outline btn-sm" onclick="iaSelCat(4,this)">5. ทัศนคติ/ทีม</button>
+     <button class="btn btn-outline btn-sm" onclick="iaSelOther(this)">✏️ อื่นๆ</button>
     </div>
     <div id="ia-sub-list" style="display:flex;flex-direction:column;gap:5px"></div>
    </div>
