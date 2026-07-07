@@ -5199,7 +5199,7 @@ async function enterApp(){
   try { await loadWarningsFromFirebase(); } catch(e) {}
   try { await loadAppreciationsFromFirebase(); } catch(e) {}
   try { await loadCalcDraftsFromFirebase(); } catch(e) {}
-  try { await loadMgrRequests(); await loadManagerUsers(); await loadMgrSuspended(); } catch(e) {}
+  try { await loadMgrRequests(); await loadManagerUsers(); await loadMgrSuspended(); await loadTeamLeft(); } catch(e) {}
   // Load tracking cards from Firebase
   try {
     if(_fbDatabase){
@@ -5365,6 +5365,7 @@ async function enterApp(){
   try{startAppreciationsSync();}catch(e){}
   try{startCalcDraftsSync();}catch(e){}
   try{startMgrSuspendedSync();}catch(e){}
+  try{startTeamLeftSync();}catch(e){}
   try{loadPaymentAccountsFromFirebase();startPaymentAccountsSync();}catch(e){}
   } catch(e) {
     console.error('enterApp failed:', e);
@@ -12646,21 +12647,28 @@ function renderStaff(){
     try{ syncManagerCategoryFromRoles(); separateAdminsFromManagerCategory(); }catch(e){}
     const data=getStaffData();
     const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
+    // 🚪 คนที่ออกจากทีม — ไม่นับในจำนวนทีม + ไม่ขึ้นในหมวดปกติ (ยังเก็บข้อมูลไว้)
+    const _left=getTeamLeft();
+    const _active=s=>s && !_left[s.id];
     // Deduplicate by name to avoid counting multi-category staff multiple times
-    const allNames = new Set(Object.values(data).flat().map(s=>s.name+'|'+(s.nickname||'')));
+    const allNames = new Set(Object.values(data).flat().filter(_active).map(s=>s.name+'|'+(s.nickname||'')));
     const total = allNames.size;
+    // จำนวนคนที่ออกจากทีม (นับตาม id ไม่ซ้ำ)
+    const _leftIds = new Set(Object.values(data).flat().filter(s=>s&&_left[s.id]).map(s=>s.id));
+    const leftCount = _leftIds.size;
     // Summary row
     const sumEl=document.getElementById('team-summary-row');
     if(sumEl){
       let chips='';
       Object.entries(CATS).forEach(([key,cat])=>{
-        const count=(data[key]||[]).length;
+        const count=(data[key]||[]).filter(_active).length;
         if(!count)return;
         chips+='<div class="team-sum-chip" style="background:'+catColors[key]+'18;border:1px solid '+catColors[key]+'33;color:'+catColors[key]+'">'+cat.label.split(' ')[0]+' <strong>'+count+'</strong></div>';
       });
       const _adminN=getAdminMembers().length;
       if(_adminN) chips+='<div class="team-sum-chip" style="background:rgba(255,80,80,.12);border:1px solid rgba(255,80,80,.3);color:#FF6060">👑 <strong>'+_adminN+'</strong></div>';
       chips+='<div class="team-sum-chip" style="background:var(--dim);border:1px solid var(--border2);color:var(--text2)">👥 รวม <strong>'+total+'</strong> คน</div>';
+      if(leftCount) chips+='<div class="team-sum-chip" style="background:rgba(150,150,150,.12);border:1px solid rgba(150,150,150,.3);color:var(--text2)">🚪 ออกทีม <strong>'+leftCount+'</strong></div>';
       sumEl.innerHTML=chips;
     }
     // Tabs
@@ -12674,7 +12682,7 @@ function renderStaff(){
       allTab.onclick=()=>{activeStaffCat='all';renderStaff();};
       wrap.appendChild(allTab);
       Object.entries(CATS).forEach(([key,cat])=>{
-        const count=(data[key]||[]).length;
+        const count=(data[key]||[]).filter(_active).length;
         if(!count)return;
         const tab=document.createElement('div');
         tab.className='tab'+(activeStaffCat===key?' active':'');
@@ -12692,6 +12700,15 @@ function renderStaff(){
         aTab.textContent='👑 Admin '+_adminCount;
         aTab.onclick=()=>{activeStaffCat='admin';renderStaff();};
         wrap.appendChild(aTab);
+      }
+      // 🚪 แท็บ "ออกจากทีมแล้ว"
+      if(leftCount){
+        const lTab=document.createElement('div');
+        lTab.className='tab'+(activeStaffCat==='left'?' active':'');
+        lTab.style.color=activeStaffCat==='left'?'var(--text)':'var(--text2)';
+        lTab.textContent='🚪 ออกทีม '+leftCount;
+        lTab.onclick=()=>{activeStaffCat='left';renderStaff();};
+        wrap.appendChild(lTab);
       }
       const modeWrap=document.createElement('div');
       modeWrap.style.cssText='margin-left:auto;display:flex;gap:4px';
@@ -12719,9 +12736,11 @@ function renderStaffGrid(){
   const q=(document.getElementById('staff-search')||{}).value?.toLowerCase()||'';
   const cc={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
   let html='';
+  const _left=getTeamLeft();
   Object.entries(CATS).forEach(([key,cat])=>{
+    if(activeStaffCat==='left') return; // แท็บ "ออกทีม" แสดงเฉพาะโซนด้านล่าง
     if(activeStaffCat!=='all'&&activeStaffCat!==key)return;
-    const staff=(data[key]||[]).filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q));
+    const staff=(data[key]||[]).filter(s=>!_left[s.id]).filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q));
     if(!staff.length)return;
     const color=cc[key]||'var(--text2)';
     html+='<div style="margin-bottom:20px;border-left:4px solid '+color+';border-radius:12px;overflow:hidden;background:var(--card)">';
@@ -12777,6 +12796,7 @@ function renderStaffGrid(){
         html+='<button onclick="openEditStaff(\''+s.id+'\',\''+key+'\')" style="padding:3px 10px;background:none;border:1px solid rgba(255,255,255,.2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:11px;cursor:pointer">✏️ แก้ไข</button>';
         html+=resetBtn;
         html+='<button onclick="deleteStaff(\''+s.id+'\',\''+key+'\')" style="padding:3px 10px;background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.3);border-radius:6px;color:var(--red);font-family:Kanit;font-size:11px;cursor:pointer">🗑️ ลบ</button>';
+        html+='<button onclick="adminLeaveTeam(\''+s.id+'\')" style="padding:3px 10px;background:rgba(150,150,150,.1);border:1px solid rgba(150,150,150,.35);border-radius:6px;color:var(--text2);font-family:Kanit;font-size:11px;cursor:pointer">🚪 ออกทีม</button>';
         html+='</div></div></div>';
       });
       html+='</div>';
@@ -12802,6 +12822,38 @@ function renderStaffGrid(){
         html+='</div></div>';
       });
       html+='</div></div>';
+    }
+  }
+  // 🚪 โซน "ออกจากทีมแล้ว" — สีเทา + ปุ่มกู้คืน (แสดงในแท็บทั้งหมด/ออกทีม)
+  if(activeStaffCat==='all'||activeStaffCat==='left'){
+    const seen=new Set(); const leftMembers=[];
+    Object.values(data).forEach(arr=>{ (arr||[]).forEach(s=>{ if(s&&_left[s.id]&&!seen.has(s.id)){ seen.add(s.id); leftMembers.push(s); } }); });
+    const lm=leftMembers.filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q));
+    if(lm.length){
+      const gcol='#8a8a8a';
+      html+='<div style="margin-bottom:20px;border-left:4px solid '+gcol+';border-radius:12px;overflow:hidden;background:var(--card)">';
+      html+='<div style="padding:12px 18px;background:rgba(255,255,255,.025);font-weight:700;color:'+gcol+'">🚪 ออกจากทีมแล้ว <span style="font-size:12px;font-weight:400;color:var(--text2)">('+lm.length+' คน · ข้อมูลยังอยู่ กู้คืนได้)</span></div>';
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:8px;padding:12px 16px">';
+      lm.forEach(s=>{
+        const info=_left[s.id]||{};
+        const av=(s.nickname||s.name||'?')[0];
+        const cats=(s.categories||[]).map(c=>CATS[c]?.label||c).join(', ');
+        let leftAt=''; try{ leftAt=info.at?new Date(info.at).toLocaleDateString('th-TH'):''; }catch(e){}
+        html+='<div style="display:flex;flex-direction:column;padding:12px 14px;background:rgba(130,130,130,.06);border:1px dashed rgba(150,150,150,.4);border-radius:11px;filter:grayscale(.7);opacity:.8">'
+          +'<div style="display:flex;align-items:center;gap:10px">'
+          +'<span style="width:32px;height:32px;border-radius:50%;background:rgba(150,150,150,.2);color:'+gcol+';display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">'+av+'</span>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-weight:700;color:var(--text2);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(s.nickname||s.name)+' <span style="font-size:11px;color:var(--text2);font-weight:400">'+(s.name||'')+'</span></div>'
+          +(cats?'<div style="font-size:10px;color:var(--text2)">'+cats+'</div>':'')
+          +'</div></div>'
+          +'<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07)">'
+          +'<span style="font-size:10px;color:var(--text2)">'+(leftAt?'ออกเมื่อ '+leftAt:'')+'</span>'
+          +'<button class="btn btn-sm" style="padding:5px 12px;font-size:11px;background:rgba(0,223,160,.15);border:1px solid rgba(0,223,160,.4);color:var(--green);border-radius:7px;cursor:pointer;font-family:Kanit" onclick="adminRejoinTeam(\''+s.id+'\')">↩️ กู้คืนเข้าทีม</button>'
+          +'</div></div>';
+      });
+      html+='</div></div>';
+    } else if(activeStaffCat==='left'){
+      html+='<div style="padding:32px;text-align:center;color:var(--text2)">— ไม่มีสมาชิกที่ออกจากทีม —</div>';
     }
   }
   el.innerHTML=html||'<div style="padding:32px;text-align:center;color:var(--text2)">ยังไม่มีสมาชิก — กด ➕ เพิ่มสมาชิก</div>';
@@ -20589,6 +20641,10 @@ function teamMemberCardHTML(s, col, viewer){
       <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(255,64,64,.35);color:#FF6060" onclick="event.stopPropagation();teamWarn('${s.id}')">✉️ เตือน</button>
       <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(255,199,0,.4);color:#FFC700" onclick="event.stopPropagation();teamAppr('${s.id}')">⭐ ชื่นชม</button>
     </div>`;
+    // 🚪 ออกจากทีม — เฉพาะแอดมิน
+    if(viewer==='admin'){
+      actions+=`<div style="margin-top:6px"><button class="btn btn-sm btn-outline" style="width:100%;padding:5px 4px;font-size:11px;border-color:rgba(150,150,150,.4);color:var(--text2)" onclick="event.stopPropagation();adminLeaveTeam('${s.id}')">🚪 ออกจากทีม</button></div>`;
+    }
   } else if(rank){
     const bc=rank==='admin'?'#FF6060':'var(--accent2)';
     const bb=rank==='admin'?'rgba(255,80,80,.15)':'rgba(21,101,255,.15)';
@@ -21581,6 +21637,52 @@ async function mgrUnsuspendStaff(staffId, staffName){
   _refreshTeamViews();
   toast(currentUser?.role==='manager'?'▶️ คืนงานแล้ว — แจ้งแอดมินเรียบร้อย':'▶️ คืนงานแล้ว','info');
 }
+// ══════════════════════════════════════════════
+// ออกจากทีม (admin only) — ย้ายสมาชิกไปโซน "ออกจากทีมแล้ว"
+//   เก็บ staffId ไว้ใน team_left (+ Firebase teamLeft/) · ข้อมูลใน staff_v3 ยังอยู่ครบ
+//   คนที่ออกจะไม่ถูกนับในจำนวนทีม + ไม่ขึ้นในหมวดปกติ · กู้คืนกลับเข้าทีมได้
+// ══════════════════════════════════════════════
+function getTeamLeft(){ return ls('team_left')||{}; }
+function isStaffLeft(id){ return !!getTeamLeft()[id]; }
+async function saveTeamLeft(map){
+  ls('team_left', map);
+  if(_fbDatabase){ try{ await _fbDatabase.ref('teamLeft').set(map); }catch(e){} }
+}
+async function loadTeamLeft(){
+  if(!_fbDatabase) return;
+  try{ const snap=await _fbDatabase.ref('teamLeft').get(); if(snap.exists()) ls('team_left', snap.val()||{}); }catch(e){}
+}
+function startTeamLeftSync(){
+  if(!_fbDatabase) return;
+  try{
+    _fbDatabase.ref('teamLeft').on('value', snap=>{
+      ls('team_left', snap.exists()?(snap.val()||{}):{});
+      const pg=document.getElementById('page-staff');
+      if(pg && !pg.classList.contains('hidden')) try{ renderStaff(); }catch(e){}
+    }, err=>{ console.warn('[teamLeft] listener:', err?.code||err?.message); });
+  }catch(e){}
+}
+async function adminLeaveTeam(staffId, staffName){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const s=getStaffById(staffId);
+  const nm=s?(s.nickname||s.name):(staffName||staffId);
+  if(!confirm(`ให้ "${nm}" ออกจากทีม?\n\nชื่อจะถูกย้ายไปโซน "ออกจากทีมแล้ว" และจะไม่ถูกนับในจำนวนทีม\nข้อมูลยังอยู่ครบ — กู้คืนกลับเข้าทีมได้ภายหลัง`)) return;
+  const map=getTeamLeft();
+  map[staffId]={ by:currentUser?.nickname||currentUser?.email||'Admin', at:new Date().toISOString(), name:nm };
+  await saveTeamLeft(map);
+  renderStaff();
+  toast(`🚪 ย้าย "${nm}" ออกจากทีมแล้ว`,'info');
+}
+async function adminRejoinTeam(staffId, staffName){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const map=getTeamLeft();
+  const nm=(map[staffId]&&map[staffId].name)||staffName||staffId;
+  delete map[staffId];
+  await saveTeamLeft(map);
+  renderStaff();
+  toast(`✅ กู้คืน "${nm}" กลับเข้าทีมแล้ว`,'success');
+}
+
 // refresh หน้าทีมที่กำลังเปิด (admin: staff/staff-detail · manager: mgr-team)
 function _refreshTeamViews(){
   if(currentUser?.role==='manager'){ try{renderMgrTeam();}catch(e){} }
