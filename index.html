@@ -7401,6 +7401,7 @@ function findDuplicateStaff(){
   const groupsByEmail = {};   // email → [staff,...]
   const groupsByAccount = {}; // bank+account → [staff,...]
   const groupsByAllNames = {}; // ชื่อเล่น+ชื่อจริง+นามสกุล ตรงกันหมด → [staff,...]
+  const groupsByNameNick = {}; // ชื่อจริง+ชื่อเล่น ตรงกัน (ไม่ต้องมีนามสกุล) → จับ record ที่ข้อมูลไม่ครบ
 
   allStaff.forEach(s => {
     // by email
@@ -7421,6 +7422,11 @@ function findDuplicateStaff(){
     if(nk && nm && ln && nk.length > 0 && nm.length > 0 && ln.length > 0){
       const key3 = `${nk}|${nm}|${ln}`;
       (groupsByAllNames[key3] = groupsByAllNames[key3] || []).push(s);
+    }
+    // 🧠 By name + nickname (2 field) — จับคนที่มี record thin (ไม่มี email/นามสกุล) ซ้ำกับ record หลัก
+    if(nk && nm){
+      const key2 = `${nk}|${nm}`;
+      (groupsByNameNick[key2] = groupsByNameNick[key2] || []).push(s);
     }
   });
 
@@ -7452,15 +7458,23 @@ function findDuplicateStaff(){
     const [nk, nm, ln] = k.split('|');
     _addGroup(members, `👤 ชื่อเล่น + ชื่อจริง + นามสกุล ตรงกันหมด: ${nk} / ${nm} ${ln}`);
   });
+  Object.entries(groupsByNameNick).forEach(([k, members]) => {
+    const [nk, nm] = k.split('|');
+    _addGroup(members, `🧩 ชื่อจริง + ชื่อเล่น ตรงกัน: ${nm} (${nk}) — อาจมี record ข้อมูลไม่ครบซ้ำ`);
+  });
 
   if(!dupGroups.length){
     resultEl.innerHTML = `<div style="padding:14px;background:rgba(0,223,160,.08);border:1px solid rgba(0,223,160,.3);border-radius:10px;color:var(--green);font-weight:700">✅ ไม่พบสมาชิกซ้ำ — staff ทั้ง ${allStaff.length} คนเป็น records แยกกัน</div>`;
     return;
   }
 
+  window._dupGroups = dupGroups;   // เก็บไว้ให้ปุ่ม "รวมร่างอัตโนมัติ" ใช้
+  const _totalDupRecords = dupGroups.reduce((a,g)=>a+(g.members.length-1),0);
   let html = `<div style="padding:14px;background:rgba(255,128,171,.08);border:1px solid rgba(255,128,171,.3);border-radius:10px;margin-bottom:12px">
     <div style="font-weight:800;color:#FF80AB;font-size:14px;margin-bottom:4px">⚠️ พบ ${dupGroups.length} กลุ่มที่อาจเป็นคนซ้ำกัน</div>
-    <div style="font-size:11px;color:var(--text2)">สแกน ${allStaff.length} สต๊าฟ · กดปุ่มเลือก "เก็บคนนี้" → records อื่นในกลุ่มจะถูกลบและย้ายงาน workers ไปที่คนที่เลือก</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:10px">สแกน ${allStaff.length} สต๊าฟ · กด "เก็บคนนี้" เพื่อรวมทีละกลุ่ม หรือกดปุ่มด้านล่างรวมทั้งหมดทีเดียว</div>
+    <button class="btn btn-blue" onclick="bulkMergeAllDuplicates()" style="padding:10px 18px;font-weight:700">⚡ รวมร่างอัตโนมัติทั้งหมด (เก็บ record ข้อมูลครบสุด · ลบซ้ำ ${_totalDupRecords} อัน)</button>
+    <div style="font-size:10.5px;color:var(--text2);margin-top:6px">ระบบจะเลือก record ที่ข้อมูลครบสุดของแต่ละคนให้อัตโนมัติ + ย้ายงานมารวม + สำรอง backup ก่อนลบ</div>
   </div>`;
 
   dupGroups.forEach((g, gi) => {
@@ -7579,6 +7593,69 @@ async function mergeDuplicateStaff(keepId, removeIds, keepName){
     setTimeout(()=>findDuplicateStaff(), 600);
   } catch(e){
     console.error('mergeDuplicateStaff:', e);
+    toast('❌ '+e.message,'error');
+  }
+}
+
+// ⚡ รวมร่างซ้ำทั้งหมดทีเดียว — cluster กลุ่มที่ตรวจเจอด้วย union-find แล้ว merge ทุกคลัสเตอร์
+//    เก็บ record ที่ข้อมูลครบสุดของแต่ละคน · ย้าย worker.id + users.staffId + ลบตัวซ้ำ · backup ก่อน
+async function bulkMergeAllDuplicates(){
+  const groups = window._dupGroups || [];
+  if(!groups.length){ toast('ยังไม่ได้สแกน หรือไม่พบสมาชิกซ้ำ — กด "🔍 สแกนตรวจ" ก่อน','info'); return; }
+  // 1) union-find รวมสมาชิกจากทุกกลุ่มที่ทับกัน → คลัสเตอร์ "คนเดียวกัน"
+  const byId = {};
+  const parent = {};
+  const find = x => { while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
+  const union = (a,b) => { const ra=find(a), rb=find(b); if(ra!==rb) parent[ra]=rb; };
+  groups.forEach(g => g.members.forEach(m => { if(m&&m.id){ byId[m.id]=m; if(parent[m.id]==null) parent[m.id]=m.id; } }));
+  groups.forEach(g => { const ids=g.members.map(m=>m&&m.id).filter(Boolean); for(let i=1;i<ids.length;i++) union(ids[0], ids[i]); });
+  const clusters = {};
+  Object.keys(byId).forEach(id => { const r=find(id); (clusters[r]=clusters[r]||[]).push(id); });
+  // 2) เลือก keep = record ข้อมูลครบสุด ต่อคลัสเตอร์
+  const _score = x => (x.email?3:0)+(x.promptpay?1:0)+(x.bank?1:0)+(x.account?1:0)+(x.qrUrl?1:0)+(x.phone?1:0)+((x.categories||[]).length);
+  const merges = [];
+  Object.values(clusters).forEach(ids => {
+    if(ids.length < 2) return;
+    const recs = ids.map(id=>byId[id]).sort((a,b)=>_score(b)-_score(a));
+    merges.push({ keepId: recs[0].id, removeIds: recs.slice(1).map(r=>r.id) });
+  });
+  if(!merges.length){ toast('ไม่มีอะไรต้องรวม','info'); return; }
+  const totalRemove = merges.reduce((a,m)=>a+m.removeIds.length,0);
+  if(!confirm(`⚡ รวมร่างอัตโนมัติ ${merges.length} คน · ลบ record ซ้ำ ${totalRemove} อัน\n\nระบบจะ:\n1. เก็บ record ที่ข้อมูลครบสุดของแต่ละคน\n2. ย้ายงานทั้งหมดในโปรเจกต์มารวมที่ record ที่เก็บ\n3. ผูกบัญชี user ที่ชี้ id เก่า → id ใหม่\n4. ลบ record ซ้ำออก\n\n💾 สำรอง backup ไว้ใน localStorage 24 ชม. · undo ไม่ได้\n\nยืนยันรวมทั้งหมด?`)) return;
+  try{
+    toast('⏳ กำลังรวมร่าง...','info');
+    // backup ครั้งเดียว
+    ls('_bulk_merge_backup_'+Date.now(), { at:new Date().toISOString(), merges, staffData:getStaffData(), projects:getProjects() });
+    // remove-id → keep-id
+    const remap = {}; merges.forEach(m => m.removeIds.forEach(rid => { remap[rid]=m.keepId; }));
+    const updates = {};
+    // 3) projects: ย้าย worker.id
+    const projs = getProjects(); let movedWorkers=0, movedProjs=0;
+    projs.forEach(p => { let dirty=false; (p.workers||[]).forEach(w => { if(remap[w.id]){ w.id=remap[w.id]; dirty=true; movedWorkers++; } }); if(dirty){ movedProjs++; updates['projects/'+p.id+'/workers']=p.workers; } });
+    // 4) users: ย้าย staffId
+    let movedUsers=0;
+    try{
+      if(_fbDatabase){
+        const usnap = await _fbDatabase.ref('users').get();
+        if(usnap.exists()){ Object.entries(usnap.val()).forEach(([uid,u])=>{ if(u && remap[u.staffId]){ updates['users/'+uid+'/staffId']=remap[u.staffId]; movedUsers++; } }); }
+      }
+    }catch(e){ console.warn('bulk users remap:', e); }
+    if(movedProjs) ls('projects', projs);   // อัปเดต cache ในเครื่องเสมอ
+    if(_fbDatabase && Object.keys(updates).length){ await _fbDatabase.ref().update(updates); }
+    // 5) staff_v3: ลบตัวซ้ำ (เก็บ record ที่เลือกไว้ตามตำแหน่งเดิมของมัน — ไม่ยัด role ที่ซ้ำกลับเข้ามา)
+    const data = getStaffData();
+    let removed=0;
+    Object.keys(data).forEach(cat => {
+      data[cat] = (Array.isArray(data[cat])?data[cat]:Object.values(data[cat]||{})).filter(s => {
+        if(s && remap[s.id]){ removed++; return false; }
+        return true;
+      });
+    });
+    saveStaffData(data);
+    toast(`✅ รวมร่างเสร็จ — เหลือคนละ 1 record · ลบซ้ำ ${removed} อัน · ย้ายงาน ${movedWorkers} ใน ${movedProjs} โปรเจกต์${movedUsers?' · ผูก user '+movedUsers:''}`,'success');
+    setTimeout(()=>{ try{findDuplicateStaff();}catch(e){} try{renderStaff();}catch(e){} }, 700);
+  }catch(e){
+    console.error('bulkMergeAllDuplicates:', e);
     toast('❌ '+e.message,'error');
   }
 }
@@ -12642,6 +12719,41 @@ function renderProfit(){
 // ══════════════════════════════════════════════
 // STAFF
 // ══════════════════════════════════════════════
+// identity ของ "คนคนเดียว" — ผูก record เข้าด้วยกันถ้าแชร์ "email" หรือ "ชื่อจริง+ชื่อเล่น"
+//   (คนเดิมที่มีหลาย record คนละ id / กรอกข้อมูลไม่ครบ จะถูกนับเป็นคนเดียว)
+//   ใช้ union-find เพื่อเชื่อม record ที่ thin (ไม่มี email) กับ record ที่มี email ผ่านชื่อที่ตรงกัน
+function _emKey(s){ const m=String(s&&s.email||'').toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/); return m?('e:'+m[0]):''; }
+function _nmKey(s){ const nm=String(s&&s.name||'').trim().toLowerCase(), nk=String(s&&s.nickname||'').trim().toLowerCase(); return (nm||nk)?('n:'+nm+'|'+nk):''; }
+function _buildPersonResolver(allStaffList){
+  const parent={};
+  const find=x=>{ while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
+  const union=(a,b)=>{ const ra=find(a),rb=find(b); if(ra!==rb) parent[ra]=rb; };
+  (allStaffList||[]).forEach(s=>{
+    const e=_emKey(s), n=_nmKey(s);
+    [e,n].filter(Boolean).forEach(k=>{ if(parent[k]==null) parent[k]=k; });
+    if(e && n) union(e,n);   // record นี้ทำให้ email-group กับ name-group เป็นคนเดียวกัน
+  });
+  return function(s){
+    const anchor=_emKey(s)||_nmKey(s);
+    if(!anchor) return 'x:'+((s&&s.id)||'');
+    return parent[anchor]==null ? anchor : find(anchor);
+  };
+}
+// ยุบ record ที่เป็นคนเดียวกันให้เหลือคนละ 1 — เก็บ record ที่ข้อมูลครบสุดไว้
+function _uniqByPerson(arr, resolve){
+  const r = resolve || _buildPersonResolver(arr);
+  const seen=new Map(); const out=[];
+  (arr||[]).forEach(s=>{
+    const k=r(s);
+    if(!seen.has(k)){ seen.set(k,out.length); out.push(s); }
+    else {
+      const idx=seen.get(k); const cur=out[idx];
+      const score=x=>((x.bank?1:0)+(x.promptpay?1:0)+(x.phone?1:0)+(x.account?1:0)+(x.qrUrl?1:0)+(x.email?1:0));
+      if(score(s)>score(cur)) out[idx]=s;
+    }
+  });
+  return out;
+}
 function renderStaff(){
   try{
     try{ syncManagerCategoryFromRoles(); separateAdminsFromManagerCategory(); }catch(e){}
@@ -12650,8 +12762,10 @@ function renderStaff(){
     // 🚪 คนที่ออกจากทีม — ไม่นับในจำนวนทีม + ไม่ขึ้นในหมวดปกติ (ยังเก็บข้อมูลไว้)
     const _left=getTeamLeft();
     const _active=s=>s && !_left[s.id];
-    // Deduplicate by name to avoid counting multi-category staff multiple times
-    const allNames = new Set(Object.values(data).flat().filter(_active).map(s=>s.name+'|'+(s.nickname||'')));
+    // resolver ผูก record เข้าเป็น "คนเดียว" (email/ชื่อ) — ใช้ร่วมทั้งหน้า
+    const _resolvePerson=_buildPersonResolver(Object.values(data).flat());
+    // Deduplicate by person identity — คนเดียวกันที่มีหลาย record นับครั้งเดียว
+    const allNames = new Set(Object.values(data).flat().filter(_active).map(_resolvePerson));
     const total = allNames.size;
     // จำนวนคนที่ออกจากทีม (นับตาม id ไม่ซ้ำ)
     const _leftIds = new Set(Object.values(data).flat().filter(s=>s&&_left[s.id]).map(s=>s.id));
@@ -12661,7 +12775,7 @@ function renderStaff(){
     if(sumEl){
       let chips='';
       Object.entries(CATS).forEach(([key,cat])=>{
-        const count=(data[key]||[]).filter(_active).length;
+        const count=_uniqByPerson((data[key]||[]).filter(_active), _resolvePerson).length;
         if(!count)return;
         chips+='<div class="team-sum-chip" style="background:'+catColors[key]+'18;border:1px solid '+catColors[key]+'33;color:'+catColors[key]+'">'+cat.label.split(' ')[0]+' <strong>'+count+'</strong></div>';
       });
@@ -12682,7 +12796,7 @@ function renderStaff(){
       allTab.onclick=()=>{activeStaffCat='all';renderStaff();};
       wrap.appendChild(allTab);
       Object.entries(CATS).forEach(([key,cat])=>{
-        const count=(data[key]||[]).filter(_active).length;
+        const count=_uniqByPerson((data[key]||[]).filter(_active), _resolvePerson).length;
         if(!count)return;
         const tab=document.createElement('div');
         tab.className='tab'+(activeStaffCat===key?' active':'');
@@ -12737,10 +12851,11 @@ function renderStaffGrid(){
   const cc={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
   let html='';
   const _left=getTeamLeft();
+  const _resolvePerson=_buildPersonResolver(Object.values(data).flat());
   Object.entries(CATS).forEach(([key,cat])=>{
     if(activeStaffCat==='left') return; // แท็บ "ออกทีม" แสดงเฉพาะโซนด้านล่าง
     if(activeStaffCat!=='all'&&activeStaffCat!==key)return;
-    const staff=(data[key]||[]).filter(s=>!_left[s.id]).filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q));
+    const staff=_uniqByPerson((data[key]||[]).filter(s=>!_left[s.id]), _resolvePerson).filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q));
     if(!staff.length)return;
     const color=cc[key]||'var(--text2)';
     html+='<div style="margin-bottom:20px;border-left:4px solid '+color+';border-radius:12px;overflow:hidden;background:var(--card)">';
