@@ -11668,8 +11668,9 @@ function renderConfirmCart(){
   `;
 
   foot.innerHTML = `
-    <div style="flex:1;font-size:11px;color:var(--text2);align-self:center;min-width:140px">💡 ติ๊กเฉพาะที่ต้องการแล้วกด "ส่งที่เลือก"</div>
+    <div style="flex:1;font-size:11px;color:var(--text2);align-self:center;min-width:140px">💡 ติ๊กเฉพาะที่ต้องการ · "ส่งที่เลือก" = ส่งใบยืนยัน · "จ่ายไปแล้ว" = บันทึกว่าจ่ายจริงไปแล้ว (ไม่ส่งใบ)</div>
     <button class="btn btn-outline" onclick="closeModal('modal-confirm-cart')">ปิด</button>
+    <button class="btn" style="background:rgba(0,223,160,.15);color:var(--green);border:1px solid rgba(0,223,160,.45);font-weight:800;padding:9px 16px;font-size:13.5px" onclick="markSelectedPaidFromCart()" title="กรณีจ่ายเงินจริงไปแล้ว (เช่น สถานะหลุดหลังแก้ชื่อ/รวมร่าง) — บันทึกเป็นจ่ายแล้วทันที ไม่ส่งใบยืนยัน">✅ จ่ายไปแล้ว (ที่เลือก)</button>
     <button class="btn" style="background:#9B6FFF;color:#fff;border:none;font-weight:800;padding:9px 18px;font-size:13.5px" onclick="sendSelectedFromCart()">📤 ส่งที่เลือก</button>
   `;
 }
@@ -11857,6 +11858,73 @@ async function sendSelectedFromCart(){
     renderConfirmCart();
   }
   try { renderQueue(); } catch(e){}
+}
+
+// ✅ ทำเครื่องหมาย "จ่ายไปแล้ว" หลายรายการจากตะกร้าทีเดียว
+//    ใช้กรณีจ่ายเงินจริงไปแล้วแต่สถานะหลุด (เช่น record ถูกแก้ชื่อ/รวมร่าง) — ไม่ส่งใบยืนยัน ไม่ออกใบใหม่
+async function markSelectedPaidFromCart(){
+  const selectedKeys = Array.from(document.querySelectorAll('[data-cart-item]'))
+    .filter(el => el.checked)
+    .map(el => el.dataset.cartItem);
+  if(!selectedKeys.length){ toast('ยังไม่ได้เลือกรายการ','warn'); return; }
+  // จัดกลุ่มตาม staff สำหรับ preview
+  const byStaff = {};
+  selectedKeys.forEach(key => {
+    const item = _confirmCart.get(key);
+    if(item) (byStaff[item.workerId] = byStaff[item.workerId] || []).push({key, item});
+  });
+  const peopleCount = Object.keys(byStaff).length;
+  const totalAmt = selectedKeys.reduce((a,k) => a + (Number(_confirmCart.get(k)?.customAmount)||0), 0);
+  const preview = Object.entries(byStaff).slice(0,6).map(([sid, arr]) => {
+    const s = getStaffById(sid);
+    const sum = arr.reduce((a,{item})=>a+(Number(item.customAmount)||0), 0);
+    return `• ${s?.nickname || sid} — ${arr.length} รายการ · ${fmtB(sum)}`;
+  }).join('\n');
+  const more = peopleCount > 6 ? `\n... และอีก ${peopleCount-6} คน` : '';
+  if(!confirm(
+    `✅ ทำเครื่องหมาย "จ่ายไปแล้ว"?\n\n` +
+    `ผู้รับ: ${peopleCount} คน (${selectedKeys.length} รายการ)\n` +
+    `ยอดรวม: ${fmtB(totalAmt)}\n\n` +
+    `${preview}${more}\n\n` +
+    `⚠️ ใช้เมื่อจ่ายเงินจริงไปแล้ว (เช่น สถานะหลุดหลังแก้ชื่อ/รวมร่างสมาชิก)\n` +
+    `รายการจะถูกบันทึกเป็น "จ่ายแล้ว" ทันที — ไม่ส่งใบยืนยัน ไม่แจ้งเตือนทีม`
+  )) return;
+  toast(`⏳ กำลังบันทึก ${selectedKeys.length} รายการ...`,'info');
+  const nowIso = new Date().toISOString();
+  let ok = 0, fail = 0;
+  for(const key of selectedKeys){
+    const item = _confirmCart.get(key);
+    if(!item) continue;
+    try {
+      const res = await saveProjectMerge(item.projId, (p)=>{
+        const w = (p.workers||[]).find(x => x.id === item.workerId && x.slot === item.slot);
+        if(w){
+          w.status = 'paid';
+          if(!w.paidAt) w.paidAt = nowIso;
+          if(!w.note) w.note = 'ทำเครื่องหมายจ่ายย้อนหลัง (bulk)';
+        }
+      });
+      if(res && res.ok === false) throw (res.error || new Error('save failed'));
+      ok++;
+      _confirmCart.delete(key);
+    } catch(e){
+      console.warn('cart mark-paid error:', e);
+      fail++;
+    }
+  }
+  _saveCart();
+  _updateCartFab();
+  if(fail > 0){
+    toast(`✅ บันทึกจ่ายแล้ว ${ok} · ล้มเหลว ${fail}`,'warn');
+  } else {
+    toast(`✅ บันทึกว่าจ่ายไปแล้ว ${ok} รายการ (${peopleCount} คน)`,'success');
+  }
+  if(_confirmCart.size === 0){
+    closeModal('modal-confirm-cart');
+  } else {
+    renderConfirmCart();
+  }
+  try { renderQueue(); updateQueueBadge(); } catch(e){}
 }
 
 function _renderStaffConfirmList(items){
