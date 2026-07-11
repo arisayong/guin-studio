@@ -3036,6 +3036,7 @@ function saveTrkCheckedCards(){
 let selectedYear = 'all';
 let selectedType = 'all';
 let selectedProjStatusQ = 'all'; // 'all' | 'active' (งานที่ยังไม่จบ = ไม่ done/cancelled)
+let selectedPayStatusQ = 'all';  // 'all' | 'full' (จ่ายครบ) | 'partial' (จ่ายบางส่วน) | 'none' (ยังไม่จ่าย)
 let chartMonthly = null;
 let chartCat = null;
 let billingStaffFilter = 'all';
@@ -8366,7 +8367,7 @@ function renderProjects(){
       <option value="admin" ${selectedManager==='admin'?'selected':''}>🛠️ แอดมินจัดการเอง</option>
       ${_projManagerOptions().map(m=>`<option value="${m.uid}" ${selectedManager===m.uid?'selected':''}>🗂️ ${m.label}</option>`).join('')}
     </select>`:''}
-    ${(selectedYear!=='all'||selectedMonth!=='all'||selectedClient!=='all'||selectedType!=='all'||selectedManager!=='all'||selectedProjStatusQ!=='all')?`<button class="btn btn-outline btn-sm" style="padding:6px 12px;font-size:11px" onclick="selectedYear='all';selectedMonth='all';selectedClient='all';selectedType='all';selectedManager='all';selectedProjStatusQ='all';renderProjects()">🔄 ล้างตัวกรอง</button>`:''}
+    ${(selectedYear!=='all'||selectedMonth!=='all'||selectedClient!=='all'||selectedType!=='all'||selectedManager!=='all'||selectedProjStatusQ!=='all'||selectedPayStatusQ!=='all')?`<button class="btn btn-outline btn-sm" style="padding:6px 12px;font-size:11px" onclick="selectedYear='all';selectedMonth='all';selectedClient='all';selectedType='all';selectedManager='all';selectedProjStatusQ='all';selectedPayStatusQ='all';renderProjects()">🔄 ล้างตัวกรอง</button>`:''}
   </div>`;
   // Build type filter
   const types=[...new Set(projs.map(p=>p.type).filter(Boolean))];
@@ -8374,7 +8375,12 @@ function renderProjects(){
   // 🔥 ปุ่มช็อตคัท "งานที่ยังไม่จบ" = ยังไม่เริ่ม + กำลังทำ (ไม่รวมเสร็จแล้ว/ยกเลิก)
   const _activeCount=projs.filter(p=>p.projStatus!=='done'&&p.projStatus!=='cancelled').length;
   const _statusChip=`<div class="filter-chip${selectedProjStatusQ==='active'?' active':''}" style="${selectedProjStatusQ==='active'?'':'border-color:rgba(255,158,0,.45);color:var(--orange);'}font-weight:700" onclick="selectedProjStatusQ=selectedProjStatusQ==='active'?'all':'active';renderProjects()">🔥 งานที่ยังไม่จบ (${_activeCount})</div>`;
-  if(tf)tf.innerHTML=_statusChip+['all',...types].map(t=>`<div class="filter-chip${selectedType===t?' active':''}" onclick="selectedType='${t}';renderProjects()">${t==='all'?'ทุกประเภท':t}</div>`).join('');
+  // 💸 ชิปกรองสถานะจ่ายทีม: จ่ายครบ / จ่ายบางส่วน / ยังไม่จ่าย (กดซ้ำเพื่อยกเลิก)
+  const _payCounts={full:0,partial:0,none:0};
+  projs.forEach(p=>{const st=_projPayState(p);if(_payCounts[st]!==undefined)_payCounts[st]++;});
+  const _payChip=(key,label,color)=>`<div class="filter-chip${selectedPayStatusQ===key?' active':''}" style="${selectedPayStatusQ===key?'':'border-color:'+color+'55;color:'+color+';'}font-weight:700" onclick="selectedPayStatusQ=selectedPayStatusQ==='${key}'?'all':'${key}';renderProjects()">${label} (${_payCounts[key]})</div>`;
+  const _payChips=_payChip('full','✅ จ่ายครบ','var(--green)')+_payChip('partial','🟡 จ่ายบางส่วน','var(--orange)')+_payChip('none','⏳ ยังไม่จ่าย','var(--red)');
+  if(tf)tf.innerHTML=_statusChip+_payChips+['all',...types].map(t=>`<div class="filter-chip${selectedType===t?' active':''}" onclick="selectedType='${t}';renderProjects()">${t==='all'?'ทุกประเภท':t}</div>`).join('');
   renderProjList();
 
   } catch(e){ console.error('renderProjects error:', e); }
@@ -8399,6 +8405,13 @@ function _projManagerOptions(){
   getProjects().forEach(p=>{ if(p.managerId && p.managerId!=='undefined' && !map[p.managerId]){ const u=uc[p.managerId]||Object.values(uc).find(x=>x&&x.uid===p.managerId); map[p.managerId]=u?{...u,uid:p.managerId}:{uid:p.managerId,nickname:'Manager',name:''}; } });
   return Object.values(map).map(u=>{ const first=(u.name||'').trim().split(/\s+/)[0]||''; const nick=u.nickname||''; return {uid:u.uid, label:((nick&&first&&first!==nick)?(nick+' '+first):(nick||first||u.email||'Manager'))}; })
     .sort((a,b)=>a.label.localeCompare(b.label,'th'));
+}
+// 💸 สถานะจ่ายทีมของโปรเจกต์: 'full' จ่ายครบ · 'partial' จ่ายบางส่วน · 'none' ยังไม่จ่าย · 'noteam' ไม่มีทีม
+function _projPayState(p){
+  const ws=(p&&p.workers||[]).filter(w=>w&&w.id);
+  if(!ws.length) return 'noteam';
+  const paid=ws.filter(w=>w.status==='paid').length;
+  return paid===ws.length?'full':paid>0?'partial':'none';
 }
 function renderProjList(){
   try {
@@ -8432,6 +8445,8 @@ function renderProjList(){
       if(selectedType!=='all'&&p.type!==selectedType)return false;
       // 🔥 Quick filter: งานที่ยังไม่จบ (ยังไม่เริ่ม/กำลังทำ — ไม่รวมเสร็จ/ยกเลิก)
       if(selectedProjStatusQ==='active'&&(p.projStatus==='done'||p.projStatus==='cancelled'))return false;
+      // 💸 Pay filter: จ่ายครบ/จ่ายบางส่วน/ยังไม่จ่าย
+      if(selectedPayStatusQ!=='all'&&_projPayState(p)!==selectedPayStatusQ)return false;
       // Search
       if(q&&!(p.name||'').toLowerCase().includes(q)&&!(p.client||'').toLowerCase().includes(q))return false;
       return true;
