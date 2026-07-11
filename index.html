@@ -13829,7 +13829,21 @@ function renderMyDash(){
       });
       return;
     }
-    // staff list โหลดแล้วแต่ไม่มี id นี้ — อาจเป็นแอดมินลบหรือเปลี่ยน id
+    // 🩹 Self-heal: staffId ชี้ record ที่ถูกลบ/รวมร่างไปแล้ว → ลอง re-resolve จากอีเมลบัญชี
+    //    (เคสหลังรวมร่างสมาชิกซ้ำ — record เก่าหาย แต่ record ใหม่อีเมลเดียวกันยังอยู่)
+    if(currentUser.email){
+      const healed = _findStaffByEmail(currentUser.email);
+      if(healed){
+        console.log('🩹 staffId เดิมหาย → re-resolve จากอีเมล:', currentUser.staffId, '→', healed.id);
+        currentUser.staffId = healed.id;
+        // persist ให้ครั้งหน้าไม่ต้องซ่อมซ้ำ
+        try{ if(_fbDatabase && currentUser.uid) _fbDatabase.ref('users/'+currentUser.uid+'/staffId').set(healed.id); }catch(e){}
+        s = healed;
+      }
+    }
+  }
+  if(!s){
+    // staff list โหลดแล้วแต่ไม่มี id นี้ + อีเมลก็หาไม่เจอ — ให้ผูกบัญชีใหม่
     console.warn('Staff id not found:', currentUser.staffId);
     _showMyDashNotLinked(currentUser.email);
     return;
