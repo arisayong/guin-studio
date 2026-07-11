@@ -1954,6 +1954,7 @@ body.sidebar-collapsed .main-content{
     <div class="tab active" onclick="switchDocsMain('worker',this)">💸 ใบสำคัญจ่ายทีม</div>
     <div class="tab" onclick="switchDocsMain('client',this)">📋 ใบเสนอราคา</div>
     <div class="tab" onclick="switchDocsMain('invoice',this)">🧾 ใบแจ้งหนี้</div>
+    <div class="tab" onclick="switchDocsMain('wht',this)">🏛️ ใบ 50 ทวิ</div>
     <div class="tab" onclick="switchDocsMain('history',this)">📁 ประวัติเอกสาร</div>
    </div>
 
@@ -2174,6 +2175,59 @@ body.sidebar-collapsed .main-content{
       </div>
       <div id="vc-byperson-list"></div>
      </div>
+    </div>
+   </div>
+
+   <!-- ══ TAB: ใบ 50 ทวิ (หนังสือรับรองการหักภาษี ณ ที่จ่าย) ══ -->
+   <div id="docs-wht" class="hidden">
+    <div class="section-card" style="border-left:4px solid #8a6d3b">
+     <div class="section-title">🏛️ หนังสือรับรองการหักภาษี ณ ที่จ่าย (ใบ 50 ทวิ)</div>
+     <div style="font-size:12px;color:var(--text2);margin-bottom:14px">ตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร · ออกให้ผู้ทำงานที่ถูกหักภาษี ณ ที่จ่าย · เอกสารทางการ (ขาว-ดำ)</div>
+     <!-- ผู้จ่ายเงิน -->
+     <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">① ผู้มีหน้าที่หักภาษี ณ ที่จ่าย (ผู้จ่ายเงิน) <span style="font-weight:400;text-transform:none;font-size:11px;opacity:.7">· กรอกครั้งเดียว ระบบจำให้</span></div>
+     <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:8px">
+      <div class="form-group" style="margin:0"><label class="form-label">ชื่อผู้จ่าย (บริษัท/บุคคล)</label><input class="form-input" id="wht-payer-name" placeholder="เช่น บริษัท กวิน โฮม สตูดิโอ จำกัด" oninput="_whtSavePayer()"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">เลขประจำตัวผู้เสียภาษี (13 หลัก)</label><input class="form-input" id="wht-payer-taxid" placeholder="0-0000-00000-00-0" maxlength="17" oninput="_whtSavePayer()"></div>
+     </div>
+     <div class="form-group" style="margin-bottom:14px"><label class="form-label">ที่อยู่ผู้จ่าย</label><input class="form-input" id="wht-payer-addr" placeholder="ที่อยู่ตามที่จดทะเบียน" oninput="_whtSavePayer()"></div>
+     <!-- ผู้รับเงิน -->
+     <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">② ผู้ถูกหักภาษี ณ ที่จ่าย (ผู้รับเงิน)</div>
+     <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px;margin-bottom:8px">
+      <div class="form-group" style="margin:0"><label class="form-label">เลือกจากทีมงาน</label>
+       <select class="form-input form-select" id="wht-staff-sel" onchange="_whtPickStaff()"><option value="">— เลือกทีมงาน / กรอกเอง —</option></select>
+      </div>
+      <div class="form-group" style="margin:0"><label class="form-label">ชื่อ-นามสกุล</label><input class="form-input" id="wht-payee-name" placeholder="ชื่อจริงผู้รับเงิน"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">เลขบัตรประชาชน (13 หลัก)</label><input class="form-input" id="wht-payee-taxid" placeholder="0-0000-00000-00-0" maxlength="17"></div>
+     </div>
+     <div class="form-group" style="margin-bottom:14px"><label class="form-label">ที่อยู่ผู้รับเงิน</label><input class="form-input" id="wht-payee-addr" placeholder="ที่อยู่ตามบัตรประชาชน"></div>
+     <!-- รายละเอียดเงินได้ -->
+     <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">③ เงินได้และภาษีที่หัก</div>
+     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:8px">
+      <div class="form-group" style="margin:0"><label class="form-label">ประเภทเงินได้</label>
+       <select class="form-input form-select" id="wht-income-type">
+        <option value="402">ม.40(2) ค่าจ้าง/ค่าบริการอิสระ</option>
+        <option value="401">ม.40(1) เงินเดือน ค่าจ้าง</option>
+        <option value="408">ม.40(8) อื่น ๆ</option>
+       </select>
+      </div>
+      <div class="form-group" style="margin:0"><label class="form-label">วันที่จ่ายเงิน</label><input class="form-input" id="wht-pay-date" type="date"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">จำนวนเงินที่จ่าย (฿)</label><input class="form-input" id="wht-amount" type="number" min="0" step="any" placeholder="0" onwheel="this.blur()" oninput="_whtCalc()"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">หักภาษี %</label><input class="form-input" id="wht-tax-pct" type="number" min="0" max="100" step="any" value="3" placeholder="3" onwheel="this.blur()" oninput="_whtCalc()"></div>
+     </div>
+     <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:rgba(138,109,59,.08);border:1px solid rgba(138,109,59,.3);border-radius:9px">
+      <span style="font-size:13px;color:var(--text2)">ภาษีที่หักนำส่ง: <strong id="wht-tax-amt" style="color:var(--orange)">฿0</strong></span>
+      <span style="font-size:13px;color:var(--text2)">ยอดจ่ายจริง: <strong id="wht-net-amt" style="color:var(--green)">฿0</strong></span>
+      <label style="font-size:12px;color:var(--text2);margin-left:auto;display:flex;align-items:center;gap:6px"><input type="checkbox" id="wht-manual-tax" onchange="_whtToggleManualTax()"> กรอกยอดภาษีเอง</label>
+      <input class="form-input" id="wht-tax-manual" type="number" min="0" step="any" placeholder="ยอดภาษี" style="display:none;width:120px;padding:6px 10px" oninput="_whtCalc()">
+     </div>
+     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="form-group" style="margin:0;width:130px"><label class="form-label">เล่มที่/เลขที่</label><input class="form-input" id="wht-doc-no" placeholder="อัตโนมัติ"></div>
+      <button class="btn btn-blue" style="margin-top:18px" onclick="issueWht()">🏛️ ออกใบ 50 ทวิ</button>
+     </div>
+    </div>
+    <div class="section-card">
+     <div class="section-title">📜 ใบ 50 ทวิ ที่ออกล่าสุด</div>
+     <div id="wht-recent-list" style="font-size:13px;color:var(--text2)">—</div>
     </div>
    </div>
 
@@ -2400,11 +2454,17 @@ body.sidebar-collapsed .main-content{
    <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:12px;margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">Budget จากลูกค้า</label>
      <div style="display:flex;gap:6px">
-      <select class="form-input form-select" id="pj-budget-type" style="width:100px;padding:10px 28px 10px 10px" onchange="calcProjSummary()" title="เหมา = ยอดรวม / นาที = คูณนาทีหนัง">
+      <select class="form-input form-select" id="pj-budget-type" style="width:110px;padding:10px 28px 10px 10px" onchange="toggleBudgetQty();calcProjSummary()" title="เหมา/โปรเจกต์ = ยอดรวม · นาที = คูณนาทีหนัง · ชั่วโมง/หน้า/วัน/บท = คูณจำนวนที่กรอก">
        <option value="flat">เหมา</option>
        <option value="per-minute">นาที</option>
+       <option value="per-hour">ชั่วโมง</option>
+       <option value="per-page">หน้า</option>
+       <option value="per-day">วัน</option>
+       <option value="per-episode">บท</option>
+       <option value="per-project">โปรเจกต์</option>
       </select>
       <input class="form-input" id="pj-budget" type="number" placeholder="0" min="0" step="any" data-price onwheel="this.blur()" oninput="calcProjSummary()" style="flex:1;min-width:0">
+      <input class="form-input" id="pj-budget-qty" type="number" placeholder="จำนวน" min="0" step="any" onwheel="this.blur()" oninput="calcProjSummary()" style="display:none;width:86px;text-align:center" title="จำนวน (ชั่วโมง/หน้า/วัน/บท)">
      </div>
      <div id="pj-budget-calc" style="font-size:11px;color:var(--text2);margin-top:4px;display:none"></div>
     </div>
@@ -2437,9 +2497,14 @@ body.sidebar-collapsed .main-content{
     <div class="form-group" style="margin:0"><label class="form-label">หมายเหตุ (การหัก / เงื่อนไข)</label><input class="form-input" id="pj-note" placeholder="เช่น หัก 3% ค่าธรรมเนียม"></div>
     <div class="form-group" style="margin:0">
      <label class="form-label">🗂️ มอบหมาย Manager</label>
-     <select class="form-input form-select" id="pj-manager">
+     <select class="form-input form-select" id="pj-manager" onchange="syncManagerFee()">
       <option value="">— ไม่มี / แอดมินจัดการเอง —</option>
      </select>
+     <div id="pj-manager-fee-wrap" style="display:none;align-items:center;gap:8px;margin-top:8px">
+      <span style="font-size:12px;color:var(--text2);white-space:nowrap">💰 ค่าเหมา Manager</span>
+      <input class="form-input" id="pj-manager-fee" type="number" min="0" step="any" data-price placeholder="0" onwheel="this.blur()" oninput="syncManagerFee()" style="flex:1;min-width:0;padding:7px 10px">
+      <span style="font-size:11px;color:var(--text2);white-space:nowrap">฿ (เหมา/โปรเจกต์)</span>
+     </div>
     </div>
    </div>
 
@@ -2970,6 +3035,7 @@ function saveTrkCheckedCards(){
 })();
 let selectedYear = 'all';
 let selectedType = 'all';
+let selectedProjStatusQ = 'all'; // 'all' | 'active' (งานที่ยังไม่จบ = ไม่ done/cancelled)
 let chartMonthly = null;
 let chartCat = null;
 let billingStaffFilter = 'all';
@@ -5366,6 +5432,7 @@ async function enterApp(){
   try{startCalcDraftsSync();}catch(e){}
   try{startMgrSuspendedSync();}catch(e){}
   try{startTeamLeftSync();}catch(e){}
+  try{startMgrColorsSync();}catch(e){}
   // ⛔ ปิด client auto-sync (เดิมยิงชีททุกครั้งที่รีหน้า → ถ้าสคริปต์เติมซ้ำจะเด้งรัว)
   //    ให้ใช้ onFormSubmit trigger ฝั่งชีทแทน (ยิงเฉพาะตอนมีคนกรอกฟอร์มจริง) + ปุ่มซิงค์มือ
   // 🧹 admin: ล้างชื่อซ้ำที่อีเมลตรงกัน 1 ครั้งหลังเข้าระบบ (รอ staff โหลดก่อน)
@@ -8299,12 +8366,15 @@ function renderProjects(){
       <option value="admin" ${selectedManager==='admin'?'selected':''}>🛠️ แอดมินจัดการเอง</option>
       ${_projManagerOptions().map(m=>`<option value="${m.uid}" ${selectedManager===m.uid?'selected':''}>🗂️ ${m.label}</option>`).join('')}
     </select>`:''}
-    ${(selectedYear!=='all'||selectedMonth!=='all'||selectedClient!=='all'||selectedType!=='all'||selectedManager!=='all')?`<button class="btn btn-outline btn-sm" style="padding:6px 12px;font-size:11px" onclick="selectedYear='all';selectedMonth='all';selectedClient='all';selectedType='all';selectedManager='all';renderProjects()">🔄 ล้างตัวกรอง</button>`:''}
+    ${(selectedYear!=='all'||selectedMonth!=='all'||selectedClient!=='all'||selectedType!=='all'||selectedManager!=='all'||selectedProjStatusQ!=='all')?`<button class="btn btn-outline btn-sm" style="padding:6px 12px;font-size:11px" onclick="selectedYear='all';selectedMonth='all';selectedClient='all';selectedType='all';selectedManager='all';selectedProjStatusQ='all';renderProjects()">🔄 ล้างตัวกรอง</button>`:''}
   </div>`;
   // Build type filter
   const types=[...new Set(projs.map(p=>p.type).filter(Boolean))];
   const tf=document.getElementById('type-filter');
-  if(tf)tf.innerHTML=['all',...types].map(t=>`<div class="filter-chip${selectedType===t?' active':''}" onclick="selectedType='${t}';renderProjects()">${t==='all'?'ทุกประเภท':t}</div>`).join('');
+  // 🔥 ปุ่มช็อตคัท "งานที่ยังไม่จบ" = ยังไม่เริ่ม + กำลังทำ (ไม่รวมเสร็จแล้ว/ยกเลิก)
+  const _activeCount=projs.filter(p=>p.projStatus!=='done'&&p.projStatus!=='cancelled').length;
+  const _statusChip=`<div class="filter-chip${selectedProjStatusQ==='active'?' active':''}" style="${selectedProjStatusQ==='active'?'':'border-color:rgba(255,158,0,.45);color:var(--orange);'}font-weight:700" onclick="selectedProjStatusQ=selectedProjStatusQ==='active'?'all':'active';renderProjects()">🔥 งานที่ยังไม่จบ (${_activeCount})</div>`;
+  if(tf)tf.innerHTML=_statusChip+['all',...types].map(t=>`<div class="filter-chip${selectedType===t?' active':''}" onclick="selectedType='${t}';renderProjects()">${t==='all'?'ทุกประเภท':t}</div>`).join('');
   renderProjList();
 
   } catch(e){ console.error('renderProjects error:', e); }
@@ -8312,13 +8382,14 @@ function renderProjects(){
 // ป้ายผู้ดูแลโปรเจกต์: Admin (จัดการเอง) หรือ Manager (ชื่อเล่น+ชื่อจริง ไม่เอานามสกุล)
 function _projManagerLabel(p){
   if(!p || !p.managerId || p.managerId==='undefined') return {isAdmin:true};
+  const color=getMgrColor(p.managerId)||'';
   const uc=ls('mgr_users_cache')||{};
   const u=uc[p.managerId] || Object.values(uc).find(x=>x && x.uid===p.managerId);
-  if(!u) return {isAdmin:false, name:'Manager'};
+  if(!u) return {isAdmin:false, name:'Manager', color};
   const first=(u.name||'').trim().split(/\s+/)[0]||'';
   const nick=u.nickname||'';
   const label=(nick && first && first!==nick) ? (nick+' '+first) : (nick||first||u.email||'Manager');
-  return {isAdmin:false, name:label};
+  return {isAdmin:false, name:label, color};
 }
 // รายชื่อเมเนเจอร์สำหรับ dropdown กรอง (manager-role + ที่ดูแลโปรเจกต์อยู่)
 function _projManagerOptions(){
@@ -8359,6 +8430,8 @@ function renderProjList(){
       if(selectedManager!=='all' && selectedManager!=='admin' && p.managerId!==selectedManager) return false;
       // Type filter
       if(selectedType!=='all'&&p.type!==selectedType)return false;
+      // 🔥 Quick filter: งานที่ยังไม่จบ (ยังไม่เริ่ม/กำลังทำ — ไม่รวมเสร็จ/ยกเลิก)
+      if(selectedProjStatusQ==='active'&&(p.projStatus==='done'||p.projStatus==='cancelled'))return false;
       // Search
       if(q&&!(p.name||'').toLowerCase().includes(q)&&!(p.client||'').toLowerCase().includes(q))return false;
       return true;
@@ -8406,9 +8479,11 @@ function renderProjList(){
           +(p.note?'<div style="font-size:10px;color:var(--text2)">📝 '+p.note+'</div>':'')
           +'</td>'
           +'<td style="padding:8px 6px;color:var(--text2)">'+(p.client||'—')+'</td>'
-          +(function(){const mi=_projManagerLabel(p);return mi.isAdmin
-              ?'<td style="padding:8px 6px"><span style="font-size:10px;padding:2px 9px;border-radius:8px;background:rgba(155,111,255,.12);color:#9B6FFF;border:1px solid rgba(155,111,255,.3);font-weight:700;white-space:nowrap">🛠️ Admin</span></td>'
-              :'<td style="padding:8px 6px"><span style="font-size:10px;padding:2px 9px;border-radius:8px;background:rgba(21,101,255,.15);color:var(--accent2);border:1px solid rgba(21,101,255,.3);font-weight:700;white-space:nowrap">🗂️ '+mi.name+'</span></td>';})()
+          +(function(){const mi=_projManagerLabel(p);if(mi.isAdmin)
+              return '<td style="padding:8px 6px"><span style="font-size:10px;padding:2px 9px;border-radius:8px;background:rgba(155,111,255,.12);color:#9B6FFF;border:1px solid rgba(155,111,255,.3);font-weight:700;white-space:nowrap">🛠️ Admin</span></td>';
+            const _c=mi.color||'';
+            const _style=_c?('background:'+_c+'22;color:'+_c+';border:1px solid '+_c+'66'):'background:rgba(21,101,255,.15);color:var(--accent2);border:1px solid rgba(21,101,255,.3)';
+            return '<td style="padding:8px 6px"><span style="font-size:10px;padding:2px 9px;border-radius:8px;'+_style+';font-weight:700;white-space:nowrap">'+(_c?'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+_c+';margin-right:4px;vertical-align:middle"></span>':'🗂️ ')+mi.name+'</span></td>';})()
           +'<td style="padding:8px 6px"><span style="font-size:10px;background:var(--bg2);padding:2px 6px;border-radius:6px;color:var(--text2)">'+(p.type||'—')+'</span></td>'
           +'<td style="padding:8px 6px;white-space:nowrap">'+dlHtml+'</td>'
           +'<td style="padding:8px 6px;font-weight:700;color:var(--accent2)">'+(p.budget?fmtB(p.budget):'—')+'</td>'
@@ -8478,6 +8553,63 @@ function adminProjDetailHTML(p){
 // ══════════════════════════════════════════════
 function initFormSlots(){formSlots={dub:{main:[],sub:[]},adp:{only:[]},mix:{only:[]},qc:{only:[]},sub:{only:[]},mgr:{only:[]}};activeCats=new Set()}
 
+// ══ 💰 ค่าเหมา Manager ตรงจุดมอบหมาย — กรอกครั้งเดียว ระบบใส่ลงหมวด Manager ให้เอง ══
+function _mgrStaffIdOf(uid){
+  if(!uid) return '';
+  const uc=ls('mgr_users_cache')||{};
+  const u=uc[uid]||Object.values(uc).find(x=>x&&x.uid===uid);
+  return (u&&u.staffId)||'';
+}
+function syncManagerFee(){
+  try{
+    const uid=document.getElementById('pj-manager')?.value||'';
+    const feeEl=document.getElementById('pj-manager-fee');
+    const wrap=document.getElementById('pj-manager-fee-wrap');
+    if(wrap) wrap.style.display = uid ? 'flex' : 'none';
+    if(!formSlots.mgr) formSlots.mgr={only:[]};
+    if(!formSlots.mgr.only) formSlots.mgr.only=[];
+    const staffId = uid ? _mgrStaffIdOf(uid) : '';
+    // เปลี่ยนเมเนเจอร์ → เอา entry ที่ช่องนี้สร้างให้คนก่อนออก
+    const prevId = window._mgrFeeStaffId||'';
+    if(prevId && prevId!==staffId){
+      formSlots.mgr.only = formSlots.mgr.only.filter(w=>w.staffId!==prevId);
+    }
+    window._mgrFeeStaffId = staffId;
+    const fee = parseFloat(feeEl?.value)||0;
+    if(uid && !staffId && fee>0){
+      toast('⚠️ เมเนเจอร์คนนี้ยังไม่ผูกกับรายชื่อทีมงาน — เพิ่มค่าตอบแทนในหมวด Manager ด้านล่างแทน','warn');
+    }
+    if(uid && staffId){
+      let entry = formSlots.mgr.only.find(w=>w.staffId===staffId);
+      if(fee>0){
+        if(!entry){ formSlots.mgr.only.push({staffId, amount:fee, unit:'เหมา'}); }
+        else { entry.amount=fee; entry.unit='เหมา'; }
+        // เปิดหมวด Manager ให้เห็น (แสดงเป็นรายการเดียวกัน ไม่ต้องกรอกซ้ำ)
+        activeCats.add('mgr');
+        const block=document.getElementById('catblock-mgr'); if(block)block.classList.remove('hidden');
+        const btn=document.getElementById('toggle-mgr'); if(btn)btn.classList.add('on');
+      } else if(entry){
+        formSlots.mgr.only = formSlots.mgr.only.filter(w=>w.staffId!==staffId);
+      }
+    }
+    try{ renderWorkerList('mgr','only'); calcProjSummary(); }catch(e){}
+  }catch(e){ console.warn('syncManagerFee:', e); }
+}
+// เติมช่องค่าเหมาตอนเปิดแก้โปรเจกต์ (ดึงจาก entry ในหมวด Manager ของเมเนเจอร์คนนั้น)
+function prefillManagerFee(p){
+  try{
+    const feeEl=document.getElementById('pj-manager-fee');
+    const wrap=document.getElementById('pj-manager-fee-wrap');
+    const uid=(p&&p.managerId&&p.managerId!=='undefined')?p.managerId:'';
+    const staffId=uid?_mgrStaffIdOf(uid):'';
+    window._mgrFeeStaffId=staffId;
+    if(wrap) wrap.style.display = uid ? 'flex' : 'none';
+    if(!feeEl) return;
+    const entry=(formSlots.mgr&&formSlots.mgr.only||[]).find(w=>w.staffId===staffId);
+    feeEl.value = entry ? (entry.amount||'') : '';
+  }catch(e){}
+}
+
 // ══════════════════════════════════════════════════════════
 // PHASES (กำหนดส่งของแต่ละทีมในฟอร์มโปรเจกต์)
 //   Short cat keys: adp, dub, mix, qc, sub, mgr
@@ -8535,9 +8667,38 @@ function onPhaseDateChange(cat, field, value){
     }
   } else if(field === 'deadline'){
     formPhases[cat].deadline = value;
+    // 🔗 ไล่เดทไลน์เฟสถัดไป +1 วันอัตโนมัติ (เฉพาะเฟสที่เปิดใช้และยังว่าง — พิมพ์แก้เองได้เสมอ)
+    if(value) cascadePhaseDeadlines(cat, value);
   } else if(field === 'time'){
     formPhases[cat].submitTime = value;
   }
+}
+
+// ไล่เติมเดทไลน์เฟสถัดจาก fromCat ทีละ +1 วัน — ข้ามเฟสที่ปิดอยู่ · ไม่ทับเฟสที่มีค่าแล้ว (ใช้ค่านั้นเป็นฐานนับต่อ)
+function cascadePhaseDeadlines(fromCat, fromIso){
+  try{
+    const order = ['adp','dub','mix','qc','sub','mgr'];
+    const idx = order.indexOf(fromCat);
+    if(idx < 0) return;
+    const _isoLocal = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    let prev = new Date(fromIso);
+    if(isNaN(prev)) return;
+    for(let i = idx+1; i < order.length; i++){
+      const c = order[i];
+      if(typeof activeCats !== 'undefined' && activeCats && !activeCats.has(c)) continue;
+      if(!formPhases[c]) formPhases[c] = { startDate:'', deadline:'', submitTime:'', status:'none' };
+      if(formPhases[c].deadline){
+        const d = new Date(formPhases[c].deadline);
+        if(!isNaN(d)) prev = d;   // เฟสนี้ตั้งเองไว้แล้ว → ใช้เป็นฐานนับเฟสถัดไป
+        continue;
+      }
+      prev = new Date(prev.getTime() + 864e5);
+      const iso = _isoLocal(prev);
+      formPhases[c].deadline = iso;
+      const dEl = document.getElementById('ph-'+c+'-deadline');
+      if(dEl) dEl.value = iso;
+    }
+  }catch(e){ console.warn('cascadePhaseDeadlines:', e); }
 }
 
 // ดึง phases ปัจจุบันออกมาเป็น object สำหรับบันทึก
@@ -8655,8 +8816,13 @@ async function openNewProject(){
   document.getElementById('proj-modal-title').textContent='โปรเจกต์ใหม่';
   const _metaEl = document.getElementById('proj-modal-meta');
   if(_metaEl){ _metaEl.textContent=''; _metaEl.style.display='none'; }
-  ['pj-name','pj-client','pj-budget','pj-duration','pj-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['pj-name','pj-client','pj-budget','pj-budget-qty','pj-duration','pj-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  toggleBudgetQty();
   const _ms=document.getElementById('pj-manager');if(_ms){const _mm=getAllManagerUsers();_ms.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+_mm.map(m=>`<option value="${m.uid}">${m.nickname||m.email}</option>`).join('');}
+  const _mf=document.getElementById('pj-manager-fee');if(_mf)_mf.value='';
+  const _mfw=document.getElementById('pj-manager-fee-wrap');if(_mfw)_mfw.style.display='none';
+  window._mgrFeeStaffId='';
+  window._projRateHints=null;
   ['pj-type'].forEach(id=>{const el=document.getElementById(id);if(el)el.selectedIndex=0;});
   const today=new Date().toISOString().split('T')[0];
   const ps=document.getElementById('pj-start');if(ps)ps.value=isoToThai(today);
@@ -8729,8 +8895,14 @@ function addWorkerToSlot(cat,slot){
   const staffId=sel.value;
   if(!formSlots[cat])formSlots[cat]={};if(!formSlots[cat][slot])formSlots[cat][slot]=[];
   if(formSlots[cat][slot].find(w=>w.staffId===staffId)){toast('เพิ่มคนนี้แล้ว','warn');sel.value='';return}
-  formSlots[cat][slot].push({staffId,amount:0,unit:'นาที'});sel.value='';
-  console.log('formSlots after add:', JSON.stringify(formSlots[cat][slot]));
+  // 💡 ราคาอ้างอิงอัตโนมัติ (ยังพิมพ์แก้ได้):
+  //   1) ตามแถวล่าสุดในช่องเดียวกัน  2) ตามเรทจากแบบร่างคำนวนราคา (rateHints)  3) เริ่มที่ 0
+  const _last=[...formSlots[cat][slot]].reverse().find(w=>((w.amount||0)>0));
+  const _hint=(window._projRateHints||{})[cat];
+  const _seed=_last?{amount:_last.amount,unit:_last.unit||'นาที',qty:_last.qty||0}
+             :_hint?{amount:_hint.rate||0,unit:_hint.unit||'นาที',qty:_hint.qty||0}
+             :{amount:0,unit:'นาที',qty:0};
+  formSlots[cat][slot].push({staffId,amount:_seed.amount,unit:_seed.unit,qty:_seed.qty});sel.value='';
   renderWorkerList(cat,slot);calcProjSummary();
 }
 function renderAllWorkerLists(){
@@ -8740,6 +8912,17 @@ function renderAllWorkerLists(){
 function clearAllWorkerLists(){
   const cats=[['dub','main'],['dub','sub'],['adp','only'],['mix','only'],['qc','only'],['sub','only'],['mgr','only']];
     cats.forEach(([cat,slot])=>{const id=cat==='dub'?`dub-${slot}-list`:`${cat}-list`;const el=document.getElementById(id);if(el)el.innerHTML=''});
+}
+// ══ หน่วยราคา ══
+//   นาที = เรท × ความยาวโปรเจกต์ · เหมา/โปรเจกต์ = คงที่ · ชั่วโมง/หน้า/วัน/บท = เรท × จำนวนที่กรอก (w.qty)
+const PRICE_UNITS = ['นาที','เหมา','โปรเจกต์','ชั่วโมง','หน้า','วัน','บท'];
+const PRICE_QTY_UNITS = ['ชั่วโมง','หน้า','วัน','บท'];
+function calcWorkerAmt(w, dur){
+  const rate = (w && parseFloat(w.amount)) || 0;
+  const u = (w && w.unit) || 'นาที';
+  if(u === 'นาที') return dur > 0 ? rate * dur : rate;
+  if(PRICE_QTY_UNITS.includes(u)) return rate * (parseFloat(w.qty) || 0);
+  return rate; // เหมา / โปรเจกต์
 }
 function renderWorkerList(cat,slot){
   const listId=cat==='dub'?`dub-${slot}-list`:`${cat}-list`;
@@ -8754,10 +8937,10 @@ function renderWorkerList(cat,slot){
     const nameBadge=hasPerson
       ? `<span class="worker-name-badge" style="color:${col};cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px" onclick="openReplaceWorker('${cat}','${slot}',${i},event)" title="คลิกเพื่อเปลี่ยนคน">${s.nickname} <span style="font-size:9px;opacity:.55">🔄</span></span>`
       : `<span class="worker-name-badge" style="color:#FF9E00;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;border:1px dashed rgba(255,158,0,.5);border-radius:7px;padding:3px 9px;background:rgba(255,158,0,.06)" onclick="openReplaceWorker('${cat}','${slot}',${i},event)" title="คลิกเพื่อเลือกคน">👤 + เลือกคน</span>`;
-    const isMin=w.unit==='นาที';const calcAmt=isMin&&dur>0?(w.amount||0)*dur:(w.amount||0);
+    const calcAmt=calcWorkerAmt(w,dur);
     const tax=parseFloat((document.getElementById(cat+'-tax')||{}).value)||0;
     const afterTax=Math.round(calcAmt*(1-tax/100));
-    const showAmt = isMin&&dur>0 ? calcAmt : (w.amount||0)>0 ? calcAmt : 0;
+    const showAmt = calcAmt>0 ? calcAmt : 0;
     const amtLabel = showAmt>0
       ? (tax>0
           ? `<span id="wamt-${cat}-${slot}-${i}" style="font-size:11px;padding:3px 8px;background:rgba(0,180,255,.1);border-radius:6px;white-space:nowrap;color:var(--accent2)">= <span style="text-decoration:line-through;opacity:.5;color:var(--text2)">${fmtB(showAmt)}</span> → ${fmtB(afterTax)}</span>`
@@ -8773,9 +8956,13 @@ function renderWorkerList(cat,slot){
         oninput="updateSlotAmount('${cat}','${slot}',${i},this.value)">
       <span style="color:var(--text2);font-size:12px">/</span>
       <select style="padding:5px 8px;background:rgba(0,0,0,.35);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:12px" onchange="updateSlotUnit('${cat}','${slot}',${i},this.value)">
-       <option value="นาที"${(w.unit==='นาที'||!w.unit)?' selected':''}>นาที</option>
-       <option value="เหมา"${w.unit==='เหมา'?' selected':''}>เหมา</option>
+       ${PRICE_UNITS.map(u=>`<option value="${u}"${(w.unit===u||(!w.unit&&u==='นาที'))?' selected':''}>${u}</option>`).join('')}
       </select>
+      ${PRICE_QTY_UNITS.includes(w.unit)?`<span style="color:var(--text2);font-size:12px">×</span>
+      <input type="number" value="${w.qty||''}" placeholder="กี่${w.unit}" min="0" step="any" onwheel="this.blur()" title="จำนวน${w.unit}ของคนนี้"
+        style="width:76px;padding:6px 9px;background:rgba(0,0,0,.35);border:1px solid rgba(0,180,255,.35);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px;text-align:center"
+        oninput="updateSlotQty('${cat}','${slot}',${i},this.value)">
+      <span style="color:var(--text2);font-size:11px">${w.unit}</span>`:''}
       ${calcHtml}
       <button class="btn btn-xs" style="background:${hasComment?'rgba(155,111,255,.18)':'rgba(255,255,255,.05)'};color:${hasComment?'#9B6FFF':'var(--text2)'};border:1px solid ${hasComment?'rgba(155,111,255,.35)':'var(--border2)'};padding:3px 8px" onclick="toggleWorkerComment('${cat}','${slot}',${i})" title="หมายเหตุ/คอมเมนต์">💬${hasComment?' •':''}</button>
       <button class="btn btn-xs" style="background:rgba(0,180,255,.1);color:var(--accent2);border:1px solid rgba(0,180,255,.3);padding:3px 8px" onclick="copyWorkerRow('${cat}','${slot}',${i})" title="ก๊อปปี้ค่า (ราคา/หน่วย) เป็นแถวใหม่ แล้วเลือกคนเพิ่ม">📋</button>
@@ -8791,7 +8978,7 @@ function renderWorkerList(cat,slot){
 function copyWorkerRow(cat,slot,i){
   const arr=(formSlots[cat]||{})[slot]; if(!arr||!arr[i])return;
   const src=arr[i];
-  arr.splice(i+1,0,{staffId:'', amount:src.amount, unit:src.unit, comment:src.comment||''});
+  arr.splice(i+1,0,{staffId:'', amount:src.amount, unit:src.unit, qty:src.qty||0, comment:src.comment||''});
   renderWorkerList(cat,slot); calcProjSummary();
   toast('📋 ก๊อปปี้ค่าแล้ว — กด "เลือกคน" ที่แถวใหม่','success');
 }
@@ -8879,7 +9066,7 @@ function updateWorkerAmtLabel(cat,slot,idx){
   const w=(formSlots[cat]||{})[slot]?.[idx];if(!w)return;
   const dur=parseFloat(document.getElementById('pj-duration')?.value)||0;
   const tax=parseFloat((document.getElementById(cat+'-tax')||{}).value)||0;
-  const calcAmt=w.unit==='นาที'&&dur>0?(w.amount||0)*dur:(w.amount||0);
+  const calcAmt=calcWorkerAmt(w,dur);
   const afterTax=Math.round(calcAmt*(1-tax/100));
   const showAmt=calcAmt>0?calcAmt:0;
   const labelEl=document.getElementById('wamt-'+cat+'-'+slot+'-'+idx);
@@ -8891,14 +9078,27 @@ function updateWorkerAmtLabel(cat,slot,idx){
   } else { labelEl.textContent=''; }
 }
 function updateSlotUnit(cat,slot,i,val){if(formSlots[cat]&&formSlots[cat][slot])formSlots[cat][slot][i].unit=val;renderWorkerList(cat,slot);calcProjSummary()}
+function updateSlotQty(cat,slot,i,val){if(formSlots[cat]&&formSlots[cat][slot]&&formSlots[cat][slot][i]){formSlots[cat][slot][i].qty=parseFloat(val)||0;calcProjSummary();}}
 function removeFromSlot(cat,slot,i){if(formSlots[cat]&&formSlots[cat][slot])formSlots[cat][slot].splice(i,1);renderWorkerList(cat,slot);calcProjSummary()}
+// Budget: flat/per-project = คงที่ · per-minute = ×ความยาว · per-hour/page/day/episode = ×จำนวนที่กรอก
+const BUDGET_QTY_LABEL = { 'per-hour':'ชั่วโมง', 'per-page':'หน้า', 'per-day':'วัน', 'per-episode':'บท' };
+function calcBudgetTotal(rate, type, dur, qty){
+  if(type==='per-minute') return dur>0 ? rate*dur : rate;
+  if(BUDGET_QTY_LABEL[type]) return rate*(qty||0);
+  return rate; // flat / per-project
+}
+function toggleBudgetQty(){
+  const t=document.getElementById('pj-budget-type')?.value||'flat';
+  const q=document.getElementById('pj-budget-qty');
+  if(q){ q.style.display = BUDGET_QTY_LABEL[t] ? '' : 'none'; q.placeholder = BUDGET_QTY_LABEL[t] ? 'กี่'+BUDGET_QTY_LABEL[t] : 'จำนวน'; }
+}
 function calcProjSummary(){
   const dur=parseFloat(document.getElementById('pj-duration')?.value)||0;
   let totalExp=0;
   const catKeys=['dub','adp','mix','qc','sub','mgr'];
   catKeys.forEach(key=>{
     let catTotal=0;const slots=formSlots[key]||{};
-    Object.values(slots).forEach(arr=>arr.forEach(w=>{const amt=w.unit==='นาที'&&dur>0?(w.amount||0)*dur:(w.amount||0);catTotal+=amt}));
+    Object.values(slots).forEach(arr=>arr.forEach(w=>{catTotal+=calcWorkerAmt(w,dur)}));
     const tax=parseFloat((document.getElementById(key+'-tax')||{}).value)||0;
     const after=catTotal*(1-tax/100);totalExp+=after;
     const el=document.getElementById(key+'-subtotal');
@@ -8912,12 +9112,17 @@ function calcProjSummary(){
   });
   const budgetRaw=parseFloat(document.getElementById('pj-budget')?.value)||0;
   const budgetType=document.getElementById('pj-budget-type')?.value||'flat';
-  const budget=(budgetType==='per-minute'&&dur>0)?budgetRaw*dur:budgetRaw;
+  const budgetQty=parseFloat(document.getElementById('pj-budget-qty')?.value)||0;
+  const budget=calcBudgetTotal(budgetRaw,budgetType,dur,budgetQty);
   const _bcEl=document.getElementById('pj-budget-calc');
   if(_bcEl){
+    const _qLabel=BUDGET_QTY_LABEL[budgetType];
     if(budgetType==='per-minute'&&budgetRaw>0){
       _bcEl.style.display='block';
       _bcEl.innerHTML=dur>0?('= '+fmtB(budgetRaw)+' × '+dur+' นาที <strong style="color:var(--accent2)">= '+fmtB(budget)+'</strong>'):'<span style="color:var(--orange)">⚠️ ใส่ความยาว (นาที) เพื่อคำนวนยอดรวม</span>';
+    } else if(_qLabel&&budgetRaw>0){
+      _bcEl.style.display='block';
+      _bcEl.innerHTML=budgetQty>0?('= '+fmtB(budgetRaw)+' × '+budgetQty+' '+_qLabel+' <strong style="color:var(--accent2)">= '+fmtB(budget)+'</strong>'):'<span style="color:var(--orange)">⚠️ กรอกจำนวน'+_qLabel+'ในช่องขวาเพื่อคำนวนยอดรวม</span>';
     } else { _bcEl.style.display='none'; }
   }
   const profit=budget-totalExp;
@@ -8947,8 +9152,8 @@ async function saveProject(){
     Object.entries(slots).forEach(([slot,arr])=>{
       arr.forEach(w=>{
         if(!w.staffId) return; // ข้าม placeholder ที่ยังไม่เลือกคน (ก๊อปปี้ค่าไว้/จาก calc)
-        const amt=w.unit==='นาที'&&dur>0?(w.amount||0)*dur:(w.amount||0);
-        workers.push({id:w.staffId,slot:cat+'-'+slot,amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'นาที',status:'pending',note:'',comment:w.comment||''});
+        const amt=calcWorkerAmt(w,dur);
+        workers.push({id:w.staffId,slot:cat+'-'+slot,amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,status:'pending',note:'',comment:w.comment||''});
       });
     });
   });
@@ -8959,9 +9164,10 @@ async function saveProject(){
     id:editingProjId||('P'+Date.now()),name,date:existingProj?.date||today,
     client:document.getElementById('pj-client').value.trim(),
     type:document.getElementById('pj-type').value,
-    budget:(function(){const r=parseFloat(document.getElementById('pj-budget').value)||0;const t=document.getElementById('pj-budget-type')?.value||'flat';return (t==='per-minute'&&dur>0)?r*dur:r;})(),
+    budget:(function(){const r=parseFloat(document.getElementById('pj-budget').value)||0;const t=document.getElementById('pj-budget-type')?.value||'flat';const q=parseFloat(document.getElementById('pj-budget-qty')?.value)||0;return calcBudgetTotal(r,t,dur,q);})(),
     budgetRate:parseFloat(document.getElementById('pj-budget').value)||0,
     budgetType:document.getElementById('pj-budget-type')?.value||'flat',
+    budgetQty:parseFloat(document.getElementById('pj-budget-qty')?.value)||0,
     duration:dur,
     startDate:thaiToIso(document.getElementById('pj-start').value)||document.getElementById('pj-start').value,
     deadline:thaiToIso(document.getElementById('pj-deadline').value)||document.getElementById('pj-deadline').value,
@@ -8997,6 +9203,8 @@ async function saveProject(){
     // Fix: preserve projStatus so editing doesn't reset "เสร็จแล้ว" back to "ยังไม่เริ่ม"
     if(existing && existing.projStatus) proj.projStatus = existing.projStatus;
     if(existing && existing.createdAt) proj.createdAt = existing.createdAt;
+    if(existing && existing.rateHints) proj.rateHints = existing.rateHints;   // เรทอ้างอิงจากแบบร่าง
+    if(existing && existing.fromCalcId) proj.fromCalcId = existing.fromCalcId;
     // Preserve phase status (บรีฟ/ทำ/ส่ง) ที่หน้าติดตามอาจอัปเดต เพื่อไม่ให้รีเซ็ตเมื่อบันทึกฟอร์ม
     if(existing && existing.phases){
       Object.entries(existing.phases).forEach(([k, exPh])=>{
@@ -9413,11 +9621,13 @@ async function openEditProject(id){
   if(_btEl){
     _btEl.value=p.budgetType||'flat';
   }
-  if(p.budgetType==='per-minute'&&p.budgetRate){
+  if(p.budgetRate&&(p.budgetType==='per-minute'||BUDGET_QTY_LABEL[p.budgetType])){
     document.getElementById('pj-budget').value=p.budgetRate;
   } else {
     document.getElementById('pj-budget').value=p.budget||'';
   }
+  const _bqEl=document.getElementById('pj-budget-qty');if(_bqEl)_bqEl.value=p.budgetQty||'';
+  toggleBudgetQty();
   document.getElementById('pj-duration').value=p.duration||'';
   document.getElementById('pj-note').value=p.note||'';
   document.getElementById('pj-start').value=isoToThai(p.startDate||'');document.getElementById('pj-start-pk').value=p.startDate||'';
@@ -9431,7 +9641,7 @@ async function openEditProject(id){
   (p.workers||[]).forEach(w=>{
     const parts=w.slot.split('-');const cat=parts[0];const slot=parts.slice(1).join('-')||'only';
     if(!activeCats.has(cat)){activeCats.add(cat);const btn=document.getElementById('toggle-'+cat);const block=document.getElementById('catblock-'+cat);if(btn)btn.classList.add('on');if(block)block.classList.remove('hidden')}
-    if(formSlots[cat]&&formSlots[cat][slot]!==undefined)formSlots[cat][slot].push({staffId:w.id,amount:w.ratePerUnit||w.amount||0,unit:w.unit||'นาที',comment:w.comment||''});
+    if(formSlots[cat]&&formSlots[cat][slot]!==undefined)formSlots[cat][slot].push({staffId:w.id,amount:w.ratePerUnit||w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,comment:w.comment||''});
   });
   // ─ Load phases (กำหนดส่งของแต่ละทีม) จาก project หรือจาก trkCard เก่าเป็น fallback ─
   loadPhasesFromProject(p);
@@ -9457,7 +9667,9 @@ async function openEditProject(id){
   // เติมวันโปรเจกต์ให้ phase ที่ยังว่าง
   applyProjectDatesToEmptyPhases();
   populateFormPhasesUI();
+  window._projRateHints = p.rateHints || null;   // 💡 เรทอ้างอิงจากแบบร่าง (ถ้าแปลงมาจากคำนวนราคา)
   populateWorkerSelects();renderAllWorkerLists();calcProjSummary();
+  prefillManagerFee(p);   // 💰 เติมช่องค่าเหมา Manager จาก entry เดิม
   openModal('modal-project');
   // ─ Claim presence + auto-draft ─
   claimPresence(id, 'editing');
@@ -12759,18 +12971,11 @@ function renderProfit(){
 function _emKey(s){ const m=String(s&&s.email||'').toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/); return m?('e:'+m[0]):''; }
 function _nmKey(s){ const nm=String(s&&s.name||'').trim().toLowerCase(), nk=String(s&&s.nickname||'').trim().toLowerCase(); return (nm||nk)?('n:'+nm+'|'+nk):''; }
 function _buildPersonResolver(allStaffList){
-  const parent={};
-  const find=x=>{ while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
-  const union=(a,b)=>{ const ra=find(a),rb=find(b); if(ra!==rb) parent[ra]=rb; };
-  (allStaffList||[]).forEach(s=>{
-    const e=_emKey(s), n=_nmKey(s);
-    [e,n].filter(Boolean).forEach(k=>{ if(parent[k]==null) parent[k]=k; });
-    if(e && n) union(e,n);   // record นี้ทำให้ email-group กับ name-group เป็นคนเดียวกัน
-  });
+  // key = อีเมล ถ้ามี · ไม่งั้น ชื่อ+ชื่อเล่น
+  // ⚠️ ไม่เชื่อม email-group กับ name-group ข้ามกัน — กันคนละคนที่ชื่อเหมือนกัน (แต่คนละอีเมล)
+  //    ถูกยุบรวมจนหายไปจากหน้าเว็บ. คนที่มีอีเมล = จับด้วยอีเมลอย่างเดียว (unique ต่อคน)
   return function(s){
-    const anchor=_emKey(s)||_nmKey(s);
-    if(!anchor) return 'x:'+((s&&s.id)||'');
-    return parent[anchor]==null ? anchor : find(anchor);
+    return _emKey(s) || _nmKey(s) || ('x:'+((s&&s.id)||''));
   };
 }
 // ยุบ record ที่เป็นคนเดียวกันให้เหลือคนละ 1 — เก็บ record ที่ข้อมูลครบสุดไว้
@@ -14243,10 +14448,11 @@ function renderDocs() {
   try{renderQtDocNoBar();renderInvDocNoBar();}catch(e){}
 }
 function switchDocsMain(tab, el) {
-  ['client','invoice','worker','history'].forEach(t => {
+  ['client','invoice','worker','wht','history'].forEach(t => {
     const d = document.getElementById('docs-' + t);
     if (d) d.classList.toggle('hidden', t !== tab);
   });
+  if (tab === 'wht') { try{ initWhtTab(); }catch(e){ console.warn('initWhtTab:',e); } }
   document.querySelectorAll('#docs-main-tabs .tab').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
   if (tab === 'history') renderDocsHistory();
@@ -14265,6 +14471,200 @@ function populateDocsProjSelects() {
   // qt-proj, inv-proj และ vc-proj ใช้ multi-select picker (ติ๊กได้หลายโปรเจกต์)
   // refresh รายการโปรเจกต์ในตัวเลือกถ้าแผงเปิดอยู่
   try { if(document.getElementById('vc-proj-panel')?.style.display === 'flex') renderVcProjOptions(document.getElementById('vc-proj-search')?.value||''); } catch(e){}
+}
+
+/* ══════════════════════
+   🏛️ ใบ 50 ทวิ — หนังสือรับรองการหักภาษี ณ ที่จ่าย
+   ══════════════════════ */
+function _thaiBahtText(num){
+  num = Math.round((parseFloat(num)||0)*100)/100;
+  if(num===0) return 'ศูนย์บาทถ้วน';
+  const T=['','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'];
+  const P=['','สิบ','ร้อย','พัน','หมื่น','แสน'];
+  const readGroup=(s)=>{
+    let out='';
+    const len=s.length;
+    for(let i=0;i<len;i++){
+      const d=+s[i], pos=len-i-1;
+      if(!d) continue;
+      if(pos===0 && d===1 && len>1) out+='เอ็ด';
+      else if(pos===1 && d===2) out+='ยี่สิบ';
+      else if(pos===1 && d===1) out+='สิบ';
+      else out+=T[d]+P[pos];
+    }
+    return out;
+  };
+  const readNum=(n)=>{
+    let s=String(n), out='';
+    while(s.length>6){
+      const head=s.slice(0,s.length-6);
+      out+=readNum(+head)+'ล้าน';
+      s=s.slice(-6);
+      if(+s===0) return out;
+    }
+    return out+readGroup(String(+s));
+  };
+  const baht=Math.floor(num), satang=Math.round((num-baht)*100);
+  let out=baht>0?readNum(baht)+'บาท':'';
+  out+=satang>0?readNum(satang)+'สตางค์':'ถ้วน';
+  return out;
+}
+const WHT_INCOME_LABEL={ '401':'เงินเดือน ค่าจ้าง เบี้ยเลี้ยง โบนัส ฯลฯ ตามมาตรา 40 (1)', '402':'ค่าธรรมเนียม ค่านายหน้า ค่าจ้างทำของ ค่าบริการ ฯลฯ ตามมาตรา 40 (2)', '408':'อื่น ๆ ตามมาตรา 40 (8)' };
+function initWhtTab(){
+  // payer จำค่าไว้
+  const payer=ls('wht_payer')||{};
+  const _s=(id,v)=>{const el=document.getElementById(id);if(el&&!el.value)el.value=v||'';};
+  _s('wht-payer-name',payer.name); _s('wht-payer-taxid',payer.taxid); _s('wht-payer-addr',payer.addr);
+  const d=document.getElementById('wht-pay-date'); if(d&&!d.value)d.value=new Date().toISOString().split('T')[0];
+  // staff dropdown
+  const sel=document.getElementById('wht-staff-sel');
+  if(sel && sel.options.length<=1){
+    const list=(typeof buildWorkerList==='function'?buildWorkerList():[]);
+    sel.innerHTML='<option value="">— เลือกทีมงาน / กรอกเอง —</option>'+list.map(s=>`<option value="${s.id}">${s.nickname||''} ${s.name||''}</option>`).join('');
+  }
+  _whtCalc(); renderWhtRecent();
+  // ดึงประวัติจาก Firebase (misc/wht_docs) มาอัปเดต
+  try{ fbLoadKeyed('wht_docs').then(v=>{ if(Array.isArray(v)&&v.length>=getWhtDocs().length){ ls('wht_docs',v); renderWhtRecent(); } }); }catch(e){}
+}
+function _whtSavePayer(){
+  ls('wht_payer',{ name:document.getElementById('wht-payer-name')?.value||'', taxid:document.getElementById('wht-payer-taxid')?.value||'', addr:document.getElementById('wht-payer-addr')?.value||'' });
+}
+function _whtPickStaff(){
+  const id=document.getElementById('wht-staff-sel')?.value; if(!id)return;
+  const s=getStaffById(id); if(!s)return;
+  const nEl=document.getElementById('wht-payee-name'); if(nEl)nEl.value=s.name||'';
+}
+function _whtToggleManualTax(){
+  const on=document.getElementById('wht-manual-tax')?.checked;
+  const m=document.getElementById('wht-tax-manual'); if(m)m.style.display=on?'':'none';
+  _whtCalc();
+}
+function _whtCalc(){
+  const amt=parseFloat(document.getElementById('wht-amount')?.value)||0;
+  const pct=parseFloat(document.getElementById('wht-tax-pct')?.value)||0;
+  const manual=document.getElementById('wht-manual-tax')?.checked;
+  const tax=manual?(parseFloat(document.getElementById('wht-tax-manual')?.value)||0):Math.round(amt*pct)/100;
+  const t=document.getElementById('wht-tax-amt'); if(t)t.textContent=fmtB(tax);
+  const n=document.getElementById('wht-net-amt'); if(n)n.textContent=fmtB(amt-tax);
+  return {amt,tax};
+}
+function getWhtDocs(){ return ls('wht_docs')||[]; }
+async function saveWhtDocs(arr){ ls('wht_docs',arr); try{ await fbSaveKeyed('wht_docs',arr); }catch(e){} }
+function renderWhtRecent(){
+  const el=document.getElementById('wht-recent-list'); if(!el)return;
+  const docs=getWhtDocs().slice(0,15);
+  if(!docs.length){ el.innerHTML='<div style="padding:10px;color:var(--text2)">ยังไม่เคยออกใบ 50 ทวิ</div>'; return; }
+  el.innerHTML=docs.map(d=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border2)">
+    <span style="font-size:12px;font-weight:700;color:#c9a227">${d.docNo}</span>
+    <span style="flex:1;font-size:13px">${(d.payee&&d.payee.name)||'-'}</span>
+    <span style="font-size:12px;color:var(--text2)">${fmtDate(d.payDate)}</span>
+    <span style="font-size:12px;font-weight:700">${fmtB(d.amount)}</span>
+    <span style="font-size:11px;color:var(--orange)">ภาษี ${fmtB(d.tax)}</span>
+    <button class="btn btn-xs btn-outline" onclick='printWhtDoc(${JSON.stringify(JSON.stringify(d))})'>🖨️ พิมพ์ซ้ำ</button>
+  </div>`).join('');
+}
+async function issueWht(){
+  const payer={ name:document.getElementById('wht-payer-name')?.value?.trim()||'', taxid:document.getElementById('wht-payer-taxid')?.value?.trim()||'', addr:document.getElementById('wht-payer-addr')?.value?.trim()||'' };
+  const payee={ name:document.getElementById('wht-payee-name')?.value?.trim()||'', taxid:document.getElementById('wht-payee-taxid')?.value?.trim()||'', addr:document.getElementById('wht-payee-addr')?.value?.trim()||'' };
+  if(!payer.name){ toast('กรอกชื่อผู้จ่ายเงินก่อน','error'); return; }
+  if(!payee.name){ toast('กรอกชื่อผู้รับเงินก่อน','error'); return; }
+  const {amt,tax}=_whtCalc();
+  if(amt<=0){ toast('กรอกจำนวนเงินที่จ่าย','error'); return; }
+  const yearBE=new Date().getFullYear()+543;
+  let docNo=document.getElementById('wht-doc-no')?.value?.trim();
+  if(!docNo){ const seq=(getWhtDocs().length+1); docNo='WHT'+yearBE+'-'+String(seq).padStart(3,'0'); }
+  const doc={
+    id:'WHT'+Date.now(), docNo,
+    payer, payee,
+    incomeType:document.getElementById('wht-income-type')?.value||'402',
+    payDate:document.getElementById('wht-pay-date')?.value||new Date().toISOString().split('T')[0],
+    amount:amt, tax, taxPct:parseFloat(document.getElementById('wht-tax-pct')?.value)||0,
+    createdAt:new Date().toISOString(), createdBy:currentUser?.nickname||currentUser?.email||''
+  };
+  const all=getWhtDocs(); all.unshift(doc); await saveWhtDocs(all);
+  renderWhtRecent();
+  printWhtDoc(JSON.stringify(doc));
+  toast('🏛️ ออกใบ 50 ทวิ แล้ว — '+docNo,'success');
+}
+function printWhtDoc(json){
+  let d; try{ d=typeof json==='string'?JSON.parse(json):json; }catch(e){ return; }
+  const incomeLabel=WHT_INCOME_LABEL[d.incomeType]||WHT_INCOME_LABEL['402'];
+  const payDateTH=(function(){ try{ const dt=new Date(d.payDate); return dt.getDate()+' '+['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'][dt.getMonth()]+' '+(dt.getFullYear()+543); }catch(e){ return d.payDate; } })();
+  const fmtN=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const cell='padding:6px 10px;border:1px solid #333;font-size:13px';
+  const box=(checked)=>'<span style="display:inline-block;width:13px;height:13px;border:1.5px solid #333;text-align:center;line-height:12px;font-size:11px;margin-right:5px;vertical-align:-2px">'+(checked?'✓':'&nbsp;')+'</span>';
+  const html=`
+  <div style="max-width:760px;margin:0 auto;background:#fff;color:#111;padding:36px 42px;border:1.5px solid #333;font-family:'Sarabun','Kanit',sans-serif">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div style="font-size:12px">ฉบับที่ 1 (สำหรับผู้ถูกหักภาษี ณ ที่จ่าย ใช้แนบพร้อมกับแบบแสดงรายการภาษี)</div>
+      <div style="font-size:12px;text-align:right">เล่มที่/เลขที่ <strong>${d.docNo}</strong></div>
+    </div>
+    <div style="text-align:center;margin:14px 0 4px;font-size:17px;font-weight:700">หนังสือรับรองการหักภาษี ณ ที่จ่าย</div>
+    <div style="text-align:center;font-size:13px;margin-bottom:16px">ตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร</div>
+    <div style="border:1px solid #333;padding:10px 14px;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">ผู้มีหน้าที่หักภาษี ณ ที่จ่าย :</div>
+      <div style="font-size:13.5px;line-height:1.8">ชื่อ <strong>${d.payer.name}</strong><br>
+      ที่อยู่ ${d.payer.addr||'—'}<br>
+      เลขประจำตัวผู้เสียภาษีอากร <strong style="letter-spacing:2px">${d.payer.taxid||'—'}</strong></div>
+    </div>
+    <div style="border:1px solid #333;padding:10px 14px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">ผู้ถูกหักภาษี ณ ที่จ่าย :</div>
+      <div style="font-size:13.5px;line-height:1.8">ชื่อ <strong>${d.payee.name}</strong><br>
+      ที่อยู่ ${d.payee.addr||'—'}<br>
+      เลขประจำตัวผู้เสียภาษีอากร (เลขบัตรประชาชน) <strong style="letter-spacing:2px">${d.payee.taxid||'—'}</strong></div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:0">
+      <thead><tr>
+        <th style="${cell};background:#efefef;text-align:left;width:46%">ประเภทเงินได้พึงประเมินที่จ่าย</th>
+        <th style="${cell};background:#efefef;width:18%">วัน เดือน ปี ที่จ่าย</th>
+        <th style="${cell};background:#efefef;width:18%">จำนวนเงินที่จ่าย</th>
+        <th style="${cell};background:#efefef;width:18%">ภาษีที่หักและนำส่งไว้</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td style="${cell}">${incomeLabel}</td>
+          <td style="${cell};text-align:center">${payDateTH}</td>
+          <td style="${cell};text-align:right">${fmtN(d.amount)}</td>
+          <td style="${cell};text-align:right">${fmtN(d.tax)}</td>
+        </tr>
+        <tr>
+          <td style="${cell};text-align:right;font-weight:700" colspan="2">รวมเงินที่จ่ายและภาษีที่หักนำส่ง</td>
+          <td style="${cell};text-align:right;font-weight:700">${fmtN(d.amount)}</td>
+          <td style="${cell};text-align:right;font-weight:700">${fmtN(d.tax)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="border:1px solid #333;border-top:none;padding:8px 12px;font-size:13px">
+      รวมเงินภาษีที่หักนำส่ง (ตัวอักษร) <strong>${_thaiBahtText(d.tax)}</strong>
+    </div>
+    <div style="border:1px solid #333;border-top:none;padding:8px 12px;font-size:13px">
+      ผู้จ่ายเงิน : ${box(true)} หักภาษี ณ ที่จ่าย &nbsp;&nbsp; ${box(false)} ออกภาษีให้ตลอดไป &nbsp;&nbsp; ${box(false)} ออกภาษีให้ครั้งเดียว &nbsp;&nbsp; ${box(false)} อื่น ๆ
+    </div>
+    <div style="margin-top:16px;font-size:13px;line-height:1.7">
+      ขอรับรองว่าข้อความและตัวเลขดังกล่าวข้างต้นถูกต้องตรงกับความจริงทุกประการ
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:26px">
+      <div style="text-align:center;font-size:13px">
+        <div style="margin-bottom:34px">ลงชื่อ ................................................................ ผู้จ่ายเงิน</div>
+        <div>( ${d.payer.name} )</div>
+        <div style="margin-top:8px">วันที่ ${payDateTH}</div>
+        <div style="margin-top:10px;font-size:11px;color:#555">(ประทับตรานิติบุคคล ถ้ามี)</div>
+      </div>
+    </div>
+    <div style="margin-top:22px;padding-top:10px;border-top:1px solid #999;font-size:10.5px;color:#555;line-height:1.6">
+      คำเตือน : ผู้มีหน้าที่ออกหนังสือรับรองการหักภาษี ณ ที่จ่าย ฝ่าฝืนไม่ปฏิบัติตามมาตรา 50 ทวิ แห่งประมวลรัษฎากร ต้องรับโทษทางอาญาตามมาตรา 35 แห่งประมวลรัษฎากร
+    </div>
+  </div>`;
+  const fullHtml='<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>'+d.docNo+'</title>'+
+    '<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Kanit:wght@400;600;700&display=swap" rel="stylesheet">'+
+    '<style>*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}body{font-family:Sarabun,Kanit,sans-serif;background:#eee;padding:28px}'+
+    '@media print{body{background:#fff;padding:0}.no-print{display:none}@page{margin:12mm;size:A4}}</style>'+
+    '</head><body>'+html+
+    '<div class="no-print" style="text-align:center;margin:24px 0">'+
+    '<button onclick="window.print()" style="padding:12px 32px;background:#333;color:#fff;border:none;border-radius:8px;font-family:Kanit;font-size:15px;font-weight:700;cursor:pointer">🖨️ พิมพ์ / บันทึกเป็น PDF</button>'+
+    '</div></body></html>';
+  const w=window.open('','_blank');
+  if(w){ w.document.write(fullHtml); w.document.close(); }
 }
 
 /* ══════════════════════
@@ -14789,7 +15189,7 @@ function _vcGetRetroByPerson(){
   const covered = _vcCoveredSet();
   const byPerson = new Map();
   getProjects().forEach(p => {
-    if(p.projStatus === 'cancelled') return;
+    // งานยกเลิกก็ออกใบได้ — บางงานจ่ายชดเชยตามเปอร์เซ็นต์ให้คนทำแล้ว
     (p.workers||[]).forEach(w => {
       if(w.status !== 'paid') return;
       const s = getStaffById(w.id); if(!s) return;
@@ -14941,7 +15341,7 @@ function setVcMode(mode){
 function _vcGetPersonItems(staffId){
   const items = [];
   getProjects().forEach(p => {
-    if(p.projStatus === 'cancelled') return;
+    // งานยกเลิกก็ส่งเอกสารยืนยันรับเงินได้ (จ่ายชดเชย)
     (p.workers||[]).forEach(w => {
       if(w.id !== staffId) return;
       if(w.status === 'paid') return;
@@ -14957,10 +15357,9 @@ function _vcGetPersonItems(staffId){
 function renderVcByPerson(){
   const listEl = document.getElementById('vc-byperson-list');
   if(!listEl) return;
-  // จัดกลุ่ม workers ที่ "confirmed + not paid" ตาม staff
+  // จัดกลุ่ม workers ที่ "confirmed + not paid" ตาม staff (รวมงานยกเลิก — จ่ายชดเชยได้)
   const byPerson = new Map();
   getProjects().forEach(p => {
-    if(p.projStatus === 'cancelled') return;
     (p.workers||[]).forEach(w => {
       if(w.status === 'paid') return;
       if(getWorkerConfirmStatus(w) !== 'confirmed') return;
@@ -15587,7 +15986,7 @@ function renderVcProjOptions(filter){
   const box = document.getElementById('vc-proj-options');
   if(!box) return;
   const q = (filter||'').trim().toLowerCase();
-  let projs = getProjects().filter(p => p.projStatus !== 'cancelled');
+  let projs = getProjects();   // รวมงานยกเลิกด้วย — ออกใบชดเชยได้
   if(q) projs = projs.filter(p => (p.name||'').toLowerCase().includes(q) || (p.client||'').toLowerCase().includes(q));
   if(!projs.length){
     box.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">ไม่พบโปรเจกต์</div>';
@@ -15598,7 +15997,7 @@ function renderVcProjOptions(filter){
       return `<div onclick="toggleVcProj('${p.id}')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer;${on?'background:rgba(0,180,255,.1)':''}" onmouseover="this.style.background='rgba(255,255,255,.04)'" onmouseout="this.style.background='${on?'rgba(0,180,255,.1)':'transparent'}'">
         <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${on?'var(--accent2)':'var(--border)'};background:${on?'var(--accent2)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">${on?'<span style="color:#fff;font-size:11px;font-weight:800">✓</span>':''}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+          <div style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}${p.projStatus==='cancelled'?' <span style="font-size:9.5px;padding:1px 6px;border-radius:8px;background:rgba(255,64,64,.14);color:var(--red);font-weight:700">❌ ยกเลิก · จ่ายชดเชย</span>':''}</div>
           <div style="font-size:10.5px;color:var(--text2)">${p.client?p.client+' · ':''}${nTeam} ทีมงาน</div>
         </div>
       </div>`;
@@ -18040,6 +18439,8 @@ function _getCurrentFormSnapshot(){
       type: get('pj-type'),
       budget: get('pj-budget'),
       budgetType: get('pj-budget-type') || 'flat',
+      budgetQty: get('pj-budget-qty'),
+      managerFee: get('pj-manager-fee'),
       duration: get('pj-duration'),
       startDate: get('pj-start'),
       deadline: get('pj-deadline'),
@@ -18101,6 +18502,9 @@ function _applyDraft(snap){
   set('pj-type', snap.type);
   set('pj-budget', snap.budget);
   set('pj-budget-type', snap.budgetType);
+  set('pj-budget-qty', snap.budgetQty);
+  set('pj-manager-fee', snap.managerFee);
+  try{ toggleBudgetQty(); }catch(e){}
   set('pj-duration', snap.duration);
   set('pj-start', snap.startDate);
   set('pj-deadline', snap.deadline);
@@ -18895,11 +19299,15 @@ function toggleCalcCat(key){
 }
 
 // Helper: compute subtotal for one sub-slot inside a calc category
+//   per-minute = ×ความยาว · per-hour/page/day/episode = ×จำนวน (slot.qty) · flat/per-project = คงที่
+const CALC_QTY_UNITS = { 'per-hour':'ชั่วโมง', 'per-page':'หน้า', 'per-day':'วัน', 'per-episode':'บท' };
 function _calcSlotTotal(slot, dur){
   const rate = parseFloat(slot.rate)||0;
   const ppl = parseInt(slot.ppl)||1;
   const tax = parseFloat(slot.tax)||0;
-  const base = (slot.unit==='per-minute' && dur>0) ? rate*dur : rate;
+  const base = (slot.unit==='per-minute' && dur>0) ? rate*dur
+             : CALC_QTY_UNITS[slot.unit] ? rate*(parseFloat(slot.qty)||0)
+             : rate;
   const total = base * ppl;
   const afterTax = Math.round(total * (1 - tax/100));
   return { rate, ppl, tax, base:Math.round(base), total:Math.round(total), afterTax };
@@ -18958,7 +19366,8 @@ function updateCalcSlotUnit(catKey, slotKey, val){
   if(!isNaN(idx) && cc.slots[idx]){
     cc.slots[idx].unit = val;
   }
-  updateCalcLive(catKey, slotKey);
+  renderCalcCats();   // re-render เพื่อโชว์/ซ่อนช่อง "กี่ชั่วโมง/หน้า/วัน/บท"
+  renderCalcSummary();
 }
 
 function _calcSlotInputsHTML(catKey, slotKey, slot, color, labelPrefix){
@@ -18975,8 +19384,17 @@ function _calcSlotInputsHTML(catKey, slotKey, slot, color, labelPrefix){
       <select style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" onchange="updateCalcSlotUnit('${catKey}','${slotKey}',this.value)">
         <option value="per-minute" ${s.unit==='per-minute'||!s.unit?'selected':''}>/นาที</option>
         <option value="flat" ${s.unit==='flat'?'selected':''}>เหมา</option>
+        <option value="per-hour" ${s.unit==='per-hour'?'selected':''}>/ชั่วโมง</option>
+        <option value="per-page" ${s.unit==='per-page'?'selected':''}>/หน้า</option>
+        <option value="per-day" ${s.unit==='per-day'?'selected':''}>/วัน</option>
+        <option value="per-episode" ${s.unit==='per-episode'?'selected':''}>/บท</option>
+        <option value="per-project" ${s.unit==='per-project'?'selected':''}>/โปรเจกต์</option>
       </select>
     </div>
+    ${CALC_QTY_UNITS[s.unit]?`<div>
+      <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">กี่${CALC_QTY_UNITS[s.unit]}</label>
+      <input type="number" min="0" value="${s.qty||''}" placeholder="0" style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid rgba(0,180,255,.35);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcSetSlot('${catKey}','${slotKey}','qty',this.value);updateCalcLive('${catKey}','${slotKey}')">
+    </div>`:''}
     <div>
       <label style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">จำนวนคน</label>
       <input type="number" min="1" value="${s.ppl||1}" style="width:100%;padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="_calcSetSlot('${catKey}','${slotKey}','ppl',this.value);updateCalcLive('${catKey}','${slotKey}')">
@@ -19175,17 +19593,23 @@ async function convertCalcToProject(id){
   // 🔧 สร้างแถว placeholder ตามจำนวนคน + ราคา/หน่วยที่คำนวนไว้ (ยังไม่ระบุชื่อ — ผู้ใช้เลือกเอง)
   const _cats = _migrateCalcCats(d.cats||{});
   const _placeholders = [];
+  const _rateHints = {};   // {catKey:{rate,unit,qty}} — ใช้เติมราคาอัตโนมัติตอนเพิ่มคนใหม่
   Object.entries(_cats).forEach(([catKey, c])=>{
     if(!CALC_CATS.find(x=>x.key===catKey)) return;
     (c.slots||[]).forEach((sl, slotIdx)=>{
       const ppl = Math.max(1, parseInt(sl.ppl)||1);
       const rate = parseFloat(sl.rate)||0;
-      const unit = (sl.unit==='per-minute') ? 'นาที' : 'เหมา';
+      // map หน่วยจาก calc → หน่วยโปรเจกต์
+      const _UNIT_MAP = {'per-minute':'นาที','flat':'เหมา','per-hour':'ชั่วโมง','per-page':'หน้า','per-day':'วัน','per-episode':'บท','per-project':'โปรเจกต์'};
+      const unit = _UNIT_MAP[sl.unit] || 'เหมา';
+      const qty = CALC_QTY_UNITS[sl.unit] ? (parseFloat(sl.qty)||0) : 0;
       const slotKey = catKey==='dub' ? (slotIdx===0 ? 'main' : 'sub') : 'only';
-      const finalAmt = (unit==='นาที' && dur>0) ? Math.round(rate*dur) : Math.round(rate);
+      const finalAmt = Math.round(calcWorkerAmt({amount:rate, unit, qty}, dur));
       for(let n=0;n<ppl;n++){
-        _placeholders.push({ id:'', slot:catKey+'-'+slotKey, amount:finalAmt, ratePerUnit:rate, unit, status:'pending', note:'', comment:'' });
+        _placeholders.push({ id:'', slot:catKey+'-'+slotKey, amount:finalAmt, ratePerUnit:rate, unit, qty, status:'pending', note:'', comment:'' });
       }
+      // 💡 เก็บเรทอ้างอิงต่อหมวด — เวลาเพิ่มคนใหม่ในโปรเจกต์ ราคาจะขึ้นตามที่คิดไว้ (แก้ได้)
+      if(rate>0 && !_rateHints[catKey]) _rateHints[catKey] = { rate, unit, qty };
     });
   });
   const proj = {
@@ -19210,6 +19634,7 @@ async function convertCalcToProject(id){
     evidenceLogs: [], snapshot: null,
     createdAt: new Date().toISOString(),
     projStatus: 'notstarted',
+    rateHints: _rateHints,   // เรทอ้างอิงจากแบบร่าง — เติมราคาอัตโนมัติตอนเพิ่มคน
     fromCalcId: d.id,
     managerId: (currentUser?.role==='manager'?currentUser.uid:'')
   };
@@ -20837,6 +21262,11 @@ function teamMemberCardHTML(s, col, viewer){
     if(viewer==='admin'){
       actions+=`<div style="margin-top:6px"><button class="btn btn-sm btn-outline" style="width:100%;padding:5px 4px;font-size:11px;border-color:rgba(150,150,150,.4);color:var(--text2)" onclick="event.stopPropagation();adminLeaveTeam('${s.id}')">🚪 ออกจากทีม</button></div>`;
     }
+    // 🎨 สีประจำเมเนเจอร์ — โชว์เฉพาะการ์ดคนที่เป็น manager (admin เลือกให้)
+    if(viewer==='admin' && rank==='manager'){
+      const _mUid=_mgrUidForStaff(s);
+      if(_mUid) actions+=mgrColorPickerHTML(_mUid);
+    }
   } else if(rank){
     const bc=rank==='admin'?'#FF6060':'var(--accent2)';
     const bb=rank==='admin'?'rgba(255,80,80,.15)':'rgba(21,101,255,.15)';
@@ -21873,6 +22303,53 @@ async function adminRejoinTeam(staffId, staffName){
   await saveTeamLeft(map);
   renderStaff();
   toast(`✅ กู้คืน "${nm}" กลับเข้าทีมแล้ว`,'success');
+}
+
+// ══════════════════════════════════════════════
+// 🎨 สีประจำเมเนเจอร์ — เลือกที่หน้าจัดการทีม · โชว์ที่ป้ายเมเนเจอร์หน้าโปรเจกต์
+//   เก็บเป็น {uid: '#hex'} ใน ls('mgr_colors') + Firebase mgrColors/
+// ══════════════════════════════════════════════
+const MGR_COLOR_PRESETS = ['#FF9E00','#00DFA0','#00B4FF','#9B6FFF','#FF5DA2','#FF6B4A','#F5D90A','#4ADE80'];
+function getMgrColors(){ return ls('mgr_colors')||{}; }
+function getMgrColor(uid){ return uid ? (getMgrColors()[uid]||'') : ''; }
+async function setMgrColor(uid, color){
+  if(!uid) return;
+  const m=getMgrColors();
+  if(color) m[uid]=color; else delete m[uid];
+  ls('mgr_colors', m);
+  if(_fbDatabase){ try{ await _fbDatabase.ref('mgrColors').set(m); }catch(e){} }
+  try{ renderStaff(); }catch(e){}
+  try{ const pg=document.getElementById('page-projects'); if(pg&&!pg.classList.contains('hidden')) renderProjects(); }catch(e){}
+}
+function startMgrColorsSync(){
+  if(!_fbDatabase) return;
+  try{
+    _fbDatabase.ref('mgrColors').on('value', snap=>{
+      ls('mgr_colors', snap.exists()?(snap.val()||{}):{});
+      try{ const pg=document.getElementById('page-projects'); if(pg&&!pg.classList.contains('hidden')) renderProjList(); }catch(e){}
+    }, err=>{});
+  }catch(e){}
+}
+// หา uid ของ manager จาก staff record (match ด้วย staffId หรือ email)
+function _mgrUidForStaff(s){
+  if(!s) return '';
+  const uc=ls('mgr_users_cache')||{};
+  const em=String(s.email||'').toLowerCase();
+  for(const [uid,u] of Object.entries(uc)){
+    if(!u || u.role!=='manager') continue;
+    if((u.staffId && u.staffId===s.id) || (em && String(u.email||'').toLowerCase()===em)) return u.uid||uid;
+  }
+  return '';
+}
+// แถบเลือกสี (ใช้ในการ์ดสมาชิกหมวด Manager — admin เท่านั้น)
+function mgrColorPickerHTML(uid){
+  if(!uid) return '';
+  const cur=getMgrColor(uid);
+  return `<div style="display:flex;align-items:center;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)" onclick="event.stopPropagation()">
+    <span style="font-size:10px;color:var(--text2);margin-right:2px">🎨 สีประจำ:</span>
+    ${MGR_COLOR_PRESETS.map(c=>`<span onclick="setMgrColor('${uid}','${c}')" title="${c}" style="width:16px;height:16px;border-radius:50%;background:${c};cursor:pointer;display:inline-block;border:2px solid ${cur===c?'#fff':'transparent'};box-shadow:${cur===c?'0 0 0 1px '+c:'none'}"></span>`).join('')}
+    ${cur?`<span onclick="setMgrColor('${uid}','')" title="ล้างสี" style="font-size:11px;color:var(--text2);cursor:pointer;margin-left:3px">✕</span>`:''}
+  </div>`;
 }
 
 // refresh หน้าทีมที่กำลังเปิด (admin: staff/staff-detail · manager: mgr-team)
