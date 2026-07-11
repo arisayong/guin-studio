@@ -5366,6 +5366,9 @@ async function enterApp(){
   try{startCalcDraftsSync();}catch(e){}
   try{startMgrSuspendedSync();}catch(e){}
   try{startTeamLeftSync();}catch(e){}
+  try{startAutoSheetSync();}catch(e){}   // 🔁 admin: ดึงคนใหม่จากชีทอัตโนมัติทุก 5 นาที
+  // 🧹 admin: ล้างชื่อซ้ำที่อีเมลตรงกัน 1 ครั้งหลังเข้าระบบ (รอ staff โหลดก่อน)
+  if(currentUser?.role==='admin'){ setTimeout(()=>{ autoDedupStaffByEmail().then(n=>{ if(n>0) toast(`🧹 รวมชื่อซ้ำอัตโนมัติ ${n} คน`,'info'); }); }, 6000); }
   try{loadPaymentAccountsFromFirebase();startPaymentAccountsSync();}catch(e){}
   } catch(e) {
     console.error('enterApp failed:', e);
@@ -7624,40 +7627,70 @@ async function bulkMergeAllDuplicates(){
   if(!confirm(`⚡ รวมร่างอัตโนมัติ ${merges.length} คน · ลบ record ซ้ำ ${totalRemove} อัน\n\nระบบจะ:\n1. เก็บ record ที่ข้อมูลครบสุดของแต่ละคน\n2. ย้ายงานทั้งหมดในโปรเจกต์มารวมที่ record ที่เก็บ\n3. ผูกบัญชี user ที่ชี้ id เก่า → id ใหม่\n4. ลบ record ซ้ำออก\n\n💾 สำรอง backup ไว้ใน localStorage 24 ชม. · undo ไม่ได้\n\nยืนยันรวมทั้งหมด?`)) return;
   try{
     toast('⏳ กำลังรวมร่าง...','info');
-    // backup ครั้งเดียว
-    ls('_bulk_merge_backup_'+Date.now(), { at:new Date().toISOString(), merges, staffData:getStaffData(), projects:getProjects() });
-    // remove-id → keep-id
-    const remap = {}; merges.forEach(m => m.removeIds.forEach(rid => { remap[rid]=m.keepId; }));
-    const updates = {};
-    // 3) projects: ย้าย worker.id
-    const projs = getProjects(); let movedWorkers=0, movedProjs=0;
-    projs.forEach(p => { let dirty=false; (p.workers||[]).forEach(w => { if(remap[w.id]){ w.id=remap[w.id]; dirty=true; movedWorkers++; } }); if(dirty){ movedProjs++; updates['projects/'+p.id+'/workers']=p.workers; } });
-    // 4) users: ย้าย staffId
-    let movedUsers=0;
-    try{
-      if(_fbDatabase){
-        const usnap = await _fbDatabase.ref('users').get();
-        if(usnap.exists()){ Object.entries(usnap.val()).forEach(([uid,u])=>{ if(u && remap[u.staffId]){ updates['users/'+uid+'/staffId']=remap[u.staffId]; movedUsers++; } }); }
-      }
-    }catch(e){ console.warn('bulk users remap:', e); }
-    if(movedProjs) ls('projects', projs);   // อัปเดต cache ในเครื่องเสมอ
-    if(_fbDatabase && Object.keys(updates).length){ await _fbDatabase.ref().update(updates); }
-    // 5) staff_v3: ลบตัวซ้ำ (เก็บ record ที่เลือกไว้ตามตำแหน่งเดิมของมัน — ไม่ยัด role ที่ซ้ำกลับเข้ามา)
-    const data = getStaffData();
-    let removed=0;
-    Object.keys(data).forEach(cat => {
-      data[cat] = (Array.isArray(data[cat])?data[cat]:Object.values(data[cat]||{})).filter(s => {
-        if(s && remap[s.id]){ removed++; return false; }
-        return true;
-      });
-    });
-    saveStaffData(data);
-    toast(`✅ รวมร่างเสร็จ — เหลือคนละ 1 record · ลบซ้ำ ${removed} อัน · ย้ายงาน ${movedWorkers} ใน ${movedProjs} โปรเจกต์${movedUsers?' · ผูก user '+movedUsers:''}`,'success');
+    const st = await _applyStaffMerges(merges);
+    toast(`✅ รวมร่างเสร็จ — เหลือคนละ 1 record · ลบซ้ำ ${st.removed} อัน · ย้ายงาน ${st.movedWorkers} ใน ${st.movedProjs} โปรเจกต์${st.movedUsers?' · ผูก user '+st.movedUsers:''}`,'success');
     setTimeout(()=>{ try{findDuplicateStaff();}catch(e){} try{renderStaff();}catch(e){} }, 700);
   }catch(e){
     console.error('bulkMergeAllDuplicates:', e);
     toast('❌ '+e.message,'error');
   }
+}
+
+// core: ลงมือ merge ตามรายการ {keepId, removeIds} — ย้าย worker.id + users.staffId + ลบตัวซ้ำ + backup
+//   ใช้ร่วมทั้งปุ่มรวมร่าง (manual) และ auto-dedup หลังซิงค์ชีท
+async function _applyStaffMerges(merges){
+  ls('_bulk_merge_backup_'+Date.now(), { at:new Date().toISOString(), merges, staffData:getStaffData(), projects:getProjects() });
+  const remap = {}; merges.forEach(m => m.removeIds.forEach(rid => { remap[rid]=m.keepId; }));
+  const updates = {};
+  const projs = getProjects(); let movedWorkers=0, movedProjs=0;
+  projs.forEach(p => { let dirty=false; (p.workers||[]).forEach(w => { if(remap[w.id]){ w.id=remap[w.id]; dirty=true; movedWorkers++; } }); if(dirty){ movedProjs++; updates['projects/'+p.id+'/workers']=p.workers; } });
+  let movedUsers=0;
+  try{
+    if(_fbDatabase){
+      const usnap = await _fbDatabase.ref('users').get();
+      if(usnap.exists()){ Object.entries(usnap.val()).forEach(([uid,u])=>{ if(u && remap[u.staffId]){ updates['users/'+uid+'/staffId']=remap[u.staffId]; movedUsers++; } }); }
+    }
+  }catch(e){ console.warn('merge users remap:', e); }
+  if(movedProjs) ls('projects', projs);
+  if(_fbDatabase && Object.keys(updates).length){ await _fbDatabase.ref().update(updates); }
+  const data = getStaffData(); let removed=0;
+  Object.keys(data).forEach(cat => {
+    data[cat] = (Array.isArray(data[cat])?data[cat]:Object.values(data[cat]||{})).filter(s => {
+      if(s && remap[s.id]){ removed++; return false; }
+      return true;
+    });
+  });
+  saveStaffData(data);
+  return { merged:merges.length, removed, movedWorkers, movedProjs, movedUsers };
+}
+
+// 🧹 auto-dedup: รวม record ที่ "อีเมลตรงกันเป๊ะ" (สัญญาณปลอดภัย) — ใช้ล้างซ้ำที่ชีทสร้างทุกครั้งหลังซิงค์
+//   คนที่กรอกฟอร์ม/สมัคร ล้วนมีอีเมล → ตัวซ้ำจากชีทจะถูกยุบทันที · เงียบ ๆ ไม่ต้อง confirm (มี backup)
+async function autoDedupStaffByEmail(){
+  if(currentUser?.role!=='admin') return 0;
+  const data = getStaffData();
+  const byEmail = {};
+  Object.entries(data).forEach(([cat,arr])=>{
+    (Array.isArray(arr)?arr:Object.values(arr||{})).filter(Boolean).forEach(s=>{
+      if(!s.id) return;
+      const em=(String(s.email||'').toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/)||[])[0];
+      if(em) (byEmail[em]=byEmail[em]||[]).push(s);
+    });
+  });
+  const _score = x => (x.promptpay?1:0)+(x.bank?1:0)+(x.account?1:0)+(x.qrUrl?1:0)+(x.phone?1:0)+((x.categories||[]).length);
+  const merges = [];
+  Object.values(byEmail).forEach(list=>{
+    const ids=[...new Set(list.map(s=>s.id))];
+    if(ids.length<2) return;   // อีเมลนี้มี record เดียว → ไม่ต้องทำ
+    const recs=ids.map(id=>list.find(s=>s.id===id)).sort((a,b)=>_score(b)-_score(a));
+    merges.push({ keepId:recs[0].id, removeIds:recs.slice(1).map(r=>r.id) });
+  });
+  if(!merges.length) return 0;
+  try{
+    const st = await _applyStaffMerges(merges);
+    console.log('[autoDedup] merged', st);
+    return st.merged;
+  }catch(e){ console.warn('autoDedupStaffByEmail:', e); return 0; }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -20323,13 +20356,15 @@ async function clearSyncConfig(){
   toast('🗑️ ล้างค่าแล้ว','info');
 }
 
-async function syncFromSheet(){
+async function syncFromSheet(opts){
+  const silent = !!(opts && opts.silent);   // auto-sync → เงียบ (ไม่ขึ้น toast รบกวน)
   if(currentUser?.role !== 'admin'){
-    toast('❌ เฉพาะแอดมินเท่านั้น', 'error'); return;
+    if(!silent) toast('❌ เฉพาะแอดมินเท่านั้น', 'error'); return;
   }
   const url = ls('apps_script_sync_url') || '';
   const secret = ls('apps_script_sync_secret') || '';
   if(!url || !secret){
+    if(silent) return;
     const goSetup = confirm('ยังไม่ได้ตั้งค่า URL ของ Apps Script\n\nไปหน้า Settings เพื่อตั้งค่าเลยไหม?');
     if(goSetup) nav('settings');
     return;
@@ -20337,7 +20372,10 @@ async function syncFromSheet(){
   const btn = document.getElementById('top-sync-btn');
   const origHtml = btn ? btn.innerHTML : '';
   if(btn){ btn.innerHTML = '⏳'; btn.disabled = true; }
-  toast('🔄 กำลังซิงค์จากชีท...', 'info');
+  if(!silent) toast('🔄 กำลังซิงค์จากชีท...', 'info');
+  // เก็บชุดอีเมลก่อนซิงค์ — ใช้หา "คนใหม่จริง ๆ" (ไม่เชื่อ data.added ของ Apps Script ที่อาจ re-add ทั้งหมด)
+  const _emailSetNow = ()=>{ const set=new Set(); const d=getStaffData(); Object.values(d||{}).forEach(arr=>(Array.isArray(arr)?arr:Object.values(arr||{})).forEach(s=>{ const em=(String(s&&s.email||'').toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/)||[])[0]; if(em) set.add(em); })); return set; };
+  const _beforeEmails = _emailSetNow();
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -20348,34 +20386,64 @@ async function syncFromSheet(){
     });
     const data = await res.json();
     if(!data.ok){
-      toast('❌ ซิงค์ไม่สำเร็จ: ' + (data.error || 'unknown'), 'error');
+      if(!silent) toast('❌ ซิงค์ไม่สำเร็จ: ' + (data.error || 'unknown'), 'error');
+      else console.warn('[autoSync] fail:', data.error);
       return;
     }
-    const msg =
-      `✅ ซิงค์สำเร็จ · ` +
-      `➕ ใหม่ ${data.added||0} · ` +
-      `⏭️ ข้าม ${data.skipped||0}` +
-      (data.backfilled ? ` · 📱 backfill QR ${data.backfilled}` : '') +
-      (data.excluded ? ` · 🚫 บล็อก ${data.excluded}` : '');
-    toast(msg, 'success');
+    // === 🧹 auto-dedup: ล้างชื่อซ้ำที่ชีทสร้างขึ้นทันที (อีเมลตรงกัน = คนเดียวกัน) ===
+    //     รอ Firebase listener อัปเดต staff_v3 ก่อนสักครู่ แล้วค่อยยุบซ้ำ
+    let mergedN = 0;
+    try{
+      await new Promise(r=>setTimeout(r, 1200));
+      mergedN = await autoDedupStaffByEmail();
+    }catch(e){ console.warn('auto-dedup after sync:', e); }
 
-    // === 🔔 แจ้งเตือน admins ถ้ามีคนใหม่เพิ่ม ===
-    if((data.added||0) > 0){
+    // === หา "คนใหม่จริง ๆ" จากอีเมลที่เพิ่งโผล่ (แม่นกว่า data.added ที่อาจนับ re-add ทั้งหมด) ===
+    const _afterEmails = _emailSetNow();
+    let _newPeople = 0;
+    _afterEmails.forEach(e=>{ if(!_beforeEmails.has(e)) _newPeople++; });
+
+    // แจ้งผล: manual → โชว์เสมอ · auto(silent) → โชว์เฉพาะเมื่อมีคนใหม่จริง
+    if(!silent){
+      let msg = _newPeople>0 ? `✅ ซิงค์เสร็จ · 🎉 สมาชิกใหม่ ${_newPeople} คน` : `✅ ซิงค์เสร็จ · ไม่มีสมาชิกใหม่`;
+      if(mergedN>0) msg += ` · 🧹 รวมชื่อซ้ำ ${mergedN}`;
+      if(data.excluded) msg += ` · 🚫 บล็อก ${data.excluded}`;
+      toast(msg, 'success');
+    } else if(_newPeople>0){
+      toast(`🎉 มีสมาชิกใหม่ ${_newPeople} คน (ซิงค์อัตโนมัติ)`, 'success');
+    }
+
+    // === 🔔 แจ้งเตือน admins เฉพาะเมื่อมีคนใหม่จริง (กันสแปมตอนชีท re-add ทั้งหมด) ===
+    if(_newPeople > 0){
       try {
         await addNotificationToAdmins({
           type:'staff_added',
-          title:'➕ มีสมาชิกใหม่ในชีท',
-          text: `เพิ่มสมาชิกใหม่ ${data.added} คน · ข้าม ${data.skipped||0} · ${data.excluded?'บล็อก '+data.excluded:''}`,
+          title:'➕ มีสมาชิกใหม่',
+          text: `เพิ่มสมาชิกใหม่ ${_newPeople} คน${data.excluded?' · บล็อก '+data.excluded:''}`,
         });
       } catch(e){ console.warn('notify staff_added:', e); }
     }
-    // รายชื่อคนใหม่ที่เพิ่มเข้ามาในรอบนี้จะมาจาก Firebase listener อัตโนมัติ (ไม่ต้อง handle ตรงนี้ซ้ำ)
   } catch(e) {
     console.error('[syncFromSheet]', e);
-    toast('❌ ติดต่อ Apps Script ไม่ได้: ' + (e.message||''), 'error');
+    if(!silent) toast('❌ ติดต่อ Apps Script ไม่ได้: ' + (e.message||''), 'error');
   } finally {
     if(btn){ btn.innerHTML = origHtml; btn.disabled = false; }
   }
+}
+
+// 🔁 auto-sync ชีทเป็นระยะ (admin เท่านั้น) — ดึงคนใหม่ที่สมัคร/กรอกฟอร์มเข้ามาเองโดยไม่ต้องกดปุ่ม
+let _autoSheetSyncTimer = null;
+function startAutoSheetSync(){
+  if(currentUser?.role !== 'admin') return;
+  if(_autoSheetSyncTimer) return;   // กันตั้งซ้ำ
+  const run = ()=>{
+    if(currentUser?.role !== 'admin') return;
+    const url = ls('apps_script_sync_url') || '';
+    const secret = ls('apps_script_sync_secret') || '';
+    if(url && secret){ try{ syncFromSheet({silent:true}); }catch(e){} }
+  };
+  setTimeout(run, 10000);                            // ครั้งแรก ~10 วิ หลังเข้าระบบ
+  _autoSheetSyncTimer = setInterval(run, 10*60*1000); // แล้วทุก 10 นาที
 }
 
 async function syncPublicStaffList(){
