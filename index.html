@@ -6145,6 +6145,24 @@ function renderTrkCalendar() {
   });
   const projectGroups = [...projectGroupsMap.values()];
 
+  // 📌 เรียงตามเดทไลน์: งานใกล้ครบกำหนดสุดขึ้นบนสุด · งานเสร็จ/ยกเลิกไปอยู่ล่างสุด
+  const _projById = new Map((getProjects()||[]).map(p=>[p.id,p]));
+  projectGroups.forEach(g=>{
+    const card=(getTrkCards()||[]).find(c=>c.id===g.cardId);
+    const lp=card&&card.projId?_projById.get(card.projId):null;
+    g._status = lp ? (lp.projStatus||'') : '';
+  });
+  projectGroups.sort((a,b)=>{
+    const ad=(a._status==='done'||a._status==='cancelled')?1:0;
+    const bd=(b._status==='done'||b._status==='cancelled')?1:0;
+    if(ad!==bd) return ad-bd;
+    return (a.projDeadline||a.end).getTime()-(b.projDeadline||b.end).getTime();
+  });
+
+  // 🔀 โหมดแสดงผล: 'compact' (ย่อ 1 โปรเจกต์=1แถว · ค่าเริ่มต้น) | 'full' (เต็มแบบเดิม)
+  const viewMode = ls('trk_cal_view')||'compact';
+  if(!window._trkCalExpanded) window._trkCalExpanded = new Set();
+
   /* ── build week cells ── */
   const firstDay = new Date(trkCalYear, trkCalMonth, 1);
   const lastDay  = new Date(trkCalYear, trkCalMonth + 1, 0);
@@ -6184,6 +6202,7 @@ function renderTrkCalendar() {
           ${years.map(y => `<option value="${y}"${y === trkCalYear ? ' selected' : ''}>${y + 543}</option>`).join('')}
         </select>
         <button onclick="trkCalMonth=new Date().getMonth();trkCalYear=new Date().getFullYear();renderTrkCalendar()" style="padding:5px 12px;border-radius:7px;background:var(--accent2);border:none;color:#fff;font-family:Kanit;font-size:12px;font-weight:700;cursor:pointer">วันนี้</button>
+        <button onclick="trkCalToggleView()" title="สลับ โหมดย่อ (1 โปรเจกต์=1 แถว) / โหมดเต็ม (เห็นทุกเฟส)" style="padding:5px 12px;border-radius:7px;background:${viewMode==='compact'?'#9B6FFF':'#e8edf7'};border:none;color:${viewMode==='compact'?'#fff':'#41547a'};font-family:Kanit;font-size:12px;font-weight:700;cursor:pointer">${viewMode==='compact'?'👁️ โหมดย่อ':'📋 โหมดเต็ม'}</button>
       </div>
       <button class="trk-cal-nav-btn" onclick="trkCalNext()">หน้า ›</button>
     </div>
@@ -6244,10 +6263,6 @@ function renderTrkCalendar() {
       const borderL = isFirstWeekSeg ? `1px solid ${g.frameColor}` : 'none';
       const borderR = isLastWeekSeg  ? `1px solid ${g.frameColor}` : 'none';
 
-      const cardTop = rowOffset;
-      const cardHeight = HEAD_H + visiblePhases.length * PHASE_ROW_H;
-      rowOffset += cardHeight + CARD_GAP;
-
       // Frame styled with column positioning
       const frameLeft  = `calc(${frameColS}*((100% - 4px)/7) + 2px)`;
       const frameWidth = `calc(${frameSpan}*((100% - 4px)/7))`;
@@ -6264,6 +6279,60 @@ function renderTrkCalendar() {
       // Frame color override if project is done
       const finalFrameColor = isProjDone ? '#00DFA0' : isProjCancelled ? '#888' : g.frameColor;
       const frameBgColor = isProjDone ? 'rgba(0,223,160,.10)' : isProjCancelled ? 'rgba(120,120,120,.08)' : 'rgba(255,255,255,.55)';
+
+      // ═══ 👁️ โหมดย่อ: 1 โปรเจกต์ = 1 แถว (กดเพื่อขยายดูทุกเฟส) ═══
+      const gKeyEsc = String(g.projId).replace(/'/g,"\\'");
+      if(viewMode==='compact' && !window._trkCalExpanded.has(g.projId)){
+        const isEnded = isProjDone || isProjCancelled;
+        const ROW_H = isEnded ? 20 : 27;
+        const rowTop = rowOffset; rowOffset += ROW_H + 5;
+        const labelEscC = String(g.projLabel||'').replace(/</g,'&lt;');
+        // ป้ายนับถอยหลังเดทไลน์
+        const dlDate = g.projDeadline || g.end;
+        const diff = Math.ceil((dlDate - today)/864e5);
+        let chip;
+        if(isProjDone) chip='<span style="font-size:9.5px;font-weight:800;color:#1d9e6d">✅ เสร็จแล้ว</span>';
+        else if(isProjCancelled) chip='<span style="font-size:9.5px;font-weight:800;color:#888">❌ ยกเลิก</span>';
+        else if(diff<0) chip='<span style="font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:9px;background:#FF4040;color:#fff">เลย '+Math.abs(diff)+' วัน</span>';
+        else if(diff===0) chip='<span style="font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:9px;background:#FF4040;color:#fff">🚩 วันนี้</span>';
+        else if(diff<=3) chip='<span style="font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:9px;background:#FF9E00;color:#fff">เหลือ '+diff+' วัน</span>';
+        else chip='<span style="font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:9px;background:'+finalFrameColor+';color:#fff">เหลือ '+diff+' วัน</span>';
+
+        if(isEnded){
+          // งานจบแล้ว → แถวบางสีจาง
+          return `<div onclick="trkCalToggleExpand('${gKeyEsc}')" title="กดเพื่อขยายดูเฟส" style="position:absolute;top:${rowTop}px;left:2px;right:2px;height:${ROW_H}px;display:flex;align-items:center;gap:8px;padding:0 10px;border:1px dashed #cfd9ea;border-radius:7px;background:#f7fafd;cursor:pointer;font-size:10px;color:#7d8ca5;overflow:hidden;z-index:1;box-sizing:border-box">
+            ${isProjDone?'✅':'❌'} <b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%">${labelEscC}</b>
+            <span style="flex:1"></span>${chip}<span style="font-size:9px">▸</span>
+          </div>`;
+        }
+
+        const frameRangeMsC = Math.max(864e5, frameClampE.getTime()-frameClampS.getTime()+864e5);
+        const halfDayPct = 43200000/frameRangeMsC*100;
+        // จุดสี = เดทไลน์ของแต่ละเฟสที่จบในสัปดาห์นี้
+        const dotsHTML = visiblePhases.filter(ph=>ph.end>=wS&&ph.end<=wE).map(ph=>{
+          const pct=(ph.end.getTime()-frameClampS.getTime())/frameRangeMsC*100+halfDayPct;
+          const tip=String(ph.label||'').replace(/"/g,'')+' · '+ph.end.getDate()+(ph.submitTime?' '+ph.submitTime.slice(0,5):'')+(ph.done?' · เสร็จแล้ว':'');
+          return `<span title="${tip}" style="position:absolute;top:50%;left:${Math.min(97,Math.max(2,pct)).toFixed(1)}%;transform:translate(-50%,-50%);width:9px;height:9px;border-radius:50%;background:${ph.done?'#22C55E':ph.color};border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.12);${ph.done?'opacity:.55':''}"></span>`;
+        }).join('');
+        // 🚩 ธงเดทไลน์โปรเจกต์
+        let flagHTML='';
+        if(g.projDeadline && g.projDeadline>=wS && g.projDeadline<=wE){
+          const fp=(g.projDeadline.getTime()-frameClampS.getTime())/frameRangeMsC*100+halfDayPct;
+          flagHTML=`<span style="position:absolute;top:-8px;left:${Math.min(98,Math.max(1,fp)).toFixed(1)}%;transform:translateX(-50%);font-size:11px">🚩</span>`;
+        }
+        const radLc=isFirstWeekSeg?'8px':'0', radRc=isLastWeekSeg?'8px':'0';
+        return `<div onclick="trkCalToggleExpand('${gKeyEsc}')" title="กดเพื่อขยายดูทุกเฟสของ ${labelEscC}" style="position:absolute;top:${rowTop}px;left:2px;right:2px;height:${ROW_H}px;cursor:pointer;z-index:1">
+          <div style="position:absolute;top:0;height:${ROW_H}px;left:${frameLeft};width:${frameWidth};background:${finalFrameColor}18;border-top:1.5px solid ${finalFrameColor};border-bottom:1.5px solid ${finalFrameColor};border-left:${isFirstWeekSeg?'1.5px solid '+finalFrameColor:'none'};border-right:${isLastWeekSeg?'1.5px solid '+finalFrameColor:'none'};border-radius:${radLc} ${radRc} ${radRc} ${radLc};box-sizing:border-box">
+            <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:10.5px;font-weight:800;color:#0a1a3a;white-space:nowrap;max-width:42%;overflow:hidden;text-overflow:ellipsis">▸ 📁 ${labelEscC}</span>
+            ${dotsHTML}${flagHTML}
+          </div>
+          <div style="position:absolute;right:6px;top:50%;transform:translateY(-50%);display:flex;gap:5px;align-items:center;background:rgba(255,255,255,.88);border-radius:8px;padding:1px 5px">${chip}</div>
+        </div>`;
+      }
+
+      const cardTop = rowOffset;
+      const cardHeight = HEAD_H + visiblePhases.length * PHASE_ROW_H;
+      rowOffset += cardHeight + CARD_GAP;
 
       const frameHTML = `<div style="position:absolute;top:${cardTop}px;left:${frameLeft};width:${frameWidth};height:${cardHeight}px;
         border-top:1px solid ${finalFrameColor};border-bottom:1px solid ${finalFrameColor};
@@ -6314,6 +6383,7 @@ function renderTrkCalendar() {
         <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;${nameStyle}">📁 ${labelEsc}${isProjCancelled?' · ❌ ยกเลิก':''}</span>
         ${deadlineBadge}
         ${doneBtnHTML}
+        ${viewMode==='compact'?`<button onclick="event.stopPropagation();trkCalToggleExpand('${gKeyEsc}')" title="ย่อกลับเป็นแถวเดียว" style="padding:1px 7px;border-radius:10px;font-size:9px;font-weight:800;cursor:pointer;font-family:Kanit;background:#e8edf7;border:none;color:#41547a;flex-shrink:0;line-height:1.4;pointer-events:auto">▴ ย่อ</button>`:''}
       </div>`;
 
       // Span (in days) for this group's frame range — used to calc bar fill width
@@ -6385,9 +6455,15 @@ function renderTrkCalendar() {
     }).join('');
 
     const barsH = Math.max(4, rowOffset + 4);
+    // 💠 แถบไฮไลต์ "วันนี้" พาดลงทุกการ์ดของสัปดาห์นี้
+    let todayOverlay='';
+    if(today>=wS && today<=wE){
+      const tc=today.getDay();
+      todayOverlay=`<div style="position:absolute;top:0;bottom:0;left:calc(${tc}*((100% - 4px)/7) + 2px);width:calc((100% - 4px)/7);background:rgba(21,101,255,.055);border-left:1.5px dashed rgba(21,101,255,.28);border-right:1.5px dashed rgba(21,101,255,.28);border-radius:4px;pointer-events:none;z-index:0"></div>`;
+    }
     html += `
       <div style="display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid #edf2fa">${dayRow}</div>
-      <div style="position:relative;height:${barsH}px;margin-bottom:2px">${cardsHTML}</div>`;
+      <div style="position:relative;height:${barsH}px;margin-bottom:2px">${todayOverlay}${cardsHTML}</div>`;
   });
 
   html += '</div>';
@@ -6396,6 +6472,18 @@ function renderTrkCalendar() {
 
 function trkCalPrev(){trkCalMonth--;if(trkCalMonth<0){trkCalMonth=11;trkCalYear--}renderTrkCalendar()}
 function trkCalNext(){trkCalMonth++;if(trkCalMonth>11){trkCalMonth=0;trkCalYear++}renderTrkCalendar()}
+// 🔀 สลับโหมดปฏิทิน ย่อ/เต็ม (จำค่าไว้ในเครื่อง)
+function trkCalToggleView(){
+  ls('trk_cal_view', (ls('trk_cal_view')||'compact')==='compact'?'full':'compact');
+  renderTrkCalendar();
+}
+// ▸▾ ขยาย/ย่อ โปรเจกต์เดียวในโหมดย่อ
+function trkCalToggleExpand(k){
+  if(!window._trkCalExpanded) window._trkCalExpanded=new Set();
+  const s=window._trkCalExpanded;
+  if(s.has(k)) s.delete(k); else s.add(k);
+  renderTrkCalendar();
+}
 // State: trk filters
 window._trkFilter = window._trkFilter || { status: 'active', deadline: 'all' };
 
