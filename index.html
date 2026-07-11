@@ -5366,7 +5366,8 @@ async function enterApp(){
   try{startCalcDraftsSync();}catch(e){}
   try{startMgrSuspendedSync();}catch(e){}
   try{startTeamLeftSync();}catch(e){}
-  try{startAutoSheetSync();}catch(e){}   // 🔁 admin: ดึงคนใหม่จากชีทอัตโนมัติทุก 5 นาที
+  // ⛔ ปิด client auto-sync (เดิมยิงชีททุกครั้งที่รีหน้า → ถ้าสคริปต์เติมซ้ำจะเด้งรัว)
+  //    ให้ใช้ onFormSubmit trigger ฝั่งชีทแทน (ยิงเฉพาะตอนมีคนกรอกฟอร์มจริง) + ปุ่มซิงค์มือ
   // 🧹 admin: ล้างชื่อซ้ำที่อีเมลตรงกัน 1 ครั้งหลังเข้าระบบ (รอ staff โหลดก่อน)
   if(currentUser?.role==='admin'){ setTimeout(()=>{ autoDedupStaffByEmail().then(n=>{ if(n>0) toast(`🧹 รวมชื่อซ้ำอัตโนมัติ ${n} คน`,'info'); }); }, 6000); }
   try{loadPaymentAccountsFromFirebase();startPaymentAccountsSync();}catch(e){}
@@ -17651,6 +17652,9 @@ function startFirebaseSync() {
   if(currentUser?.role === 'admin'){
     const seenNotifIds = new Set((ls('_seen_admin_notifs') || []));
     let _notifFirstLoad = true;
+    // 🛡️ กันเด้งรัว: ถ้ามี notif ใหม่ทะลักในเวลาสั้น ๆ (เช่นสคริปต์เติมซ้ำทั้งชุด) → โชว์แค่ไม่กี่อัน แล้วสรุปรวม
+    let _burstCount = 0, _burstResetAt = 0;
+    const _BURST_MAX = 4, _BURST_WINDOW = 8000;
     _fbDatabase.ref('admin_notifications/new_staff')
       .orderByChild('addedAt')
       .limitToLast(20)
@@ -17666,7 +17670,12 @@ function startFirebaseSync() {
         // ตั้งอายุของ notif — ถ้าเก่ากว่า 5 นาทีถือว่า stale (reload เว็บแล้วเจอของเก่า)
         const addedAt = new Date(data.addedAt||0).getTime();
         if(Date.now() - addedAt > 5*60*1000) return;
-        showNewStaffToast(data);
+        // ── burst guard ──
+        const now = Date.now();
+        if(now > _burstResetAt){ _burstCount = 0; _burstResetAt = now + _BURST_WINDOW; }
+        _burstCount++;
+        if(_burstCount <= _BURST_MAX){ showNewStaffToast(data); }
+        else if(_burstCount === _BURST_MAX + 1){ try{ toast('➕ มีสมาชิกใหม่เข้ามาหลายคนพร้อมกัน — เปิดหน้าจัดการทีมเพื่อดูทั้งหมด','info'); }catch(e){} }
       });
     // หลังดึงข้อมูลชุดแรกเสร็จ → เปิด flag ให้รอบต่อไปโชว์ toast
     _fbDatabase.ref('admin_notifications/new_staff').once('value', () => {
