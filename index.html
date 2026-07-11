@@ -10218,7 +10218,8 @@ function renderQueue() {
   });
 
   // 📜 ย้ายโปรเจกต์ที่จ่ายครบแล้วออกจากคิว → ไปอยู่หน้า "ประวัติการจ่ายเงิน" (กันปนกับงานที่กำลังทำ)
-  const activeProjs = inScopeProjs.filter(p => !_isProjectFullyPaid(p));
+  //    ✅ ยกเว้น: กดแท็บ "จ่ายแล้ว" อยู่ → โชว์งานที่จ่ายครบทั้งหมดด้วย (ไม่งั้นกดแล้วเห็นไม่ครบ)
+  const activeProjs = (queueFilter === 'paid') ? inScopeProjs : inScopeProjs.filter(p => !_isProjectFullyPaid(p));
 
   // === Step 2: "All workers in scope" — ใช้นับ badges (ไม่กรอง status/confirm) ===
   //   เพื่อให้ badge counts ขึ้นตลอด ไม่หายเมื่อกดกรอง
