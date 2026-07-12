@@ -1353,6 +1353,19 @@ body.sidebar-collapsed .main-content{
     <div id="duplicate-result" style="margin-top:10px"></div>
    </div>
 
+   <!-- 🚑 กู้คืนสมาชิกที่หาย — record ถูกลบแต่บัญชี/งานยังอ้างถึง -->
+   <div class="section-card" style="border-left:4px solid var(--red);margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">🚑</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:var(--red)">กู้คืนสมาชิกที่หาย</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">คนที่ record ถูกลบ/รวมร่างจนหาย แต่บัญชีหรืองานในโปรเจกต์ยังอ้างถึง — กู้ข้อมูลเต็มจาก backup · ต่อสายงาน+บัญชีกลับ · ปลดบล็อก sync ให้อัตโนมัติ (ไม่สร้างข้อมูลเบิ้ล)</div>
+     </div>
+     <button class="btn btn-outline" onclick="rescueMissingStaffScan()" style="padding:10px 18px;border-color:var(--red);color:var(--red)">🔍 สแกนหาคนหาย</button>
+    </div>
+    <div id="rescue-result" style="margin-top:10px"></div>
+   </div>
+
    <!-- Repair Broken staffId — ซ่อม users ที่ staffId ชี้ไปคนที่ถูกลบ -->
    <div class="section-card" style="border-left:4px solid #00DFA0;margin-bottom:16px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
@@ -7562,6 +7575,7 @@ function findDuplicateStaff(){
   const groupsByAccount = {}; // bank+account → [staff,...]
   const groupsByAllNames = {}; // ชื่อเล่น+ชื่อจริง+นามสกุล ตรงกันหมด → [staff,...]
   const groupsByNameNick = {}; // ชื่อจริง+ชื่อเล่น ตรงกัน (ไม่ต้องมีนามสกุล) → จับ record ที่ข้อมูลไม่ครบ
+  const groupsByPhone = {};    // 📱 เบอร์/พร้อมเพย์ตรงกัน → จับคนเดียวกันที่ใช้คนละอีเมล
 
   allStaff.forEach(s => {
     // by email
@@ -7587,6 +7601,11 @@ function findDuplicateStaff(){
     if(nk && nm){
       const key2 = `${nk}|${nm}`;
       (groupsByNameNick[key2] = groupsByNameNick[key2] || []).push(s);
+    }
+    // 📱 By phone/promptpay — จับคนเดียวกันที่กรอกคนละอีเมล
+    const phd = String(s.promptpay||s.phone||'').replace(/\D/g,'');
+    if(phd.length >= 9){
+      (groupsByPhone[phd] = groupsByPhone[phd] || []).push(s);
     }
   });
 
@@ -7621,6 +7640,9 @@ function findDuplicateStaff(){
   Object.entries(groupsByNameNick).forEach(([k, members]) => {
     const [nk, nm] = k.split('|');
     _addGroup(members, `🧩 ชื่อจริง + ชื่อเล่น ตรงกัน: ${nm} (${nk}) — อาจมี record ข้อมูลไม่ครบซ้ำ`);
+  });
+  Object.entries(groupsByPhone).forEach(([ph, members]) => {
+    _addGroup(members, `📱 เบอร์/พร้อมเพย์ตรงกัน: ${ph} — คนเดียวกันแต่ใช้คนละอีเมล`);
   });
 
   if(!dupGroups.length){
@@ -8173,6 +8195,138 @@ async function restoreExcluded(id, displayName){
     console.error('restore error:', e);
     toast('❌ ' + e.message,'error');
   }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 🚑 กู้คืนสมาชิกที่หาย — record ถูกลบ/รวมร่างจนหาย แต่บัญชีหรืองานยังอ้างถึง id เดิม
+//   แหล่งกู้: (1) backup ใน localStorage (_bulk_merge_backup_/_merge_dup_backup_/_rescue_backup_)
+//             (2) record ปัจจุบันที่อีเมลตรง (→ ต่อสายแทนการกู้ กันเบิ้ล)
+//             (3) ข้อมูลจากบัญชี user (สร้าง record ขั้นต่ำ แล้วให้ซิงค์ชีทเติมเต็ม)
+//   + ปลดบล็อก staff_excluded ให้อัตโนมัติ (กันหายซ้ำตอนซิงค์)
+// ═══════════════════════════════════════════════════════════
+function _rescueEmailOf(x){ const m=String(x&&x.email||'').toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/); return m?m[0]:''; }
+async function rescueMissingStaffScan(){
+  const el=document.getElementById('rescue-result'); if(!el) return;
+  el.innerHTML='<div style="padding:12px;color:var(--text2)">⏳ กำลังสแกน...</div>';
+  try{
+    const staffNow=getAllStaff();
+    const validIds=new Set(staffNow.map(s=>s.id));
+    const curByEmail={}; staffNow.forEach(s=>{const e=_rescueEmailOf(s); if(e&&!curByEmail[e])curByEmail[e]=s;});
+    // 1) รวบรวม id ที่หาย จากงานในโปรเจกต์ + บัญชีผู้ใช้
+    const orphanIds=new Map(); // id → {jobs, account}
+    getProjects().forEach(p=>(p.workers||[]).forEach(w=>{
+      if(!w||!w.id||validIds.has(w.id)) return;
+      if(!orphanIds.has(w.id)) orphanIds.set(w.id,{jobs:0,account:null});
+      orphanIds.get(w.id).jobs++;
+    }));
+    let allUsers={};
+    if(_fbDatabase){ try{ const s=await _fbDatabase.ref('users').get(); if(s.exists()) allUsers=s.val()||{}; }catch(e){} }
+    Object.entries(allUsers).forEach(([uid,u])=>{
+      if(!u||!u.staffId||validIds.has(u.staffId)) return;
+      if(!orphanIds.has(u.staffId)) orphanIds.set(u.staffId,{jobs:0,account:null});
+      orphanIds.get(u.staffId).account={uid,email:u.email||'',nickname:u.nickname||'',name:u.name||''};
+    });
+    if(!orphanIds.size){
+      el.innerHTML='<div style="padding:14px;background:rgba(0,223,160,.08);border:1px solid rgba(0,223,160,.3);border-radius:8px;color:var(--green);font-weight:700">✅ ไม่พบสมาชิกที่หาย — งานและบัญชีทุกอันชี้หาตัวคนเจอครบ</div>';
+      window._rescuePlan=null; return;
+    }
+    // 2) หา record เต็มจาก backups (ใหม่สุดก่อน)
+    const backupRecords={};
+    Object.keys(localStorage).filter(k=>/^guin3__(bulk_merge_backup_|merge_dup_backup_|rescue_backup_)/.test(k)).sort().reverse().forEach(k=>{
+      try{
+        const b=JSON.parse(localStorage.getItem(k)); const sd=(b&&b.staffData)||null; if(!sd) return;
+        Object.entries(sd).forEach(([cat,arr])=>(Array.isArray(arr)?arr:Object.values(arr||{})).filter(Boolean).forEach(s=>{
+          if(s.id&&orphanIds.has(s.id)&&!backupRecords[s.id]) backupRecords[s.id]={...s,_cat:cat};
+        }));
+      }catch(e){}
+    });
+    // 3) excluded list
+    let excluded={};
+    if(_fbDatabase){ try{ const s=await _fbDatabase.ref('staff_excluded').get(); if(s.exists()) excluded=s.val()||{}; }catch(e){} }
+    // 4) วางแผนต่อคน
+    const plan=[];
+    orphanIds.forEach((info,id)=>{
+      const rec=backupRecords[id]||null;
+      const em=_rescueEmailOf(rec)||_rescueEmailOf(info.account);
+      const nameGarbage=rec&&String(rec.name||'').includes('@');
+      const existing=em?curByEmail[em]:null;
+      const isExcluded=!!excluded[id]||(em&&Object.values(excluded).some(x=>x&&_rescueEmailOf(x)===em));
+      let action,label;
+      if(existing){ action='remap'; label='มีตัวจริงในทีมแล้ว ('+(existing.nickname||existing.name)+') → ต่องาน/บัญชีเข้าคนนี้'; }
+      else if(rec&&!nameGarbage){ action='restore'; label='กู้คืนจาก backup: '+(rec.nickname||rec.name)+(rec.name&&rec.nickname?' ('+rec.name+')':''); }
+      else if(info.account&&em){ action='stub'; label='สร้าง record จากบัญชี: '+(info.account.nickname||em)+' → ซิงค์ชีทเติมข้อมูลทีหลัง'; }
+      else { action='manual'; label='ไม่มีข้อมูลพอ (id: '+String(id).slice(0,18)+'…) — ซิงค์ชีทแล้วใช้ Staff Coverage Audit ต่อ'; }
+      plan.push({id,info,rec,existing,action,label,isExcluded,email:em});
+    });
+    plan.sort((a,b)=>(a.action==='manual'?1:0)-(b.action==='manual'?1:0));
+    window._rescuePlan=plan;
+    const icons={restore:'🚑',remap:'🔗',stub:'🆕',manual:'⚠️'};
+    let html=`<div style="padding:12px 14px;background:rgba(255,158,0,.08);border:1px solid rgba(255,158,0,.35);border-radius:10px;margin-bottom:10px">
+      <div style="font-weight:800;color:var(--orange);font-size:14px">พบ ${plan.length} คนที่ "ตัวหาย" (งาน/บัญชียังอ้างถึง แต่ไม่มีในคลังทีม)</div>
+      <div style="font-size:11.5px;color:var(--text2);margin-top:3px">🚑 กู้จาก backup (ข้อมูลเต็ม id เดิม — งานต่อกลับทันที) · 🔗 ต่อเข้าตัวจริงที่มีอยู่ · 🆕 สร้างจากบัญชี · ⚠️ ต้องจัดการเอง</div></div>`;
+    plan.forEach(x=>{
+      html+=`<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;margin-bottom:6px;font-size:12.5px">
+        <div style="font-weight:700">${icons[x.action]} ${_escH(x.label)} ${x.isExcluded?'<span style="color:var(--red);font-size:10.5px">· 🚫 ติดบล็อก sync (จะปลดให้)</span>':''}</div>
+        <div style="font-size:10.5px;color:var(--text2);margin-top:2px;font-family:monospace">id: ${_escH(String(x.id).slice(0,24))}… · งานที่อ้างถึง ${x.info.jobs} รายการ${x.info.account?' · บัญชี: '+_escH(x.info.account.email||x.info.account.nickname):''}</div>
+      </div>`;
+    });
+    const doable=plan.filter(x=>x.action!=='manual').length;
+    html+=`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-blue" onclick="rescueMissingStaffApply()" ${doable?'':'disabled'} style="font-weight:800">🚑 กู้คืนทั้งหมด (${doable} คน)</button>
+      <span style="font-size:11px;color:var(--text2)">ระบบสำรองข้อมูลก่อนทำเสมอ · หลังกู้เสร็จกด 🔄 ซิงค์ชีท 1 ครั้งเพื่อเติมข้อมูลล่าสุด (ไม่เบิ้ล — จับคู่ด้วยอีเมล)</span></div>`;
+    el.innerHTML=html;
+  }catch(e){ console.error('rescueScan:',e); el.innerHTML='<div style="padding:12px;color:var(--red)">❌ '+e.message+'</div>'; }
+}
+async function rescueMissingStaffApply(){
+  const plan=(window._rescuePlan||[]).filter(x=>x.action!=='manual');
+  if(!plan.length){ toast('ไม่มีรายการที่กู้ได้อัตโนมัติ','info'); return; }
+  if(!confirm('ยืนยันกู้คืน/ต่อสาย '+plan.length+' คน?\n\n• กู้ record กลับด้วย id เดิม → งานและบัญชีต่อกลับทันที\n• ไม่สร้างข้อมูลซ้ำ (คนที่มีตัวจริงอยู่แล้วจะใช้วิธีต่อสายแทน)\n• ปลดบล็อก sync ให้คนที่ติดบัญชีดำ\n\n(สำรองข้อมูลก่อนอัตโนมัติ)')) return;
+  try{
+    ls('_rescue_backup_'+Date.now(), { at:new Date().toISOString(), staffData:getStaffData(), projects:getProjects() });
+    const data=getStaffData();
+    const projs=getProjects();
+    const updates={};
+    let nRestore=0,nStub=0,nRemap=0,nUnblock=0;
+    // อ่าน excluded ครั้งเดียว
+    let excluded={};
+    if(_fbDatabase){ try{ const s=await _fbDatabase.ref('staff_excluded').get(); if(s.exists()) excluded=s.val()||{}; }catch(e){} }
+    for(const item of plan){
+      if(item.action==='restore'||item.action==='stub'){
+        let rec, cat;
+        if(item.action==='restore'){ rec={...item.rec}; cat=rec._cat||rec.category||'dubbing'; delete rec._cat; }
+        else {
+          rec={ id:item.id, name:item.info.account.name||item.info.account.nickname||item.email, nickname:item.info.account.nickname||'', email:item.info.account.email||item.email, categories:['dubbing'] };
+          cat='dubbing';
+        }
+        if(!data[cat]) data[cat]=[];
+        if(!data[cat].some(s=>s&&s.id===rec.id)){
+          data[cat].push({...rec, category:cat});
+          if(item.action==='restore') nRestore++; else nStub++;
+        }
+      } else if(item.action==='remap'){
+        projs.forEach(p=>{
+          let dirty=false;
+          (p.workers||[]).forEach(w=>{ if(w.id===item.id){ w.id=item.existing.id; dirty=true; } });
+          if(dirty) updates['projects/'+p.id+'/workers']=p.workers;
+        });
+        if(item.info.account) updates['users/'+item.info.account.uid+'/staffId']=item.existing.id;
+        nRemap++;
+      }
+      // ปลดบล็อก sync (ทั้ง key ตรง id และ entry ที่อีเมลตรง)
+      if(item.isExcluded&&_fbDatabase){
+        for(const [k,v] of Object.entries(excluded)){
+          if(k===item.id||(item.email&&v&&_rescueEmailOf(v)===item.email)){
+            try{ await _fbDatabase.ref('staff_excluded/'+k).remove(); delete excluded[k]; nUnblock++; }catch(e){}
+          }
+        }
+      }
+    }
+    saveStaffData(data);   // เขียน staff_v3 + auto-publish public list
+    try{ ls('projects_cache', projs); }catch(e){}
+    if(_fbDatabase&&Object.keys(updates).length){ await _fbDatabase.ref().update(updates); }
+    toast(`✅ กู้คืนสำเร็จ — 🚑 กู้จาก backup ${nRestore} · 🆕 สร้างใหม่ ${nStub} · 🔗 ต่อสาย ${nRemap}${nUnblock?' · ปลดบล็อก '+nUnblock:''}`,'success');
+    setTimeout(()=>{ try{renderStaff();}catch(e){} rescueMissingStaffScan(); },600);
+  }catch(e){ console.error('rescueApply:',e); toast('❌ '+e.message,'error'); }
 }
 
 // ซ่อม orphan workers ทั้งหมด (พร้อม backup)
@@ -13152,11 +13306,27 @@ function renderProfit(){
 function _emKey(s){ const m=String(s&&s.email||'').toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/); return m?('e:'+m[0]):''; }
 function _nmKey(s){ const nm=String(s&&s.name||'').trim().toLowerCase(), nk=String(s&&s.nickname||'').trim().toLowerCase(); return (nm||nk)?('n:'+nm+'|'+nk):''; }
 function _buildPersonResolver(allStaffList){
-  // key = อีเมล ถ้ามี · ไม่งั้น ชื่อ+ชื่อเล่น
-  // ⚠️ ไม่เชื่อม email-group กับ name-group ข้ามกัน — กันคนละคนที่ชื่อเหมือนกัน (แต่คนละอีเมล)
-  //    ถูกยุบรวมจนหายไปจากหน้าเว็บ. คนที่มีอีเมล = จับด้วยอีเมลอย่างเดียว (unique ต่อคน)
+  // key หลัก = อีเมล > ชื่อ+ชื่อเล่น > id
+  // เชื่อมเป็น "คนเดียวกัน" เพิ่มเมื่อ: 📱 เบอร์/พร้อมเพย์เดียวกัน หรือ ชื่อจริง+ชื่อเล่น ตรงกันทั้งคู่
+  //   (จับคนเดียวกันที่ใช้ 2 อีเมลได้ · ยังไม่เชื่อมด้วยชื่อเล่นอย่างเดียว — กันคนละคนชื่อเล่นซ้ำโดนยุบ)
+  const parent={};
+  const find=x=>{ while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
+  const union=(a,b)=>{ const ra=find(a),rb=find(b); if(ra!==rb) parent[ra]=rb; };
+  const anchorOf=s=>_emKey(s)||_nmKey(s)||('x:'+((s&&s.id)||''));
+  const byPhone={}, byNameNick={};
+  (allStaffList||[]).forEach(s=>{
+    if(!s) return;
+    const a=anchorOf(s); if(parent[a]==null) parent[a]=a;
+    const ph=String(s.promptpay||s.phone||'').replace(/\D/g,'');
+    if(ph.length>=9) (byPhone[ph]=byPhone[ph]||[]).push(a);
+    const nm=String(s.name||'').normalize('NFC').trim().replace(/\s+/g,' ').toLowerCase();
+    const nk=String(s.nickname||'').normalize('NFC').trim().toLowerCase();
+    if(nm&&nk) (byNameNick[nm+'|'+nk]=byNameNick[nm+'|'+nk]||[]).push(a);
+  });
+  [byPhone,byNameNick].forEach(m=>Object.values(m).forEach(arr=>{ for(let i=1;i<arr.length;i++) union(arr[0],arr[i]); }));
   return function(s){
-    return _emKey(s) || _nmKey(s) || ('x:'+((s&&s.id)||''));
+    const a=anchorOf(s);
+    return parent[a]==null ? a : find(a);
   };
 }
 // ยุบ record ที่เป็นคนเดียวกันให้เหลือคนละ 1 — เก็บ record ที่ข้อมูลครบสุดไว้
@@ -13275,7 +13445,8 @@ function renderStaffGrid(){
   Object.entries(CATS).forEach(([key,cat])=>{
     if(activeStaffCat==='left') return; // แท็บ "ออกทีม" แสดงเฉพาะโซนด้านล่าง
     if(activeStaffCat!=='all'&&activeStaffCat!==key)return;
-    const staff=_uniqByPerson((data[key]||[]).filter(s=>!_left[s.id]), _resolvePerson).filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q));
+    // 🔍 ค้นหาก่อนแล้วค่อยยุบร่างซ้ำ — คนที่ record โดนยุบรวมกับตัวอื่นจะยังค้นเจอด้วยชื่อของ record ไหนก็ได้
+    const staff=_uniqByPerson((data[key]||[]).filter(s=>!_left[s.id]).filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q)||String(s.email||'').toLowerCase().includes(q)), _resolvePerson);
     if(!staff.length)return;
     const color=cc[key]||'var(--text2)';
     html+='<div style="margin-bottom:20px;border-left:4px solid '+color+';border-radius:12px;overflow:hidden;background:var(--card)">';
@@ -21453,9 +21624,12 @@ function teamMemberCardHTML(s, col, viewer){
       <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(255,64,64,.35);color:#FF6060" onclick="event.stopPropagation();teamWarn('${s.id}')">✉️ เตือน</button>
       <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(255,199,0,.4);color:#FFC700" onclick="event.stopPropagation();teamAppr('${s.id}')">⭐ ชื่นชม</button>
     </div>`;
-    // 🚪 ออกจากทีม — เฉพาะแอดมิน
+    // 🚪 ออกจากทีม + 🗑️ ลบถาวร — เฉพาะแอดมิน
     if(viewer==='admin'){
-      actions+=`<div style="margin-top:6px"><button class="btn btn-sm btn-outline" style="width:100%;padding:5px 4px;font-size:11px;border-color:rgba(150,150,150,.4);color:var(--text2)" onclick="event.stopPropagation();adminLeaveTeam('${s.id}')">🚪 ออกจากทีม</button></div>`;
+      actions+=`<div style="display:flex;gap:6px;margin-top:6px">
+        <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(150,150,150,.4);color:var(--text2)" onclick="event.stopPropagation();adminLeaveTeam('${s.id}')" title="ย้ายไปโซนออกจากทีม (ข้อมูลยังอยู่ กู้คืนได้)">🚪 ออกจากทีม</button>
+        <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(255,64,64,.4);color:var(--red)" onclick="event.stopPropagation();deleteStaff('${s.id}')" title="ลบออกจากระบบถาวร + บล็อกไม่ให้ซิงค์กลับจากชีท (คืนได้ที่ ตั้งค่า → รายชื่อบล็อก Sync)">🗑️ ลบถาวร</button>
+      </div>`;
     }
     // 🎨 สีประจำเมเนเจอร์ — โชว์เฉพาะการ์ดคนที่เป็น manager (admin เลือกให้)
     if(viewer==='admin' && rank==='manager'){
