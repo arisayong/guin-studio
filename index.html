@@ -8281,16 +8281,26 @@ async function rescueMissingStaffScan(){
     let html=`<div style="padding:12px 14px;background:rgba(255,158,0,.08);border:1px solid rgba(255,158,0,.35);border-radius:10px;margin-bottom:10px">
       <div style="font-weight:800;color:var(--orange);font-size:14px">พบ ${plan.length} คนที่ "ตัวหาย" (งาน/บัญชียังอ้างถึง แต่ไม่มีในคลังทีม)</div>
       <div style="font-size:11.5px;color:var(--text2);margin-top:3px">🚑 กู้จาก backup (ข้อมูลเต็ม id เดิม — งานต่อกลับทันที) · 🔗 ต่อเข้าตัวจริงที่มีอยู่ · 🆕 สร้างจากบัญชี · ⚠️ ต้องจัดการเอง</div></div>`;
+    // dropdown รายชื่อทีมปัจจุบัน — ให้ admin เลือกผูกเอง (เรียงตามชื่อเล่น)
+    const _pickOpts=staffNow.slice().sort((a,b)=>String(a.nickname||a.name||'').localeCompare(String(b.nickname||b.name||''),'th'))
+      .map(s=>`<option value="${_escH(s.id)}">${_escH(s.nickname||'')} · ${_escH(s.name||'')}${s.email?' · '+_escH(s.email):''}</option>`).join('');
     plan.forEach((x,i)=>{
-      const checkable=x.action!=='manual';
       // 🆕 stub = ไม่ติ๊กให้อัตโนมัติ (เสี่ยงสร้างซ้ำถ้าคนนี้มีในทีมอยู่แล้วแต่จับคู่ไม่เจอ) — admin ติ๊กเองเมื่อแน่ใจ
       const preChecked=x.action==='restore'||x.action==='remap';
-      html+=`<div style="background:var(--bg2);border:1px solid ${x.action==='stub'?'rgba(255,158,0,.4)':'var(--border2)'};border-radius:8px;padding:9px 12px;margin-bottom:6px;font-size:12.5px;display:flex;gap:10px;align-items:flex-start">
-        ${checkable?`<input type="checkbox" data-rescue-idx="${i}" ${preChecked?'checked':''} style="width:16px;height:16px;margin-top:2px;cursor:pointer;accent-color:var(--accent2);flex-shrink:0">`:'<span style="width:16px;flex-shrink:0"></span>'}
+      const showPicker=x.action==='stub'||x.action==='manual';
+      html+=`<div style="background:var(--bg2);border:1px solid ${showPicker?'rgba(255,158,0,.4)':'var(--border2)'};border-radius:8px;padding:9px 12px;margin-bottom:6px;font-size:12.5px;display:flex;gap:10px;align-items:flex-start">
+        <input type="checkbox" data-rescue-idx="${i}" ${preChecked?'checked':''} style="width:16px;height:16px;margin-top:2px;cursor:pointer;accent-color:var(--accent2);flex-shrink:0">
         <div style="flex:1;min-width:0">
           <div style="font-weight:700">${icons[x.action]} ${_escH(x.label)} ${x.isExcluded?'<span style="color:var(--red);font-size:10.5px">· 🚫 ติดบล็อก sync (จะปลดให้)</span>':''}</div>
           <div style="font-size:10.5px;color:var(--text2);margin-top:2px;font-family:monospace">id: ${_escH(String(x.id).slice(0,24))}… · งานที่อ้างถึง ${x.info.jobs} รายการ${x.info.account?' · บัญชี: '+_escH(x.info.account.email||x.info.account.nickname):''}</div>
-          ${x.action==='stub'?'<div style="font-size:10.5px;color:var(--orange);margin-top:2px">⚠️ ติ๊กเฉพาะเมื่อแน่ใจว่าคนนี้ "ไม่มี" ในทีมจริง ๆ — ถ้ามีอยู่แล้วจะกลายเป็นชื่อซ้ำ</div>':''}
+          ${showPicker?`<div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--accent2);font-weight:700">🔗 ผูกกับคนในทีม:</span>
+            <select data-rescue-pick="${i}" onchange="var cb=document.querySelector('[data-rescue-idx=\\'${i}\\']');if(cb)cb.checked=!!this.value" style="flex:1;min-width:220px;padding:6px 10px;background:var(--bg2);border:1px solid rgba(0,180,255,.4);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px">
+              <option value="">— เลือกตัวจริงของคนนี้ (แนะนำ ถ้าเขามีชื่อในทีมแล้ว) —</option>
+              ${_pickOpts}
+            </select>
+          </div>
+          <div style="font-size:10.5px;color:var(--orange);margin-top:4px">⚠️ ถ้าไม่เลือกผูก + ติ๊ก = สร้าง record ใหม่ → จะกลายเป็นชื่อซ้ำถ้าคนนี้มีในทีมอยู่แล้ว</div>`:''}
         </div>
       </div>`;
     });
@@ -8302,9 +8312,20 @@ async function rescueMissingStaffScan(){
   }catch(e){ console.error('rescueScan:',e); el.innerHTML='<div style="padding:12px;color:var(--red)">❌ '+e.message+'</div>'; }
 }
 async function rescueMissingStaffApply(){
-  // เอาเฉพาะรายการที่ติ๊กไว้
-  const checkedIdx=new Set([...document.querySelectorAll('[data-rescue-idx]')].filter(cb=>cb.checked).map(cb=>parseInt(cb.dataset.rescueIdx)));
-  const plan=(window._rescuePlan||[]).filter((x,i)=>x.action!=='manual'&&checkedIdx.has(i));
+  // เอาเฉพาะรายการที่ติ๊กไว้ · ถ้า admin เลือก "ผูกกับคนในทีม" เอง → ใช้เป็น remap เข้าคนนั้น (ไม่สร้างใหม่)
+  const allNow=getAllStaff();
+  const plan=[];
+  (window._rescuePlan||[]).forEach((x,i)=>{
+    const cb=document.querySelector('[data-rescue-idx="'+i+'"]');
+    if(!cb||!cb.checked) return;
+    const pickId=document.querySelector('[data-rescue-pick="'+i+'"]')?.value||'';
+    if(pickId){
+      const t=allNow.find(s=>s.id===pickId);
+      if(t){ plan.push({...x, action:'remap', existing:t}); return; }
+    }
+    if(x.action==='manual') return;   // manual ที่ไม่ได้เลือกผูก → ข้าม
+    plan.push(x);
+  });
   if(!plan.length){ toast('ยังไม่ได้ติ๊กเลือกรายการ','warn'); return; }
   if(!confirm('ยืนยันกู้คืน/ต่อสาย '+plan.length+' คน?\n\n• กู้ record กลับด้วย id เดิม → งานและบัญชีต่อกลับทันที\n• ไม่สร้างข้อมูลซ้ำ (คนที่มีตัวจริงอยู่แล้วจะใช้วิธีต่อสายแทน)\n• ปลดบล็อก sync ให้คนที่ติดบัญชีดำ\n\n(สำรองข้อมูลก่อนอัตโนมัติ)')) return;
   try{
