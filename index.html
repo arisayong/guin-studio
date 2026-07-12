@@ -8244,17 +8244,34 @@ async function rescueMissingStaffScan(){
     let excluded={};
     if(_fbDatabase){ try{ const s=await _fbDatabase.ref('staff_excluded').get(); if(s.exists()) excluded=s.val()||{}; }catch(e){} }
     // 4) วางแผนต่อคน
+    //    หา "ตัวจริงในทีม" ด้วย: อีเมล → ชื่อเล่น (ต้อง unique) → ชื่อจริง (unique) — กันสร้างซ้ำ
+    const normNick=v=>String(v||'').normalize('NFC').toLowerCase().replace(/\s+/g,'');
+    const curByNick={}, nickCount={}, curByName={}, nameCount={};
+    staffNow.forEach(s=>{
+      const n=normNick(s.nickname); if(n){ nickCount[n]=(nickCount[n]||0)+1; curByNick[n]=s; }
+      const nm=normNick(s.name); if(nm){ nameCount[nm]=(nameCount[nm]||0)+1; curByName[nm]=s; }
+    });
     const plan=[];
     orphanIds.forEach((info,id)=>{
       const rec=backupRecords[id]||null;
       const em=_rescueEmailOf(rec)||_rescueEmailOf(info.account);
       const nameGarbage=rec&&String(rec.name||'').includes('@');
-      const existing=em?curByEmail[em]:null;
+      let existing=em?curByEmail[em]:null;
+      let matchedBy='อีเมล';
+      if(!existing){
+        // ลองชื่อเล่น/ชื่อจริง จาก backup record หรือบัญชี (ต้องมีคนเดียวในทีมที่ใช้ชื่อนี้)
+        const cands=[rec&&!nameGarbage?rec.nickname:'', info.account?.nickname, rec&&!nameGarbage?rec.name:'', info.account?.name];
+        for(const c of cands){
+          const n=normNick(c); if(!n) continue;
+          if(nickCount[n]===1){ existing=curByNick[n]; matchedBy='ชื่อเล่น "'+c+'"'; break; }
+          if(nameCount[n]===1){ existing=curByName[n]; matchedBy='ชื่อ "'+c+'"'; break; }
+        }
+      }
       const isExcluded=!!excluded[id]||(em&&Object.values(excluded).some(x=>x&&_rescueEmailOf(x)===em));
       let action,label;
-      if(existing){ action='remap'; label='มีตัวจริงในทีมแล้ว ('+(existing.nickname||existing.name)+') → ต่องาน/บัญชีเข้าคนนี้'; }
+      if(existing){ action='remap'; label='มีตัวจริงในทีมแล้ว: '+(existing.nickname||existing.name)+' (จับคู่ด้วย'+matchedBy+') → ต่องาน/บัญชีเข้าคนนี้ ไม่สร้างใหม่'; }
       else if(rec&&!nameGarbage){ action='restore'; label='กู้คืนจาก backup: '+(rec.nickname||rec.name)+(rec.name&&rec.nickname?' ('+rec.name+')':''); }
-      else if(info.account&&em){ action='stub'; label='สร้าง record จากบัญชี: '+(info.account.nickname||em)+' → ซิงค์ชีทเติมข้อมูลทีหลัง'; }
+      else if(info.account&&em){ action='stub'; label='ไม่พบตัวจริงในทีม → สร้าง record ใหม่จากบัญชี: '+(info.account.nickname||em); }
       else { action='manual'; label='ไม่มีข้อมูลพอ (id: '+String(id).slice(0,18)+'…) — ซิงค์ชีทแล้วใช้ Staff Coverage Audit ต่อ'; }
       plan.push({id,info,rec,existing,action,label,isExcluded,email:em});
     });
@@ -8264,22 +8281,31 @@ async function rescueMissingStaffScan(){
     let html=`<div style="padding:12px 14px;background:rgba(255,158,0,.08);border:1px solid rgba(255,158,0,.35);border-radius:10px;margin-bottom:10px">
       <div style="font-weight:800;color:var(--orange);font-size:14px">พบ ${plan.length} คนที่ "ตัวหาย" (งาน/บัญชียังอ้างถึง แต่ไม่มีในคลังทีม)</div>
       <div style="font-size:11.5px;color:var(--text2);margin-top:3px">🚑 กู้จาก backup (ข้อมูลเต็ม id เดิม — งานต่อกลับทันที) · 🔗 ต่อเข้าตัวจริงที่มีอยู่ · 🆕 สร้างจากบัญชี · ⚠️ ต้องจัดการเอง</div></div>`;
-    plan.forEach(x=>{
-      html+=`<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;margin-bottom:6px;font-size:12.5px">
-        <div style="font-weight:700">${icons[x.action]} ${_escH(x.label)} ${x.isExcluded?'<span style="color:var(--red);font-size:10.5px">· 🚫 ติดบล็อก sync (จะปลดให้)</span>':''}</div>
-        <div style="font-size:10.5px;color:var(--text2);margin-top:2px;font-family:monospace">id: ${_escH(String(x.id).slice(0,24))}… · งานที่อ้างถึง ${x.info.jobs} รายการ${x.info.account?' · บัญชี: '+_escH(x.info.account.email||x.info.account.nickname):''}</div>
+    plan.forEach((x,i)=>{
+      const checkable=x.action!=='manual';
+      // 🆕 stub = ไม่ติ๊กให้อัตโนมัติ (เสี่ยงสร้างซ้ำถ้าคนนี้มีในทีมอยู่แล้วแต่จับคู่ไม่เจอ) — admin ติ๊กเองเมื่อแน่ใจ
+      const preChecked=x.action==='restore'||x.action==='remap';
+      html+=`<div style="background:var(--bg2);border:1px solid ${x.action==='stub'?'rgba(255,158,0,.4)':'var(--border2)'};border-radius:8px;padding:9px 12px;margin-bottom:6px;font-size:12.5px;display:flex;gap:10px;align-items:flex-start">
+        ${checkable?`<input type="checkbox" data-rescue-idx="${i}" ${preChecked?'checked':''} style="width:16px;height:16px;margin-top:2px;cursor:pointer;accent-color:var(--accent2);flex-shrink:0">`:'<span style="width:16px;flex-shrink:0"></span>'}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700">${icons[x.action]} ${_escH(x.label)} ${x.isExcluded?'<span style="color:var(--red);font-size:10.5px">· 🚫 ติดบล็อก sync (จะปลดให้)</span>':''}</div>
+          <div style="font-size:10.5px;color:var(--text2);margin-top:2px;font-family:monospace">id: ${_escH(String(x.id).slice(0,24))}… · งานที่อ้างถึง ${x.info.jobs} รายการ${x.info.account?' · บัญชี: '+_escH(x.info.account.email||x.info.account.nickname):''}</div>
+          ${x.action==='stub'?'<div style="font-size:10.5px;color:var(--orange);margin-top:2px">⚠️ ติ๊กเฉพาะเมื่อแน่ใจว่าคนนี้ "ไม่มี" ในทีมจริง ๆ — ถ้ามีอยู่แล้วจะกลายเป็นชื่อซ้ำ</div>':''}
+        </div>
       </div>`;
     });
     const doable=plan.filter(x=>x.action!=='manual').length;
     html+=`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
-      <button class="btn btn-blue" onclick="rescueMissingStaffApply()" ${doable?'':'disabled'} style="font-weight:800">🚑 กู้คืนทั้งหมด (${doable} คน)</button>
+      <button class="btn btn-blue" onclick="rescueMissingStaffApply()" ${doable?'':'disabled'} style="font-weight:800">🚑 กู้คืนที่ติ๊กไว้</button>
       <span style="font-size:11px;color:var(--text2)">ระบบสำรองข้อมูลก่อนทำเสมอ · หลังกู้เสร็จกด 🔄 ซิงค์ชีท 1 ครั้งเพื่อเติมข้อมูลล่าสุด (ไม่เบิ้ล — จับคู่ด้วยอีเมล)</span></div>`;
     el.innerHTML=html;
   }catch(e){ console.error('rescueScan:',e); el.innerHTML='<div style="padding:12px;color:var(--red)">❌ '+e.message+'</div>'; }
 }
 async function rescueMissingStaffApply(){
-  const plan=(window._rescuePlan||[]).filter(x=>x.action!=='manual');
-  if(!plan.length){ toast('ไม่มีรายการที่กู้ได้อัตโนมัติ','info'); return; }
+  // เอาเฉพาะรายการที่ติ๊กไว้
+  const checkedIdx=new Set([...document.querySelectorAll('[data-rescue-idx]')].filter(cb=>cb.checked).map(cb=>parseInt(cb.dataset.rescueIdx)));
+  const plan=(window._rescuePlan||[]).filter((x,i)=>x.action!=='manual'&&checkedIdx.has(i));
+  if(!plan.length){ toast('ยังไม่ได้ติ๊กเลือกรายการ','warn'); return; }
   if(!confirm('ยืนยันกู้คืน/ต่อสาย '+plan.length+' คน?\n\n• กู้ record กลับด้วย id เดิม → งานและบัญชีต่อกลับทันที\n• ไม่สร้างข้อมูลซ้ำ (คนที่มีตัวจริงอยู่แล้วจะใช้วิธีต่อสายแทน)\n• ปลดบล็อก sync ให้คนที่ติดบัญชีดำ\n\n(สำรองข้อมูลก่อนอัตโนมัติ)')) return;
   try{
     ls('_rescue_backup_'+Date.now(), { at:new Date().toISOString(), staffData:getStaffData(), projects:getProjects() });
