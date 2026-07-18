@@ -10861,6 +10861,11 @@ function renderQueue() {
     const sendAllBtn = eligibleSendCount>0
       ? `<button onclick="event.stopPropagation();directSendConfirmAll('${p.id}')" style="padding:7px 14px;background:#9B6FFF;border:none;border-radius:8px;color:#fff;font-family:Kanit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap" title="ส่งใบยืนยันยอดให้ทีมทั้งโปรเจกต์ทันที (${eligibleSendCount} คน)">📤 ส่งใบยืนยันยอดรวม (${eligibleSendCount})</button>`
       : '';
+    // 🚫 ปุ่ม "ยกเลิกใบยืนยันทั้งกลุ่ม" — โชว์เมื่อมีใบที่ส่งไปแล้ว (กันเคสเผลอกดส่งผิดโปรเจกต์)
+    const cancelableCount = g.workers.filter(w => w.status!=='paid' && ['sent','confirmed'].includes(getWorkerConfirmStatus(w))).length;
+    const cancelAllBtn = cancelableCount>0
+      ? `<button onclick="event.stopPropagation();cancelConfirmAll('${p.id}')" style="padding:7px 12px;background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.35);border-radius:8px;color:var(--red);font-family:Kanit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap" title="ยกเลิกใบยืนยันยอดที่ส่งไปแล้วทั้งโปรเจกต์ (${cancelableCount} ใบ) — ใบจะหายจากหน้าทีมทันที">🚫 ยกเลิกใบยืนยัน (${cancelableCount})</button>`
+      : '';
 
     // Worker rows
     const workerRows = g.workers.map(w => {
@@ -10984,7 +10989,7 @@ function renderQueue() {
         </div>
         <div class="qgroup-r3" style="display:contents">
           <div class="qgroup-client">${clientPaidBtn}</div>
-          <div class="qgroup-action" style="margin-left:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${sendAllBtn}${headerStatus}</div>
+          <div class="qgroup-action" style="margin-left:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${sendAllBtn}${cancelAllBtn}${headerStatus}</div>
         </div>
         <div class="qgroup-chevron" style="font-size:12px;color:var(--text2);margin-left:6px;transition:transform .2s" id="${groupId}-chevron">${_expandedQueueGroups.has(groupId)?'▼':'▶'}</div>
       </div>
@@ -11532,6 +11537,34 @@ async function askResendConfirm(projId, workerId, slot){
 }
 
 // Admin → ยกเลิกใบยืนยัน (เพื่อแก้ยอดแล้วส่งใหม่)
+/* 🚫 ยกเลิกใบยืนยันยอด "ทั้งโปรเจกต์" ทีเดียว — ใช้เมื่อเผลอส่งผิด (เช่น โปรเจกต์ที่ลูกค้ายังไม่จ่าย)
+   ยกเลิกทั้งใบที่รอทีมยืนยัน (sent) และที่ทีมยืนยันแล้วแต่ยังไม่จ่าย (confirmed) — ใบหายจากหน้าทีมทันที */
+async function cancelConfirmAll(projId){
+  const p = getProjects().find(x=>x.id===projId); if(!p) return;
+  const targets = (p.workers||[]).filter(w => w.status!=='paid' && ['sent','confirmed'].includes(getWorkerConfirmStatus(w)));
+  if(!targets.length){ toast('ไม่มีใบยืนยันให้ยกเลิกในโปรเจกต์นี้','info'); return; }
+  const nSent = targets.filter(w=>getWorkerConfirmStatus(w)==='sent').length;
+  const nConf = targets.length - nSent;
+  if(!confirm(`🚫 ยกเลิกใบยืนยันยอดทั้งโปรเจกต์ "${p.name}"?\n\n` +
+    `จะยกเลิก ${targets.length} ใบ (รอทีมยืนยัน ${nSent}${nConf?' · ทีมยืนยันแล้ว '+nConf:''})\n` +
+    `สถานะกลับเป็น "ยังไม่ส่ง" และใบจะหายจากหน้า "ยืนยันยอด" ของทีมทันที\n\n` +
+    `(อยากส่งใหม่เมื่อไหร่ค่อยกด 📤 ส่งใบยืนยันยอดรวม อีกครั้ง)`)) return;
+  const res = await saveProjectMerge(projId, (fresh)=>{
+    (fresh.workers||[]).forEach(w=>{
+      if(w.status==='paid') return;
+      if(w.confirmStatus==='sent' || w.confirmStatus==='confirmed'){
+        w.confirmStatus='none';
+        delete w.confirmSentAt;
+        delete w.confirmRespondedAt;
+        delete w.confirmRejectReason;
+        delete w.confirmAmount;
+      }
+    });
+  });
+  if(res && res.ok===false){ toast('❌ ยกเลิกไม่สำเร็จ: '+(res.error?.message||''),'error'); return; }
+  toast(`🚫 ยกเลิกใบยืนยัน ${targets.length} ใบของ "${p.name}" แล้ว`,'info');
+  try{ renderQueue(); updateQueueBadge(); }catch(e){}
+}
 async function askCancelConfirm(projId, workerId, slot){
   const s = getStaffById(workerId);
   if(!confirm(`🚫 ยกเลิกใบยืนยันยอดของ ${s?.nickname || 'Staff'}?\n\n` +
