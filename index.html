@@ -1366,6 +1366,19 @@ body.sidebar-collapsed .main-content{
     <div id="rescue-result" style="margin-top:10px"></div>
    </div>
 
+   <!-- 🔕 ล้างแจ้งเตือนใบยืนยันที่ค้าง -->
+   <div class="section-card" style="border-left:4px solid var(--purple);margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+     <span style="font-size:28px">🔕</span>
+     <div style="flex:1;min-width:200px">
+      <div style="font-size:17px;font-weight:800;color:var(--purple)">ล้างแจ้งเตือนใบยืนยันที่ค้าง</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">กวาดแจ้งเตือน "ใบยืนยันยอด" ที่กระดิ่งของทีมทุกคน ที่ตัวใบถูกยกเลิกไปแล้ว (ไม่มีใบจริงให้กด) — เก็บตกใบที่ยกเลิกก่อนอัปเดตเวอร์ชันนี้</div>
+     </div>
+     <button class="btn btn-outline" onclick="sweepStaleConfirmNotifs()" style="padding:10px 18px;border-color:var(--purple);color:var(--purple)">🔕 กวาดล้างทั้งระบบ</button>
+    </div>
+    <div id="sweep-notif-result" style="margin-top:6px"></div>
+   </div>
+
    <!-- Repair Broken staffId — ซ่อม users ที่ staffId ชี้ไปคนที่ถูกลบ -->
    <div class="section-card" style="border-left:4px solid #00DFA0;margin-bottom:16px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
@@ -11537,6 +11550,66 @@ async function askResendConfirm(projId, workerId, slot){
 }
 
 // Admin → ยกเลิกใบยืนยัน (เพื่อแก้ยอดแล้วส่งใหม่)
+/* 🔕 ลบแจ้งเตือน "ใบยืนยันยอด" ที่กระดิ่งของทีม — เรียกตอน admin ยกเลิกใบ เพื่อไม่ให้ทีมสับสน
+   (notifications listener ฝั่งทีมเป็น realtime → กระดิ่งอัปเดตหายทันที) */
+async function _removePaymentNotifs(projId, staffIds){
+  if(!_fbDatabase || !staffIds || !staffIds.length) return 0;
+  try{
+    const usnap = await _fbDatabase.ref('users').get();
+    if(!usnap.exists()) return 0;
+    const idSet = new Set(staffIds);
+    const uids = Object.entries(usnap.val()||{}).filter(([uid,u])=>u&&u.staffId&&idSet.has(u.staffId)).map(([uid])=>uid);
+    let removed = 0;
+    for(const uid of uids){
+      try{
+        const nsnap = await _fbDatabase.ref('notifications/'+uid).get();
+        if(!nsnap.exists()) continue;
+        for(const [nid,n] of Object.entries(nsnap.val()||{})){
+          if(n && n.type==='payment' && n.projId===projId){
+            try{ await _fbDatabase.ref('notifications/'+uid+'/'+nid).remove(); removed++; }catch(e){}
+          }
+        }
+      }catch(e){}
+    }
+    return removed;
+  }catch(e){ console.warn('removePaymentNotifs:', e); return 0; }
+}
+/* 🔕 กวาดล้างแจ้งเตือน "ใบยืนยันยอด" ที่ค้างทั้งระบบ — ลบเฉพาะแจ้งเตือนขอให้ยืนยัน
+   ที่เจ้าตัว "ไม่มีใบ sent/confirmed ค้างจริง" ในโปรเจกต์นั้นแล้ว (ใบถูกยกเลิก/จ่ายจบไปแล้ว)
+   ไม่แตะแจ้งเตือนชนิดอื่น และไม่แตะแจ้งเตือนของใบที่ยังรอยืนยันจริง ๆ */
+async function sweepStaleConfirmNotifs(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const el=document.getElementById('sweep-notif-result');
+  if(!_fbDatabase){ if(el)el.innerHTML='<div style="padding:10px;color:var(--red)">❌ Firebase ไม่พร้อม</div>'; return; }
+  if(el)el.innerHTML='<div style="padding:10px;color:var(--text2)">⏳ กำลังสแกนแจ้งเตือนของทีมทุกคน...</div>';
+  try{
+    const usnap=await _fbDatabase.ref('users').get();
+    const users=usnap.exists()?(usnap.val()||{}):{};
+    const projById=new Map(getProjects().map(p=>[p.id,p]));
+    let removed=0, checked=0;
+    for(const [uid,u] of Object.entries(users)){
+      if(!u||!u.staffId) continue;
+      let nsnap; try{ nsnap=await _fbDatabase.ref('notifications/'+uid).get(); }catch(e){ continue; }
+      if(!nsnap||!nsnap.exists()) continue;
+      for(const [nid,n] of Object.entries(nsnap.val()||{})){
+        if(!n||n.type!=='payment') continue;
+        if(!String(n.title||'').includes('ใบยืนยัน')) continue;   // เอาเฉพาะแจ้งเตือน "ขอให้ยืนยัน" — ไม่แตะแจ้งโอนเงิน/อื่น ๆ
+        checked++;
+        const p=n.projId?projById.get(n.projId):null;
+        const hasActive=p?(p.workers||[]).some(w=>w.id===u.staffId&&['sent','confirmed'].includes(getWorkerConfirmStatus(w))):false;
+        if(!hasActive){
+          try{ await _fbDatabase.ref('notifications/'+uid+'/'+nid).remove(); removed++; }catch(e){}
+        }
+      }
+    }
+    const msg=`✅ กวาดเสร็จ — ตรวจ ${checked} แจ้งเตือนใบยืนยัน · ลบที่ค้าง ${removed} รายการ (กระดิ่งทีมอัปเดตทันที)`;
+    if(el)el.innerHTML='<div style="padding:10px 14px;background:rgba(0,223,160,.08);border:1px solid rgba(0,223,160,.3);border-radius:8px;color:var(--green);font-weight:700;font-size:13px">'+msg+'</div>';
+    toast(`🔕 ลบแจ้งเตือนค้าง ${removed} รายการ`,'success');
+  }catch(e){
+    console.error('sweepStaleConfirmNotifs:',e);
+    if(el)el.innerHTML='<div style="padding:10px;color:var(--red)">❌ '+e.message+'</div>';
+  }
+}
 /* 🚫 ยกเลิกใบยืนยันยอด "ทั้งโปรเจกต์" ทีเดียว — ใช้เมื่อเผลอส่งผิด (เช่น โปรเจกต์ที่ลูกค้ายังไม่จ่าย)
    ยกเลิกทั้งใบที่รอทีมยืนยัน (sent) และที่ทีมยืนยันแล้วแต่ยังไม่จ่าย (confirmed) — ใบหายจากหน้าทีมทันที */
 async function cancelConfirmAll(projId){
@@ -11562,7 +11635,10 @@ async function cancelConfirmAll(projId){
     });
   });
   if(res && res.ok===false){ toast('❌ ยกเลิกไม่สำเร็จ: '+(res.error?.message||''),'error'); return; }
-  toast(`🚫 ยกเลิกใบยืนยัน ${targets.length} ใบของ "${p.name}" แล้ว`,'info');
+  // 🔕 ลบแจ้งเตือนที่กระดิ่งของทีมด้วย — ไม่ให้เห็นใบค้างแล้วสับสน
+  let nNotif = 0;
+  try{ nNotif = await _removePaymentNotifs(projId, [...new Set(targets.map(w=>w.id))]); }catch(e){}
+  toast(`🚫 ยกเลิกใบยืนยัน ${targets.length} ใบของ "${p.name}" แล้ว${nNotif?' · ลบแจ้งเตือนทีม '+nNotif+' รายการ':''}`,'info');
   try{ renderQueue(); updateQueueBadge(); }catch(e){}
 }
 async function askCancelConfirm(projId, workerId, slot){
@@ -11576,6 +11652,12 @@ async function askCancelConfirm(projId, workerId, slot){
     confirmRejectReason: null,
     confirmAmount: null,
   });
+  // 🔕 ลบแจ้งเตือนที่กระดิ่งของคนนั้นด้วย (เฉพาะถ้าเขาไม่มีใบอื่นค้างในโปรเจกต์เดียวกัน)
+  try{
+    const p2 = getProjects().find(x=>x.id===projId);
+    const stillHas = (p2?.workers||[]).some(w=>w.id===workerId && ['sent','confirmed'].includes(getWorkerConfirmStatus(w)));
+    if(!stillHas) await _removePaymentNotifs(projId, [workerId]);
+  }catch(e){}
   toast('🚫 ยกเลิกใบยืนยันแล้ว','info');
   renderQueue();
 }
