@@ -2465,7 +2465,7 @@ body.sidebar-collapsed .main-content{
   <div class="modal-body">
    <div id="edit-presence-banner" style="display:none;background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.4);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--orange);line-height:1.5"></div>
    <div style="margin-bottom:12px">
-    <div class="form-group" style="margin:0"><label class="form-label">ชื่อโปรเจกต์ *</label><input class="form-input" id="pj-name" placeholder="เช่น One Piece Ep.1100"></div>
+    <div class="form-group" style="margin:0"><label class="form-label">ชื่อโปรเจกต์ *</label><input class="form-input" id="pj-name" placeholder="เช่น One Piece Ep.1100" oninput="const t=document.getElementById('proj-modal-title');if(t)t.textContent=this.value.trim()||'โปรเจกต์ใหม่'"></div>
    </div>
    <div style="margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">ประเภทงาน</label>
@@ -3063,6 +3063,7 @@ let selectedYear = 'all';
 let selectedType = 'all';
 let selectedProjStatusQ = 'all'; // 'all' | 'active' (งานที่ยังไม่จบ = ไม่ done/cancelled)
 let selectedPayStatusQ = 'all';  // 'all' | 'full' (จ่ายครบ) | 'partial' (จ่ายบางส่วน) | 'none' (ยังไม่จ่าย)
+let selectedDueTodayQ = 'all';   // 'all' | 'today' (deadline ตรงกับวันนี้)
 let chartMonthly = null;
 let chartCat = null;
 let billingStaffFilter = 'all';
@@ -8667,9 +8668,16 @@ function renderProjects(){
   const TM=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
   // Build client list (sorted, unique, ตัด empty)
-  const clientSet=new Set();
-  projs.forEach(p=>{ if(p.client && p.client.trim()) clientSet.add(p.client.trim()); });
-  const clients=[...clientSet].sort((a,b)=>a.localeCompare(b,'th'));
+  // รวมชื่อที่สะกดต่างแค่ตัวพิมพ์ใหญ่-เล็ก (เช่น Gientech/GienTech = ลูกค้าเดียวกัน) — ใช้ตัวสะกดที่พบบ่อยสุดเป็นตัวแสดง
+  const clientCount=new Map();   // lowercase → {casing: count}
+  projs.forEach(p=>{
+    const c=(p.client||'').trim(); if(!c) return;
+    const k=c.toLowerCase();
+    if(!clientCount.has(k)) clientCount.set(k,new Map());
+    const m=clientCount.get(k); m.set(c,(m.get(c)||0)+1);
+  });
+  const clients=[...clientCount.values()].map(m=>[...m.entries()].sort((a,b)=>b[1]-a[1])[0][0])
+    .sort((a,b)=>a.localeCompare(b,'th'));
 
   const yf=document.getElementById('year-filter');
   if(yf)yf.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
@@ -8694,7 +8702,7 @@ function renderProjects(){
       <option value="admin" ${selectedManager==='admin'?'selected':''}>🛠️ แอดมินจัดการเอง</option>
       ${_projManagerOptions().map(m=>`<option value="${m.uid}" ${selectedManager===m.uid?'selected':''}>🗂️ ${m.label}</option>`).join('')}
     </select>`:''}
-    ${(selectedYear!=='all'||selectedMonth!=='all'||selectedClient!=='all'||selectedType!=='all'||selectedManager!=='all'||selectedProjStatusQ!=='all'||selectedPayStatusQ!=='all')?`<button class="btn btn-outline btn-sm" style="padding:6px 12px;font-size:11px" onclick="selectedYear='all';selectedMonth='all';selectedClient='all';selectedType='all';selectedManager='all';selectedProjStatusQ='all';selectedPayStatusQ='all';renderProjects()">🔄 ล้างตัวกรอง</button>`:''}
+    ${(selectedYear!=='all'||selectedMonth!=='all'||selectedClient!=='all'||selectedType!=='all'||selectedManager!=='all'||selectedProjStatusQ!=='all'||selectedPayStatusQ!=='all'||selectedDueTodayQ!=='all')?`<button class="btn btn-outline btn-sm" style="padding:6px 12px;font-size:11px" onclick="selectedYear='all';selectedMonth='all';selectedClient='all';selectedType='all';selectedManager='all';selectedProjStatusQ='all';selectedPayStatusQ='all';selectedDueTodayQ='all';renderProjects()">🔄 ล้างตัวกรอง</button>`:''}
   </div>`;
   // Build type filter
   const types=[...new Set(projs.map(p=>p.type).filter(Boolean))];
@@ -8707,7 +8715,17 @@ function renderProjects(){
   projs.forEach(p=>{const st=_projPayState(p);if(_payCounts[st]!==undefined)_payCounts[st]++;});
   const _payChip=(key,label,color)=>`<div class="filter-chip${selectedPayStatusQ===key?' active':''}" style="${selectedPayStatusQ===key?'':'border-color:'+color+'55;color:'+color+';'}font-weight:700" onclick="selectedPayStatusQ=selectedPayStatusQ==='${key}'?'all':'${key}';renderProjects()">${label} (${_payCounts[key]})</div>`;
   const _payChips=_payChip('full','✅ จ่ายครบ','var(--green)')+_payChip('partial','🟡 จ่ายบางส่วน','var(--orange)')+_payChip('none','⏳ ยังไม่จ่าย','var(--red)');
-  if(tf)tf.innerHTML=_statusChip+_payChips+['all',...types].map(t=>`<div class="filter-chip${selectedType===t?' active':''}" onclick="selectedType='${t}';renderProjects()">${t==='all'?'ทุกประเภท':t}</div>`).join('');
+  // 📅 ชิป "ส่งวันนี้" — deadline ตรงกับวันนี้ (ไม่รวมงานเสร็จ/ยกเลิก)
+  const _t0=new Date(); _t0.setHours(0,0,0,0);
+  const _isDueToday=p=>{
+    if(p.projStatus==='done'||p.projStatus==='cancelled') return false;
+    let dl=p.deadline||''; if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dl)) dl=thaiToIso(dl)||dl;
+    const d=dl?new Date(dl):null; if(!d||isNaN(d)) return false;
+    d.setHours(0,0,0,0); return d.getTime()===_t0.getTime();
+  };
+  const _dueTodayCount=projs.filter(_isDueToday).length;
+  const _todayChip=`<div class="filter-chip${selectedDueTodayQ==='today'?' active':''}" style="${selectedDueTodayQ==='today'?'':'border-color:rgba(255,64,64,.45);color:var(--red);'}font-weight:700" onclick="selectedDueTodayQ=selectedDueTodayQ==='today'?'all':'today';renderProjects()">📅 ส่งวันนี้ (${_dueTodayCount})</div>`;
+  if(tf)tf.innerHTML=_statusChip+_todayChip+_payChips+['all',...types].map(t=>`<div class="filter-chip${selectedType===t?' active':''}" onclick="selectedType='${t}';renderProjects()">${t==='all'?'ทุกประเภท':t}</div>`).join('');
   renderProjList();
 
   } catch(e){ console.error('renderProjects error:', e); }
@@ -8764,7 +8782,7 @@ function renderProjList(){
       // 🗂️ Manager scope: เห็นเฉพาะโปรเจกต์ที่ตัวเองดูแล
       if(currentUser?.role==='manager' && p.managerId!==currentUser.uid) return false;
       // Client filter
-      if(selectedClient!=='all' && (p.client||'').trim() !== selectedClient) return false;
+      if(selectedClient!=='all' && (p.client||'').trim().toLowerCase() !== selectedClient.toLowerCase()) return false;
       // Manager filter: admin=จัดการเอง(ไม่มี managerId) · <uid>=เมเนเจอร์คนนั้นดูแล
       if(selectedManager==='admin' && p.managerId) return false;
       if(selectedManager!=='all' && selectedManager!=='admin' && p.managerId!==selectedManager) return false;
@@ -8774,6 +8792,15 @@ function renderProjList(){
       if(selectedProjStatusQ==='active'&&(p.projStatus==='done'||p.projStatus==='cancelled'))return false;
       // 💸 Pay filter: จ่ายครบ/จ่ายบางส่วน/ยังไม่จ่าย
       if(selectedPayStatusQ!=='all'&&_projPayState(p)!==selectedPayStatusQ)return false;
+      // 📅 ส่งวันนี้: deadline ตรงกับวันนี้ (ไม่รวมเสร็จ/ยกเลิก)
+      if(selectedDueTodayQ==='today'){
+        if(p.projStatus==='done'||p.projStatus==='cancelled')return false;
+        let _dl=p.deadline||''; if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(_dl)) _dl=thaiToIso(_dl)||_dl;
+        const _d=_dl?new Date(_dl):null; if(!_d||isNaN(_d))return false;
+        _d.setHours(0,0,0,0);
+        const _n=new Date(); _n.setHours(0,0,0,0);
+        if(_d.getTime()!==_n.getTime())return false;
+      }
       // Search
       if(q&&!(p.name||'').toLowerCase().includes(q)&&!(p.client||'').toLowerCase().includes(q))return false;
       return true;
