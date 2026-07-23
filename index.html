@@ -5460,6 +5460,7 @@ async function enterApp(){
   try{startMgrSuspendedSync();}catch(e){}
   try{startTeamLeftSync();}catch(e){}
   try{startMgrColorsSync();}catch(e){}
+  try{_pruneBackups(2);}catch(e){}   // 💾 เคลียร์ backup เก่าเกิน (กัน localStorage เต็ม)
   // ⛔ ปิด client auto-sync (เดิมยิงชีททุกครั้งที่รีหน้า → ถ้าสคริปต์เติมซ้ำจะเด้งรัว)
   //    ให้ใช้ onFormSubmit trigger ฝั่งชีทแทน (ยิงเฉพาะตอนมีคนกรอกฟอร์มจริง) + ปุ่มซิงค์มือ
   // 🧹 admin: ล้างชื่อซ้ำที่อีเมลตรงกัน 1 ครั้งหลังเข้าระบบ (รอ staff โหลดก่อน)
@@ -7561,6 +7562,27 @@ async function _applyRepairBrokenStaffIds(){
 }
 
 // ═══════════════════════════════════════════════════════════
+// 💾 Backup แบบไม่ให้พื้นที่เต็มแล้วล้มงาน
+//   localStorage มีโควตา ~5MB — backup แต่ละชุดเก็บทีม+โปรเจกต์ทั้งระบบ สะสมแล้วล้นเร็ว
+//   กติกา: เก็บครอบครัวละไม่เกิน 2 ชุดล่าสุด · ถ้ายังเต็ม เคลียร์ backup เก่าทั้งหมดแล้วลองใหม่
+function _pruneBackups(keepPerFamily){
+  ['_bulk_merge_backup_','_merge_dup_backup_','_rescue_backup_','audit_backup_'].forEach(f=>{
+    const keys=Object.keys(localStorage).filter(k=>k.startsWith('guin3_'+f)).sort();
+    while(keys.length>keepPerFamily){ try{ localStorage.removeItem(keys.shift()); }catch(e){} }
+  });
+}
+function _safeBackup(prefix, data){
+  const key=prefix+Date.now();
+  _pruneBackups(2);
+  try{ ls(key, data); return key; }
+  catch(e1){
+    _pruneBackups(0);   // เต็มจริง → เคลียร์ backup เก่าทั้งหมด
+    try{ ls(key, data); return key; }
+    catch(e2){ console.warn('backup quota exceeded:', e2?.message); return null; }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // 👥 Duplicate Staff Detector — หาคนที่อาจซ้ำกัน
 // ═══════════════════════════════════════════════════════════
 function findDuplicateStaff(){
@@ -7717,7 +7739,10 @@ async function mergeDuplicateStaff(keepId, removeIds, keepName){
       staffData: JSON.parse(JSON.stringify(getStaffData())),
       projects: JSON.parse(JSON.stringify(getProjects())),
     };
-    ls('_merge_dup_backup_'+Date.now(), backup);
+    const _bk=_safeBackup('_merge_dup_backup_', backup);
+    if(!_bk && !confirm('⚠️ พื้นที่สำรองข้อมูลในเบราว์เซอร์เต็ม — สำรองอัตโนมัติไม่ได้\n(ข้อมูลจริงยังปลอดภัยบน Firebase + backup รายวันใน Google Drive)\n\nดำเนินการ merge ต่อโดยไม่มี backup ในเครื่อง?')){
+      toast('ยกเลิก merge','info'); return;
+    }
 
     toast('⏳ กำลัง merge...','info');
 
@@ -7831,7 +7856,9 @@ async function bulkMergeAllDuplicates(){
 // core: ลงมือ merge ตามรายการ {keepId, removeIds} — ย้าย worker.id + users.staffId + ลบตัวซ้ำ + backup
 //   ใช้ร่วมทั้งปุ่มรวมร่าง (manual) และ auto-dedup หลังซิงค์ชีท
 async function _applyStaffMerges(merges){
-  ls('_bulk_merge_backup_'+Date.now(), { at:new Date().toISOString(), merges, staffData:getStaffData(), projects:getProjects() });
+  if(!_safeBackup('_bulk_merge_backup_', { at:new Date().toISOString(), merges, staffData:getStaffData(), projects:getProjects() })){
+    console.warn('bulk merge: backup ไม่สำเร็จ (พื้นที่เต็ม) — ดำเนินการต่อ (ข้อมูลจริงอยู่บน Firebase)');
+  }
   const remap = {}; merges.forEach(m => m.removeIds.forEach(rid => { remap[rid]=m.keepId; }));
   const updates = {};
   const projs = getProjects(); let movedWorkers=0, movedProjs=0;
@@ -8342,7 +8369,9 @@ async function rescueMissingStaffApply(){
   if(!plan.length){ toast('ยังไม่ได้ติ๊กเลือกรายการ','warn'); return; }
   if(!confirm('ยืนยันกู้คืน/ต่อสาย '+plan.length+' คน?\n\n• กู้ record กลับด้วย id เดิม → งานและบัญชีต่อกลับทันที\n• ไม่สร้างข้อมูลซ้ำ (คนที่มีตัวจริงอยู่แล้วจะใช้วิธีต่อสายแทน)\n• ปลดบล็อก sync ให้คนที่ติดบัญชีดำ\n\n(สำรองข้อมูลก่อนอัตโนมัติ)')) return;
   try{
-    ls('_rescue_backup_'+Date.now(), { at:new Date().toISOString(), staffData:getStaffData(), projects:getProjects() });
+    if(!_safeBackup('_rescue_backup_', { at:new Date().toISOString(), staffData:getStaffData(), projects:getProjects() })){
+      console.warn('rescue: backup ไม่สำเร็จ (พื้นที่เต็ม) — ดำเนินการต่อ');
+    }
     const data=getStaffData();
     const projs=getProjects();
     const updates={};
@@ -8396,12 +8425,8 @@ async function fixAllOrphansWithBackup(){
   if(!confirm('ยืนยันซ่อม '+fixable.length+' worker? (ระบบจะสำรองข้อมูลก่อน)')) return;
 
   try{
-    // Backup projects to localStorage
-    const backupKey = 'audit_backup_'+Date.now();
-    ls(backupKey, JSON.stringify(getProjects()));
-    // Keep only latest 3 backups
-    const allKeys = Object.keys(localStorage).filter(k=>k.startsWith('audit_backup_')).sort();
-    while(allKeys.length > 3){ localStorage.removeItem(allKeys.shift()); }
+    // Backup projects to localStorage (แบบกันพื้นที่เต็ม)
+    const backupKey = _safeBackup('audit_backup_', getProjects()) || '(ไม่มี — พื้นที่เต็ม)';
 
     // Apply fixes
     const projs = getProjects();
