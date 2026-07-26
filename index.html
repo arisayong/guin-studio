@@ -7833,7 +7833,7 @@ async function bulkMergeAllDuplicates(){
   const clusters = {};
   Object.keys(byId).forEach(id => { const r=find(id); (clusters[r]=clusters[r]||[]).push(id); });
   // 2) เลือก keep = record ข้อมูลครบสุด ต่อคลัสเตอร์
-  const _score = x => (x.email?3:0)+(x.promptpay?1:0)+(x.bank?1:0)+(x.account?1:0)+(x.qrUrl?1:0)+(x.phone?1:0)+((x.categories||[]).length);
+  const _score = x => (x.manualEditAt?100:0)+(x.email?3:0)+(x.promptpay?1:0)+(x.bank?1:0)+(x.account?1:0)+(x.qrUrl?1:0)+(x.phone?1:0)+((x.categories||[]).length);
   const merges = [];
   Object.values(clusters).forEach(ids => {
     if(ids.length < 2) return;
@@ -7893,11 +7893,16 @@ async function autoDedupStaffByEmail(){
   Object.entries(data).forEach(([cat,arr])=>{
     (Array.isArray(arr)?arr:Object.values(arr||{})).filter(Boolean).forEach(s=>{
       if(!s.id) return;
-      const em=(String(s.email||'').toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/)||[])[0];
-      if(em) (byEmail[em]=byEmail[em]||[]).push(s);
+      // จับกลุ่มด้วยอีเมลปัจจุบัน + อีเมลเก่า (prevEmails) — คนที่แอดมินเพิ่งเปลี่ยนเมล
+      // จะจับคู่กับตัวซ้ำที่ชีทสร้างด้วยเมลเก่าได้
+      const _ems=[s.email, ...(Array.isArray(s.prevEmails)?s.prevEmails:[])];
+      _ems.forEach(raw=>{
+        const em=(String(raw||'').toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/)||[])[0];
+        if(em && !(byEmail[em]||[]).some(x=>x.id===s.id)) (byEmail[em]=byEmail[em]||[]).push(s);
+      });
     });
   });
-  const _score = x => (x.promptpay?1:0)+(x.bank?1:0)+(x.account?1:0)+(x.qrUrl?1:0)+(x.phone?1:0)+((x.categories||[]).length);
+  const _score = x => (x.manualEditAt?100:0)+(x.promptpay?1:0)+(x.bank?1:0)+(x.account?1:0)+(x.qrUrl?1:0)+(x.phone?1:0)+((x.categories||[]).length);
   const merges = [];
   Object.values(byEmail).forEach(list=>{
     const ids=[...new Set(list.map(s=>s.id))];
@@ -13552,7 +13557,7 @@ function _uniqByPerson(arr, resolve){
     if(!seen.has(k)){ seen.set(k,out.length); out.push(s); }
     else {
       const idx=seen.get(k); const cur=out[idx];
-      const score=x=>((x.bank?1:0)+(x.promptpay?1:0)+(x.phone?1:0)+(x.account?1:0)+(x.qrUrl?1:0)+(x.email?1:0));
+      const score=x=>((x.manualEditAt?100:0)+(x.bank?1:0)+(x.promptpay?1:0)+(x.phone?1:0)+(x.account?1:0)+(x.qrUrl?1:0)+(x.email?1:0));
       if(score(s)>score(cur)) out[idx]=s;
     }
   });
@@ -13899,10 +13904,21 @@ function saveStaff(){
   const _rsel=document.getElementById('st-role-sel');
   if(_rsel && _rsel.value==='manager' && !cats.includes('manager')) cats.push('manager');
   const data=getStaffData();
+  // 🔒 จำอีเมลเก่า (prevEmails) + ตราประทับ "แอดมินแก้เอง" (manualEditAt)
+  //    → ซิงค์ชีทจับคู่คนเดิมด้วยอีเมลเก่าได้ ไม่สร้างซ้ำ · ตอน merge ตัวที่แอดมินแก้ชนะเสมอ
+  const _oldRec = editingStaffId ? (getStaffById(editingStaffId)||{}) : {};
+  const _newEmail = document.getElementById('st-email').value.trim();
+  const _prevEmails = Array.isArray(_oldRec.prevEmails) ? _oldRec.prevEmails.slice() : [];
+  const _oldEmLc = String(_oldRec.email||'').trim().toLowerCase();
+  if(_oldEmLc && _newEmail && _oldEmLc!==_newEmail.toLowerCase() && !_prevEmails.some(x=>String(x).toLowerCase()===_oldEmLc)){
+    _prevEmails.push(_oldRec.email);
+  }
   const baseStaff={id:editingStaffId||('S'+Date.now()),name,nickname:nick,gender:document.getElementById('st-gender').value,
     bank:document.getElementById('st-bank').value.trim(),account:document.getElementById('st-account').value.trim(),
-    promptpay:document.getElementById('st-promptpay').value.trim(),email:document.getElementById('st-email').value.trim(),
+    promptpay:document.getElementById('st-promptpay').value.trim(),email:_newEmail,
     qrUrl:(document.getElementById('st-qr-url')?.value||'').trim(),
+    prevEmails:_prevEmails.slice(-5),
+    manualEditAt:new Date().toISOString(),
     categories:cats};
   // Remove from all categories (editing OR same name to prevent duplicates)
   const dupCheck = name+'|'+nick;
@@ -22040,9 +22056,18 @@ async function saveStaffDetailInline(){
   const roleSel=document.getElementById('sd-edit-role');
   if(roleSel && roleSel.value==='manager' && !cats.includes('manager')) cats.push('manager');
   const existing=getStaffById(id)||{};
+  // 🔒 จำอีเมลเก่า + ตราประทับแอดมินแก้เอง — กันซิงค์ชีทสร้างซ้ำ/เขียนทับ
+  const _newEm=v('sd-edit-email');
+  const _oldEmLc=String(existing.email||'').trim().toLowerCase();
+  const _pe=Array.isArray(existing.prevEmails)?existing.prevEmails.slice():[];
+  if(_oldEmLc && _newEm && _oldEmLc!==_newEm.toLowerCase() && !_pe.some(x=>String(x).toLowerCase()===_oldEmLc)){
+    _pe.push(existing.email);
+  }
   const merged={...existing, id, name, nickname:nick,
     gender:v('sd-edit-gender'), bank:v('sd-edit-bank'), account:v('sd-edit-account'),
-    promptpay:v('sd-edit-promptpay'), email:v('sd-edit-email'), qrUrl:v('sd-edit-qr'),
+    promptpay:v('sd-edit-promptpay'), email:_newEm, qrUrl:v('sd-edit-qr'),
+    prevEmails:_pe.slice(-5),
+    manualEditAt:new Date().toISOString(),
     categories:cats };
   const data=getStaffData();
   Object.keys(data).forEach(k=>{ data[k]=(Array.isArray(data[k])?data[k]:[]).filter(x=>x.id!==id); });
