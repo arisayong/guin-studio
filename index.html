@@ -3990,6 +3990,15 @@ function renderPayrollMonth(){
       ${card('ยังไม่มีใบสำคัญจ่าย', needDoc+' คน', needDoc?'var(--orange)':'var(--green)', needDoc?'กดออกใบได้เลย':'ออกใบครบแล้ว ✅')}
     </div>`;
     // ⚠️ งานที่อ้างถึงสมาชิกที่ไม่มีในระบบแล้ว — ถ้าไม่เตือน จะหายเงียบจนยอดไม่ตรง
+    // ⚠️ โปรเจกต์ที่มอบหมายเมเนเจอร์แล้วแต่ไม่มีค่าตอบแทน → เมเนเจอร์ไม่ได้เงิน
+    const missFee = findMissingMgrFee(monthKey);
+    if(missFee.length){
+      sumEl.innerHTML += `<div style="margin-top:10px;padding:11px 14px;background:rgba(255,158,0,.08);border:1px solid rgba(255,158,0,.35);border-radius:10px;font-size:12.5px;line-height:1.6;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px">⚠️ <strong style="color:var(--orange)">มี ${missFee.length} โปรเจกต์ในเดือนนี้ที่มอบหมายเมเนเจอร์ไว้ แต่ยังไม่ได้ใส่ค่าตอบแทนของเขา</strong>
+          <div style="color:var(--text2);margin-top:2px">งานพวกนี้จะไม่ขึ้นในรอบจ่าย และเมเนเจอร์จะไม่ได้เงิน</div></div>
+        <button class="btn btn-sm" style="background:var(--orange);border:none;color:#231504;font-weight:700" onclick="window._mfaScope=null;openMgrFeeAudit()">🔧 ดูและเติมให้ครบ</button>
+      </div>`;
+    }
     const orph = prCountOrphans(monthKey, slotFilter);
     if(orph.n){
       sumEl.innerHTML += `<div style="margin-top:10px;padding:11px 14px;background:rgba(255,64,64,.07);border:1px solid rgba(255,64,64,.3);border-radius:10px;font-size:12.5px;line-height:1.6">
@@ -4054,11 +4063,16 @@ function prDiagnose(staffId){
   const monthKey=document.getElementById('pr-month')?.value||'';
   const slotFilter=document.getElementById('pr-role')?.value||'mgr';
   const s=getStaffById(staffId);
-  const inView=[], otherMonth=[], otherSlot=[];
+  const inView=[], otherMonth=[], otherSlot=[], noFee=[];
+  // uid ของบัญชีเมเนเจอร์คนนี้ — ใช้เทียบกับ "ผู้ดูแล" ของโปรเจกต์ (คนละอย่างกับรายการค่าตอบแทน)
+  const mgrUid = (typeof _mgrUidForStaff==='function' && s) ? _mgrUidForStaff(s) : '';
+  const _dlMonth = p => String(p.deadline || p.date || p.startDate || '').slice(0,7);
   (getProjects()||[]).forEach(p=>{
     const pm=_prProjMonth(p);
+    let hasRow=false;
     (p.workers||[]).forEach(w=>{
       if(w.id!==staffId) return;
+      hasRow=true;
       const pre=(w.slot||'').split('-')[0];
       const slotOk = (slotFilter==='all' || pre===slotFilter);
       const monthOk = (pm===monthKey);
@@ -4067,6 +4081,10 @@ function prDiagnose(staffId){
       else if(!monthOk) otherMonth.push(rec);
       else otherSlot.push(rec);
     });
+    // 🗂️ เป็นผู้ดูแลโปรเจกต์นี้ แต่ไม่มีรายการค่าตอบแทนของตัวเองเลย → จะไม่ถูกนับ/ไม่ได้เงิน
+    if(!hasRow && mgrUid && p.managerId===mgrUid && (pm===monthKey || _dlMonth(p)===monthKey)){
+      noFee.push({p, pm, dlm:_dlMonth(p)});
+    }
   });
   const row=(r,extra)=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:5px 0;border-top:1px solid var(--border2)">
     <span style="flex:1;min-width:0">${esc(r.p.name||'(ไม่มีชื่อ)')} <span style="color:var(--text2)">· ${PR_SLOT_LABEL[r.pre]||r.pre}${extra?' · '+extra:''}</span></span>
@@ -4083,9 +4101,124 @@ function prDiagnose(staffId){
     ${block('✅ อยู่ในรอบนี้','var(--green)',inView,r=>row(r))}
     ${block('📅 อยู่เดือนอื่น (วันเริ่มโปรเจกต์คนละเดือน)','var(--orange)',otherMonth,r=>row(r,'รับงานเดือน '+(r.pm?_thaiMonthLabel(r.pm):'ไม่ระบุวันที่')))}
     ${block('🏷️ อยู่หมวดอื่น (ไม่ตรงกับตัวกรองด้านบน)','#9B6FFF',otherSlot,r=>row(r))}
-    <div style="font-size:11.5px;color:var(--text2);margin-top:12px;line-height:1.6;padding-top:10px;border-top:1px solid var(--border2)">
-      💡 การจัดเดือนใช้ <strong>วันเริ่มโปรเจกต์ (วันรับงาน)</strong> — ถ้างานไหนควรอยู่รอบนี้แต่ไปอยู่เดือนอื่น ให้แก้วันเริ่มงานในฟอร์มโปรเจกต์ หรือเลือก "👥 ทุกคน" เพื่อดูรวมทุกหมวด
-    </div>`, 640);
+    <div style="margin-top:14px;padding:11px 13px;background:${noFee.length?'rgba(255,64,64,.07)':'rgba(0,223,160,.05)'};border:1px solid ${noFee.length?'rgba(255,64,64,.3)':'rgba(0,223,160,.2)'};border-radius:10px">
+      <div style="font-size:12.5px;font-weight:700;color:${noFee.length?'var(--red)':'var(--green)'}">
+        🗂️ เป็นผู้ดูแลโปรเจกต์ แต่ยังไม่มีรายการค่าตอบแทนของตัวเอง <span style="font-weight:400;color:var(--text2)">(${noFee.length} โปรเจกต์)</span>
+      </div>
+      ${noFee.length
+        ? `<div style="font-size:11.5px;color:var(--text2);margin:4px 0 6px">นี่คือสาเหตุที่ตัวเลขไม่ตรงกับหน้าโปรเจกต์ — หน้าโปรเจกต์นับจาก "ผู้ดูแล" แต่หน้านี้นับจาก "รายการค่าตอบแทน" · เปิดโปรเจกต์แล้วใส่ค่าเมเนเจอร์ในช่อง 🗂️ Manager ให้ครบ</div>`
+          + noFee.map(r=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:5px 0;border-top:1px solid var(--border2)">
+              <span style="flex:1;min-width:0"><span style="cursor:pointer;color:var(--accent2);font-weight:600" onclick="document.getElementById('tag-overlay')?.remove();openEditProject('${escJs(r.p.id)}')">${esc(r.p.name||'(ไม่มีชื่อ)')}</span>
+                <span style="color:var(--text2)">· รับงาน ${r.pm?_thaiMonthLabel(r.pm):'—'} · เดทไลน์ ${r.p.deadline?fmtDate(r.p.deadline):'—'}</span></span>
+              <span style="white-space:nowrap;color:var(--red);font-weight:700">ยังไม่มีค่าตอบแทน</span></div>`).join('')
+        : '<div style="font-size:11.5px;color:var(--text2);margin-top:3px">ทุกโปรเจกต์ที่ดูแลมีรายการค่าตอบแทนครบแล้ว ✅</div>'}
+    </div>
+    <div style="font-size:11.5px;color:var(--text2);margin-top:12px;line-height:1.65;padding-top:10px;border-top:1px solid var(--border2)">
+      💡 <strong>ทำไมตัวเลขต่างจากหน้าโปรเจกต์:</strong><br>
+      · หน้าโปรเจกต์นับ <strong>โปรเจกต์ที่คนนี้เป็นผู้ดูแล</strong> และกรองเดือนจาก <strong>เดทไลน์</strong><br>
+      · หน้านี้นับ <strong>รายการค่าตอบแทนที่มีชื่อคนนี้จริง</strong> และกรองเดือนจาก <strong>วันเริ่มงาน (วันรับงาน)</strong><br>
+      โปรเจกต์ที่ดูแลแต่ไม่ได้ใส่ค่าตอบแทน จะไม่ขึ้นในรอบจ่าย (และคนนั้นจะไม่ได้เงิน) — ดูรายการด้านบน
+    </div>`, 660);
+}
+// ══════════════════════════════════════════════
+// ⚠️ ตรวจโปรเจกต์ที่มอบหมายเมเนเจอร์ไว้ แต่ไม่ได้ใส่ค่าตอบแทนของเขา
+//    (เมเนเจอร์จะไม่ได้เงินและไม่โผล่ในรอบจ่าย) — หาแล้วเติมให้ครบในทีเดียว
+// ══════════════════════════════════════════════
+function findMissingMgrFee(monthKey){
+  const out=[];
+  (getProjects()||[]).forEach(p=>{
+    if(p.projStatus==='cancelled') return;
+    const uid=p.managerId;
+    if(!uid || uid==='undefined') return;
+    if(monthKey && monthKey!=='all' && _prProjMonth(p)!==monthKey) return;
+    const staffId = (typeof _mgrStaffIdOf==='function') ? _mgrStaffIdOf(uid) : '';
+    if(!staffId) return;                                   // บัญชีเมเนเจอร์ยังไม่ผูกกับข้อมูลทีม — ข้าม
+    const has=(p.workers||[]).some(w=>w.id===staffId && String(w.slot||'').startsWith('mgr'));
+    if(has) return;
+    const s=getStaffById(staffId);
+    out.push({p, uid, staffId, name: s?(s.nickname||s.name):'(ไม่พบข้อมูลทีม)', month:_prProjMonth(p)});
+  });
+  return out;
+}
+// ยอดค่าเมเนเจอร์ที่คนนี้เคยได้ล่าสุด — ใช้เป็นค่าเริ่มต้นให้ไม่ต้องพิมพ์ซ้ำ
+function _lastMgrFeeOf(staffId){
+  let best=null, bestDate='';
+  (getProjects()||[]).forEach(p=>{
+    (p.workers||[]).forEach(w=>{
+      if(w.id!==staffId || !String(w.slot||'').startsWith('mgr')) return;
+      const d=p.startDate||p.date||'';
+      if(!best || d>bestDate){ best=w.amount||0; bestDate=d; }
+    });
+  });
+  return best||0;
+}
+function openMgrFeeAudit(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const monthKey=document.getElementById('pr-month')?.value||'';
+  const scope=window._mfaScope||monthKey;   // null/ว่าง = ใช้เดือนที่เลือกอยู่
+  const list=findMissingMgrFee(scope);
+  window._mfaList=list;
+  const monthLbl = (scope==='all') ? 'ทุกเดือน' : _thaiMonthLabel(scope);
+  const rows = list.length ? list.map((r,i)=>`
+    <div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--border2);flex-wrap:wrap">
+      <input type="checkbox" data-mfa="${i}" checked>
+      <div style="flex:1;min-width:150px">
+        <div style="font-size:12.5px;font-weight:600;color:var(--accent2);cursor:pointer" onclick="document.getElementById('tag-overlay')?.remove();openEditProject('${escJs(r.p.id)}')">${esc(r.p.name||'(ไม่มีชื่อ)')}</div>
+        <div style="font-size:11px;color:var(--text2)">🗂️ ${esc(r.name)} · รับงาน ${r.month?_thaiMonthLabel(r.month):'—'}${r.p.deadline?' · เดทไลน์ '+fmtDate(r.p.deadline):''}</div>
+      </div>
+      <input type="number" min="0" step="any" onwheel="this.blur()" data-mfa-amt="${i}" value="${_lastMgrFeeOf(r.staffId)||''}" placeholder="ค่าเมเนเจอร์"
+        style="width:110px;padding:6px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12.5px;text-align:right">
+    </div>`).join('') : '<div style="font-size:12.5px;color:var(--green);padding:12px 0">✅ ทุกโปรเจกต์ที่มอบหมายเมเนเจอร์ มีค่าตอบแทนครบแล้ว</div>';
+  _tagOverlayShow('⚠️ โปรเจกต์ที่ยังไม่ได้ใส่ค่าเมเนเจอร์', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.65;margin-bottom:10px">
+      โปรเจกต์เหล่านี้มอบหมายให้เมเนเจอร์ดูแลแล้ว แต่ไม่มีรายการค่าตอบแทนของเขาในระบบ → <strong style="color:var(--red)">เขาจะไม่ได้เงินและไม่ขึ้นในรอบจ่าย</strong><br>
+      ใส่ยอดแล้วกดเติม ระบบจะเพิ่มรายการในช่อง 🗂️ Manager ให้อัตโนมัติ (สถานะ "รอจ่าย")
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+      <select onchange="window._mfaScope=this.value;openMgrFeeAudit()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+        <option value="${monthKey}"${scope!=='all'?' selected':''}>เฉพาะ ${_thaiMonthLabel(monthKey)}</option>
+        <option value="all"${scope==='all'?' selected':''}>ทุกเดือน</option>
+      </select>
+      <span style="font-size:12px;color:var(--text2)">พบ ${list.length} โปรเจกต์ (${monthLbl})</span>
+      ${list.length?`<input id="mfa-bulk" type="number" min="0" step="any" onwheel="this.blur()" placeholder="ใส่ยอดเดียวกันทุกอัน" style="width:170px;padding:6px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12.5px">
+      <button class="btn btn-sm btn-outline" onclick="_mfaFillAll()">เติมทุกช่อง</button>`:''}
+    </div>
+    ${rows}
+    ${list.length?`<button class="btn" style="width:100%;margin-top:12px" onclick="applyMgrFees()">💾 เติมค่าเมเนเจอร์ให้ที่ติ๊กไว้</button>`:''}`, 660);
+}
+function _mfaFillAll(){
+  const v=document.getElementById('mfa-bulk')?.value||'';
+  if(!v) return;
+  document.querySelectorAll('[data-mfa-amt]').forEach(el=>{ el.value=v; });
+}
+async function applyMgrFees(){
+  const list=window._mfaList||[];
+  const picks=[];
+  document.querySelectorAll('[data-mfa]:checked').forEach(cb=>{
+    const i=parseInt(cb.dataset.mfa);
+    const amt=parseFloat(document.querySelector(`[data-mfa-amt="${i}"]`)?.value)||0;
+    if(list[i] && amt>0) picks.push({...list[i], amt});
+  });
+  if(!picks.length){ toast('ยังไม่ได้ใส่ยอด หรือไม่ได้ติ๊กรายการ','error'); return; }
+  const total=picks.reduce((a,x)=>a+x.amt,0);
+  if(!confirm(`เติมค่าเมเนเจอร์ ${picks.length} โปรเจกต์\nรวม ${fmtB(total)}\n\nยืนยัน?`)) return;
+  let ok=0, fail=0;
+  for(const it of picks){
+    try{
+      const res=await saveProjectMerge(it.p.id,(p)=>{
+        p.workers=p.workers||[];
+        if(p.workers.some(w=>w.id===it.staffId && String(w.slot||'').startsWith('mgr'))) return;
+        p.workers.push({ id:it.staffId, slot:'mgr-only', amount:Math.round(it.amt), ratePerUnit:it.amt,
+          unit:'เหมา', qty:0, status:'pending', note:'', comment:'เติมค่าเมเนเจอร์ย้อนหลัง' });
+      });
+      if(res && res.ok===false) fail++; else ok++;
+    }catch(e){ fail++; }
+  }
+  logAudit('project.edit','เติมค่าเมเนเจอร์', `${ok} โปรเจกต์ · รวม ${fmtB(total)}`);
+  toast(fail? `เติมแล้ว ${ok} · ล้มเหลว ${fail}` : `✅ เติมค่าเมเนเจอร์ ${ok} โปรเจกต์ (${fmtB(total)})`, fail?'warn':'success');
+  document.getElementById('tag-overlay')?.remove();
+  renderPayrollMonth();
+  try{ renderProjects(); }catch(e){}
 }
 // นับรายการที่อ้างถึงสมาชิกที่ไม่มีใน staff_v3 แล้ว (คนหาย/ถูกรวมร่าง) — ไม่งั้นจะหายเงียบ
 function prCountOrphans(monthKey, slotFilter){
