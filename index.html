@@ -1134,6 +1134,7 @@ body.sidebar-collapsed .main-content{
    <div class="nav-section">การเงิน</div>
    <div class="nav-item" onclick="nav('queue')"><span class="nav-icon">💸</span><span>คิวจ่ายเงิน</span><span class="nav-badge hidden" id="queue-badge">0</span></div>
    <div class="nav-item" onclick="nav('payroll')"><span class="nav-icon">📆</span><span>รอบจ่ายรายเดือน</span></div>
+   <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">🗓️</span><span>รอบขอคิว</span></div>
    <div class="nav-item" onclick="nav('payment-history')"><span class="nav-icon">📜</span><span>ประวัติการจ่ายเงิน</span></div>
    <div class="nav-item" onclick="nav('profit')"><span class="nav-icon">📊</span><span>กำไร-ขาดทุน</span></div>
    <div class="nav-item" onclick="nav('docs')"><span class="nav-icon">🗂️</span><span>เอกสาร</span></div>
@@ -1157,6 +1158,7 @@ body.sidebar-collapsed .main-content{
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
    <div class="nav-item" onclick="nav('mgr-calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-item" onclick="nav('confirm-amount')"><span class="nav-icon">📥</span><span>ยืนยันยอด</span><span class="nav-badge hidden" id="ca-badge-mgr">0</span></div>
+   <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">🗓️</span><span>รอบขอคิว</span></div>
    <div class="nav-item" onclick="nav('mgr-team')"><span class="nav-icon">👥</span><span>จัดการทีม</span></div>
   </nav>
  </aside>
@@ -1497,6 +1499,21 @@ body.sidebar-collapsed .main-content{
     </div>
    </div>
    <div id="calc-list"></div>
+  </div>
+
+  <!-- ── 🗓️ คิวว่างรายสัปดาห์ (แทนชีทลงคิว — เฟส 4) ── -->
+  <div id="page-availability" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">🗓️ รอบขอคิว</div>
+    <div class="page-subtitle">เปิดรอบขอคิว → โพสใน Discord → รวบรวมคนที่ตอบรับ · <span style="color:var(--accent2)">งานที่ถืออยู่ดึงจากระบบให้อัตโนมัติ</span></div>
+    <div class="page-actions">
+     <select id="av-round" class="form-input form-select" style="width:auto;min-width:230px;padding:7px 30px 7px 12px;font-size:13px" onchange="avSelectRound(this.value)"></select>
+     <input id="av-search" class="form-input" placeholder="🔍 ค้นหาชื่อ" style="width:auto;min-width:130px;padding:7px 12px;font-size:13px" oninput="renderAvailability()">
+     <button class="btn btn-blue" onclick="openNewRound()">➕ เปิดรอบขอคิว</button>
+    </div>
+   </div>
+   <div id="av-head" style="margin-bottom:12px"></div>
+   <div id="av-table" style="overflow-x:auto"></div>
   </div>
 
   <!-- ── 📆 รอบจ่ายรายเดือน — จ่าย + ออกเอกสารรายคนจบในที่เดียว ── -->
@@ -3921,10 +3938,456 @@ function saveStaffTags(staffId){
 }
 
 // ══════════════════════════════════════════════
+// 🗓️ รอบขอคิว (เฟส 4 — แทนชีทลงคิว + รองรับ Discord ในอนาคต)
+//    1 รอบ = 1 ครั้งที่โพสถามใน Discord ว่า "ขอคิวช่วง X-Y ใครสะดวกบ้าง"
+//    เก็บ "ข้อความที่ทีมตอบ" ตามจริง — ไม่ตีความแทน · งานที่ถืออยู่ดึงจากระบบให้เอง
+// ══════════════════════════════════════════════
+const AV_CATS = {
+  dubbing:{label:'นักพากย์', icon:'🎤', mention:'@นักพากย์ชาย @นักพากย์หญิง', channel:'ลงคิวนักพากย์'},
+  adaptation:{label:'ทีมบท', icon:'✍️', mention:'@ทีมบท', channel:'ลงคิวบท-qc'},
+  qc:{label:'ทีม QC', icon:'✅', mention:'@ทีม QC', channel:'ลงคิวบท-qc'},
+  mix:{label:'ทีมมิกซ์', icon:'🎧', mention:'@ทีมมิกซ์', channel:'ลงคิวมิกซ์-ซับ'},
+  subVideo:{label:'ทีมซับ/วิดีโอ', icon:'🎬', mention:'@ทีมซับ', channel:'ลงคิวมิกซ์-ซับ'},
+  manager:{label:'เมเนเจอร์', icon:'🗂️', mention:'@เมเนเจอร์', channel:'-'},
+};
+const _TH_MONTH_FULL=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+let _avRoundId = null;
+function getRounds(){ const v=ls('recruit_rounds'); return Array.isArray(v)?v:[]; }
+async function saveRounds(list){ ls('recruit_rounds', list); await fbSaveKeyed('recruit_rounds', list); }
+function getRound(id){ return getRounds().find(r=>r.id===id)||null; }
+function getRoundReplies(roundId){ const v=ls('avail_r_'+roundId); return (v&&typeof v==='object')?v:{}; }
+// ── สถานะการตอบ: ตอบรับ / แจ้งไม่สะดวก / ยังไม่ตอบ ──
+//    ทีมอัปเดตคำตอบซ้ำได้ ระบบเก็บของเดิมไว้เป็นประวัติ แล้วยึดข้อความล่าสุดเป็นคำตอบปัจจุบัน
+const AV_CANCEL_RE = /ไม่สะดวก|ไม่ว่าง|ขอถอน|ถอนคิว|ยกเลิก|ขอผ่าน|ติดธุระ|ไม่ไหว|ขอบายรอบนี้|บายรอบนี้|ไม่รับ/;
+const AV_YES_RE    = /สะดวก|ว่าง|รับได้|รับ|สนใจ|สน|โอเค|ok/i;
+function _avDetectStatus(text, prev){
+  const t=String(text||'').trim();
+  if(!t) return 'pending';
+  if(AV_CANCEL_RE.test(t)) return 'unavailable';
+  if(AV_YES_RE.test(t) || /\d/.test(t)) return 'available';
+  return prev && prev!=='pending' ? prev : 'available';
+}
+async function saveRoundReply(roundId, staffId, patch){
+  const all=getRoundReplies(roundId);
+  const cur=all[staffId]||{ freeText:'', note:'', status:'pending', history:[], discordName:'', source:'web' };
+  const next={ ...cur, ...patch, updatedAt:new Date().toISOString(), by:currentUser?.nickname||currentUser?.email||'' };
+  // ข้อความเปลี่ยน → เก็บของเดิมเข้าประวัติ แล้วประเมินสถานะใหม่
+  if(Object.prototype.hasOwnProperty.call(patch,'freeText') && (patch.freeText||'')!==(cur.freeText||'')){
+    next.history=[...(cur.history||[])];
+    if((cur.freeText||'').trim()){
+      next.history.push({ text:cur.freeText, at:cur.updatedAt||'', by:cur.by||'', status:cur.status||'' });
+      if(next.history.length>10) next.history=next.history.slice(-10);
+    }
+    if(!Object.prototype.hasOwnProperty.call(patch,'status')){
+      next.status=_avDetectStatus(patch.freeText, cur.status);
+    }
+  }
+  if(!next.status) next.status=_avDetectStatus(next.freeText, 'pending');
+  all[staffId]=next;
+  ls('avail_r_'+roundId, all);
+  await fbSaveKeyed('avail_r_'+roundId, all);
+}
+const AV_STATUS = {
+  available:   {label:'ตอบรับ',       icon:'✅', color:'var(--green)',  bg:'rgba(0,223,160,.15)'},
+  unavailable: {label:'แจ้งไม่สะดวก', icon:'❌', color:'var(--red)',    bg:'rgba(255,64,64,.13)'},
+  pending:     {label:'ยังไม่ตอบ',    icon:'⏳', color:'var(--text2)',  bg:'rgba(150,150,150,.12)'},
+};
+function _avStatusOf(e){
+  if(!e) return 'pending';
+  if(e.status) return e.status;
+  return _avDetectStatus(e.freeText, 'pending');
+}
+async function avToggleStatus(staffId){
+  if(!_avRoundId) return;
+  const e=getRoundReplies(_avRoundId)[staffId]||{};
+  const cur=_avStatusOf(e);
+  const next = cur==='unavailable' ? 'available' : 'unavailable';
+  await saveRoundReply(_avRoundId, staffId, {status:next});
+  renderAvailability();
+}
+function avShowHistory(staffId){
+  const e=getRoundReplies(_avRoundId)[staffId]||{};
+  const s=getStaffById(staffId);
+  const hist=[...(e.history||[])].reverse();
+  const row=(t,at,st)=>`<div style="padding:8px 0;border-top:1px solid var(--border2)">
+    <div style="font-size:12.5px">${esc(t||'(ว่าง)')}</div>
+    <div style="font-size:10.5px;color:var(--text2);margin-top:2px">${st?((AV_STATUS[st]||{}).icon||'')+' ':''}${at?_logWhen(at):''}</div></div>`;
+  _tagOverlayShow(`🕓 ประวัติการตอบของ ${esc(s?(s.nickname||s.name):staffId)}`,
+    `<div style="font-size:11.5px;color:var(--text2);margin-bottom:8px">คำตอบล่าสุดคือคำตอบที่ใช้จริง — รายการเก่าเก็บไว้ให้ตรวจย้อนหลัง</div>
+     <div style="padding:9px 11px;background:rgba(0,180,255,.07);border:1px solid rgba(0,180,255,.25);border-radius:9px">
+       <div style="font-size:10.5px;color:var(--accent2);font-weight:700">ล่าสุด</div>
+       <div style="font-size:13px;margin-top:2px">${esc(e.freeText||'(ยังไม่ตอบ)')}</div>
+       <div style="font-size:10.5px;color:var(--text2);margin-top:2px">${(AV_STATUS[_avStatusOf(e)]||{}).icon||''} ${(AV_STATUS[_avStatusOf(e)]||{}).label||''} ${e.updatedAt?'· '+_logWhen(e.updatedAt):''}</div>
+     </div>
+     ${hist.length?`<div style="font-size:12px;font-weight:700;margin-top:12px">ก่อนหน้านี้ (${hist.length})</div>`+hist.map(h=>row(h.text,h.at,h.status)).join('')
+       :'<div style="font-size:11.5px;color:var(--text2);margin-top:12px">ยังไม่เคยแก้คำตอบ</div>'}`, 520);
+}
+function _isoOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+// ช่วงวันของรอบ → รายการวันจริง (ไม่เกิน 45 วัน กันหลุด)
+function _roundDays(r){
+  const out=[]; if(!r||!r.dateFrom) return out;
+  const s=new Date(r.dateFrom), e=new Date(r.dateTo||r.dateFrom);
+  for(let d=new Date(s); d<=e && out.length<45; d.setDate(d.getDate()+1)) out.push(new Date(d));
+  return out;
+}
+function _roundRangeLabel(r){
+  if(!r||!r.dateFrom) return '—';
+  const s=new Date(r.dateFrom), e=new Date(r.dateTo||r.dateFrom);
+  const sameMonth = s.getMonth()===e.getMonth() && s.getFullYear()===e.getFullYear();
+  return sameMonth
+    ? `${s.getDate()}-${e.getDate()} ${_TH_MONTH_FULL[e.getMonth()]}`
+    : `${s.getDate()} ${_TH_M[s.getMonth()]} – ${e.getDate()} ${_TH_M[e.getMonth()]}`;
+}
+// ข้อความประกาศสำหรับวางใน Discord
+function roundAnnounceText(r){
+  const c=AV_CATS[r.cat]||AV_CATS.dubbing;
+  const lines=[];
+  lines.push(`สวัสดีค่ะ${c.label}ทุกท่าน`);
+  lines.push(`ขออนุญาตขอคิวช่วง ${_roundRangeLabel(r)} หน่อยค่ะ`);
+  if((r.note||'').trim()){ lines.push(''); lines.push(r.note.trim()); }
+  if(r.nda) lines.push('รบกวนแจ้งด้วยว่าสะดวกเซ็น NDA ไหมคะ');
+  lines.push('');
+  lines.push('รบกวนพิมพ์ตอบใต้โพสนี้ว่าสะดวกวันไหนบ้างนะคะ 🙏');
+  lines.push(c.mention);
+  return lines.join('\n');
+}
+function openNewRound(){
+  const role=currentUser?.role;
+  if(role!=='admin'&&role!=='manager'){ toast('เฉพาะแอดมิน/เมเนเจอร์','error'); return; }
+  const today=new Date();
+  const nextWeek=new Date(today); nextWeek.setDate(today.getDate()+6);
+  _tagOverlayShow('➕ เปิดรอบขอคิวใหม่', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:12px">
+      กำหนดช่วงวันที่ต้องการขอคิว แล้วระบบจะสร้างข้อความประกาศให้คัดลอกไปโพสใน Discord ได้เลย
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="flex:1;min-width:150px">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:3px">ขอคิวจากทีม</div>
+        <select id="nr-cat" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+          ${Object.entries(AV_CATS).map(([k,v])=>`<option value="${k}"${k==='dubbing'?' selected':''}>${v.icon} ${v.label}</option>`).join('')}
+        </select>
+      </div>
+      <div style="min-width:145px">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:3px">ตั้งแต่วันที่</div>
+        <input id="nr-from" type="date" value="${_isoOf(today)}" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+      </div>
+      <div style="min-width:145px">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:3px">ถึงวันที่</div>
+        <input id="nr-to" type="date" value="${_isoOf(nextWeek)}" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+      </div>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:3px">รายละเอียดเพิ่มเติม (ไม่บังคับ)</div>
+    <textarea id="nr-note" rows="3" placeholder="เช่น จะมีงานแนว Anime ญี่ปุ่น/จีน เข้ามา" style="width:100%;padding:8px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px;resize:vertical;box-sizing:border-box"></textarea>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin:10px 0;cursor:pointer">
+      <input type="checkbox" id="nr-nda" checked> ถามด้วยว่าสะดวกเซ็น NDA ไหม
+    </label>
+    <button class="btn" style="width:100%" onclick="createRound()">✅ เปิดรอบและสร้างข้อความประกาศ</button>`, 580);
+}
+async function createRound(){
+  const from=document.getElementById('nr-from')?.value;
+  const to=document.getElementById('nr-to')?.value;
+  if(!from||!to){ toast('เลือกช่วงวันที่ก่อน','error'); return; }
+  if(to<from){ toast('วันที่สิ้นสุดต้องไม่น้อยกว่าวันเริ่ม','error'); return; }
+  const r={
+    id:'RD'+Date.now(),
+    cat:document.getElementById('nr-cat')?.value||'dubbing',
+    dateFrom:from, dateTo:to,
+    note:(document.getElementById('nr-note')?.value||'').trim(),
+    nda:!!document.getElementById('nr-nda')?.checked,
+    status:'open', createdAt:new Date().toISOString(),
+    createdBy:currentUser?.nickname||currentUser?.email||'',
+  };
+  const list=getRounds(); list.unshift(r); await saveRounds(list);
+  _avRoundId=r.id;
+  logAudit('recruit.round', (AV_CATS[r.cat]||{}).label||r.cat, 'ขอคิว '+_roundRangeLabel(r));
+  document.getElementById('tag-overlay')?.remove();
+  renderAvailability();
+  showRoundAnnounce(r.id);
+}
+function showRoundAnnounce(roundId){
+  const r=getRound(roundId); if(!r) return;
+  const c=AV_CATS[r.cat]||AV_CATS.dubbing;
+  const txt=roundAnnounceText(r);
+  _tagOverlayShow('📢 ข้อความประกาศ — คัดลอกไปโพสใน Discord', `
+    <div style="font-size:11.5px;color:var(--text2);margin-bottom:8px">แนะนำให้โพสในห้อง <strong style="color:var(--accent2)"># ${esc(c.channel)}</strong></div>
+    <textarea id="ra-text" rows="10" style="width:100%;padding:11px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:Kanit;font-size:13px;line-height:1.65;resize:vertical;box-sizing:border-box">${esc(txt)}</textarea>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn" style="flex:1" onclick="_raCopy()">📋 คัดลอกข้อความ</button>
+      <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-top:10px;line-height:1.6">
+      หลังโพสแล้ว ทีมจะพิมพ์ตอบใต้โพส — เอาคำตอบมากรอกในตารางด้านหลังนี้ได้เลย (หรือให้บอทเติมให้อัตโนมัติเมื่อทำบอทเสร็จ)
+    </div>`, 600);
+}
+function _raCopy(){
+  const el=document.getElementById('ra-text'); if(!el) return;
+  el.select();
+  try{ navigator.clipboard.writeText(el.value); toast('📋 คัดลอกแล้ว','success'); }
+  catch(e){ try{ document.execCommand('copy'); toast('📋 คัดลอกแล้ว','success'); }catch(_){ toast('กด Ctrl+C เพื่อคัดลอก','info'); } }
+}
+async function closeRound(roundId){
+  const list=getRounds(); const r=list.find(x=>x.id===roundId); if(!r) return;
+  r.status = r.status==='open' ? 'closed' : 'open';
+  await saveRounds(list);
+  toast(r.status==='open'?'เปิดรอบอีกครั้ง':'ปิดรอบแล้ว','success');
+  renderAvailability();
+}
+async function deleteRound(roundId){
+  const r=getRound(roundId); if(!r) return;
+  if(!confirm(`ลบรอบขอคิว ${_roundRangeLabel(r)} ?\n(คำตอบที่บันทึกไว้จะหายด้วย)`)) return;
+  await saveRounds(getRounds().filter(x=>x.id!==roundId));
+  try{ localStorage.removeItem('guin3_avail_r_'+roundId); }catch(e){}
+  _avRoundId=null;
+  toast('ลบรอบแล้ว','success');
+  renderAvailability();
+}
+// แปลงข้อความแบบที่ทีมพิมพ์ ("28-02", "สะดวก 4-6", "สะดวกทุกวัน") เป็นวันจริงในช่วงของรอบ
+function parseFreeDays(text, days){
+  const raw=String(text||'').trim();
+  if(!raw) return {days:[], everyday:false, unclear:false};
+  if(/สะดวกทุกวัน|ว่างทุกวัน|ทุกวัน/.test(raw)) return {days:days.slice(), everyday:true, unclear:false};
+  // ตัดตัวเลขที่ไม่ใช่ "วันที่" ออกก่อน เช่น "รับได้วันละ 2-3 เรื่อง", "ว่างหลัง 18:00", "2 ตอน"
+  const t = raw
+    .replace(/\d{1,2}\s*[:.]\s*\d{2}/g,' ')                                     // เวลา 18:00
+    .replace(/\d{1,3}(\s*-\s*\d{1,3})?\s*(เรื่อง|งาน|ตอน|คน|ชั่วโมง|ชม\.?|นาที|ep\.?|EP\.?|ep)/gi,' ')
+    .replace(/(วันละ|ครั้งละ|รับได้|ไม่เกิน|สูงสุด)\s*\d{1,3}(\s*-\s*\d{1,3})?/g,' ');
+  const nums=new Set();
+  (t.match(/\d{1,2}\s*-\s*\d{1,2}|\d{1,2}/g)||[]).forEach(tok=>{
+    const r=tok.split('-').map(x=>parseInt(x.trim()));
+    if(r.length===2 && !isNaN(r[0]) && !isNaN(r[1])){
+      if(r[1]>=r[0]) { for(let i=r[0];i<=r[1];i++) nums.add(i); }
+      else { for(let i=r[0];i<=31;i++) nums.add(i); for(let i=1;i<=r[1];i++) nums.add(i); }   // ข้ามเดือน เช่น 28-02
+    } else if(!isNaN(r[0])) nums.add(r[0]);
+  });
+  const hit=days.filter(d=>nums.has(d.getDate()));
+  // ตอบว่าสะดวกแต่ไม่ได้ระบุวันชัด → ไม่เดาให้ ปล่อยให้คนอ่านข้อความเอง
+  const saysYes=/สะดวก|ว่าง|รับ|สนใจ|ได้/.test(raw);
+  return {days:hit, everyday:false, unclear: hit.length===0 && saysYes};
+}
+// งานที่ถืออยู่ + เดทไลน์ (แบบเดียวกับที่ชีทเขียนมือ เช่น D35(20/07))
+function _avCurrentJobs(staffId, refDate){
+  const out=[];
+  (getProjects()||[]).forEach(p=>{
+    if(p.projStatus==='done'||p.projStatus==='cancelled') return;
+    if(!(p.workers||[]).some(w=>w.id===staffId)) return;
+    const dl=p.deadline||'';
+    if(dl && refDate){
+      const d=new Date(dl); d.setHours(0,0,0,0);
+      const cutoff=new Date(refDate); cutoff.setDate(cutoff.getDate()-7);
+      if(d<cutoff) return;
+    }
+    out.push({name:p.name||'', dl, id:p.id});
+  });
+  return out.sort((a,b)=>String(a.dl||'9999').localeCompare(String(b.dl||'9999')));
+}
+function renderAvailability(){
+  const role=currentUser?.role;
+  if(role!=='admin' && role!=='manager'){
+    const pg=document.getElementById('page-availability');
+    if(pg) pg.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin / Manager</div>';
+    return;
+  }
+  const rounds=getRounds();
+  const selEl=document.getElementById('av-round');
+  if(!_avRoundId || !rounds.some(r=>r.id===_avRoundId)) _avRoundId = rounds[0]?.id || null;
+  if(selEl){
+    selEl.innerHTML = rounds.length
+      ? rounds.map(r=>`<option value="${esc(r.id)}"${r.id===_avRoundId?' selected':''}>${(AV_CATS[r.cat]||{}).icon||''} ${_roundRangeLabel(r)} · ${(AV_CATS[r.cat]||{}).label||r.cat}${r.status==='closed'?' (ปิดแล้ว)':''}</option>`).join('')
+      : '<option value="">— ยังไม่มีรอบขอคิว —</option>';
+  }
+  const headEl=document.getElementById('av-head');
+  const tblEl=document.getElementById('av-table');
+  const r=getRound(_avRoundId);
+  if(!r){
+    if(headEl) headEl.innerHTML='';
+    if(tblEl) tblEl.innerHTML=`<div style="text-align:center;padding:48px;color:var(--text2)">
+      ยังไม่มีรอบขอคิว<br><button class="btn" style="margin-top:14px" onclick="openNewRound()">➕ เปิดรอบขอคิวแรก</button></div>`;
+    return;
+  }
+  const days=_roundDays(r);
+  const data=getRoundReplies(r.id);
+  const q=(document.getElementById('av-search')?.value||'').trim().toLowerCase();
+  let list=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s && s.id && isStaffAssignable(s));
+  if(r.cat!=='all') list=list.filter(s=>[].concat(s.categories||[s.category]).filter(Boolean).includes(r.cat));
+  const seen=new Set();
+  list=list.filter(s=>{ if(seen.has(s.id)) return false; seen.add(s.id); return true; });
+  if(q) list=list.filter(s=>((s.nickname||'')+' '+(s.name||'')+' '+(s.email||'')).toLowerCase().includes(q));
+  // เรียง: ตอบรับ → แจ้งไม่สะดวก → ยังไม่ตอบ
+  const _rank={available:0, unavailable:1, pending:2};
+  list.sort((a,b)=>{
+    const ra=_rank[_avStatusOf(data[a.id])], rb=_rank[_avStatusOf(data[b.id])];
+    if(ra!==rb) return ra-rb;
+    return String(a.nickname||a.name||'').localeCompare(String(b.nickname||b.name||''),'th');
+  });
+  const nAvail=list.filter(s=>_avStatusOf(data[s.id])==='available').length;
+  const nCancel=list.filter(s=>_avStatusOf(data[s.id])==='unavailable').length;
+  const answered=nAvail;
+  const c=AV_CATS[r.cat]||{};
+  if(headEl){
+    headEl.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <div style="padding:11px 15px;background:var(--bg2);border-radius:11px;flex:1;min-width:230px">
+        <div style="font-size:10.5px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">รอบขอคิว</div>
+        <div style="font-size:16px;font-weight:800;margin-top:2px">${c.icon||''} ${_roundRangeLabel(r)}
+          <span style="font-size:11px;color:var(--text2);font-weight:500">· ${esc(c.label||r.cat)}</span>
+          ${r.status==='closed'?'<span style="font-size:10px;background:rgba(150,150,150,.2);color:var(--text2);padding:2px 8px;border-radius:8px;font-weight:700;margin-left:4px">ปิดแล้ว</span>':'<span style="font-size:10px;background:rgba(0,223,160,.16);color:var(--green);padding:2px 8px;border-radius:8px;font-weight:700;margin-left:4px">เปิดรับ</span>'}
+        </div>
+        ${r.note?`<div style="font-size:11px;color:var(--text2);margin-top:3px">${esc(r.note)}</div>`:''}
+      </div>
+      <div style="padding:11px 15px;background:var(--bg2);border-radius:11px;min-width:170px">
+        <div style="font-size:10.5px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">ตอบรับแล้ว</div>
+        <div style="font-size:16px;font-weight:800;margin-top:2px;color:${answered?'var(--green)':'var(--text2)'}">${answered} / ${list.length} คน</div>
+        ${nCancel?`<div style="font-size:10.5px;color:var(--red);margin-top:2px">❌ แจ้งไม่สะดวก ${nCancel} คน</div>`:''}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-sm btn-outline" onclick="showRoundAnnounce('${escJs(r.id)}')">📢 ข้อความประกาศ</button>
+        <button class="btn btn-sm btn-outline" onclick="avCopyForChat()">📋 คัดลอกสรุป</button>
+        <button class="btn btn-sm btn-outline" onclick="closeRound('${escJs(r.id)}')">${r.status==='open'?'🔒 ปิดรอบ':'🔓 เปิดอีกครั้ง'}</button>
+        <button class="btn btn-sm btn-outline" style="border-color:rgba(255,64,64,.3);color:var(--red)" onclick="deleteRound('${escJs(r.id)}')">🗑️</button>
+      </div>
+    </div>`;
+  }
+  if(!tblEl) return;
+  if(!list.length){ tblEl.innerHTML='<div style="text-align:center;padding:40px;color:var(--text2)">ไม่มีสมาชิกในหมวดนี้</div>'; return; }
+  const TH_DOW=['จ','อ','พ','พฤ','ศ','ส','อา'];
+  const th=(t,w)=>`<th style="padding:8px 10px;font-size:11.5px;color:var(--text2);font-weight:700;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border2)${w?';width:'+w:''}">${t}</th>`;
+  const refDate=days[0]||new Date(r.dateFrom);
+  const rows=list.map(s=>{
+    const e=data[s.id]||{};
+    const parsed=parseFreeDays(e.freeText, days);
+    const chips=parsed.everyday
+      ? '<span style="font-size:10px;padding:1px 8px;border-radius:8px;background:rgba(0,223,160,.15);color:var(--green);font-weight:700">ทุกวันในช่วงนี้</span>'
+      : parsed.unclear
+        ? '<span title="ตอบว่าสะดวกแต่ไม่ได้ระบุวันชัดเจน — อ่านข้อความที่เขาพิมพ์" style="font-size:10px;padding:1px 8px;border-radius:8px;background:rgba(255,158,0,.14);color:var(--orange);font-weight:600">ไม่ได้ระบุวัน — อ่านข้อความ</span>'
+        : parsed.days.map(d=>`<span style="font-size:10px;padding:1px 7px;border-radius:8px;background:rgba(0,180,255,.13);color:var(--accent2);font-weight:600">${TH_DOW[(d.getDay()+6)%7]} ${d.getDate()}</span>`).join(' ');
+    const jobs=_avCurrentJobs(s.id, refDate);
+    const jobHtml=jobs.length
+      ? jobs.slice(0,4).map(j=>{
+          const dd=j.dl?`(${String(new Date(j.dl).getDate()).padStart(2,'0')}/${String(new Date(j.dl).getMonth()+1).padStart(2,'0')})`:'';
+          const late=j.dl && new Date(j.dl)<refDate;
+          return `<span style="font-size:10.5px;padding:1px 7px;border-radius:7px;background:${late?'rgba(255,64,64,.12)':'rgba(255,158,0,.12)'};color:${late?'var(--red)':'var(--orange)'};font-weight:600;white-space:nowrap">${esc(j.name)}${dd}</span>`;
+        }).join(' ') + (jobs.length>4?` <span style="font-size:10px;color:var(--text2)">+${jobs.length-4}</span>`:'')
+      : '<span style="font-size:11px;color:var(--green)">ว่าง ไม่มีงานค้าง</span>';
+    const roles=[].concat(s.categories||[s.category]).filter(Boolean)
+      .map(k=>(AV_CATS[k]||{}).icon||'').join('');
+    const filled=!!(e.freeText||'').trim();
+    const st=_avStatusOf(e), stMeta=AV_STATUS[st];
+    const nHist=(e.history||[]).length;
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${st==='available'?'rgba(0,223,160,.03)':st==='unavailable'?'rgba(255,64,64,.03)':''}">
+      <td style="padding:7px 10px;font-size:12.5px;white-space:nowrap">
+        <span style="font-weight:700;${st==='unavailable'?'opacity:.65':''}">${stMeta.icon} ${esc(s.nickname||s.name||'')}</span>
+        <div style="font-size:10px;color:var(--text2)">${roles} ${e.updatedAt?('· '+_logWhen(e.updatedAt)):''}
+          ${nHist?`· <span style="cursor:pointer;color:var(--accent2)" onclick="avShowHistory('${escJs(s.id)}')" title="ดูคำตอบก่อนหน้า">🕓 แก้ ${nHist} ครั้ง</span>`:''}
+        </div>
+      </td>
+      <td style="padding:7px 10px;min-width:200px">
+        <input value="${esc(e.freeText||'')}" placeholder="วางคำตอบจาก Discord เช่น สะดวก 28-02 สะดวกเซ็น NDA"
+          onchange="avSet('${escJs(s.id)}','freeText',this.value)"
+          style="width:100%;padding:6px 9px;background:var(--bg2);border:1px solid ${st==='available'?'rgba(0,223,160,.35)':st==='unavailable'?'rgba(255,64,64,.3)':'var(--border2)'};border-radius:7px;color:var(--text);font-family:Kanit;font-size:12.5px;${st==='unavailable'?'text-decoration:line-through;opacity:.7':''}">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
+          ${st==='unavailable'?`<span style="font-size:10px;padding:1px 8px;border-radius:8px;background:${stMeta.bg};color:${stMeta.color};font-weight:700">❌ แจ้งไม่สะดวกแล้ว</span>`:chips}
+        </div>
+      </td>
+      <td style="padding:7px 10px;min-width:140px">
+        <input value="${esc(e.note||'')}" placeholder="โน้ตของแอดมิน"
+          onchange="avSet('${escJs(s.id)}','note',this.value)"
+          style="width:100%;padding:6px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12.5px">
+      </td>
+      <td style="padding:7px 10px;min-width:210px"><div style="display:flex;gap:4px;flex-wrap:wrap">${jobHtml}</div></td>
+      <td style="padding:7px 10px;white-space:nowrap">
+        ${filled
+          ? `<button class="btn btn-xs btn-outline" style="font-size:10.5px;padding:3px 8px;${st==='unavailable'?'border-color:rgba(0,223,160,.35);color:var(--green)':'border-color:rgba(255,64,64,.3);color:var(--red)'}"
+               onclick="avToggleStatus('${escJs(s.id)}')" title="${st==='unavailable'?'กลับมาสะดวก':'แจ้งว่าไม่สะดวกแล้ว'}">${st==='unavailable'?'✅ กลับมาสะดวก':'❌ ไม่สะดวกแล้ว'}</button>`
+          : `<button class="btn btn-xs btn-outline" style="font-size:10.5px;padding:3px 8px" onclick="avSet('${escJs(s.id)}','freeText','สะดวกทุกวัน')">ทุกวัน</button>`}
+        ${filled?`<button class="btn btn-xs btn-outline" style="font-size:10.5px;padding:3px 8px;color:var(--text2)" onclick="avSet('${escJs(s.id)}','freeText','')" title="ล้างคำตอบ">🗑️</button>`:''}
+      </td>
+    </tr>`;
+  }).join('');
+  tblEl.innerHTML=`<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:940px">
+    <thead><tr>${th('ชื่อ','160px')}${th('ที่ตอบมา (คำต่อคำ)')}${th('โน้ต')}${th('งานที่ถืออยู่ (ดึงอัตโนมัติ)')}${th('')}</tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+function avSelectRound(id){ _avRoundId=id; renderAvailability(); }
+async function avSet(staffId, field, value){
+  if(!_avRoundId) return;
+  await saveRoundReply(_avRoundId, staffId, {[field]:value});
+  renderAvailability();
+}
+// คัดลอกสรุปเฉพาะ "คนที่ตอบรับ" — ใช้ส่งต่อให้เมเนเจอร์จับคู่งาน
+function avCopyForChat(){
+  const r=getRound(_avRoundId); if(!r){ toast('ยังไม่มีรอบ','error'); return; }
+  const days=_roundDays(r), data=getRoundReplies(r.id);
+  const c=AV_CATS[r.cat]||{};
+  const lines=[`📋 คิวว่าง${c.label||''} · ขอคิวช่วง ${_roundRangeLabel(r)}`];
+  let list=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s&&s.id&&isStaffAssignable(s));
+  if(r.cat!=='all') list=list.filter(s=>[].concat(s.categories||[s.category]).filter(Boolean).includes(r.cat));
+  const seen=new Set(); list=list.filter(s=>{ if(seen.has(s.id))return false; seen.add(s.id); return true; });
+  const cancelled=[];
+  list.forEach(s=>{
+    const e=data[s.id]; if(!e||!(e.freeText||'').trim()) return;
+    if(_avStatusOf(e)==='unavailable'){ cancelled.push(`• ${s.nickname||s.name} — ${e.freeText}`); return; }
+    const jobs=_avCurrentJobs(s.id, days[0]);
+    const jobTxt=jobs.length?` [กำลังทำ: ${jobs.slice(0,3).map(j=>j.name+(j.dl?'('+String(new Date(j.dl).getDate()).padStart(2,'0')+'/'+String(new Date(j.dl).getMonth()+1).padStart(2,'0')+')':'')).join(', ')}]`:' [ว่าง]';
+    lines.push(`• ${s.nickname||s.name} — ${e.freeText}${e.note?' ('+e.note+')':''}${jobTxt}`);
+  });
+  if(lines.length===1) lines.push('(ยังไม่มีใครตอบ)');
+  if(cancelled.length){ lines.push('', `❌ แจ้งไม่สะดวกแล้ว (${cancelled.length})`); lines.push(...cancelled); }
+  const txt=lines.join('\n');
+  try{
+    navigator.clipboard.writeText(txt);
+    toast('📋 คัดลอกแล้ว — วางในแชท/Discord ได้เลย','success');
+  }catch(e){
+    _tagOverlayShow('📋 สรุปคิวว่าง', `<textarea readonly style="width:100%;height:260px;padding:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">${esc(txt)}</textarea>`, 600);
+  }
+}
+
+// ══════════════════════════════════════════════
 // 📆 รอบจ่ายรายเดือน — รวมงานทั้งเดือนของแต่ละคน · จ่าย + ออกใบ + ส่ง จบในที่เดียว
 //    แก้ปัญหา: เมเนเจอร์ต้องจ่ายรายคนทุกเดือน แต่งานกระจายอยู่หลายสิบโปรเจกต์
 // ══════════════════════════════════════════════
 const PR_SLOT_LABEL = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', mgr:'🗂️ Manager'};
+
+// ══════════════════════════════════════════════
+// 💼 เฟส 3 — ประเภทการจ่าย + โบนัส/หัก รายเดือน + สลิป
+//    รองรับตั้งแต่วันนี้: รายโปรเจกต์ · เงินเดือนประจำ · ผสม (เงินเดือน+รายโปรเจกต์)
+// ══════════════════════════════════════════════
+const PAY_TYPES = {
+  project: {label:'รายโปรเจกต์', icon:'📁', desc:'ได้ตามงานที่ทำ (แบบที่ทีมส่วนใหญ่ใช้อยู่)'},
+  salary:  {label:'เงินเดือนประจำ', icon:'🗓️', desc:'ได้เท่ากันทุกเดือน ไม่ขึ้นกับจำนวนงาน'},
+  hybrid:  {label:'ผสม (เงินเดือน + รายโปรเจกต์)', icon:'🔀', desc:'ได้เงินเดือนฐาน บวกค่างานรายโปรเจกต์'},
+};
+function getPayrollProfiles(){ const v=ls('payroll_profiles'); return (v&&typeof v==='object')?v:{}; }
+async function savePayrollProfiles(v){ ls('payroll_profiles',v); await fbSaveKeyed('payroll_profiles', v); }
+function getPayProfile(staffId){
+  const p=getPayrollProfiles()[staffId];
+  return { payType:'project', baseSalary:0, allowance:0, allowanceLabel:'', note:'', ...(p||{}) };
+}
+// งวดรายเดือน: โบนัส/หัก/หมายเหตุ + สถานะปิดงวด
+function getPayrollRuns(){ const v=ls('payroll_runs'); return (v&&typeof v==='object')?v:{}; }
+async function savePayrollRuns(v){ ls('payroll_runs',v); await fbSaveKeyed('payroll_runs', v); }
+function getPayrollEntry(monthKey, staffId){
+  const r=getPayrollRuns()[monthKey];
+  const e=r&&r.items&&r.items[staffId];
+  return { bonus:0, bonusLabel:'', deduction:0, deductionLabel:'', note:'', ...(e||{}) };
+}
+async function savePayrollEntry(monthKey, staffId, patch){
+  const runs=getPayrollRuns();
+  if(!runs[monthKey]) runs[monthKey]={items:{}, updatedAt:''};
+  if(!runs[monthKey].items) runs[monthKey].items={};
+  runs[monthKey].items[staffId]={ ...getPayrollEntry(monthKey,staffId), ...patch };
+  runs[monthKey].updatedAt=new Date().toISOString();
+  await savePayrollRuns(runs);
+}
+// ยอดสุทธิของคนหนึ่งในเดือนหนึ่ง = ค่างาน + เงินเดือนฐาน + เบี้ยเลี้ยง + โบนัส − หัก
+function calcPayrollTotal(staffId, monthKey, projectAmt){
+  const prof=getPayProfile(staffId);
+  const entry=getPayrollEntry(monthKey, staffId);
+  const base = (prof.payType==='salary'||prof.payType==='hybrid') ? (parseFloat(prof.baseSalary)||0) : 0;
+  const allow= (prof.payType==='salary'||prof.payType==='hybrid') ? (parseFloat(prof.allowance)||0) : 0;
+  const work = (prof.payType==='salary') ? 0 : (projectAmt||0);   // เงินเดือนล้วน = ไม่บวกค่างานซ้ำ
+  const bonus=parseFloat(entry.bonus)||0;
+  const deduct=parseFloat(entry.deduction)||0;
+  return { prof, entry, base, allow, work, bonus, deduct, net: work+base+allow+bonus-deduct };
+}
 // เดือนของงาน = เดือนที่ "รับงาน/เริ่มงาน" (ตามที่ตกลงกับเจ้าของระบบ 2026-08-02)
 //   ลำดับ: วันเริ่มงาน → วันที่ของโปรเจกต์ → วันที่สร้างในระบบ → เดทไลน์ (ท้ายสุด เผื่อของเก่าไม่มีวันเริ่ม)
 function _prProjMonth(p){
@@ -3946,6 +4409,20 @@ function buildPayrollMonth(monthKey, slotFilter){
       byPerson.get(w.id).items.push({ p, w, pre, hasDoc: covered.has(`${w.id}|${p.id}|${w.slot}`) });
     });
   });
+  // 🗓️ คนที่รับเงินเดือนประจำ ต้องขึ้นทุกเดือนแม้เดือนนั้นไม่มีงานในระบบ
+  Object.entries(getPayrollProfiles()).forEach(([staffId, prof])=>{
+    if(!prof || (prof.payType!=='salary' && prof.payType!=='hybrid')) return;
+    if(byPerson.has(staffId)) return;
+    const s=getStaffById(staffId);
+    if(!s) return;
+    if(slotFilter && slotFilter!=='all'){
+      // เคารพตัวกรองหมวด — ดูจากหมวดที่คนนั้นสังกัด
+      const cats=[].concat(s.categories||[s.category]).filter(Boolean);
+      const shortOf={dubbing:'dub',adaptation:'adp',mix:'mix',qc:'qc',subVideo:'sub',manager:'mgr'};
+      if(!cats.some(c=>shortOf[c]===slotFilter)) return;
+    }
+    byPerson.set(staffId, {staff:s, items:[]});
+  });
   return byPerson;
 }
 function renderPayrollMonth(){
@@ -3966,10 +4443,11 @@ function renderPayrollMonth(){
   const slotFilter = document.getElementById('pr-role')?.value || 'mgr';
   const byPerson = buildPayrollMonth(monthKey, slotFilter);
   const entries = [...byPerson.entries()].map(([staffId,v])=>{
-    const total   = v.items.reduce((a,it)=>a+(it.w.amount||0),0);
+    const workAmt = v.items.reduce((a,it)=>a+(it.w.amount||0),0);
     const unpaid  = v.items.filter(it=>it.w.status!=='paid');
     const noDoc   = v.items.filter(it=>!it.hasDoc);
-    return {staffId, staff:v.staff, items:v.items, total,
+    const pay     = calcPayrollTotal(staffId, monthKey, workAmt);
+    return {staffId, staff:v.staff, items:v.items, workAmt, total:pay.net, pay,
             unpaidCount:unpaid.length, unpaidAmt:unpaid.reduce((a,it)=>a+(it.w.amount||0),0), noDocCount:noDoc.length};
   }).sort((a,b)=> b.total - a.total);
 
@@ -4025,6 +4503,8 @@ function renderPayrollMonth(){
         <span style="white-space:nowrap">${fmtB(it.w.amount||0)}</span></div>`;
     }).join('');
     const btns = [];
+    btns.push(`<button class="btn btn-sm btn-outline" onclick="openPayEditor('${escJs(e.staffId)}')" title="ตั้งประเภทการจ่าย · โบนัส · หัก">⚙️ ประเภทจ่าย/โบนัส</button>`);
+    btns.push(`<button class="btn btn-sm btn-outline" onclick="printPaySlip('${escJs(e.staffId)}')" title="สลิปสรุปรายได้ของเดือนนี้">🧾 สลิป</button>`);
     if(!allPaid) btns.push(`<button class="btn btn-sm" style="background:var(--green);border:none;color:#04231a;font-weight:700" onclick="prMarkPaid('${escJs(e.staffId)}')">✅ บันทึกว่าจ่ายแล้ว (${e.unpaidCount} งาน · ${fmtB(e.unpaidAmt)})</button>`);
     if(!allDoc)  btns.push(`<button class="btn btn-sm" style="background:var(--orange);border:none;color:#231504;font-weight:700" onclick="prIssueVoucher('${escJs(e.staffId)}')">📄 ออกใบสำคัญจ่าย (${e.noDocCount} งาน)</button>`);
     if(allDoc){
@@ -4043,8 +4523,12 @@ function renderPayrollMonth(){
           <div style="font-size:11px;color:var(--text2);margin-top:2px">🏦 ${esc(s.bank||'—')} ${esc(s.account||'')}${hasEmail?' · 📧 '+esc(s.email):' · <span style="color:var(--orange)">⚠️ ไม่มีอีเมล ส่งใบไม่ได้</span>'}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:10.5px;color:var(--text2)">${e.items.length} งาน · รวม</div>
+          <div style="font-size:10.5px;color:var(--text2)">${e.items.length} งาน · ยอดสุทธิ</div>
           <div style="font-size:19px;font-weight:800;color:var(--accent2)">${fmtB(e.total)}</div>
+          ${(e.pay.base||e.pay.allow||e.pay.bonus||e.pay.deduct)?`<div style="font-size:10.5px;color:var(--text2);margin-top:2px">
+            ${e.pay.work?'ค่างาน '+fmtB(e.pay.work):''}${e.pay.base?' + เงินเดือน '+fmtB(e.pay.base):''}${e.pay.allow?' + เบี้ยเลี้ยง '+fmtB(e.pay.allow):''}${e.pay.bonus?' + โบนัส '+fmtB(e.pay.bonus):''}${e.pay.deduct?' − หัก '+fmtB(e.pay.deduct):''}
+          </div>`:''}
+          ${e.pay.prof.payType!=='project'?`<div style="font-size:10px;color:var(--text2);margin-top:2px">${PAY_TYPES[e.pay.prof.payType].icon} ${PAY_TYPES[e.pay.prof.payType].label}</div>`:''}
         </div>
       </div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
@@ -4202,19 +4686,21 @@ async function applyMgrFees(){
   if(!picks.length){ toast('ยังไม่ได้ใส่ยอด หรือไม่ได้ติ๊กรายการ','error'); return; }
   const total=picks.reduce((a,x)=>a+x.amt,0);
   if(!confirm(`เติมค่าเมเนเจอร์ ${picks.length} โปรเจกต์\nรวม ${fmtB(total)}\n\nยืนยัน?`)) return;
-  let ok=0, fail=0;
-  for(const it of picks){
-    try{
-      const res=await saveProjectMerge(it.p.id,(p)=>{
-        p.workers=p.workers||[];
-        if(p.workers.some(w=>w.id===it.staffId && String(w.slot||'').startsWith('mgr'))) return;
-        p.workers.push({ id:it.staffId, slot:'mgr-only', amount:Math.round(it.amt), ratePerUnit:it.amt,
-          unit:'เหมา', qty:0, status:'pending', note:'', comment:'เติมค่าเมเนเจอร์ย้อนหลัง' });
-      });
-      if(res && res.ok===false) fail++; else ok++;
-    }catch(e){ fail++; }
-  }
-  logAudit('project.edit','เติมค่าเมเนเจอร์', `${ok} โปรเจกต์ · รวม ${fmtB(total)}`);
+  const amtBy=new Map();
+  picks.forEach(it=>amtBy.set(it.p.id, it));
+  showLoader(true);
+  let res;
+  try{
+    res=await bulkMutateProjects([...amtBy.keys()], (p)=>{
+      const it=amtBy.get(p.id); if(!it) return;
+      p.workers=p.workers||[];
+      if(p.workers.some(w=>w.id===it.staffId && String(w.slot||'').startsWith('mgr'))) return;
+      p.workers.push({ id:it.staffId, slot:'mgr-only', amount:Math.round(it.amt), ratePerUnit:it.amt,
+        unit:'เหมา', qty:0, status:'pending', note:'', comment:'เติมค่าเมเนเจอร์ย้อนหลัง' });
+    });
+  } finally { showLoader(false); }
+  const ok=res.ok, fail=res.failed.length;
+  if(ok) logAudit('project.edit','เติมค่าเมเนเจอร์', `${ok} โปรเจกต์ · รวม ${fmtB(total)}`);
   toast(fail? `เติมแล้ว ${ok} · ล้มเหลว ${fail}` : `✅ เติมค่าเมเนเจอร์ ${ok} โปรเจกต์ (${fmtB(total)})`, fail?'warn':'success');
   document.getElementById('tag-overlay')?.remove();
   renderPayrollMonth();
@@ -4233,6 +4719,130 @@ function prCountOrphans(monthKey, slotFilter){
   });
   return {n, amt};
 }
+// ⚙️ ตั้งประเภทการจ่าย (ถาวร) + โบนัส/หัก (เฉพาะเดือนนี้)
+function openPayEditor(staffId){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const monthKey=document.getElementById('pr-month')?.value||'';
+  const s=getStaffById(staffId); if(!s) return;
+  const prof=getPayProfile(staffId), entry=getPayrollEntry(monthKey, staffId);
+  const fld=(id,label,val,ph,type)=>`<div style="flex:1;min-width:130px">
+    <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:3px">${label}</div>
+    <input id="${id}" type="${type||'number'}" ${type==='number'||!type?'min="0" step="any" onwheel="this.blur()"':''} value="${esc(val==null?'':val)}" placeholder="${ph||''}"
+      style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px;box-sizing:border-box"></div>`;
+  _tagOverlayShow(`⚙️ การจ่ายเงินของ ${esc(s.nickname||s.name)}`, `
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px">ประเภทการจ่าย <span style="color:var(--text2);font-weight:400">(ใช้ทุกเดือน)</span></div>
+    ${Object.entries(PAY_TYPES).map(([k,v])=>`
+      <label style="display:flex;gap:9px;align-items:flex-start;padding:9px 11px;background:var(--bg2);border:1px solid ${prof.payType===k?'var(--accent2)':'var(--border2)'};border-radius:9px;margin-bottom:6px;cursor:pointer">
+        <input type="radio" name="paytype" value="${k}" ${prof.payType===k?'checked':''} onchange="_payTypeToggle(this.value)" style="margin-top:2px">
+        <div><div style="font-size:12.5px;font-weight:700">${v.icon} ${v.label}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:1px">${v.desc}</div></div>
+      </label>`).join('')}
+    <div id="pay-salary-fields" style="display:${prof.payType==='project'?'none':'flex'};gap:8px;flex-wrap:wrap;margin:10px 0 4px">
+      ${fld('pay-base','เงินเดือนฐาน / เดือน',prof.baseSalary||'','0')}
+      ${fld('pay-allow','เบี้ยเลี้ยง / เดือน',prof.allowance||'','0')}
+      ${fld('pay-allow-label','ชื่อเบี้ยเลี้ยง',prof.allowanceLabel||'','เช่น ค่าเดินทาง','text')}
+    </div>
+    <div style="border-top:1px solid var(--border2);margin:14px 0 10px;padding-top:12px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:6px">โบนัส / รายการหัก <span style="color:var(--text2);font-weight:400">(เฉพาะเดือน ${_thaiMonthLabel(monthKey)})</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${fld('pay-bonus','โบนัสเพิ่ม',entry.bonus||'','0')}
+        ${fld('pay-bonus-label','เหตุผลโบนัส',entry.bonusLabel||'','เช่น งานด่วน','text')}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        ${fld('pay-deduct','หักออก',entry.deduction||'','0')}
+        ${fld('pay-deduct-label','เหตุผลที่หัก',entry.deductionLabel||'','เช่น เบิกล่วงหน้า','text')}
+      </div>
+    </div>
+    <button class="btn" style="width:100%" onclick="savePayEditor('${escJs(staffId)}')">💾 บันทึก</button>`, 560);
+}
+function _payTypeToggle(v){
+  const f=document.getElementById('pay-salary-fields');
+  if(f) f.style.display = (v==='project') ? 'none' : 'flex';
+}
+async function savePayEditor(staffId){
+  const monthKey=document.getElementById('pr-month')?.value||'';
+  const payType=document.querySelector('input[name="paytype"]:checked')?.value||'project';
+  const num=id=>parseFloat(document.getElementById(id)?.value)||0;
+  const txt=id=>(document.getElementById(id)?.value||'').trim();
+  const profs=getPayrollProfiles();
+  profs[staffId]={ payType, baseSalary:num('pay-base'), allowance:num('pay-allow'),
+                   allowanceLabel:txt('pay-allow-label'), updatedAt:new Date().toISOString(), by:currentUser?.email||'' };
+  await savePayrollProfiles(profs);
+  await savePayrollEntry(monthKey, staffId, {
+    bonus:num('pay-bonus'), bonusLabel:txt('pay-bonus-label'),
+    deduction:num('pay-deduct'), deductionLabel:txt('pay-deduct-label') });
+  const s=getStaffById(staffId);
+  logAudit('payroll.setup', s?(s.nickname||s.name):staffId, `${PAY_TYPES[payType].label} · รอบ ${monthKey}`);
+  document.getElementById('tag-overlay')?.remove();
+  toast('บันทึกแล้ว ✅','success');
+  renderPayrollMonth();
+}
+// 🧾 สลิปสรุปรายได้รายเดือน (พิมพ์/บันทึก PDF ได้)
+function printPaySlip(staffId){
+  const monthKey=document.getElementById('pr-month')?.value||'';
+  const slotFilter=document.getElementById('pr-role')?.value||'mgr';
+  const rec=buildPayrollMonth(monthKey, slotFilter).get(staffId);
+  if(!rec){ toast('ไม่พบข้อมูล','error'); return; }
+  const s=rec.staff;
+  const workAmt=rec.items.reduce((a,it)=>a+(it.w.amount||0),0);
+  const c=calcPayrollTotal(staffId, monthKey, workAmt);
+  const payer=ls('wht_payer')||{};
+  const rows=[];
+  if(c.work) rows.push(['ค่าตอบแทนรายโปรเจกต์ ('+rec.items.length+' งาน)', c.work]);
+  if(c.base) rows.push(['เงินเดือน', c.base]);
+  if(c.allow) rows.push([c.prof.allowanceLabel||'เบี้ยเลี้ยง', c.allow]);
+  if(c.bonus) rows.push(['โบนัส'+(c.entry.bonusLabel?' ('+c.entry.bonusLabel+')':''), c.bonus]);
+  const fmtN=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const jobRows=rec.items.map(it=>`<tr>
+      <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px">${esc(it.p.name||'')}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px">${(PR_SLOT_LABEL[it.pre]||it.pre).replace(/[^฀-๿a-zA-Z& ]/g,'').trim()}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px;text-align:right">${fmtN(it.w.amount||0)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px;text-align:center">${it.w.status==='paid'?'จ่ายแล้ว':'รอจ่าย'}</td></tr>`).join('');
+  const html=`<div style="max-width:720px;margin:0 auto;background:#fff;color:#111;padding:34px 40px;font-family:'Sarabun','Kanit',sans-serif">
+    <div style="text-align:center;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:16px">
+      <div style="font-size:19px;font-weight:700">${esc(payer.name||'Guin Home Studio')}</div>
+      <div style="font-size:15px;margin-top:6px">สรุปรายได้ประจำเดือน ${_thaiMonthLabel(monthKey)}</div>
+    </div>
+    <table style="width:100%;font-size:13px;margin-bottom:14px">
+      <tr><td style="padding:3px 0;width:110px">ชื่อผู้รับเงิน</td><td style="padding:3px 0"><strong>${esc(s.name||'')}</strong> ${s.nickname?'('+esc(s.nickname)+')':''}</td></tr>
+      <tr><td style="padding:3px 0">ธนาคาร</td><td style="padding:3px 0">${esc(s.bank||'—')} ${esc(s.account||'')}</td></tr>
+      <tr><td style="padding:3px 0">ประเภทการจ่าย</td><td style="padding:3px 0">${PAY_TYPES[c.prof.payType].label}</td></tr>
+      <tr><td style="padding:3px 0">วันที่ออก</td><td style="padding:3px 0">${fmtDate(new Date().toISOString().split('T')[0])}</td></tr>
+    </table>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:14px">
+      <thead><tr style="background:#f2f2f2">
+        <th style="padding:6px 8px;border:1px solid #ddd;text-align:left;font-size:12.5px">รายการ</th>
+        <th style="padding:6px 8px;border:1px solid #ddd;text-align:right;font-size:12.5px;width:130px">จำนวนเงิน (บาท)</th></tr></thead>
+      <tbody>
+        ${rows.map(([l,v])=>`<tr><td style="padding:6px 8px;border:1px solid #ddd;font-size:13px">${esc(l)}</td><td style="padding:6px 8px;border:1px solid #ddd;text-align:right;font-size:13px">${fmtN(v)}</td></tr>`).join('')}
+        ${c.deduct?`<tr><td style="padding:6px 8px;border:1px solid #ddd;font-size:13px;color:#b00">หัก${c.entry.deductionLabel?' ('+esc(c.entry.deductionLabel)+')':''}</td><td style="padding:6px 8px;border:1px solid #ddd;text-align:right;font-size:13px;color:#b00">-${fmtN(c.deduct)}</td></tr>`:''}
+        <tr style="background:#f8f8f8"><td style="padding:8px;border:1px solid #ddd;font-weight:700">รวมสุทธิ</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:700;font-size:15px">${fmtN(c.net)}</td></tr>
+      </tbody>
+    </table>
+    ${rec.items.length?`<div style="font-size:12.5px;font-weight:700;margin:16px 0 6px">รายละเอียดงานในเดือนนี้</div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#f2f2f2">
+        <th style="padding:5px 8px;border:1px solid #ddd;text-align:left;font-size:12px">โปรเจกต์</th>
+        <th style="padding:5px 8px;border:1px solid #ddd;text-align:left;font-size:12px;width:110px">หน้าที่</th>
+        <th style="padding:5px 8px;border:1px solid #ddd;text-align:right;font-size:12px;width:90px">จำนวนเงิน</th>
+        <th style="padding:5px 8px;border:1px solid #ddd;text-align:center;font-size:12px;width:80px">สถานะ</th></tr></thead>
+      <tbody>${jobRows}</tbody></table>`:''}
+    <div style="margin-top:34px;display:flex;justify-content:space-between;font-size:12.5px">
+      <div style="text-align:center;width:44%"><div style="border-top:1px solid #111;padding-top:5px">ผู้จ่ายเงิน</div></div>
+      <div style="text-align:center;width:44%"><div style="border-top:1px solid #111;padding-top:5px">ผู้รับเงิน</div></div>
+    </div>
+    <div style="font-size:10.5px;color:#666;margin-top:18px;text-align:center">เอกสารนี้ออกจากระบบ Guin Home Studio เพื่อใช้สรุปรายได้ ไม่ใช่หนังสือรับรองการหักภาษี ณ ที่จ่าย</div>
+  </div>`;
+  const w=window.open('','_blank');
+  if(!w){ toast('เบราว์เซอร์บล็อกหน้าต่างใหม่ — อนุญาต popup ก่อน','error'); return; }
+  w.document.write(`<html><head><title>สลิป ${esc(s.nickname||s.name)} ${_thaiMonthLabel(monthKey)}</title><meta charset="utf-8">
+    <style>@media print{@page{margin:12mm}}body{margin:0;background:#eee;padding:18px}</style></head><body>${html}
+    <div style="text-align:center;margin:16px 0" class="no-print"><button onclick="window.print()" style="padding:9px 22px;font-size:14px;cursor:pointer">🖨️ พิมพ์ / บันทึก PDF</button></div>
+    <style>@media print{.no-print{display:none}}</style></body></html>`);
+  w.document.close();
+  logAudit('payroll.slip', s.nickname||s.name, `รอบ ${monthKey} · สุทธิ ${fmtB(c.net)}`);
+}
 function _prLatestVoucherForMonth(staffId, monthKey){
   const vs=(getDocsStore('vouchers')||[]).filter(v=>v.staffId===staffId && v.payrollMonth===monthKey);
   if(!vs.length) return (getDocsStore('vouchers')||[]).filter(v=>v.staffId===staffId).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))[0]||null;
@@ -4249,18 +4859,25 @@ async function prMarkPaid(staffId){
   const total=todo.reduce((a,it)=>a+(it.w.amount||0),0);
   if(!confirm(`บันทึกว่าจ่ายเงินให้ ${rec.staff.nickname||rec.staff.name} แล้ว\n\n${todo.length} งาน · รวม ${fmtB(total)}\nเดือน ${_thaiMonthLabel(monthKey)}\n\nยืนยัน?`)) return;
   const nowIso=new Date().toISOString();
-  let ok=0, fail=0;
-  for(const it of todo){
-    try{
-      const res=await saveProjectMerge(it.p.id, (p)=>{
-        const w=(p.workers||[]).find(x=>x.id===it.w.id && x.slot===it.w.slot);
-        if(w){ w.status='paid'; w.paidAt=nowIso; w.note=(w.note||'')||'จ่ายรอบเดือน '+monthKey; }
+  // เขียนครั้งเดียวทุกโปรเจกต์ — เร็วกว่าวนทีละตัวมาก
+  const bySlot=new Map();
+  todo.forEach(it=>{
+    if(!bySlot.has(it.p.id)) bySlot.set(it.p.id, []);
+    bySlot.get(it.p.id).push(it.w.slot);
+  });
+  showLoader(true);
+  let res;
+  try{
+    res=await bulkMutateProjects([...bySlot.keys()], (p)=>{
+      (bySlot.get(p.id)||[]).forEach(slot=>{
+        const w=(p.workers||[]).find(x=>x.id===staffId && x.slot===slot && x.status!=='paid');
+        if(w){ w.status='paid'; w.paidAt=nowIso; if(!w.note) w.note='จ่ายรอบเดือน '+monthKey; }
       });
-      if(res && res.ok===false) fail++; else ok++;
-    }catch(e){ fail++; }
-  }
-  logAudit('payment.pay', rec.staff.nickname||rec.staff.name, `รอบเดือน ${monthKey} · ${ok} งาน · ${fmtB(total)}`);
-  toast(fail? `บันทึกแล้ว ${ok} งาน · ล้มเหลว ${fail}` : `✅ บันทึกจ่ายแล้ว ${ok} งาน (${fmtB(total)})`, fail?'warn':'success');
+    });
+  } finally { showLoader(false); }
+  const ok=res.ok, fail=res.failed.length;
+  if(ok) logAudit('payment.pay', rec.staff.nickname||rec.staff.name, `รอบเดือน ${monthKey} · ${todo.length} งาน · ${fmtB(total)}`);
+  toast(fail? `บันทึกแล้ว ${ok} โปรเจกต์ · ล้มเหลว ${fail}` : `✅ บันทึกจ่ายแล้ว ${todo.length} งาน (${fmtB(total)})`, fail?'warn':'success');
   renderPayrollMonth();
 }
 // ออกใบสำคัญจ่าย 1 ใบ รวมงานทั้งเดือนของคนนั้น
@@ -4278,12 +4895,20 @@ async function prIssueVoucher(staffId){
   const date=new Date().toISOString().split('T')[0];
   const vNo=nextVoucherNo();
   toast(`📄 กำลังออกใบ ${items.length} งาน...`,'info');
-  for(const it of items){
-    try{ await saveProjectMerge(it.p.id,(p)=>{
-      const w=(p.workers||[]).find(x=>x.id===it.w.id && x.slot===it.w.slot);
-      if(w) w.voucherNo=vNo;
-    }); }catch(e){}
-  }
+  const stampBy=new Map();
+  items.forEach(it=>{
+    if(!stampBy.has(it.p.id)) stampBy.set(it.p.id, []);
+    stampBy.get(it.p.id).push(it.w.slot);
+  });
+  showLoader(true);
+  try{
+    await bulkMutateProjects([...stampBy.keys()], (p)=>{
+      (stampBy.get(p.id)||[]).forEach(slot=>{
+        const w=(p.workers||[]).find(x=>x.id===staffId && x.slot===slot);
+        if(w) w.voucherNo=vNo;
+      });
+    });
+  } finally { showLoader(false); }
   const saved=getDocsStore('vouchers')||[];
   saved.push({
     type:'voucher', docNo:vNo, staffId, staffName:s.name, staffLastName:s.lastName||'', staffNickname:s.nickname,
@@ -4600,6 +5225,9 @@ const AUDIT_ACTIONS = {
   'data.sync':        {icon:'🔄', label:'ซิงค์รายชื่อจากชีท'},
   'brief.edit':       {icon:'📖', label:'แก้บรีฟงาน'},
   'expense.company':  {icon:'🏦', label:'ค่าใช้จ่ายบริษัท'},
+  'payroll.setup':    {icon:'⚙️', label:'ตั้งค่าการจ่ายเงิน'},
+  'payroll.slip':     {icon:'🧾', label:'ออกสลิปรายได้'},
+  'recruit.round':    {icon:'🗓️', label:'เปิดรอบขอคิว'},
   'report.export':    {icon:'📄', label:'ดาวน์โหลดรายงานการเงิน'},
 };
 // เขียน log — ห้าม throw / ห้ามบล็อกงานหลักเด็ดขาด
@@ -4718,6 +5346,50 @@ async function saveProjectDB(p){
   }
 }
 function saveProjects(arr){projectsCache=arr;ls('projects_cache',arr)}
+
+// ⚡ แก้หลายโปรเจกต์พร้อมกันในการเขียนครั้งเดียว
+//    เดิม: วนเรียก saveProjectMerge ทีละตัว = อ่าน+เขียน Firebase 22 รอบ (ช้ามาก)
+//    ใหม่: อ่านทุกตัวขนานกัน → รวมเป็น update ก้อนเดียว (atomic 1 request)
+async function bulkMutateProjects(projIds, mutate){
+  const ids=[...new Set((projIds||[]).filter(Boolean))];
+  if(!ids.length) return {ok:0, failed:[]};
+  const fresh={};
+  if(_fbDatabase){
+    const snaps=await Promise.all(ids.map(id=>_fbDatabase.ref('projects/'+id).get().catch(()=>null)));
+    ids.forEach((id,i)=>{
+      const s=snaps[i];
+      fresh[id]=(s&&s.exists())?s.val():(projectsCache.find(p=>p.id===id)||null);
+    });
+  } else {
+    ids.forEach(id=>{ fresh[id]=projectsCache.find(p=>p.id===id)||null; });
+  }
+  const updates={}, changed=[], failed=[];
+  ids.forEach(id=>{
+    const p=fresh[id];
+    if(!p){ failed.push(id); return; }
+    try{
+      mutate(p);
+      p.updatedAt=new Date().toISOString();
+      updates['projects/'+id]=JSON.parse(JSON.stringify(p,(k,v)=>v===undefined?null:v));
+      changed.push(p);
+    }catch(e){ failed.push(id); }
+  });
+  if(_fbDatabase && Object.keys(updates).length){
+    try{ await _fbDatabase.ref().update(updates); }
+    catch(e){
+      console.error('bulkMutateProjects:', e);
+      toast('⚠️ บันทึกไม่สำเร็จ: '+(e.message||''),'error');
+      return {ok:0, failed:ids};
+    }
+  }
+  changed.forEach(p=>{
+    const i=projectsCache.findIndex(x=>x.id===p.id);
+    if(i>=0) projectsCache[i]=p; else projectsCache.unshift(p);
+  });
+  ls('projects_cache', projectsCache);
+  try{ _notifyProjectChange(); }catch(e){}
+  return {ok:changed.length, failed};
+}
 async function deleteProjectDB(id){
   projectsCache=projectsCache.filter(p=>p.id!==id);
   ls('projects_cache',projectsCache);
@@ -6218,7 +6890,8 @@ async function enterApp(){
   try { await loadAppreciationsFromFirebase(); } catch(e) {}
   try { await loadCalcDraftsFromFirebase(); } catch(e) {}
   try { await loadMgrRequests(); await loadManagerUsers(); await loadMgrSuspended(); await loadTeamLeft(); } catch(e) {}
-  try { await fbLoadKeyed('tags_master'); await fbLoadKeyed('brief_templates'); await fbLoadKeyed('company_expenses'); } catch(e) {}
+  try { await fbLoadKeyed('tags_master'); await fbLoadKeyed('brief_templates'); await fbLoadKeyed('company_expenses');
+        await fbLoadKeyed('payroll_profiles'); await fbLoadKeyed('payroll_runs'); } catch(e) {}
   try { logLogin(); startIdleWatch(); } catch(e) {}
   // Load tracking cards from Firebase
   try {
@@ -6462,6 +7135,7 @@ async function seedDemo(){
 // NAVIGATION
 // ══════════════════════════════════════════════
 const ADMIN_PAGES=['dashboard','track','assign','projects','project-detail','queue','payroll','payment-history','profit','staff','staff-detail','docs','calc','payment','settings'];
+// 'availability' ไม่อยู่ใน ADMIN_PAGES → admin + manager เข้าได้ (เมเนเจอร์ต้องใช้จัดคน)
 const MANAGER_PAGES=['mgr-home','mgr-projects','mgr-track','mgr-calc','mgr-team'];
 // Manager เข้าถึงหน้า admin บางหน้าได้ (track = ติดตามงาน แต่กรองเฉพาะโปรเจกต์ที่ดูแล)
 const MGR_ALLOWED_ADMIN_PAGES=['track','projects','assign'];
@@ -6478,7 +7152,7 @@ function nav(page){
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
   const renders={
-    dashboard:renderDash,track:renderTrack,assign:renderAssign,projects:renderProjects,profit:renderProfit,staff:renderStaff,'staff-detail':renderStaffDetail,queue:renderQueue,payroll:renderPayrollMonth,'payment-history':renderPaymentHistory,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
+    dashboard:renderDash,track:renderTrack,assign:renderAssign,projects:renderProjects,profit:renderProfit,staff:renderStaff,'staff-detail':renderStaffDetail,queue:renderQueue,payroll:renderPayrollMonth,availability:renderAvailability,'payment-history':renderPaymentHistory,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
     'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar,'confirm-amount':renderConfirmAmountPage,
     'mgr-home':renderMgrHome,'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-team':renderMgrTeam,
     'mgr-calc':()=>renderCalcList('mgr-calc-list',true)
