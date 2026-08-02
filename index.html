@@ -3987,6 +3987,14 @@ function renderPayrollMonth(){
       ${card('ยังไม่ได้จ่าย', fmtB(grandUnpaid), grandUnpaid?'var(--orange)':'var(--green)', grandUnpaid?'':'จ่ายครบแล้ว 🎉')}
       ${card('ยังไม่มีใบสำคัญจ่าย', needDoc+' คน', needDoc?'var(--orange)':'var(--green)', needDoc?'กดออกใบได้เลย':'ออกใบครบแล้ว ✅')}
     </div>`;
+    // ⚠️ งานที่อ้างถึงสมาชิกที่ไม่มีในระบบแล้ว — ถ้าไม่เตือน จะหายเงียบจนยอดไม่ตรง
+    const orph = prCountOrphans(monthKey, slotFilter);
+    if(orph.n){
+      sumEl.innerHTML += `<div style="margin-top:10px;padding:11px 14px;background:rgba(255,64,64,.07);border:1px solid rgba(255,64,64,.3);border-radius:10px;font-size:12.5px;line-height:1.6">
+        ⚠️ <strong style="color:var(--red)">มี ${orph.n} รายการในเดือนนี้ (รวม ${fmtB(orph.amt)}) ที่อ้างถึงสมาชิกที่ไม่มีในระบบแล้ว</strong> จึงไม่ถูกนับในรายชื่อด้านล่าง
+        <div style="color:var(--text2);margin-top:3px">มักเกิดจากรายชื่อถูกลบหรือรวมร่างไปแล้ว — แก้ได้ที่ <strong>ตั้งค่า → 🧰 เครื่องมือซ่อมข้อมูล → 🚑 กู้คืนสมาชิกที่หาย</strong></div>
+      </div>`;
+    }
   }
   const listEl=document.getElementById('pr-list'); if(!listEl) return;
   if(!entries.length){
@@ -4028,6 +4036,9 @@ function renderPayrollMonth(){
           <div style="font-size:19px;font-weight:800;color:var(--accent2)">${fmtB(e.total)}</div>
         </div>
       </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
+        <button class="btn btn-xs btn-outline" style="font-size:11px;padding:3px 10px" onclick="prDiagnose('${escJs(e.staffId)}')" title="ตรวจว่ามีงานของคนนี้อยู่เดือนอื่น/หมวดอื่นอีกไหม">🔍 จำนวนงานไม่ตรง?</button>
+      </div>
       <details style="margin-top:9px">
         <summary style="cursor:pointer;font-size:11.5px;color:var(--accent2)">ดูรายการงานทั้งหมด (${e.items.length})</summary>
         <div style="margin-top:6px;padding:8px 10px;background:rgba(0,0,0,.15);border-radius:8px">${lines}</div>
@@ -4035,6 +4046,57 @@ function renderPayrollMonth(){
       <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;margin-top:10px">${btns.join('')}</div>
     </div>`;
   }).join('');
+}
+// 🔍 ตรวจว่าทำไมจำนวนงานไม่ตรงกับที่นับเอง — ไล่หาทุกงานของคนนี้แล้วบอกเหตุผลที่ไม่อยู่ในมุมมองนี้
+function prDiagnose(staffId){
+  const monthKey=document.getElementById('pr-month')?.value||'';
+  const slotFilter=document.getElementById('pr-role')?.value||'mgr';
+  const s=getStaffById(staffId);
+  const inView=[], otherMonth=[], otherSlot=[];
+  (getProjects()||[]).forEach(p=>{
+    const pm=_prProjMonth(p);
+    (p.workers||[]).forEach(w=>{
+      if(w.id!==staffId) return;
+      const pre=(w.slot||'').split('-')[0];
+      const slotOk = (slotFilter==='all' || pre===slotFilter);
+      const monthOk = (pm===monthKey);
+      const rec={p,w,pre,pm};
+      if(monthOk && slotOk) inView.push(rec);
+      else if(!monthOk) otherMonth.push(rec);
+      else otherSlot.push(rec);
+    });
+  });
+  const row=(r,extra)=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:5px 0;border-top:1px solid var(--border2)">
+    <span style="flex:1;min-width:0">${esc(r.p.name||'(ไม่มีชื่อ)')} <span style="color:var(--text2)">· ${PR_SLOT_LABEL[r.pre]||r.pre}${extra?' · '+extra:''}</span></span>
+    <span style="white-space:nowrap;font-weight:700">${fmtB(r.w.amount||0)}</span></div>`;
+  const block=(title,color,rows,mapper)=>`<div style="margin-top:12px">
+    <div style="font-size:12.5px;font-weight:700;color:${color}">${title} <span style="color:var(--text2);font-weight:400">(${rows.length} งาน · ${fmtB(rows.reduce((a,r)=>a+(r.w.amount||0),0))})</span></div>
+    ${rows.length?rows.map(mapper).join(''):'<div style="font-size:11.5px;color:var(--text2);padding:5px 0">— ไม่มี —</div>'}</div>`;
+  const totalAll=inView.length+otherMonth.length+otherSlot.length;
+  _tagOverlayShow(`🔍 ตรวจงานของ ${esc(s?(s.nickname||s.name):staffId)}`, `
+    <div style="font-size:12px;color:var(--text2);line-height:1.65;margin-bottom:4px">
+      พบงานของคนนี้ทั้งหมด <strong style="color:var(--text)">${totalAll} รายการ</strong> ในระบบ ·
+      อยู่ในมุมมองปัจจุบัน (${_thaiMonthLabel(monthKey)} · ${slotFilter==='all'?'ทุกหมวด':(PR_SLOT_LABEL[slotFilter]||slotFilter)}) <strong style="color:var(--accent2)">${inView.length} รายการ</strong>
+    </div>
+    ${block('✅ อยู่ในรอบนี้','var(--green)',inView,r=>row(r))}
+    ${block('📅 อยู่เดือนอื่น (เดทไลน์โปรเจกต์คนละเดือน)','var(--orange)',otherMonth,r=>row(r,'เดือน '+(r.pm?_thaiMonthLabel(r.pm):'ไม่ระบุวันที่')))}
+    ${block('🏷️ อยู่หมวดอื่น (ไม่ตรงกับตัวกรองด้านบน)','#9B6FFF',otherSlot,r=>row(r))}
+    <div style="font-size:11.5px;color:var(--text2);margin-top:12px;line-height:1.6;padding-top:10px;border-top:1px solid var(--border2)">
+      💡 การจัดเดือนใช้ <strong>เดทไลน์ของโปรเจกต์</strong> — ถ้างานไหนควรอยู่รอบนี้แต่เดทไลน์เป็นเดือนอื่น ให้แก้เดทไลน์ในหน้ามอบหมายงาน หรือเลือก "👥 ทุกคน" เพื่อดูรวมทุกหมวด
+    </div>`, 640);
+}
+// นับรายการที่อ้างถึงสมาชิกที่ไม่มีใน staff_v3 แล้ว (คนหาย/ถูกรวมร่าง) — ไม่งั้นจะหายเงียบ
+function prCountOrphans(monthKey, slotFilter){
+  let n=0, amt=0;
+  (getProjects()||[]).forEach(p=>{
+    if(_prProjMonth(p)!==monthKey) return;
+    (p.workers||[]).forEach(w=>{
+      const pre=(w.slot||'').split('-')[0];
+      if(slotFilter && slotFilter!=='all' && pre!==slotFilter) return;
+      if(!getStaffById(w.id)){ n++; amt+=(w.amount||0); }
+    });
+  });
+  return {n, amt};
 }
 function _prLatestVoucherForMonth(staffId, monthKey){
   const vs=(getDocsStore('vouchers')||[]).filter(v=>v.staffId===staffId && v.payrollMonth===monthKey);
