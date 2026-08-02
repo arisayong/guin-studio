@@ -1133,6 +1133,7 @@ body.sidebar-collapsed .main-content{
    <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-section">การเงิน</div>
    <div class="nav-item" onclick="nav('queue')"><span class="nav-icon">💸</span><span>คิวจ่ายเงิน</span><span class="nav-badge hidden" id="queue-badge">0</span></div>
+   <div class="nav-item" onclick="nav('payroll')"><span class="nav-icon">📆</span><span>รอบจ่ายรายเดือน</span></div>
    <div class="nav-item" onclick="nav('payment-history')"><span class="nav-icon">📜</span><span>ประวัติการจ่ายเงิน</span></div>
    <div class="nav-item" onclick="nav('profit')"><span class="nav-icon">📊</span><span>กำไร-ขาดทุน</span></div>
    <div class="nav-item" onclick="nav('docs')"><span class="nav-icon">🗂️</span><span>เอกสาร</span></div>
@@ -1496,6 +1497,28 @@ body.sidebar-collapsed .main-content{
     </div>
    </div>
    <div id="calc-list"></div>
+  </div>
+
+  <!-- ── 📆 รอบจ่ายรายเดือน — จ่าย + ออกเอกสารรายคนจบในที่เดียว ── -->
+  <div id="page-payroll" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">📆 รอบจ่ายรายเดือน</div>
+    <div class="page-subtitle">รวมงานทั้งเดือนของแต่ละคนไว้ที่เดียว — บันทึกจ่าย ออกใบสำคัญจ่าย และส่งอีเมล จบในคลิกเดียว</div>
+    <div class="page-actions">
+     <select id="pr-month" class="form-input form-select" style="width:auto;min-width:150px;padding:7px 30px 7px 12px;font-size:13px" onchange="renderPayrollMonth()"></select>
+     <select id="pr-role" class="form-input form-select" style="width:auto;min-width:150px;padding:7px 30px 7px 12px;font-size:13px" onchange="renderPayrollMonth()">
+      <option value="mgr">🗂️ เมเนเจอร์</option>
+      <option value="all">👥 ทุกคน</option>
+      <option value="dub">🎤 Dubbing</option>
+      <option value="adp">✍️ Adaptation</option>
+      <option value="mix">🎧 Mix</option>
+      <option value="qc">✅ QC</option>
+      <option value="sub">🎬 Sub &amp; Video</option>
+     </select>
+    </div>
+   </div>
+   <div id="pr-summary" style="margin-bottom:14px"></div>
+   <div id="pr-list"></div>
   </div>
 
   <!-- ── 📋 มอบหมายงาน (แทนชีทคิวเมเนเจอร์ — เฟส 1 บรีฟข้อ 9) ── -->
@@ -3898,6 +3921,194 @@ function saveStaffTags(staffId){
 }
 
 // ══════════════════════════════════════════════
+// 📆 รอบจ่ายรายเดือน — รวมงานทั้งเดือนของแต่ละคน · จ่าย + ออกใบ + ส่ง จบในที่เดียว
+//    แก้ปัญหา: เมเนเจอร์ต้องจ่ายรายคนทุกเดือน แต่งานกระจายอยู่หลายสิบโปรเจกต์
+// ══════════════════════════════════════════════
+const PR_SLOT_LABEL = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', mgr:'🗂️ Manager'};
+function _prProjMonth(p){
+  const d = p.deadline || p.date || p.startDate || (p.createdAt||'').split('T')[0] || '';
+  return String(d).slice(0,7);
+}
+// รวบรวมงานของเดือนที่เลือก จัดกลุ่มตามคน
+function buildPayrollMonth(monthKey, slotFilter){
+  const covered = _vcCoveredSet();
+  const byPerson = new Map();
+  (getProjects()||[]).forEach(p=>{
+    if(_prProjMonth(p) !== monthKey) return;
+    (p.workers||[]).forEach(w=>{
+      const pre = (w.slot||'').split('-')[0];
+      if(slotFilter && slotFilter !== 'all' && pre !== slotFilter) return;
+      const s = getStaffById(w.id);
+      if(!s) return;
+      if(!byPerson.has(w.id)) byPerson.set(w.id, {staff:s, items:[]});
+      byPerson.get(w.id).items.push({ p, w, pre, hasDoc: covered.has(`${w.id}|${p.id}|${w.slot}`) });
+    });
+  });
+  return byPerson;
+}
+function renderPayrollMonth(){
+  if(currentUser?.role !== 'admin'){
+    const pg=document.getElementById('page-payroll');
+    if(pg) pg.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin เท่านั้น</div>';
+    return;
+  }
+  const monthSel = document.getElementById('pr-month');
+  if(monthSel){
+    const months = [...new Set((getProjects()||[]).map(_prProjMonth).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
+    const cur = monthSel.value || months[0] || new Date().toISOString().slice(0,7);
+    monthSel.innerHTML = months.map(m=>`<option value="${m}"${m===cur?' selected':''}>${_thaiMonthLabel(m)}</option>`).join('')
+      || `<option value="${cur}">${_thaiMonthLabel(cur)}</option>`;
+    if(!monthSel.value) monthSel.value = cur;
+  }
+  const monthKey = monthSel?.value || new Date().toISOString().slice(0,7);
+  const slotFilter = document.getElementById('pr-role')?.value || 'mgr';
+  const byPerson = buildPayrollMonth(monthKey, slotFilter);
+  const entries = [...byPerson.entries()].map(([staffId,v])=>{
+    const total   = v.items.reduce((a,it)=>a+(it.w.amount||0),0);
+    const unpaid  = v.items.filter(it=>it.w.status!=='paid');
+    const noDoc   = v.items.filter(it=>!it.hasDoc);
+    return {staffId, staff:v.staff, items:v.items, total,
+            unpaidCount:unpaid.length, unpaidAmt:unpaid.reduce((a,it)=>a+(it.w.amount||0),0), noDocCount:noDoc.length};
+  }).sort((a,b)=> b.total - a.total);
+
+  // สรุปหัวหน้า
+  const sumEl=document.getElementById('pr-summary');
+  const grand = entries.reduce((a,e)=>a+e.total,0);
+  const grandUnpaid = entries.reduce((a,e)=>a+e.unpaidAmt,0);
+  const needDoc = entries.filter(e=>e.noDocCount>0).length;
+  if(sumEl){
+    const card=(l,v,c,s)=>`<div style="flex:1;min-width:130px;padding:12px 14px;background:var(--bg2);border-radius:11px">
+      <div style="font-size:10.5px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">${l}</div>
+      <div style="font-size:19px;font-weight:800;margin-top:3px;color:${c}">${v}</div>
+      ${s?`<div style="font-size:10.5px;color:var(--text2);margin-top:2px">${s}</div>`:''}</div>`;
+    sumEl.innerHTML = `<div style="display:flex;gap:9px;flex-wrap:wrap">
+      ${card('คนที่ต้องจ่าย', entries.length+' คน','var(--text)', _thaiMonthLabel(monthKey))}
+      ${card('ยอดรวมทั้งเดือน', fmtB(grand),'var(--accent2)','')}
+      ${card('ยังไม่ได้จ่าย', fmtB(grandUnpaid), grandUnpaid?'var(--orange)':'var(--green)', grandUnpaid?'':'จ่ายครบแล้ว 🎉')}
+      ${card('ยังไม่มีใบสำคัญจ่าย', needDoc+' คน', needDoc?'var(--orange)':'var(--green)', needDoc?'กดออกใบได้เลย':'ออกใบครบแล้ว ✅')}
+    </div>`;
+  }
+  const listEl=document.getElementById('pr-list'); if(!listEl) return;
+  if(!entries.length){
+    listEl.innerHTML=`<div style="text-align:center;padding:44px;color:var(--text2)">ไม่มีงานของกลุ่มนี้ใน${_thaiMonthLabel(monthKey)}</div>`;
+    return;
+  }
+  listEl.innerHTML = entries.map(e=>{
+    const s=e.staff;
+    const hasEmail=!!(s.email&&s.email.includes('@'));
+    const allPaid=e.unpaidCount===0;
+    const allDoc=e.noDocCount===0;
+    const lines=e.items.map(it=>{
+      const paidTag = it.w.status==='paid' ? '<span style="color:var(--green)">✅ จ่ายแล้ว</span>' : '<span style="color:var(--orange)">⏳ ยังไม่จ่าย</span>';
+      const docTag  = it.hasDoc ? '<span style="color:var(--green)">✓ มีใบ</span>' : '<span style="color:var(--text2)">• ยังไม่มีใบ</span>';
+      return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--text2);padding:3px 0">
+        <span style="flex:1;min-width:0">${esc(it.p.name||'')} <span style="opacity:.7">· ${PR_SLOT_LABEL[it.pre]||it.pre}</span> ${paidTag} ${docTag}</span>
+        <span style="white-space:nowrap">${fmtB(it.w.amount||0)}</span></div>`;
+    }).join('');
+    const btns = [];
+    if(!allPaid) btns.push(`<button class="btn btn-sm" style="background:var(--green);border:none;color:#04231a;font-weight:700" onclick="prMarkPaid('${escJs(e.staffId)}')">✅ บันทึกว่าจ่ายแล้ว (${e.unpaidCount} งาน · ${fmtB(e.unpaidAmt)})</button>`);
+    if(!allDoc)  btns.push(`<button class="btn btn-sm" style="background:var(--orange);border:none;color:#231504;font-weight:700" onclick="prIssueVoucher('${escJs(e.staffId)}')">📄 ออกใบสำคัญจ่าย (${e.noDocCount} งาน)</button>`);
+    if(allDoc){
+      const v=_prLatestVoucherForMonth(e.staffId, monthKey);
+      if(v) btns.push(`<button class="btn btn-sm btn-outline" onclick="showVoucherSendModalByVNo('${escJs(v.docNo)}')">📧 ส่งใบอีกครั้ง (${esc(v.docNo)})</button>`);
+    }
+    const badge = allPaid && allDoc
+      ? '<span style="font-size:10px;background:rgba(0,223,160,.15);color:var(--green);padding:2px 9px;border-radius:8px;font-weight:700">✅ เรียบร้อยครบ</span>'
+      : allPaid ? '<span style="font-size:10px;background:rgba(255,158,0,.15);color:var(--orange);padding:2px 9px;border-radius:8px;font-weight:700">จ่ายแล้ว · รอออกใบ</span>'
+      : '<span style="font-size:10px;background:rgba(255,158,0,.15);color:var(--orange);padding:2px 9px;border-radius:8px;font-weight:700">⏳ รอจ่าย</span>';
+    return `<div class="section-card" style="margin-bottom:11px;border-left:3px solid ${allPaid&&allDoc?'var(--green)':'var(--orange)'}">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,180,255,.15);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-weight:800">${esc(String((s.nickname||s.name||'?')[0]).toUpperCase())}</div>
+        <div style="flex:1;min-width:150px">
+          <div style="font-size:14.5px;font-weight:800">${esc(s.nickname||s.name)} <span style="font-size:12px;color:var(--text2);font-weight:500">${esc(s.name||'')}</span> ${badge}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">🏦 ${esc(s.bank||'—')} ${esc(s.account||'')}${hasEmail?' · 📧 '+esc(s.email):' · <span style="color:var(--orange)">⚠️ ไม่มีอีเมล ส่งใบไม่ได้</span>'}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10.5px;color:var(--text2)">${e.items.length} งาน · รวม</div>
+          <div style="font-size:19px;font-weight:800;color:var(--accent2)">${fmtB(e.total)}</div>
+        </div>
+      </div>
+      <details style="margin-top:9px">
+        <summary style="cursor:pointer;font-size:11.5px;color:var(--accent2)">ดูรายการงานทั้งหมด (${e.items.length})</summary>
+        <div style="margin-top:6px;padding:8px 10px;background:rgba(0,0,0,.15);border-radius:8px">${lines}</div>
+      </details>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;margin-top:10px">${btns.join('')}</div>
+    </div>`;
+  }).join('');
+}
+function _prLatestVoucherForMonth(staffId, monthKey){
+  const vs=(getDocsStore('vouchers')||[]).filter(v=>v.staffId===staffId && v.payrollMonth===monthKey);
+  if(!vs.length) return (getDocsStore('vouchers')||[]).filter(v=>v.staffId===staffId).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))[0]||null;
+  return vs.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))[0];
+}
+// บันทึกว่าจ่ายแล้วทั้งเดือนของคนนั้น (ไม่ส่งใบยืนยันซ้ำ — ใช้กับเคสโอนไปแล้วนอกระบบ)
+async function prMarkPaid(staffId){
+  const monthKey=document.getElementById('pr-month')?.value;
+  const slotFilter=document.getElementById('pr-role')?.value||'mgr';
+  const rec=buildPayrollMonth(monthKey, slotFilter).get(staffId);
+  if(!rec) return;
+  const todo=rec.items.filter(it=>it.w.status!=='paid');
+  if(!todo.length){ toast('จ่ายครบแล้ว','info'); return; }
+  const total=todo.reduce((a,it)=>a+(it.w.amount||0),0);
+  if(!confirm(`บันทึกว่าจ่ายเงินให้ ${rec.staff.nickname||rec.staff.name} แล้ว\n\n${todo.length} งาน · รวม ${fmtB(total)}\nเดือน ${_thaiMonthLabel(monthKey)}\n\nยืนยัน?`)) return;
+  const nowIso=new Date().toISOString();
+  let ok=0, fail=0;
+  for(const it of todo){
+    try{
+      const res=await saveProjectMerge(it.p.id, (p)=>{
+        const w=(p.workers||[]).find(x=>x.id===it.w.id && x.slot===it.w.slot);
+        if(w){ w.status='paid'; w.paidAt=nowIso; w.note=(w.note||'')||'จ่ายรอบเดือน '+monthKey; }
+      });
+      if(res && res.ok===false) fail++; else ok++;
+    }catch(e){ fail++; }
+  }
+  logAudit('payment.pay', rec.staff.nickname||rec.staff.name, `รอบเดือน ${monthKey} · ${ok} งาน · ${fmtB(total)}`);
+  toast(fail? `บันทึกแล้ว ${ok} งาน · ล้มเหลว ${fail}` : `✅ บันทึกจ่ายแล้ว ${ok} งาน (${fmtB(total)})`, fail?'warn':'success');
+  renderPayrollMonth();
+}
+// ออกใบสำคัญจ่าย 1 ใบ รวมงานทั้งเดือนของคนนั้น
+async function prIssueVoucher(staffId){
+  const monthKey=document.getElementById('pr-month')?.value;
+  const slotFilter=document.getElementById('pr-role')?.value||'mgr';
+  const rec=buildPayrollMonth(monthKey, slotFilter).get(staffId);
+  if(!rec) return;
+  const items=rec.items.filter(it=>!it.hasDoc);
+  if(!items.length){ toast('ออกใบครบแล้วทุกงาน','info'); return; }
+  const s=rec.staff;
+  const totalAmt=items.reduce((a,it)=>a+(it.w.amount||0),0);
+  const unpaid=items.filter(it=>it.w.status!=='paid').length;
+  if(unpaid && !confirm(`⚠️ มี ${unpaid} งานที่ยังไม่ได้บันทึกว่าจ่าย\n\nจะออกใบสำคัญจ่ายเลยไหม?\n(ปกติควรกด "บันทึกว่าจ่ายแล้ว" ก่อน)`)) return;
+  const date=new Date().toISOString().split('T')[0];
+  const vNo=nextVoucherNo();
+  toast(`📄 กำลังออกใบ ${items.length} งาน...`,'info');
+  for(const it of items){
+    try{ await saveProjectMerge(it.p.id,(p)=>{
+      const w=(p.workers||[]).find(x=>x.id===it.w.id && x.slot===it.w.slot);
+      if(w) w.voucherNo=vNo;
+    }); }catch(e){}
+  }
+  const saved=getDocsStore('vouchers')||[];
+  saved.push({
+    type:'voucher', docNo:vNo, staffId, staffName:s.name, staffLastName:s.lastName||'', staffNickname:s.nickname,
+    items: items.map(it=>({projId:it.p.id, projName:it.p.name, slot:it.w.slot, amount:it.w.amount||0})),
+    amount: totalAmt, totalAmount: totalAmt, multiItem:true,
+    bank:s.bank||'', account:s.account||'', email:s.email||'',
+    date, note:'ค่าตอบแทนรอบเดือน '+_thaiMonthLabel(monthKey), createdAt:new Date().toISOString(),
+    retro:true, payrollMonth:monthKey,
+  });
+  saveDocsStore('vouchers', saved);
+  logAudit('doc.voucher', s.nickname||s.name, `${vNo} · รอบเดือน ${monthKey} · ${items.length} งาน · ${fmtB(totalAmt)}`);
+  toast(`✅ ออกใบ ${vNo} (${items.length} งาน · ${fmtB(totalAmt)})`,'success');
+  renderPayrollMonth();
+  try{ renderDocsHistory(); }catch(e){}
+  if(s.email && s.email.includes('@')){
+    showVoucherSendModal({ vNo, staff:s, items: items.map(it=>({projName:it.p.name, slot:it.w.slot, amount:it.w.amount||0})), totalAmt, date, note:'ค่าตอบแทนรอบเดือน '+_thaiMonthLabel(monthKey) });
+  } else {
+    toast('ℹ️ คนนี้ไม่มีอีเมล — ดาวน์โหลดใบได้ที่ ประวัติเอกสาร','info');
+  }
+}
+
+// ══════════════════════════════════════════════
 // 🏦 ค่าใช้จ่ายบริษัท + 📄 รายงานการเงิน (เฟส 2 — บรีฟข้อ 3)
 // ══════════════════════════════════════════════
 const COMPANY_EXP_CATS = ['ค่าเช่า/สถานที่','ซอฟต์แวร์/สมัครสมาชิก','อุปกรณ์','การตลาด','เดินทาง','ค่าธรรมเนียม/ภาษี','อื่น ๆ'];
@@ -4187,6 +4398,7 @@ const AUDIT_ACTIONS = {
   'staff.merge':      {icon:'🔗', label:'รวมร่างสมาชิกซ้ำ'},
   'role.change':      {icon:'👑', label:'เปลี่ยนสิทธิ์บัญชี'},
   'doc.wht':          {icon:'🏛️', label:'ออกใบ 50 ทวิ'},
+  'doc.voucher':      {icon:'📄', label:'ออกใบสำคัญจ่าย'},
   'data.restore':     {icon:'⚠️', label:'กู้คืนข้อมูลจากไฟล์'},
   'data.sync':        {icon:'🔄', label:'ซิงค์รายชื่อจากชีท'},
   'brief.edit':       {icon:'📖', label:'แก้บรีฟงาน'},
@@ -6052,7 +6264,7 @@ async function seedDemo(){
 // ══════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════
-const ADMIN_PAGES=['dashboard','track','assign','projects','project-detail','queue','payment-history','profit','staff','staff-detail','docs','calc','payment','settings'];
+const ADMIN_PAGES=['dashboard','track','assign','projects','project-detail','queue','payroll','payment-history','profit','staff','staff-detail','docs','calc','payment','settings'];
 const MANAGER_PAGES=['mgr-home','mgr-projects','mgr-track','mgr-calc','mgr-team'];
 // Manager เข้าถึงหน้า admin บางหน้าได้ (track = ติดตามงาน แต่กรองเฉพาะโปรเจกต์ที่ดูแล)
 const MGR_ALLOWED_ADMIN_PAGES=['track','projects','assign'];
@@ -6069,7 +6281,7 @@ function nav(page){
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
   const renders={
-    dashboard:renderDash,track:renderTrack,assign:renderAssign,projects:renderProjects,profit:renderProfit,staff:renderStaff,'staff-detail':renderStaffDetail,queue:renderQueue,'payment-history':renderPaymentHistory,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
+    dashboard:renderDash,track:renderTrack,assign:renderAssign,projects:renderProjects,profit:renderProfit,staff:renderStaff,'staff-detail':renderStaffDetail,queue:renderQueue,payroll:renderPayrollMonth,'payment-history':renderPaymentHistory,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
     'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar,'confirm-amount':renderConfirmAmountPage,
     'mgr-home':renderMgrHome,'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-team':renderMgrTeam,
     'mgr-calc':()=>renderCalcList('mgr-calc-list',true)
