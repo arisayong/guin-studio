@@ -1503,7 +1503,7 @@ body.sidebar-collapsed .main-content{
   <div id="page-payroll" class="page hidden">
    <div class="page-header">
     <div class="page-title">📆 รอบจ่ายรายเดือน</div>
-    <div class="page-subtitle">รวมงานทั้งเดือนของแต่ละคนไว้ที่เดียว — บันทึกจ่าย ออกใบสำคัญจ่าย และส่งอีเมล จบในคลิกเดียว</div>
+    <div class="page-subtitle">รวมงานทั้งเดือนของแต่ละคนไว้ที่เดียว — บันทึกจ่าย ออกใบสำคัญจ่าย และส่งอีเมล จบในคลิกเดียว · <span style="color:var(--accent2)">นับงานตามเดือนที่รับงาน (วันเริ่มโปรเจกต์)</span></div>
     <div class="page-actions">
      <select id="pr-month" class="form-input form-select" style="width:auto;min-width:150px;padding:7px 30px 7px 12px;font-size:13px" onchange="renderPayrollMonth()"></select>
      <select id="pr-role" class="form-input form-select" style="width:auto;min-width:150px;padding:7px 30px 7px 12px;font-size:13px" onchange="renderPayrollMonth()">
@@ -3925,8 +3925,10 @@ function saveStaffTags(staffId){
 //    แก้ปัญหา: เมเนเจอร์ต้องจ่ายรายคนทุกเดือน แต่งานกระจายอยู่หลายสิบโปรเจกต์
 // ══════════════════════════════════════════════
 const PR_SLOT_LABEL = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', mgr:'🗂️ Manager'};
+// เดือนของงาน = เดือนที่ "รับงาน/เริ่มงาน" (ตามที่ตกลงกับเจ้าของระบบ 2026-08-02)
+//   ลำดับ: วันเริ่มงาน → วันที่ของโปรเจกต์ → วันที่สร้างในระบบ → เดทไลน์ (ท้ายสุด เผื่อของเก่าไม่มีวันเริ่ม)
 function _prProjMonth(p){
-  const d = p.deadline || p.date || p.startDate || (p.createdAt||'').split('T')[0] || '';
+  const d = p.startDate || p.date || (p.createdAt||'').split('T')[0] || p.deadline || '';
   return String(d).slice(0,7);
 }
 // รวบรวมงานของเดือนที่เลือก จัดกลุ่มตามคน
@@ -4079,10 +4081,10 @@ function prDiagnose(staffId){
       อยู่ในมุมมองปัจจุบัน (${_thaiMonthLabel(monthKey)} · ${slotFilter==='all'?'ทุกหมวด':(PR_SLOT_LABEL[slotFilter]||slotFilter)}) <strong style="color:var(--accent2)">${inView.length} รายการ</strong>
     </div>
     ${block('✅ อยู่ในรอบนี้','var(--green)',inView,r=>row(r))}
-    ${block('📅 อยู่เดือนอื่น (เดทไลน์โปรเจกต์คนละเดือน)','var(--orange)',otherMonth,r=>row(r,'เดือน '+(r.pm?_thaiMonthLabel(r.pm):'ไม่ระบุวันที่')))}
+    ${block('📅 อยู่เดือนอื่น (วันเริ่มโปรเจกต์คนละเดือน)','var(--orange)',otherMonth,r=>row(r,'รับงานเดือน '+(r.pm?_thaiMonthLabel(r.pm):'ไม่ระบุวันที่')))}
     ${block('🏷️ อยู่หมวดอื่น (ไม่ตรงกับตัวกรองด้านบน)','#9B6FFF',otherSlot,r=>row(r))}
     <div style="font-size:11.5px;color:var(--text2);margin-top:12px;line-height:1.6;padding-top:10px;border-top:1px solid var(--border2)">
-      💡 การจัดเดือนใช้ <strong>เดทไลน์ของโปรเจกต์</strong> — ถ้างานไหนควรอยู่รอบนี้แต่เดทไลน์เป็นเดือนอื่น ให้แก้เดทไลน์ในหน้ามอบหมายงาน หรือเลือก "👥 ทุกคน" เพื่อดูรวมทุกหมวด
+      💡 การจัดเดือนใช้ <strong>วันเริ่มโปรเจกต์ (วันรับงาน)</strong> — ถ้างานไหนควรอยู่รอบนี้แต่ไปอยู่เดือนอื่น ให้แก้วันเริ่มงานในฟอร์มโปรเจกต์ หรือเลือก "👥 ทุกคน" เพื่อดูรวมทุกหมวด
     </div>`, 640);
 }
 // นับรายการที่อ้างถึงสมาชิกที่ไม่มีใน staff_v3 แล้ว (คนหาย/ถูกรวมร่าง) — ไม่งั้นจะหายเงียบ
