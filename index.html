@@ -4071,19 +4071,104 @@ function openDiscordSetup(){
         <select id="dc-pick-${k}" style="display:none;min-width:130px;padding:7px 8px;background:var(--bg2);border:1px solid var(--accent2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12px"
           onchange="if(this.value)document.getElementById('dc-ch-${k}').value=this.value"></select>
       </div>`).join('')}
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="btn" style="flex:1" onclick="saveDiscordSetup()">💾 บันทึก</button>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn" style="flex:1;min-width:110px" onclick="saveDiscordSetup()">💾 บันทึก</button>
+      <button class="btn btn-outline" onclick="diagnoseDiscordLink()">🩺 ตรวจหาสาเหตุ</button>
       <button class="btn btn-outline" onclick="testDiscordChannels()">🧪 ทดสอบห้อง</button>
     </div>
     <div id="dc-test-result" style="margin-top:10px;font-size:12px;line-height:1.7"></div>`, 600);
 }
+// เก็บค่า URL/รหัสลับที่พิมพ์อยู่บนหน้าจอเข้า config ก่อนใช้งาน
+// (ไม่งั้นต้องกดบันทึกก่อนถึงจะทดสอบได้ ซึ่งงงและไม่จำเป็น)
+async function _dcSyncWorkerFields(){
+  const url=(document.getElementById('dc-worker-url')?.value||'').trim();
+  const secret=(document.getElementById('dc-worker-secret')?.value||'').trim();
+  if(!url||!secret) return false;
+  const cfg=getDiscordCfg();
+  if(cfg.workerUrl!==url || cfg.workerSecret!==secret){
+    cfg.workerUrl=url; cfg.workerSecret=secret; await saveDiscordCfg(cfg);
+  }
+  return true;
+}
+// 🩺 ไล่ตรวจทีละขั้นแล้วบอกว่าติดตรงไหน — กดครั้งเดียวจบ ไม่ต้องเดา
+async function diagnoseDiscordLink(){
+  const el=document.getElementById('dc-test-result'); if(!el) return;
+  const url=(document.getElementById('dc-worker-url')?.value||'').trim();
+  const secret=(document.getElementById('dc-worker-secret')?.value||'').trim();
+  const out=[];
+  const ok=(t)=>out.push(`<div style="color:var(--green)">✅ ${t}</div>`);
+  const bad=(t,fix)=>out.push(`<div style="color:var(--red)">❌ ${t}</div>`+(fix?`<div style="color:var(--text2);font-size:11px;margin:2px 0 6px 18px">→ ${fix}</div>`:''));
+  const show=()=>{ el.innerHTML=out.join(''); };
+  el.innerHTML='⏳ กำลังตรวจ...';
+
+  // 1) รูปแบบ URL
+  if(!url){ bad('ยังไม่ได้กรอก URL ของ Worker','คัดลอกจากหน้า Cloudflare — ต้องขึ้นต้นด้วย https:// และลงท้ายด้วย .workers.dev'); show(); return; }
+  if(!/^https:\/\/.+\.workers\.dev\/?$/.test(url)){
+    bad('รูปแบบ URL ดูไม่ถูก: '+esc(url),'ต้องเป็นแบบ https://ชื่อ.บัญชี.workers.dev (ไม่มี / หรือข้อความต่อท้าย)');
+  } else ok('รูปแบบ URL ถูกต้อง');
+
+  // 2) Worker ตอบไหม + วางโค้ดแล้วหรือยัง + ใส่โทเค็นหรือยัง
+  try{
+    const r=await fetch(url,{method:'GET'});
+    const txt=await r.text();
+    let j=null; try{ j=JSON.parse(txt); }catch(e){}
+    if(!j || j.service!=='Guin Discord Bridge'){
+      bad('Worker ตอบแต่ยังเป็นโค้ดเดิม (ยังไม่ได้วางโค้ดของเรา)',
+          'Cloudflare → Worker → Edit code → ลบโค้ดเดิมทั้งหมด → วาง worker.js → Deploy'
+          +'<br>สิ่งที่ได้รับ: <code style="font-size:10px">'+esc(txt.slice(0,80))+'</code>');
+      show(); return;
+    }
+    ok('Worker ทำงานแล้ว (วางโค้ดถูกต้อง)');
+    if(j.ready) ok('ใส่ DISCORD_TOKEN ใน Worker แล้ว');
+    else { bad('ยังไม่ได้ใส่ DISCORD_TOKEN ใน Worker','Settings → Variables and Secrets → เพิ่มชื่อ <b>DISCORD_TOKEN</b> ค่า=โทเค็นบอท → Deploy'); show(); return; }
+  }catch(e){
+    bad('เปิด URL ไม่ได้เลย','เช็คว่า URL ถูกต้อง และ Worker ยัง Deploy อยู่<br>รายละเอียด: '+esc(e.message));
+    show(); return;
+  }
+
+  // 3) รหัสลับตรงกันไหม
+  if(!secret){ bad('ยังไม่ได้กรอกรหัสลับ','ใส่ค่าเดียวกับ WEB_SECRET ที่ตั้งใน Worker'); show(); return; }
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret,action:'ping'})});
+    const j=await r.json();
+    if(j.ok) ok('รหัสลับตรงกัน');
+    else { bad('รหัสลับไม่ตรง: '+esc(j.error||''),
+      'ใน Cloudflare ต้องมีตัวแปร <b>ชื่อ = WEB_SECRET</b> และ <b>ค่า = รหัสที่พิมพ์ในเว็บ</b> (ห้ามสลับช่อง) แล้วกด Deploy'); show(); return; }
+  }catch(e){ bad('ส่งคำขอไม่สำเร็จ', esc(e.message)); show(); return; }
+
+  // 4) โทเค็นใช้กับ Discord ได้ไหม
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret,action:'discordMe'})});
+    const j=await r.json();
+    if(j.ok) ok('เชื่อมต่อ Discord ได้ — บอทชื่อ '+esc(j.bot?.username||'?'));
+    else { bad('โทเค็นบอทใช้ไม่ได้: '+esc(j.error||''),'รีเซ็ตโทเค็นใหม่ใน Developer Portal แล้วอัปเดต DISCORD_TOKEN ใน Worker → Deploy'); show(); return; }
+  }catch(e){ bad('เรียก Discord ไม่สำเร็จ', esc(e.message)); show(); return; }
+
+  // 5) บอทอยู่เซิร์ฟเวอร์ไหน + เห็นห้องอะไรบ้าง
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret,action:'discordGuilds'})});
+    const j=await r.json();
+    if(j.ok && (j.guilds||[]).length) ok('บอทอยู่ในเซิร์ฟเวอร์: '+j.guilds.map(g=>esc(g.name)).join(', '));
+    else { bad('บอทยังไม่ได้อยู่ในเซิร์ฟเวอร์ไหนเลย','เชิญบอทเข้าเซิร์ฟเวอร์ผ่าน OAuth2 → URL Generator'); show(); return; }
+  }catch(e){ bad('ตรวจเซิร์ฟเวอร์ไม่สำเร็จ', esc(e.message)); show(); return; }
+
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret,action:'discordChannels'})});
+    const j=await r.json();
+    if(j.ok && (j.channels||[]).length){
+      ok('เห็นห้องข้อความ '+j.channels.length+' ห้อง: '+j.channels.slice(0,6).map(c=>'#'+esc(c.name)).join(', '));
+      out.push('<div style="color:var(--green);font-weight:700;margin-top:8px">🎉 พร้อมใช้งานแล้ว — กดปุ่ม 🔍 ดึงรายชื่อห้อง เพื่อเลือกห้องได้เลย</div>');
+    } else bad('บอทมองไม่เห็นห้องข้อความเลย','คลิกขวาที่ห้องใน Discord → แก้ไขแชนแนล → การอนุญาต → เพิ่ม Guin BOT → เปิด ดูแชนแนล + อ่านประวัติข้อความ');
+  }catch(e){ bad('ดึงรายชื่อห้องไม่สำเร็จ', esc(e.message)); }
+  show();
+  // เก็บค่าที่ใช้ได้ไว้เลย
+  try{ await _dcSyncWorkerFields(); }catch(e){}
+}
 // ดึงรายชื่อห้องมาให้เลือก แทนการพิมพ์ ID เอง
 async function loadDiscordChannelList(){
   const el=document.getElementById('dc-test-result');
-  const url=(document.getElementById('dc-worker-url')?.value||'').trim();
-  const secret=(document.getElementById('dc-worker-secret')?.value||'').trim();
-  if(!url||!secret){ if(el) el.innerHTML='<span style="color:var(--orange)">กรอก URL และรหัสลับของ Worker ก่อน</span>'; return; }
-  const cfg=getDiscordCfg(); cfg.workerUrl=url; cfg.workerSecret=secret; await saveDiscordCfg(cfg);
+  if(!await _dcSyncWorkerFields()){
+    if(el) el.innerHTML='<span style="color:var(--orange)">กรอก URL และรหัสลับของ Worker ให้ครบก่อน (2 ช่องบนสุด)</span>'; return; }
   if(el) el.innerHTML='⏳ กำลังดึงรายชื่อห้อง...';
   try{
     const r=await callAppsScript({action:'discordChannels'});
@@ -4111,7 +4196,10 @@ async function saveDiscordSetup(){
   renderAvailability();
 }
 async function testDiscordChannels(){
-  const el=document.getElementById('dc-test-result'); if(el) el.innerHTML='⏳ กำลังทดสอบ...';
+  const el=document.getElementById('dc-test-result');
+  if(!await _dcSyncWorkerFields()){
+    if(el) el.innerHTML='<span style="color:var(--orange)">กรอก URL และรหัสลับของ Worker ให้ครบก่อน (2 ช่องบนสุด)</span>'; return; }
+  if(el) el.innerHTML='⏳ กำลังทดสอบ...';
   const out=[];
   for(const [k,v] of Object.entries(AV_CATS)){
     const id=(document.getElementById('dc-ch-'+k)?.value||'').trim();
