@@ -4023,6 +4023,219 @@ function avShowHistory(staffId){
        :'<div style="font-size:11.5px;color:var(--text2);margin-top:12px">ยังไม่เคยแก้คำตอบ</div>'}`, 520);
 }
 function _isoOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+// ══════════════════════════════════════════════
+// 🐧 เชื่อม Discord ผ่าน Apps Script (ไม่ต้องมีบอทออนไลน์ตลอด · โทเค็นอยู่ฝั่งเซิร์ฟเวอร์)
+// ══════════════════════════════════════════════
+function getDiscordCfg(){ const v=ls('discord_cfg'); return (v&&typeof v==='object')?v:{channels:{}}; }
+async function saveDiscordCfg(v){ ls('discord_cfg',v); await fbSaveKeyed('discord_cfg', v); }
+function _dcChannelOf(cat){ return (getDiscordCfg().channels||{})[cat] || ''; }
+// เรียกตัวกลาง Discord — ใช้ Cloudflare Worker (Apps Script ใช้ไม่ได้ Discord บล็อก)
+async function callAppsScript(payload){
+  const cfg=getDiscordCfg();
+  const url=(cfg.workerUrl||'').trim(), secret=(cfg.workerSecret||'').trim();
+  if(!url||!secret) throw new Error('ยังไม่ได้ตั้งค่าตัวกลาง Discord — กดปุ่ม 🐧 ห้อง Discord แล้วกรอก URL + รหัสลับของ Worker');
+  const res=await fetch(url,{ method:'POST', headers:{'Content-Type':'application/json;charset=utf-8'},
+    body: JSON.stringify({secret, ...payload}) });
+  let data;
+  try{ data=await res.json(); }
+  catch(e){ throw new Error('ตัวกลางตอบกลับผิดรูปแบบ (HTTP '+res.status+') — เช็คว่า URL ถูกต้องและ Deploy โค้ดแล้ว'); }
+  if(!data.ok) throw new Error(data.error||'ไม่ทราบสาเหตุ');
+  return data;
+}
+// ตั้งค่า ID ห้องต่อทีม
+function openDiscordSetup(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const cfg=getDiscordCfg();
+  _tagOverlayShow('🐧 ตั้งค่า Discord', `
+    <div style="font-size:12px;font-weight:700;margin-bottom:5px">1. ตัวกลางเชื่อม Discord (Cloudflare Worker)</div>
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:8px">
+      ตั้งค่าครั้งเดียว · ดูวิธีทำในไฟล์ <strong>วิธีติดตั้ง Cloudflare Worker.md</strong>
+    </div>
+    <input id="dc-worker-url" value="${esc(cfg.workerUrl||'')}" placeholder="https://guin-discord.xxx.workers.dev"
+      style="width:100%;padding:8px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box;margin-bottom:6px">
+    <input id="dc-worker-secret" type="password" value="${esc(cfg.workerSecret||'')}" placeholder="รหัสลับ (ค่าเดียวกับ WEB_SECRET ใน Worker)"
+      style="width:100%;padding:8px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box">
+
+    <div style="font-size:12px;font-weight:700;margin:14px 0 5px;padding-top:12px;border-top:1px solid var(--border2)">2. ห้องลงคิวของแต่ละทีม</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <button class="btn btn-sm btn-outline" onclick="loadDiscordChannelList()">🔍 ดึงรายชื่อห้องจาก Discord</button>
+      <span style="font-size:11px;color:var(--text2);align-self:center">แนะนำให้ใช้ปุ่มนี้ จะได้ไม่ต้องพิมพ์ ID เอง</span>
+    </div>
+    ${Object.entries(AV_CATS).map(([k,v])=>`
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:7px">
+        <div style="width:118px;font-size:12.5px;flex-shrink:0">${v.icon} ${esc(v.label)}</div>
+        <input id="dc-ch-${k}" value="${esc((cfg.channels||{})[k]||'')}" placeholder="ID ห้อง หรือกดปุ่มดึงรายชื่อด้านบน"
+          style="flex:1;min-width:0;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px">
+        <select id="dc-pick-${k}" style="display:none;min-width:130px;padding:7px 8px;background:var(--bg2);border:1px solid var(--accent2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12px"
+          onchange="if(this.value)document.getElementById('dc-ch-${k}').value=this.value"></select>
+      </div>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn" style="flex:1" onclick="saveDiscordSetup()">💾 บันทึก</button>
+      <button class="btn btn-outline" onclick="testDiscordChannels()">🧪 ทดสอบห้อง</button>
+    </div>
+    <div id="dc-test-result" style="margin-top:10px;font-size:12px;line-height:1.7"></div>`, 600);
+}
+// ดึงรายชื่อห้องมาให้เลือก แทนการพิมพ์ ID เอง
+async function loadDiscordChannelList(){
+  const el=document.getElementById('dc-test-result');
+  const url=(document.getElementById('dc-worker-url')?.value||'').trim();
+  const secret=(document.getElementById('dc-worker-secret')?.value||'').trim();
+  if(!url||!secret){ if(el) el.innerHTML='<span style="color:var(--orange)">กรอก URL และรหัสลับของ Worker ก่อน</span>'; return; }
+  const cfg=getDiscordCfg(); cfg.workerUrl=url; cfg.workerSecret=secret; await saveDiscordCfg(cfg);
+  if(el) el.innerHTML='⏳ กำลังดึงรายชื่อห้อง...';
+  try{
+    const r=await callAppsScript({action:'discordChannels'});
+    const chs=r.channels||[];
+    if(!chs.length){ if(el) el.innerHTML='<span style="color:var(--orange)">บอทมองไม่เห็นห้องข้อความเลย — เปิดสิทธิ์ให้บอทในห้องก่อน</span>'; return; }
+    Object.keys(AV_CATS).forEach(k=>{
+      const sel=document.getElementById('dc-pick-'+k); if(!sel) return;
+      sel.style.display='';
+      sel.innerHTML='<option value="">— เลือกห้อง —</option>'+chs.map(c=>`<option value="${esc(c.id)}">#${esc(c.name)}</option>`).join('');
+    });
+    if(el) el.innerHTML=`<span style="color:var(--green)">✅ พบ ${chs.length} ห้อง — เลือกจากช่องขวาของแต่ละทีมได้เลย</span>`;
+  }catch(e){ if(el) el.innerHTML='<span style="color:var(--red)">❌ '+esc(e.message)+'</span>'; }
+}
+async function saveDiscordSetup(){
+  const cfg=getDiscordCfg();
+  cfg.workerUrl=(document.getElementById('dc-worker-url')?.value||'').trim();
+  cfg.workerSecret=(document.getElementById('dc-worker-secret')?.value||'').trim();
+  cfg.channels=cfg.channels||{};
+  Object.keys(AV_CATS).forEach(k=>{
+    const v=(document.getElementById('dc-ch-'+k)?.value||'').trim();
+    if(v) cfg.channels[k]=v; else delete cfg.channels[k];
+  });
+  await saveDiscordCfg(cfg);
+  toast('บันทึกแล้ว ✅','success');
+  renderAvailability();
+}
+async function testDiscordChannels(){
+  const el=document.getElementById('dc-test-result'); if(el) el.innerHTML='⏳ กำลังทดสอบ...';
+  const out=[];
+  for(const [k,v] of Object.entries(AV_CATS)){
+    const id=(document.getElementById('dc-ch-'+k)?.value||'').trim();
+    if(!id) continue;
+    try{
+      const r=await callAppsScript({action:'discordChannel', channelId:id});
+      out.push(`<div style="color:var(--green)">✅ ${v.icon} ${esc(v.label)} → #${esc(r.channel.name||'?')}</div>`);
+    }catch(e){
+      out.push(`<div style="color:var(--red)">❌ ${v.icon} ${esc(v.label)} → ${esc(e.message)}</div>`);
+    }
+  }
+  if(el) el.innerHTML = out.length?out.join(''):'<span style="color:var(--text2)">ยังไม่ได้ใส่ ID ห้องเลย</span>';
+}
+// ── จับคู่ชื่อ Discord กับทะเบียนทีม ──
+//    ชื่อใน Discord มักมีสร้อยโรล เช่น "ปอ พากย์ หญิง" / "คริส.พาร์ก/หญิง" → ตัดออกก่อนเทียบ
+function _dcCleanName(s){
+  return String(s||'')
+    .replace(/[\[\(（].*?[\]\)）]/g,' ')                       // ตัดวงเล็บ
+    .replace(/พากย์|นักพากย์|มิกซ์|ซับ|บท|เมเนเจอร์|QC|Mix|Sub|Dub/gi,' ')
+    .replace(/ชาย|หญิง|male|female/gi,' ')
+    .replace(/[\/|.·•\-_]+/g,' ')
+    .replace(/\s+/g,' ').trim().toLowerCase();
+}
+function matchStaffByDiscord(msg){
+  const all=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s&&s.id&&isStaffAssignable(s));
+  // 1) เคยผูกไว้แล้ว → ใช้เลย แม่นที่สุด
+  const byId=all.find(s=>s.discordId && s.discordId===msg.authorId);
+  if(byId) return {staff:byId, how:'linked'};
+  const clean=_dcCleanName(msg.displayName||msg.username);
+  if(!clean) return {staff:null, how:'none'};
+  const cand=[];
+  all.forEach(s=>{
+    const nick=_dcCleanName(s.nickname), name=_dcCleanName(s.name);
+    if(!nick && !name) return;
+    if(nick && (clean===nick || clean.startsWith(nick+' ') || clean.split(' ').includes(nick))) cand.push({s,score:3});
+    else if(name && clean===name) cand.push({s,score:2});
+    else if(nick && nick.length>=3 && clean.includes(nick)) cand.push({s,score:1});
+  });
+  if(!cand.length) return {staff:null, how:'none'};
+  cand.sort((a,b)=>b.score-a.score);
+  // ถ้าคะแนนสูงสุดเสมอกันหลายคน = ชื่อซ้ำ ไม่เดา ให้แอดมินเลือกเอง
+  const top=cand.filter(c=>c.score===cand[0].score);
+  if(top.length>1) return {staff:null, how:'ambiguous', options:top.map(c=>c.s)};
+  return {staff:top[0].s, how:'name'};
+}
+async function linkDiscordUser(staffId, discordId, discordName){
+  _updateStaffRecords(staffId, s=>{ s.discordId=discordId; s.discordName=discordName||''; });
+  const s=getStaffById(staffId);
+  logAudit('staff.edit', s?(s.nickname||s.name):staffId, 'ผูกบัญชี Discord: '+(discordName||discordId));
+  toast('ผูกบัญชีแล้ว ✅ ครั้งหน้าระบบจะจำเอง','success');
+  await pullFromDiscord(true);
+}
+// ── โพสประกาศลงห้อง ──
+async function postRoundToDiscord(){
+  const r=getRound(_avRoundId); if(!r) return;
+  const chId=_dcChannelOf(r.cat);
+  if(!chId){ toast('ยังไม่ได้ตั้ง ID ห้องของทีมนี้','error'); openDiscordSetup(); return; }
+  const text=roundAnnounceText(r);
+  if(!confirm(`โพสประกาศลงห้อง Discord ของ${(AV_CATS[r.cat]||{}).label||''}?\n\n${text.slice(0,300)}`)) return;
+  showLoader(true);
+  try{
+    const res=await callAppsScript({action:'discordPost', channelId:chId, content:text});
+    const list=getRounds(); const rr=list.find(x=>x.id===r.id);
+    if(rr){ rr.channelId=chId; rr.postedMessageId=res.messageId; rr.postedAt=new Date().toISOString(); await saveRounds(list); }
+    logAudit('recruit.round',(AV_CATS[r.cat]||{}).label||r.cat,'โพสประกาศลง Discord');
+    toast('📤 โพสแล้ว — รอทีมตอบ แล้วกด "ดึงคำตอบ"','success');
+    renderAvailability();
+  }catch(e){ toast('โพสไม่สำเร็จ: '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+// ── ดึงคำตอบจากห้อง ──
+async function pullFromDiscord(silent){
+  const r=getRound(_avRoundId); if(!r) return;
+  const chId=r.channelId || _dcChannelOf(r.cat);
+  if(!chId){ if(!silent){ toast('ยังไม่ได้ตั้ง ID ห้องของทีมนี้','error'); openDiscordSetup(); } return; }
+  if(!silent) showLoader(true);
+  try{
+    const res=await callAppsScript({action:'discordFetch', channelId:chId, afterId:r.postedMessageId||'', limit:100});
+    const msgs=res.messages||[];
+    const unmatched=[];
+    let n=0;
+    // ข้อความใหม่กว่าทับข้อความเก่าของคนเดียวกัน (เรียงเวลามาแล้วจาก Apps Script)
+    for(const m of msgs){
+      if(!String(m.content||'').trim()) continue;
+      const match=matchStaffByDiscord(m);
+      if(match.staff){
+        await saveRoundReply(r.id, match.staff.id, {
+          freeText:m.content.trim(), discordName:m.displayName||m.username, source:'discord' });
+        n++;
+      } else {
+        unmatched.push({...m, options: match.options||[]});
+      }
+    }
+    // เก็บคนที่จับคู่ไม่ได้ไว้ให้แอดมินกดผูก
+    const list=getRounds(); const rr=list.find(x=>x.id===r.id);
+    if(rr){ rr.unmatched=unmatched.slice(-30); rr.pulledAt=new Date().toISOString(); await saveRounds(list); }
+    if(!silent) toast(`🔄 ดึงมา ${msgs.length} ข้อความ · จับคู่ได้ ${n} คน${unmatched.length?' · ผูกชื่อไม่ได้ '+unmatched.length:''}`, unmatched.length?'warn':'success');
+    renderAvailability();
+  }catch(e){ if(!silent) toast('ดึงไม่สำเร็จ: '+e.message,'error'); }
+  finally{ if(!silent) showLoader(false); }
+}
+// กล่องรายชื่อที่ผูกไม่ได้
+function _dcUnmatchedHTML(r){
+  const un=(r.unmatched||[]);
+  if(!un.length) return '';
+  const all=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s&&s.id&&isStaffAssignable(s));
+  const seen=new Set(); const opts=all.filter(s=>{ if(seen.has(s.id))return false; seen.add(s.id); return true; })
+    .sort((a,b)=>String(a.nickname||a.name||'').localeCompare(String(b.nickname||b.name||''),'th'));
+  return `<div class="card" style="margin-bottom:12px;border-left:3px solid var(--orange)">
+    <div style="font-size:13px;font-weight:800;color:var(--orange)">🔗 ยังผูกชื่อไม่ได้ (${un.length})</div>
+    <div style="font-size:11.5px;color:var(--text2);margin:3px 0 9px">คนเหล่านี้ตอบใน Discord แต่ระบบเทียบกับทะเบียนทีมไม่ได้ — เลือกว่าเป็นใคร <strong>ผูกครั้งเดียวจำตลอด</strong></div>
+    ${un.map((m,i)=>`
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--border2)">
+        <div style="flex:1;min-width:170px">
+          <div style="font-size:12.5px;font-weight:700">${esc(m.displayName||m.username||'?')}</div>
+          <div style="font-size:11px;color:var(--text2)">${esc(String(m.content||'').slice(0,90))}</div>
+        </div>
+        <select id="dc-un-${i}" style="min-width:150px;padding:6px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px">
+          <option value="">— เลือกคนในทีม —</option>
+          ${opts.map(s=>`<option value="${esc(s.id)}"${(m.options||[]).some(o=>o.id===s.id)?' selected':''}>${esc(s.nickname||s.name)}${s.name&&s.nickname?' · '+esc(s.name):''}</option>`).join('')}
+        </select>
+        <button class="btn btn-sm" onclick="linkDiscordUser(document.getElementById('dc-un-${i}').value,'${escJs(m.authorId)}','${escJs(m.displayName||m.username)}')">🔗 ผูก</button>
+      </div>`).join('')}
+  </div>`;
+}
 // ช่วงวันของรอบ → รายการวันจริง (ไม่เกิน 45 วัน กันหลุด)
 function _roundDays(r){
   const out=[]; if(!r||!r.dateFrom) return out;
@@ -4124,6 +4337,15 @@ function _raCopy(){
   el.select();
   try{ navigator.clipboard.writeText(el.value); toast('📋 คัดลอกแล้ว','success'); }
   catch(e){ try{ document.execCommand('copy'); toast('📋 คัดลอกแล้ว','success'); }catch(_){ toast('กด Ctrl+C เพื่อคัดลอก','info'); } }
+}
+// ยกเลิกการผูกกับโพสเดิม — ใช้ตอนโพสผิดห้อง หรืออยากโพสใหม่
+async function resetRoundPost(){
+  const list=getRounds(); const r=list.find(x=>x.id===_avRoundId); if(!r) return;
+  if(!confirm('ยกเลิกการผูกกับโพสเดิมในดิสคอร์ด?\n\nคำตอบที่ดึงมาแล้วยังอยู่ครบ — แค่ให้กดโพสใหม่ได้อีกครั้ง\n(ใช้ตอนโพสผิดห้อง หรือเปลี่ยน ID ห้อง)')) return;
+  delete r.postedMessageId; delete r.channelId; delete r.unmatched;
+  await saveRounds(list);
+  toast('ยกเลิกแล้ว — กดโพสใหม่ได้เลย','success');
+  renderAvailability();
 }
 async function closeRound(roundId){
   const list=getRounds(); const r=list.find(x=>x.id===roundId); if(!r) return;
@@ -4232,6 +4454,7 @@ function renderAvailability(){
           ${r.status==='closed'?'<span style="font-size:10px;background:rgba(150,150,150,.2);color:var(--text2);padding:2px 8px;border-radius:8px;font-weight:700;margin-left:4px">ปิดแล้ว</span>':'<span style="font-size:10px;background:rgba(0,223,160,.16);color:var(--green);padding:2px 8px;border-radius:8px;font-weight:700;margin-left:4px">เปิดรับ</span>'}
         </div>
         ${r.note?`<div style="font-size:11px;color:var(--text2);margin-top:3px">${esc(r.note)}</div>`:''}
+        ${r.postedMessageId?`<div style="font-size:10.5px;color:var(--text2);margin-top:3px">📤 โพสลง Discord แล้ว${r.pulledAt?' · ดึงคำตอบล่าสุด '+_logWhen(r.pulledAt):' · ยังไม่เคยดึงคำตอบ'}</div>`:''}
       </div>
       <div style="padding:11px 15px;background:var(--bg2);border-radius:11px;min-width:170px">
         <div style="font-size:10.5px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">ตอบรับแล้ว</div>
@@ -4239,6 +4462,13 @@ function renderAvailability(){
         ${nCancel?`<div style="font-size:10.5px;color:var(--red);margin-top:2px">❌ แจ้งไม่สะดวก ${nCancel} คน</div>`:''}
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${_dcChannelOf(r.cat)
+          ? (r.postedMessageId
+              ? `<button class="btn btn-sm" style="background:var(--accent2);border:none;color:#fff;font-weight:700" onclick="pullFromDiscord()">🔄 ดึงคำตอบจาก Discord</button>`
+              : `<button class="btn btn-sm" style="background:#5865F2;border:none;color:#fff;font-weight:700" onclick="postRoundToDiscord()">📤 โพสประกาศลง Discord</button>`)
+          : `<button class="btn btn-sm btn-outline" onclick="openDiscordSetup()" title="ตั้ง ID ห้องก่อนจึงจะโพส/ดึงได้">🐧 ตั้งค่าห้อง Discord</button>`}
+        ${r.postedMessageId?`<button class="btn btn-sm btn-outline" onclick="resetRoundPost()" title="ยกเลิกการผูกกับโพสเดิม เพื่อโพสใหม่/เปลี่ยนห้อง">↩️ โพสใหม่</button>`:''}
+        <button class="btn btn-sm btn-outline" onclick="openDiscordSetup()" title="แก้ ID ห้อง Discord">🐧 ห้อง Discord</button>
         <button class="btn btn-sm btn-outline" onclick="showRoundAnnounce('${escJs(r.id)}')">📢 ข้อความประกาศ</button>
         <button class="btn btn-sm btn-outline" onclick="avCopyForChat()">📋 คัดลอกสรุป</button>
         <button class="btn btn-sm btn-outline" onclick="closeRound('${escJs(r.id)}')">${r.status==='open'?'🔒 ปิดรอบ':'🔓 เปิดอีกครั้ง'}</button>
@@ -4302,7 +4532,7 @@ function renderAvailability(){
       </td>
     </tr>`;
   }).join('');
-  tblEl.innerHTML=`<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:940px">
+  tblEl.innerHTML=_dcUnmatchedHTML(r)+`<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:940px">
     <thead><tr>${th('ชื่อ','160px')}${th('ที่ตอบมา (คำต่อคำ)')}${th('โน้ต')}${th('งานที่ถืออยู่ (ดึงอัตโนมัติ)')}${th('')}</tr></thead>
     <tbody>${rows}</tbody></table></div>`;
 }
@@ -6891,7 +7121,8 @@ async function enterApp(){
   try { await loadCalcDraftsFromFirebase(); } catch(e) {}
   try { await loadMgrRequests(); await loadManagerUsers(); await loadMgrSuspended(); await loadTeamLeft(); } catch(e) {}
   try { await fbLoadKeyed('tags_master'); await fbLoadKeyed('brief_templates'); await fbLoadKeyed('company_expenses');
-        await fbLoadKeyed('payroll_profiles'); await fbLoadKeyed('payroll_runs'); } catch(e) {}
+        await fbLoadKeyed('payroll_profiles'); await fbLoadKeyed('payroll_runs');
+        await fbLoadKeyed('recruit_rounds'); await fbLoadKeyed('discord_cfg'); } catch(e) {}
   try { logLogin(); startIdleWatch(); } catch(e) {}
   // Load tracking cards from Firebase
   try {
