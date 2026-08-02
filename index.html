@@ -1509,6 +1509,7 @@ body.sidebar-collapsed .main-content{
     <div class="page-actions">
      <select id="av-round" class="form-input form-select" style="width:auto;min-width:230px;padding:7px 30px 7px 12px;font-size:13px" onchange="avSelectRound(this.value)"></select>
      <input id="av-search" class="form-input" placeholder="🔍 ค้นหาชื่อ" style="width:auto;min-width:130px;padding:7px 12px;font-size:13px" oninput="renderAvailability()">
+     <button class="btn btn-outline" onclick="openDiscordSetup()" title="เชื่อมกับ Discord — ตั้งค่าครั้งเดียว">🐧 ตั้งค่า Discord</button>
      <button class="btn btn-blue" onclick="openNewRound()">➕ เปิดรอบขอคิว</button>
     </div>
    </div>
@@ -4422,8 +4423,18 @@ function renderAvailability(){
   const r=getRound(_avRoundId);
   if(!r){
     if(headEl) headEl.innerHTML='';
-    if(tblEl) tblEl.innerHTML=`<div style="text-align:center;padding:48px;color:var(--text2)">
-      ยังไม่มีรอบขอคิว<br><button class="btn" style="margin-top:14px" onclick="openNewRound()">➕ เปิดรอบขอคิวแรก</button></div>`;
+    const dcOk=!!(getDiscordCfg().workerUrl||'').trim();
+    if(tblEl) tblEl.innerHTML=`<div style="text-align:center;padding:44px 20px;color:var(--text2)">
+      ยังไม่มีรอบขอคิว
+      <div style="display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-top:16px">
+        <button class="btn" onclick="openNewRound()">➕ เปิดรอบขอคิวแรก</button>
+        <button class="btn btn-outline" onclick="openDiscordSetup()">🐧 ${dcOk?'แก้':'ตั้งค่า'}การเชื่อมต่อ Discord</button>
+      </div>
+      <div style="font-size:11.5px;margin-top:14px;line-height:1.7">
+        ${dcOk
+          ? '✅ เชื่อมต่อ Discord ไว้แล้ว — เปิดรอบได้เลย'
+          : 'ยังไม่ได้เชื่อมกับ Discord — จะกรอกคำตอบเองก็ได้ หรือกดตั้งค่าเพื่อให้ระบบโพส/ดึงคำตอบให้อัตโนมัติ'}
+      </div></div>`;
     return;
   }
   const days=_roundDays(r);
