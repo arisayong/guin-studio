@@ -1131,11 +1131,11 @@ body.sidebar-collapsed .main-content{
    <div class="nav-item" onclick="nav('assign')"><span class="nav-icon">📋</span><span>มอบหมายงาน</span></div>
    <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span><span class="nav-badge hidden" id="deadline-badge">0</span></div>
    <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
+   <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">📌</span><span>ลงคิว</span></div>
+   <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
    <div class="nav-section">การเงิน</div>
    <div class="nav-item" onclick="nav('queue')"><span class="nav-icon">💸</span><span>คิวจ่ายเงิน</span><span class="nav-badge hidden" id="queue-badge">0</span></div>
    <div class="nav-item" onclick="nav('payroll')"><span class="nav-icon">📆</span><span>รอบจ่ายรายเดือน</span></div>
-   <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">🗓️</span><span>รอบขอคิว</span></div>
-   <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
    <div class="nav-item" onclick="nav('payment-history')"><span class="nav-icon">📜</span><span>ประวัติการจ่ายเงิน</span></div>
    <div class="nav-item" onclick="nav('profit')"><span class="nav-icon">📊</span><span>กำไร-ขาดทุน</span></div>
    <div class="nav-item" onclick="nav('docs')"><span class="nav-icon">🗂️</span><span>เอกสาร</span></div>
@@ -1158,9 +1158,9 @@ body.sidebar-collapsed .main-content{
    <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
    <div class="nav-item" onclick="nav('mgr-calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
-   <div class="nav-item" onclick="nav('confirm-amount')"><span class="nav-icon">📥</span><span>ยืนยันยอด</span><span class="nav-badge hidden" id="ca-badge-mgr">0</span></div>
-   <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">🗓️</span><span>รอบขอคิว</span></div>
+   <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">📌</span><span>ลงคิว</span></div>
    <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
+   <div class="nav-item" onclick="nav('confirm-amount')"><span class="nav-icon">📥</span><span>ยืนยันยอด</span><span class="nav-badge hidden" id="ca-badge-mgr">0</span></div>
    <div class="nav-item" onclick="nav('mgr-team')"><span class="nav-icon">👥</span><span>จัดการทีม</span></div>
   </nav>
  </aside>
@@ -1506,8 +1506,8 @@ body.sidebar-collapsed .main-content{
   <!-- ── 🗓️ คิวว่างรายสัปดาห์ (แทนชีทลงคิว — เฟส 4) ── -->
   <div id="page-availability" class="page hidden">
    <div class="page-header">
-    <div class="page-title">🗓️ รอบขอคิว</div>
-    <div class="page-subtitle">เปิดรอบขอคิว → โพสใน Discord → รวบรวมคนที่ตอบรับ · <span style="color:var(--accent2)">งานที่ถืออยู่ดึงจากระบบให้อัตโนมัติ</span></div>
+    <div class="page-title">📌 ลงคิว</div>
+    <div class="page-subtitle">เปิดรอบลงคิว → โพสใน Discord → รวบรวมคนที่ตอบรับ · <span style="color:var(--accent2)">งานที่ถืออยู่ดึงจากระบบให้อัตโนมัติ</span></div>
     <div class="page-actions">
      <select id="av-round" class="form-input form-select" style="width:auto;min-width:230px;padding:7px 30px 7px 12px;font-size:13px" onchange="avSelectRound(this.value)"></select>
      <input id="av-search" class="form-input" placeholder="🔍 ค้นหาชื่อ" style="width:auto;min-width:130px;padding:7px 12px;font-size:13px" oninput="renderAvailability()">
@@ -1526,7 +1526,7 @@ body.sidebar-collapsed .main-content{
     <div class="page-subtitle">ลากคนที่ตอบรับใน Discord เข้าโปรเจกต์ · แอดมิน/เมเนเจอร์เห็นกระดานเดียวกันแบบเรียลไทม์ · ยืนยันทีละโปรเจกต์แล้วใส่ราคาต่อได้เลย</div>
     <div class="page-actions">
      <input id="alc-proj-search" class="form-input" placeholder="🔍 ค้นหาโปรเจกต์" style="width:auto;min-width:150px;padding:7px 12px;font-size:13px" oninput="renderAlloc()">
-     <button class="btn btn-outline" onclick="nav('availability')" title="เปิดรอบ/โพสประกาศ/ผูกชื่อ Discord ที่หน้ารอบขอคิว">🗓️ ไปหน้ารอบขอคิว</button>
+     <button class="btn btn-outline" onclick="nav('availability')" title="เปิดรอบ/โพสประกาศ/ผูกชื่อ Discord ที่หน้าลงคิว">📌 ไปหน้าลงคิว</button>
      <button class="btn btn-outline" onclick="alcPullAll()" title="ดึงข้อความตอบรับล่าสุดจาก Discord ของทุกรอบที่เปิดอยู่">🔄 ดึงคำตอบล่าสุด</button>
      <button class="btn btn-blue" onclick="openNewProject()">＋ สร้างโปรเจกต์ใหม่</button>
     </div>
@@ -4363,7 +4363,7 @@ async function postRoundToDiscord(){
   const r=getRound(_avRoundId); if(!r) return;
   const chId=_dcChannelOf(r.cat);
   if(!chId){ toast('ยังไม่ได้ตั้ง ID ห้องของทีมนี้','error'); openDiscordSetup(); return; }
-  const text=roundAnnounceText(r);
+  const text=r.announceText||roundAnnounceText(r);
   if(!confirm(`โพสประกาศลงห้อง Discord ของ${(AV_CATS[r.cat]||{}).label||''}?\n\n${text.slice(0,300)}`)) return;
   showLoader(true);
   try{
@@ -4544,7 +4544,7 @@ function openAnnounceTplEditor(roundId){
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="btn btn-green" style="flex:1" onclick="saveAnnounceTplEditor('${roundId||''}')">💾 บันทึกเทมเพลต</button>
       <button class="btn btn-outline" onclick="resetAnnounceTpl('${roundId||''}')">↩️ คืนค่าเริ่มต้น</button>
-      <button class="btn btn-outline" onclick="${roundId?`showRoundAnnounce('${roundId}')`:`document.getElementById('tag-overlay')?.remove()`}">ยกเลิก</button>
+      <button class="btn btn-outline" onclick="${roundId==='NR'?`openNewRound()`:roundId?`showRoundAnnounce('${roundId}')`:`document.getElementById('tag-overlay')?.remove()`}">ยกเลิก</button>
     </div>`, 660);
 }
 async function saveAnnounceTplEditor(roundId){
@@ -4559,7 +4559,9 @@ async function saveAnnounceTplEditor(roundId){
   });
   await saveDiscordCfg(cfg);
   toast('💾 บันทึกเทมเพลตแล้ว — ใช้กับทุกรอบต่อจากนี้','success');
-  if(roundId) showRoundAnnounce(roundId); else document.getElementById('tag-overlay')?.remove();
+  if(roundId==='NR') openNewRound();
+  else if(roundId) showRoundAnnounce(roundId);
+  else document.getElementById('tag-overlay')?.remove();
 }
 async function resetAnnounceTpl(roundId){
   if(!confirm('คืนเทมเพลตทั้งสองสำนวนกลับค่าเริ่มต้น?')) return;
@@ -4572,32 +4574,56 @@ function openNewRound(){
   if(role!=='admin'&&role!=='manager'){ toast('เฉพาะแอดมิน/เมเนเจอร์','error'); return; }
   const today=new Date();
   const nextWeek=new Date(today); nextWeek.setDate(today.getDate()+6);
-  _tagOverlayShow('➕ เปิดรอบขอคิวใหม่', `
+  const g=getAnnounceGender();
+  _tagOverlayShow('➕ เปิดรอบลงคิว', `
     <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:12px">
-      กำหนดช่วงวันที่ต้องการขอคิว แล้วระบบจะสร้างข้อความประกาศให้คัดลอกไปโพสใน Discord ได้เลย
+      เลือกทีม + ช่วงวัน แล้วข้อความประกาศด้านล่างจะเติมให้เองจากเทมเพลต — เสร็จแล้วคัดลอกหรือโพสลง Discord ได้เลย
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
       <div style="flex:1;min-width:150px">
         <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:3px">ขอคิวจากทีม</div>
-        <select id="nr-cat" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+        <select id="nr-cat" onchange="_nrRefreshPreview()" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
           ${Object.entries(AV_CATS).map(([k,v])=>`<option value="${k}"${k==='dubbing'?' selected':''}>${v.icon} ${v.label}</option>`).join('')}
         </select>
       </div>
       <div style="min-width:145px">
         <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:3px">ตั้งแต่วันที่</div>
-        <input id="nr-from" type="date" value="${_isoOf(today)}" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+        <input id="nr-from" type="date" value="${_isoOf(today)}" onchange="_nrRefreshPreview()" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
       </div>
       <div style="min-width:145px">
         <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:3px">ถึงวันที่</div>
-        <input id="nr-to" type="date" value="${_isoOf(nextWeek)}" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+        <input id="nr-to" type="date" value="${_isoOf(nextWeek)}" onchange="_nrRefreshPreview()" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
       </div>
     </div>
     <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:3px">รายละเอียดเพิ่มเติม (ไม่บังคับ)</div>
-    <textarea id="nr-note" rows="3" placeholder="เช่น จะมีงานแนว Anime ญี่ปุ่น/จีน เข้ามา" style="width:100%;padding:8px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px;resize:vertical;box-sizing:border-box"></textarea>
-    <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin:10px 0;cursor:pointer">
-      <input type="checkbox" id="nr-nda" checked> ถามด้วยว่าสะดวกเซ็น NDA ไหม
+    <textarea id="nr-note" rows="2" placeholder="เช่น จะมีงานแนว Anime ญี่ปุ่น/จีน เข้ามา" oninput="_nrRefreshPreview()" style="width:100%;padding:8px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px;resize:vertical;box-sizing:border-box"></textarea>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin:8px 0;cursor:pointer">
+      <input type="checkbox" id="nr-nda" checked onchange="_nrRefreshPreview()"> ถามด้วยว่าสะดวกเซ็น NDA ไหม
     </label>
-    <button class="btn" style="width:100%" onclick="createRound()">✅ เปิดรอบและสร้างข้อความประกาศ</button>`, 580);
+    <div style="display:flex;gap:12px;align-items:center;margin:10px 0 6px;flex-wrap:wrap;font-size:12.5px;padding-top:10px;border-top:1px solid var(--border2)">
+      <span style="font-weight:700">📢 ข้อความประกาศ · สำนวน:</span>
+      <label style="cursor:pointer"><input type="radio" name="nr-g" value="female" ${g==='female'?'checked':''} onchange="ls('announcegender','female');_nrRefreshPreview(true)"> 👩 หญิง (ค่ะ/ค่า)</label>
+      <label style="cursor:pointer"><input type="radio" name="nr-g" value="male" ${g==='male'?'checked':''} onchange="ls('announcegender','male');_nrRefreshPreview(true)"> 👨 ชาย (ครับ)</label>
+      <button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="openAnnounceTplEditor('NR')">⚙️ แก้เทมเพลต & แท็ก</button>
+    </div>
+    <textarea id="nr-preview" rows="7" oninput="this.dataset.dirty='1'" style="width:100%;padding:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px;line-height:1.6;resize:vertical;box-sizing:border-box"></textarea>
+    <div style="font-size:10.5px;color:var(--text2);margin:5px 0 10px;line-height:1.6">ระบบเติมวันที่/แท็กให้เองเมื่อเปลี่ยนทีมหรือช่วงวัน · พิมพ์แก้ในกล่องได้เลย ข้อความที่แก้จะถูกใช้เป็นประกาศของรอบนี้</div>
+    <button class="btn" style="width:100%" onclick="createRound()">✅ เปิดรอบและใช้ข้อความประกาศนี้</button>`, 640);
+  _nrRefreshPreview(true);
+}
+// สร้าง object รอบชั่วคราวจากค่าในฟอร์ม เพื่อพรีวิวข้อความประกาศ
+function _nrPreviewRound(){
+  return { cat:document.getElementById('nr-cat')?.value||'dubbing',
+    dateFrom:document.getElementById('nr-from')?.value||'', dateTo:document.getElementById('nr-to')?.value||'',
+    note:(document.getElementById('nr-note')?.value||'').trim(), nda:!!document.getElementById('nr-nda')?.checked };
+}
+// อัปเดตพรีวิว — ถ้าผู้ใช้พิมพ์แก้เองแล้ว (dirty) จะไม่เขียนทับ เว้นแต่สลับสำนวน (force)
+function _nrRefreshPreview(force){
+  const el=document.getElementById('nr-preview'); if(!el) return;
+  if(el.dataset.dirty==='1' && !force) return;
+  const gg=document.querySelector('input[name=nr-g]:checked')?.value||getAnnounceGender();
+  el.value=roundAnnounceText(_nrPreviewRound(), gg);
+  el.dataset.dirty='0';
 }
 async function createRound(){
   const from=document.getElementById('nr-from')?.value;
@@ -4613,6 +4639,10 @@ async function createRound(){
     status:'open', createdAt:new Date().toISOString(),
     createdBy:currentUser?.nickname||currentUser?.email||'',
   };
+  // ถ้าพิมพ์แก้ข้อความประกาศเองในป็อบอัพ → เก็บไว้เป็นประกาศเฉพาะรอบนี้
+  const pv=document.getElementById('nr-preview');
+  const pvTxt=String(pv?pv.value:'').trim();
+  if(pvTxt && pvTxt!==roundAnnounceText(r)) r.announceText=pvTxt;
   const list=getRounds(); list.unshift(r); await saveRounds(list);
   _avRoundId=r.id;
   logAudit('recruit.round', (AV_CATS[r.cat]||{}).label||r.cat, 'ขอคิว '+_roundRangeLabel(r));
@@ -4624,7 +4654,7 @@ function showRoundAnnounce(roundId){
   const r=getRound(roundId); if(!r) return;
   const c=AV_CATS[r.cat]||AV_CATS.dubbing;
   const g=getAnnounceGender();
-  const txt=roundAnnounceText(r, g);
+  const txt=r.announceText||roundAnnounceText(r, g);
   _tagOverlayShow('📢 ข้อความประกาศ — คัดลอกไปโพสใน Discord', `
     <div style="font-size:11.5px;color:var(--text2);margin-bottom:8px">แนะนำให้โพสในห้อง <strong style="color:var(--accent2)"># ${esc(c.channel)}</strong> · ระบบเติมช่วงวันที่ <strong style="color:var(--accent2)">${esc(_annRangeLabel(r))}</strong> และแท็กของทีมให้จากเทมเพลตอัตโนมัติ</div>
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap;font-size:12.5px">
@@ -4974,7 +5004,20 @@ const ALC_ROLE={adp:'✍️ เกลาบท',dub:'🎤 พากย์',mix:'
 const ALC_PRE=['adp','dub','mix','qc','sub','mgr'];
 const ALC_CAT2PRE={adaptation:'adp',dubbing:'dub',mix:'mix',qc:'qc',subVideo:'sub',manager:'mgr'};
 const ALC_TH_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-let _alcFilter='all', _alcSearch='', _alcShowAll=false, _alcDragSid=null;
+let _alcFilter='all', _alcSearch='', _alcShowAll=false, _alcShowFull=false, _alcDragSid=null;
+// งานนี้ยังต้องการคนไหม — ใช้ตัดสินว่าจะโชว์บนกระดานหรือไม่
+function _alcNeedsPeople(p){
+  if(p.allocDone) return false;               // แอดมิน/เมเนเจอร์กดยืนยันเองว่า "ลงคนครบแล้ว"
+  const ws=p.workers||[];
+  if(!ws.length) return true;                 // ยังไม่มีใครเลย
+  if(ws.some(w=>w && !w.id)) return true;     // มีช่องที่เปิดไว้แต่ยังไม่ใส่คน
+  return false;                               // ทุกช่องมีคนแล้ว
+}
+async function alcMarkDone(projId, val){
+  const res=await saveProjectMerge(projId, f=>{ f.allocDone=!!val; });
+  if(res.ok){ toast(val?'✔️ บันทึกว่า "ลงคนครบแล้ว" — งานนี้จะไม่ขึ้นหน้าจัดสรรคน':'↩️ เปิดรับคนอีกครั้งแล้ว','success'); renderAlloc(); }
+  else toast('บันทึกไม่สำเร็จ','error');
+}
 // Firebase อาจคืน array กลับมาเป็น object — แปลงให้เป็น array เสมอ
 function _alcArr(v){ return Array.isArray(v)?v:(v&&typeof v==='object'?Object.values(v):[]); }
 function getAllocDraft(){ const v=ls('allocdraft'); return (v&&typeof v==='object'&&!Array.isArray(v))?v:{}; }
@@ -5045,7 +5088,10 @@ function _alcPersonRow(o){
 }
 function _alcProjs(){
   const q=String(document.getElementById('alc-proj-search')?.value||'').trim().toLowerCase();
+  const d=getAllocDraft();
   let list=getProjects().filter(p=>p && p.projStatus!=='cancelled' && p.projStatus!=='done');
+  // ปกติโชว์เฉพาะงานที่ยังลงคนไม่ครบ (หรือมีฉบับร่างค้าง) — เปิดสวิตช์ด้านบนเพื่อดูงานที่ครบแล้ว
+  if(!_alcShowFull) list=list.filter(p=>_alcNeedsPeople(p) || _alcArr(d[p.id]).length);
   if(q) list=list.filter(p=>String(p.name||'').toLowerCase().includes(q)||String(p.client||'').toLowerCase().includes(q));
   return list.sort((a,b)=>String(a.deadline||'9999').localeCompare(String(b.deadline||'9999')));
 }
@@ -5062,11 +5108,18 @@ function _alcProjCard(p){
       +'</div>';
   }).join('');
   const mgr=p.managerId ? getStaffById(p.managerId) : null;
+  const needs=_alcNeedsPeople(p);
   return '<div class="alc-proj">'
     +'<div class="alc-proj-n" onclick="openProjDetail(\''+esc(p.id)+'\')" title="'+esc(p.name||'')+' — กดเพื่อเปิดรายละเอียด">📁 '+esc(p.name||'(ไม่มีชื่อ)')+'</div>'
-    +'<div class="alc-proj-m">เดทไลน์ '+_alcDL(p.deadline)+(p.episodes?' · '+esc(p.episodes)+' ตอน':'')+(mgr?' · 🗂️ '+esc(mgr.nickname):'')+'</div>'
+    +'<div class="alc-proj-m">เดทไลน์ '+_alcDL(p.deadline)+(p.episodes?' · '+esc(p.episodes)+' ตอน':'')+(mgr?' · 🗂️ '+esc(mgr.nickname):'')
+    +(!needs?' · <span class="alc-chip alc-c-all">✅ ลงคนครบแล้ว</span>':'')+'</div>'
     +rows
     +(drafts.length ? '<button class="btn btn-green btn-sm" style="width:100%;margin-top:5px" onclick="alcConfirm(\''+esc(p.id)+'\')">✅ ยืนยัน '+drafts.length+' คน เข้าโปรเจกต์</button>' : '')
+    +(p.allocDone
+      ? '<div style="text-align:center;margin-top:6px"><span onclick="alcMarkDone(\''+esc(p.id)+'\',false)" style="font-size:10.5px;color:var(--text2);cursor:pointer;text-decoration:underline dotted">↩️ ยังไม่ครบ — เปิดรับคนอีกครั้ง</span></div>'
+      : (needs && !drafts.length
+        ? '<div style="text-align:center;margin-top:6px"><span onclick="alcMarkDone(\''+esc(p.id)+'\',true)" style="font-size:10.5px;color:var(--text2);cursor:pointer;text-decoration:underline dotted" title="งานนี้ไม่ต้องการคนแล้ว — เอาออกจากหน้านี้">✔️ ลงคนครบแล้ว ซ่อนงานนี้</span></div>'
+        : ''))
     +'</div>';
 }
 function renderAlloc(){
@@ -5093,7 +5146,7 @@ function renderAlloc(){
     }).join('')+'</div>';
   const roundChips=openRounds.map(r=>{const c=AV_CATS[r.cat]||{};return '<span class="alc-chip alc-c-day">'+(c.icon||'')+' '+esc(c.label||r.cat)+'</span>';}).join(' ');
   const poolInner = !openRounds.length
-    ? '<div style="text-align:center;padding:26px 10px;color:var(--text2);font-size:12.5px;line-height:1.8">ยังไม่มีรอบขอคิวที่เปิดอยู่<br><button class="btn btn-blue btn-sm" onclick="nav(\'availability\')">🗓️ ไปเปิดรอบขอคิว</button></div>'
+    ? '<div style="text-align:center;padding:26px 10px;color:var(--text2);font-size:12.5px;line-height:1.8">ยังไม่มีรอบลงคิวที่เปิดอยู่<br><button class="btn btn-blue btn-sm" onclick="nav(\'availability\')">📌 ไปเปิดรอบลงคิว</button></div>'
     : !people.length
     ? '<div style="text-align:center;padding:26px 10px;color:var(--text2);font-size:12.5px;line-height:1.8">ยังไม่มีคนตอบรับ<br>กด "🔄 ดึงคำตอบล่าสุด" ด้านบน หรือรอทีมพิมพ์ตอบใน Discord</div>'
     : '<div class="alc-bwrap">'+rail+'<div class="alc-blist">'
@@ -5110,7 +5163,12 @@ function renderAlloc(){
     +'<div class="alc-pool"><div style="font-size:13px;font-weight:800;margin-bottom:2px">👥 คนที่ตอบรับ</div>'
     +'<div style="font-size:11px;color:var(--text2);margin-bottom:10px">กดไอคอนซ้ายเพื่อเลือกหมวด · ชี้เมาส์ค้างที่ชื่อเพื่อดูข้อความเต็ม · ลากชื่อไปวางในโปรเจกต์ทางขวา — คนเดียวลากได้หลายงาน</div>'
     +poolInner+'</div>'
-    +'<div style="flex:1;min-width:0"><div class="alc-board">'
+    +'<div style="flex:1;min-width:0">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:12px;color:var(--text2);flex-wrap:wrap">'
+    +'<span>🧩 งานที่ยังลงคนไม่ครบ <strong style="color:var(--text)">'+projs.filter(p=>_alcNeedsPeople(p)).length+'</strong> โปรเจกต์'+(_alcShowFull?' · แสดงงานที่ครบแล้วด้วย':'')+'</span>'
+    +'<label style="margin-left:auto;cursor:pointer;display:flex;gap:6px;align-items:center"><input type="checkbox" '+(_alcShowFull?'checked':'')+' onchange="_alcShowFull=this.checked;renderAlloc()"> แสดงงานที่ลงคนครบแล้วด้วย</label>'
+    +'</div>'
+    +'<div class="alc-board">'
     +shown.map(_alcProjCard).join('')
     +'<div class="alc-newproj" onclick="openNewProject()"><div style="font-size:26px">＋</div>สร้างโปรเจกต์ใหม่<div style="font-size:10px;color:var(--text2);font-weight:400;padding:0 14px">กรอกชื่อ/เดทไลน์ก่อน<br>ค่อยลากคนเข้าทีหลัง</div></div>'
     +'</div>'
@@ -5243,7 +5301,7 @@ async function alcSavePrice(){
 // 🔄 ดึงคำตอบจาก Discord ของทุกรอบที่เปิดอยู่
 async function alcPullAll(){
   const rounds=getRounds().filter(r=>r.status==='open');
-  if(!rounds.length){ toast('ยังไม่มีรอบขอคิวที่เปิดอยู่ — เปิดรอบที่หน้า 🗓️ รอบขอคิว','warn'); return; }
+  if(!rounds.length){ toast('ยังไม่มีรอบลงคิวที่เปิดอยู่ — เปิดรอบที่หน้า 📌 ลงคิว','warn'); return; }
   const keep=_avRoundId;
   showLoader(true);
   try{
