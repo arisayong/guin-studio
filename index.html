@@ -1364,11 +1364,13 @@ body.sidebar-collapsed .main-content{
    <!-- ══ แท็บ 3: ข้อมูล & สำรอง ══ -->
    <div class="set-pane hidden" id="setpane-data">
     <div class="section-card" style="margin-bottom:14px">
-     <div class="set-head"><span class="set-ico">💾</span><div><div class="set-title">สำรองข้อมูล</div><div class="set-sub">ดาวน์โหลดข้อมูลทั้งระบบเป็นไฟล์ JSON · แนะนำสำรองทุกสัปดาห์ หรือก่อนแก้ไขครั้งใหญ่</div></div></div>
+     <div class="set-head"><span class="set-ico">💾</span><div><div class="set-title">สำรองข้อมูล</div><div class="set-sub">ระบบสำรองให้เอง<strong>วันละครั้งอัตโนมัติ</strong>ขึ้น Firebase (เก็บ 7 วันล่าสุด) · ปุ่มด้านล่างใช้สำรองเพิ่มเป็นไฟล์ก่อนแก้ไขครั้งใหญ่</div></div></div>
      <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-green" onclick="exportBackup()">💾 สำรองเดี๋ยวนี้</button>
+      <button class="btn btn-outline" onclick="openAutoBackupList()">☁️ ดูสำรองอัตโนมัติ 7 วัน</button>
       <button class="btn btn-outline" onclick="openRestoreModal()">🔄 กู้คืนจากไฟล์</button>
      </div>
+     <div id="auto-backup-status" style="font-size:11.5px;color:var(--text2);margin-top:10px;line-height:1.6"></div>
      <div id="backup-history" style="margin-top:14px"></div>
     </div>
 
@@ -1877,6 +1879,7 @@ body.sidebar-collapsed .main-content{
     <div class="page-subtitle">สมาชิกทั้งหมดในสตูดิโอ</div>
     <div class="page-actions">
      <div class="search-bar" style="margin:0;flex:1;max-width:260px"><span class="icon">🔍</span><input placeholder="ค้นหาสมาชิก..." id="staff-search" oninput="renderStaffGrid()"></div>
+     <select id="staff-tag-filter" class="form-input form-select" style="width:auto;max-width:180px;padding:7px 26px 7px 10px;font-size:12.5px" onchange="renderStaffGrid()" title="กรองรายชื่อตาม Tag ประจำตัว"><option value="">🏷️ ทุก Tag</option></select>
      <button class="btn btn-outline" onclick="openTagManager()" title="สร้าง/ลบหัวข้อ Tag หมายเหตุประจำตัว">🏷️ จัดการ Tag</button>
      <button class="btn btn-blue" onclick="openAddStaff()">➕ เพิ่มสมาชิก</button>
     </div>
@@ -2279,6 +2282,7 @@ body.sidebar-collapsed .main-content{
       <div class="tab active" onclick="setDocsHistFilter('all',this)">ทั้งหมด</div>
       <div class="tab" onclick="setDocsHistFilter('quotation',this)">📋 ใบเสนอราคา</div>
       <div class="tab" onclick="setDocsHistFilter('invoice',this)">🧾 ใบแจ้งหนี้</div>
+      <div class="tab" onclick="setDocsHistFilter('receipt',this)">🧾 ใบเสร็จรับเงิน</div>
       <div class="tab" onclick="setDocsHistFilter('voucher',this)">💸 ใบสำคัญจ่าย</div>
      </div>
     </div>
@@ -3686,10 +3690,10 @@ function _todayDDMM(){
   return String(d.getDate()).padStart(2,'0') + String(d.getMonth()+1).padStart(2,'0');
 }
 function generateDocNo(prefix){
-  // prefix: 'INV' | 'QT' — counts existing same-prefix docs made today, returns next sequence
+  // prefix: 'INV' | 'QT' | 'RCP' — counts existing same-prefix docs made today, returns next sequence
   const yy = new Date().getFullYear()+543;
   const ddmm = _todayDDMM();
-  const storeKey = prefix==='INV'?'invoices' : prefix==='QT'?'quotations' : 'vouchers';
+  const storeKey = prefix==='INV'?'invoices' : prefix==='QT'?'quotations' : prefix==='RCP'?'receipts' : 'vouchers';
   const todayPrefix = prefix+'-'+yy+'-'+ddmm+'-';
   const existing = getDocsStore(storeKey)||[];
   const todayCount = existing.filter(d => (d.docNo||'').startsWith(todayPrefix)).length;
@@ -4595,11 +4599,6 @@ function openNewRound(){
         <input id="nr-to" type="date" value="${_isoOf(nextWeek)}" onchange="_nrRefreshPreview()" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
       </div>
     </div>
-    <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:3px">รายละเอียดเพิ่มเติม (ไม่บังคับ)</div>
-    <textarea id="nr-note" rows="2" placeholder="เช่น จะมีงานแนว Anime ญี่ปุ่น/จีน เข้ามา" oninput="_nrRefreshPreview()" style="width:100%;padding:8px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px;resize:vertical;box-sizing:border-box"></textarea>
-    <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin:8px 0;cursor:pointer">
-      <input type="checkbox" id="nr-nda" checked onchange="_nrRefreshPreview()"> ถามด้วยว่าสะดวกเซ็น NDA ไหม
-    </label>
     <div style="display:flex;gap:12px;align-items:center;margin:10px 0 6px;flex-wrap:wrap;font-size:12.5px;padding-top:10px;border-top:1px solid var(--border2)">
       <span style="font-weight:700">📢 ข้อความประกาศ · สำนวน:</span>
       <label style="cursor:pointer"><input type="radio" name="nr-g" value="female" ${g==='female'?'checked':''} onchange="ls('announcegender','female');_nrRefreshPreview(true)"> 👩 หญิง (ค่ะ/ค่า)</label>
@@ -4612,10 +4611,11 @@ function openNewRound(){
   _nrRefreshPreview(true);
 }
 // สร้าง object รอบชั่วคราวจากค่าในฟอร์ม เพื่อพรีวิวข้อความประกาศ
+// (หมายเหตุ/NDA ไม่มีช่องแยกแล้ว — อยากเพิ่มอะไรพิมพ์ในกล่องประกาศได้เลย)
 function _nrPreviewRound(){
   return { cat:document.getElementById('nr-cat')?.value||'dubbing',
     dateFrom:document.getElementById('nr-from')?.value||'', dateTo:document.getElementById('nr-to')?.value||'',
-    note:(document.getElementById('nr-note')?.value||'').trim(), nda:!!document.getElementById('nr-nda')?.checked };
+    note:'', nda:false };
 }
 // อัปเดตพรีวิว — ถ้าผู้ใช้พิมพ์แก้เองแล้ว (dirty) จะไม่เขียนทับ เว้นแต่สลับสำนวน (force)
 function _nrRefreshPreview(force){
@@ -4634,8 +4634,7 @@ async function createRound(){
     id:'RD'+Date.now(),
     cat:document.getElementById('nr-cat')?.value||'dubbing',
     dateFrom:from, dateTo:to,
-    note:(document.getElementById('nr-note')?.value||'').trim(),
-    nda:!!document.getElementById('nr-nda')?.checked,
+    note:'', nda:false,
     status:'open', createdAt:new Date().toISOString(),
     createdBy:currentUser?.nickname||currentUser?.email||'',
   };
@@ -5013,6 +5012,26 @@ function _alcNeedsPeople(p){
   if(ws.some(w=>w && !w.id)) return true;     // มีช่องที่เปิดไว้แต่ยังไม่ใส่คน
   return false;                               // ทุกช่องมีคนแล้ว
 }
+// ข้อความจาก Discord ที่จับคู่ชื่อกับทะเบียนทีมไม่ได้ (เก็บไว้ใน round.unmatched ตอนดึงคำตอบ)
+function _alcUnmatched(){
+  const out=[];
+  getRounds().filter(r=>r.status==='open').forEach(r=>(r.unmatched||[]).forEach((m,i)=>out.push({r,m,i})));
+  return out;
+}
+// ผูกชื่อ Discord กับทีมงาน — จำถาวร (staff.discordId) + บันทึกคำตอบของเขาเข้ารอบทันที
+async function alcLinkUnmatched(roundId, idx){
+  const sel=document.getElementById('alc-un-'+roundId+'-'+idx);
+  const sid=sel?sel.value:'';
+  if(!sid){ toast('เลือกก่อนว่าเป็นใคร','warn'); return; }
+  const list=getRounds(); const r=list.find(x=>x.id===roundId); if(!r) return;
+  const m=(r.unmatched||[])[idx]; if(!m) return;
+  await linkDiscordUser(sid, m.authorId, m.displayName||m.username||'');
+  await saveRoundReply(r.id, sid, {freeText:String(m.content||'').trim(), discordName:m.displayName||m.username||'', source:'discord'});
+  r.unmatched=(r.unmatched||[]).filter((_,j)=>j!==idx);
+  await saveRounds(list);
+  toast('🔗 ผูกชื่อแล้ว — ระบบจำถาวร ครั้งหน้าจับคู่ให้เอง','success');
+  renderAlloc();
+}
 async function alcMarkDone(projId, val){
   const res=await saveProjectMerge(projId, f=>{ f.allocDone=!!val; });
   if(res.ok){ toast(val?'✔️ บันทึกว่า "ลงคนครบแล้ว" — งานนี้จะไม่ขึ้นหน้าจัดสรรคน':'↩️ เปิดรับคนอีกครั้งแล้ว','success'); renderAlloc(); }
@@ -5145,11 +5164,34 @@ function renderAlloc(){
       return '<div class="alc-railbtn'+(_alcFilter===pre?' on':'')+'" onclick="_alcFilter=\''+pre+'\';renderAlloc()">'+((ALC_ROLE[pre]||'').split(' ')[0])+'<small>'+(ALC_ROLE[pre]||'').split(' ').slice(1).join(' ')+' '+n+'</small></div>';
     }).join('')+'</div>';
   const roundChips=openRounds.map(r=>{const c=AV_CATS[r.cat]||{};return '<span class="alc-chip alc-c-day">'+(c.icon||'')+' '+esc(c.label||r.cat)+'</span>';}).join(' ');
+  // กล่องผูกชื่อ: คนที่ตอบใน Discord แต่ระบบจับคู่ชื่อไม่ได้ — เลือกครั้งเดียว จำตลอด
+  const unm=_alcUnmatched();
+  const _staffSeen=new Set();
+  const staffOpts=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s&&s.id&&isStaffAssignable(s)&&!_staffSeen.has(s.id)&&_staffSeen.add(s.id));
+  const unmHTML = unm.length
+    ? '<div style="border:1px solid rgba(255,158,0,.4);background:rgba(255,158,0,.06);border-radius:10px;padding:9px 11px;margin-bottom:10px">'
+      +'<div style="font-size:12px;font-weight:800;color:var(--orange);margin-bottom:7px">🔗 มีคนตอบแต่ระบบไม่รู้ว่าเป็นใคร '+unm.length+' คน — เลือกชื่อแล้วกดผูก (ครั้งเดียว จำตลอด)</div>'
+      +unm.map(u=>{
+        const m=u.m;
+        const pre=(m.options&&m.options[0]&&m.options[0].id)||'';
+        return '<div style="margin-bottom:9px">'
+          +'<div style="font-size:12px;font-weight:700">💬 '+esc(m.displayName||m.username||'?')+'</div>'
+          +'<div style="font-size:11px;color:var(--text2);margin:2px 0 5px">“'+esc(String(m.content||'').slice(0,100))+'”</div>'
+          +'<div style="display:flex;gap:6px">'
+          +'<select id="alc-un-'+esc(u.r.id)+'-'+u.i+'" class="form-input form-select" style="flex:1;min-width:0;padding:5px 24px 5px 8px;font-size:12px">'
+          +'<option value="">— เลือกว่าเป็นใครในทีม —</option>'
+          +staffOpts.map(s=>'<option value="'+esc(s.id)+'"'+(s.id===pre?' selected':'')+'>'+esc(s.nickname||s.name||s.id)+'</option>').join('')
+          +'</select>'
+          +'<button class="btn btn-sm btn-blue" onclick="alcLinkUnmatched(\''+esc(u.r.id)+'\','+u.i+')">🔗 ผูก</button>'
+          +'</div></div>';
+      }).join('')
+      +'</div>'
+    : '';
   const poolInner = !openRounds.length
     ? '<div style="text-align:center;padding:26px 10px;color:var(--text2);font-size:12.5px;line-height:1.8">ยังไม่มีรอบลงคิวที่เปิดอยู่<br><button class="btn btn-blue btn-sm" onclick="nav(\'availability\')">📌 ไปเปิดรอบลงคิว</button></div>'
     : !people.length
-    ? '<div style="text-align:center;padding:26px 10px;color:var(--text2);font-size:12.5px;line-height:1.8">ยังไม่มีคนตอบรับ<br>กด "🔄 ดึงคำตอบล่าสุด" ด้านบน หรือรอทีมพิมพ์ตอบใน Discord</div>'
-    : '<div class="alc-bwrap">'+rail+'<div class="alc-blist">'
+    ? unmHTML+'<div style="text-align:center;padding:26px 10px;color:var(--text2);font-size:12.5px;line-height:1.8">'+(unm.length?'ผูกชื่อด้านบนก่อน แล้วรายชื่อจะขึ้นที่นี่':'ยังไม่มีคนตอบรับ<br>กด "🔄 ดึงคำตอบล่าสุด" ด้านบน หรือรอทีมพิมพ์ตอบใน Discord')+'</div>'
+    : unmHTML+'<div class="alc-bwrap">'+rail+'<div class="alc-blist">'
       +'<input class="form-input" id="alc-search" placeholder="🔍 ค้นหาชื่อ…" style="width:100%;margin-bottom:8px;padding:7px 11px;font-size:12.5px;box-sizing:border-box" value="'+esc(_alcSearch)+'" oninput="_alcSearch=this.value;renderAlloc();var i=document.getElementById(\'alc-search\');i.focus();i.setSelectionRange(i.value.length,i.value.length)">'
       +(free.map(_alcPersonRow).join('')||'<div style="font-size:11.5px;color:var(--text2);padding:4px">— ไม่พบคนว่างในหมวดนี้ —</div>')
       +(taken.length?'<div class="alc-divide">⬇️ ถูกลากเข้างานแล้ว '+taken.length+' คน (ลากเพิ่มได้)</div>'+taken.map(_alcPersonRow).join(''):'')
@@ -6021,7 +6063,7 @@ function _rpPreset(v){
 function buildFinanceReport(from, to){
   const inRange = d => !!d && (!from || d>=from) && (!to || d<=to);
   let received=0, expensePaid=0, billedInRange=0;
-  const incomeRows=[], expenseRows=[], receivable=[];
+  const incomeRows=[], expenseRows=[], receivable=[], payable=[], whtRows=[];
   const todayIso=new Date().toISOString().split('T')[0];
   (getProjects()||[]).forEach(p=>{
     if(p.projStatus==='cancelled') return;
@@ -6042,23 +6084,37 @@ function buildFinanceReport(from, to){
     if(inRange(p.deadline||p.date||'')) billedInRange += f.billed;
     const tax=p.tax||{};
     (p.workers||[]).forEach(w=>{
-      if(w.status!=='paid') return;
+      if(!w) return;
+      const pre=(w.slot||'').split('-')[0];
+      const t=parseFloat(tax[pre])||0;
+      const net=Math.round((w.amount||0)*(1-t/100));
+      const s=getStaffById(w.id);
+      const who=(s?(s.nickname||s.name):w.id)||'—';
+      if(w.status!=='paid'){
+        // 💳 เจ้าหนี้ — ค่าจ้างที่ยังไม่ได้จ่าย (นับทุกช่วงเวลา เหมือนลูกหนี้)
+        if(w.id && net>0) payable.push({proj:p.name, who, amount:net, deadline:p.deadline||''});
+        return;
+      }
       const d=(w.paidAt||'').split('T')[0] || p.deadline || '';
       if(!inRange(d)) return;
-      const pre=(w.slot||'').split('-')[0];
-      const net=Math.round((w.amount||0)*(1-(parseFloat(tax[pre])||0)/100));
       expensePaid+=net;
-      const s=getStaffById(w.id);
-      expenseRows.push({date:d, proj:p.name, who:(s?(s.nickname||s.name):w.id), amount:net});
+      expenseRows.push({date:d, proj:p.name, who, amount:net});
+      // 🧾 ภาษีหัก ณ ที่จ่าย = ส่วนต่างยอดเต็มกับยอดสุทธิ
+      const wht=(w.amount||0)-net;
+      if(wht>0) whtRows.push({date:d, proj:p.name, who, gross:w.amount||0, pct:t, tax:wht});
     });
   });
+  const whtDocs=(typeof getWhtDocs==='function'?getWhtDocs():[]).filter(d=>d&&inRange(d.payDate));
   const company=getCompanyExpenses().filter(e=>inRange(e.date));
   const companyTotal=company.reduce((a,e)=>a+(parseFloat(e.amount)||0),0);
   const profit=received-expensePaid;
   return { from,to, received, expensePaid, companyTotal, profit, netProfit:profit-companyTotal,
            billedInRange, incomeRows, expenseRows, company, receivable,
            receivableTotal: receivable.reduce((a,r)=>a+r.amount,0),
-           overdueTotal: receivable.filter(r=>r.overdue).reduce((a,r)=>a+r.amount,0) };
+           overdueTotal: receivable.filter(r=>r.overdue).reduce((a,r)=>a+r.amount,0),
+           payable, payableTotal: payable.reduce((a,r)=>a+r.amount,0),
+           whtRows, whtTotal: whtRows.reduce((a,r)=>a+r.tax,0),
+           whtDocs, whtDocsTotal: whtDocs.reduce((a,r)=>a+(parseFloat(r.tax)||0),0) };
 }
 function renderFinanceReport(){
   const el=document.getElementById('rp-body'); if(!el) return;
@@ -6089,6 +6145,8 @@ function renderFinanceReport(){
       ${card('เงินสดคงเหลือ', r.profit, r.profit>=0?'var(--green)':'var(--red)', 'เงินเข้า − จ่ายทีม')}
       ${card('กำไรสุทธิช่วงนี้', r.netProfit, r.netProfit>=0?'var(--green)':'var(--red)', 'หักค่าใช้จ่ายบริษัทแล้ว')}
       ${card('ลูกหนี้คงค้าง', r.receivableTotal, r.overdueTotal?'var(--red)':'var(--text2)', r.overdueTotal?('🔴 เลยกำหนด '+fmtB(r.overdueTotal)):'ยังไม่ถึงกำหนด')}
+      ${card('เจ้าหนี้คงค้าง', r.payableTotal, r.payableTotal?'var(--orange)':'var(--text2)', 'ค่าจ้างทีมยังไม่จ่าย · '+r.payable.length+' รายการ')}
+      ${card('ภาษีหักช่วงนี้', r.whtTotal, 'var(--purple)', 'หัก ณ ที่จ่ายจากค่าจ้างที่จ่ายแล้ว')}
     </div>
     ${list('💰 รายรับที่รับเข้ามาในช่วงนี้', r.incomeRows.sort((a,b)=>a.date.localeCompare(b.date)),
         x=>row(fmtDate(x.date), esc(x.proj)+' <span style="color:var(--text2)">· '+esc(x.label)+'</span>', fmtB(x.amount)),
@@ -6102,7 +6160,16 @@ function renderFinanceReport(){
     ${list('📋 ลูกหนี้ — งานที่ยังไม่ได้เก็บเงิน (ทุกช่วงเวลา)', r.receivable.sort((a,b)=>String(a.dueDate).localeCompare(String(b.dueDate))),
         x=>row(x.dueDate?fmtDate(x.dueDate):'—',
                (x.overdue?'🔴 ':'')+esc(x.proj)+' <span style="color:var(--text2)">· '+esc(x.label)+(x.client?' · '+esc(x.client):'')+'</span>', fmtB(x.amount)),
-        'เก็บเงินครบทุกงาน 🎉')}`;
+        'เก็บเงินครบทุกงาน 🎉')}
+    ${list('💳 เจ้าหนี้ — ค่าจ้างทีมที่ยังไม่ได้จ่าย (ทุกช่วงเวลา)', r.payable.sort((a,b)=>String(a.deadline||'9999').localeCompare(String(b.deadline||'9999'))),
+        x=>row(x.deadline?fmtDate(x.deadline):'—', esc(x.who)+' <span style="color:var(--text2)">· '+esc(x.proj)+'</span>', fmtB(x.amount)),
+        'จ่ายทีมครบทุกงาน 🎉')}
+    ${list('🧾 ภาษีหัก ณ ที่จ่าย — หักไว้จากค่าจ้างที่จ่ายในช่วงนี้ (รวม '+fmtB(r.whtTotal)+')', r.whtRows.sort((a,b)=>a.date.localeCompare(b.date)),
+        x=>row(fmtDate(x.date), esc(x.who)+' <span style="color:var(--text2)">· '+esc(x.proj)+' · หัก '+x.pct+'% จาก '+fmtB(x.gross)+'</span>', fmtB(x.tax)),
+        'ไม่มีการหักภาษีในช่วงนี้')}
+    ${list('📄 ใบ 50 ทวิ ที่ออกในช่วงนี้ (รวมภาษี '+fmtB(r.whtDocsTotal)+')', r.whtDocs.sort((a,b)=>String(a.payDate).localeCompare(String(b.payDate))),
+        x=>row(fmtDate(x.payDate), esc((x.payee&&x.payee.name)||'—')+' <span style="color:var(--text2)">· '+esc(x.docNo||'')+'</span>', fmtB(parseFloat(x.tax)||0)),
+        'ยังไม่ได้ออกใบ 50 ทวิในช่วงนี้')}`;
 }
 function exportFinanceReportCSV(){
   const r=window._lastReport; if(!r){ toast('ยังไม่มีข้อมูลรายงาน','error'); return; }
@@ -6113,7 +6180,8 @@ function exportFinanceReportCSV(){
   L.push([]);
   L.push(['สรุป'].map(esc2).join(','));
   [['เงินเข้าในช่วงนี้ (ลูกค้าจ่ายจริง)',r.received],['จ่ายทีมในช่วงนี้',r.expensePaid],['ค่าใช้จ่ายบริษัท',r.companyTotal],
-   ['เงินสดคงเหลือ',r.profit],['กำไรสุทธิช่วงนี้',r.netProfit],['ลูกหนี้คงค้าง (ทุกช่วงเวลา)',r.receivableTotal],['ในนั้นเลยกำหนดชำระ',r.overdueTotal]]
+   ['เงินสดคงเหลือ',r.profit],['กำไรสุทธิช่วงนี้',r.netProfit],['ลูกหนี้คงค้าง (ทุกช่วงเวลา)',r.receivableTotal],['ในนั้นเลยกำหนดชำระ',r.overdueTotal],
+   ['เจ้าหนี้คงค้าง — ค่าจ้างทีมยังไม่จ่าย (ทุกช่วงเวลา)',r.payableTotal],['ภาษีหัก ณ ที่จ่ายในช่วงนี้',r.whtTotal]]
     .forEach(([k,v])=>L.push([k,v].map(esc2).join(',')));
   const section=(title,head,rows)=>{ L.push([]); L.push([title].map(esc2).join(',')); L.push(head.map(esc2).join(','));
     rows.forEach(x=>L.push(x.map(esc2).join(','))); };
@@ -6122,6 +6190,12 @@ function exportFinanceReportCSV(){
   section('ค่าใช้จ่ายบริษัท',['วันที่','รายการ','หมวด','จำนวนเงิน'], r.company.map(x=>[x.date,x.label,x.cat||'',x.amount]));
   section('ลูกหนี้คงค้าง',['ครบกำหนด','โปรเจกต์','ลูกค้า','งวด','จำนวนเงิน','สถานะ'],
     r.receivable.map(x=>[x.dueDate,x.proj,x.client,x.label,x.amount, x.overdue?'เลยกำหนด':'ยังไม่ถึงกำหนด']));
+  section('เจ้าหนี้คงค้าง (ค่าจ้างทีมยังไม่จ่าย)',['เดทไลน์งาน','ผู้รับเงิน','โปรเจกต์','จำนวนเงิน (หลังหักภาษี)'],
+    r.payable.map(x=>[x.deadline,x.who,x.proj,x.amount]));
+  section('ภาษีหัก ณ ที่จ่าย (หักจากค่าจ้างที่จ่ายในช่วงนี้)',['วันที่จ่าย','ผู้ถูกหัก','โปรเจกต์','ยอดก่อนหัก','% ที่หัก','ภาษีที่หักไว้'],
+    r.whtRows.map(x=>[x.date,x.who,x.proj,x.gross,x.pct,x.tax]));
+  section('ใบ 50 ทวิ ที่ออกในช่วงนี้',['วันที่จ่าย','เลขที่','ผู้ถูกหัก','ยอดก่อนหัก','ภาษีที่หัก'],
+    r.whtDocs.map(x=>[x.payDate,x.docNo,(x.payee&&x.payee.name)||'',x.amount,x.tax]));
   const blob=new Blob(['﻿'+L.join('\n')],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -7887,6 +7961,8 @@ async function enterApp(){
         await fbLoadKeyed('payroll_profiles'); await fbLoadKeyed('payroll_runs');
         await fbLoadKeyed('recruit_rounds'); await fbLoadKeyed('discord_cfg'); await fbLoadKeyed('allocdraft'); await fbLoadKeyed('announcetpl'); } catch(e) {}
   try { logLogin(); startIdleWatch(); } catch(e) {}
+  // 🕐 สำรองอัตโนมัติรายวัน — รอ 8 วิ ให้ข้อมูลโหลดครบก่อน
+  try { setTimeout(()=>{ try{ autoDailyBackup(); }catch(e){} }, 8000); } catch(e) {}
   // Load tracking cards from Firebase
   try {
     if(_fbDatabase){
@@ -7899,6 +7975,7 @@ async function enterApp(){
         // 🔧 โหลดใบสำคัญจ่าย + ใบแจ้งหนี้จาก Firebase ตอนเปิดเครื่อง (เดิมไม่ได้โหลด → ประวัติว่างในเครื่องอื่น)
         if(d.vouchers)ls('docs_vouchers',d.vouchers);
         if(d.invoices)ls('docs_invoices',d.invoices);
+        if(d.receipts)ls('docs_receipts',d.receipts);
         if(d.history)ls('docs_history',d.history);
         if(d.voucherSeq){ ls('voucher_seq',d.voucherSeq); const n=parseInt(d.voucherSeq,10); if(!isNaN(n)) voucherSeq=Math.max(voucherSeq||0,n); }
       }
@@ -10387,7 +10464,7 @@ async function mergeDuplicateStaff(keepId, removeIds, keepName){
       projects: JSON.parse(JSON.stringify(getProjects())),
     };
     const _bk=_safeBackup('_merge_dup_backup_', backup);
-    if(!_bk && !confirm('⚠️ พื้นที่สำรองข้อมูลในเบราว์เซอร์เต็ม — สำรองอัตโนมัติไม่ได้\n(ข้อมูลจริงยังปลอดภัยบน Firebase + backup รายวันใน Google Drive)\n\nดำเนินการ merge ต่อโดยไม่มี backup ในเครื่อง?')){
+    if(!_bk && !confirm('⚠️ พื้นที่สำรองข้อมูลในเบราว์เซอร์เต็ม — สำรองก่อน merge ไม่ได้\n(ข้อมูลจริงยังปลอดภัยบน Firebase + สำรองอัตโนมัติรายวัน 7 วันล่าสุด)\n\nดำเนินการ merge ต่อโดยไม่มี backup ในเครื่อง?')){
       toast('ยกเลิก merge','info'); return;
     }
 
@@ -12054,6 +12131,12 @@ function _assignEditRowHTML(p){
   const budgetCell=budgetLocked
     ? `<td style="padding:6px;font-size:11px;color:var(--text2);vertical-align:top" title="งบเป็นแบบคิดตามหน่วย — แก้ได้ในฟอร์มเต็ม (ปุ่ม 👥)">${fmtB(p.budget||0)}<br>🔒</td>`
     : `<td style="padding:6px;min-width:84px;vertical-align:top">${inp('ar-budget','number',p.budget||'','งบ')}</td>`;
+  // ลูกค้า: เลือกจากที่เคยกรอกได้หรือพิมพ์ใหม่ · ประเภทงาน: ชุดเดียวกับฟอร์มโปรเจกต์
+  const clients=[...new Set((getProjects()||[]).map(x=>(x.client||'').trim()).filter(Boolean))].sort();
+  const clientCell=`<input id="ar-client" list="ar-client-list" value="${esc(p.client||'')}" placeholder="ลูกค้า" style="width:100%;min-width:0;padding:5px 7px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px"><datalist id="ar-client-list">${clients.map(c=>`<option value="${esc(c)}"></option>`).join('')}</datalist>`;
+  const types=['หนัง','ซีรีย์','อนิเมะ','อนิเมชัน','หนังแนวตั้ง','เกม','โฆษณา','บรรยาย','หนังสือเสียง','เพลง','มิกซ์'];
+  if(p.type && !types.includes(p.type)) types.push(p.type);
+  const typeSel=`<select id="ar-type" style="width:100%;padding:5px 4px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px"><option value="">— ประเภท —</option>${types.map(t=>`<option${p.type===t?' selected':''}>${esc(t)}</option>`).join('')}</select>`;
   return `<tr id="${isNew?'assign-newrow':'assign-editrow'}" style="background:rgba(0,180,255,.06)">
     <td style="padding:6px;min-width:126px;vertical-align:top">${inp('ar-deadline','date',p.deadline||'')}</td>
     <td style="padding:6px;min-width:88px;vertical-align:top">${codeSel}</td>
@@ -12063,6 +12146,8 @@ function _assignEditRowHTML(p){
     <td style="padding:6px;min-width:112px;vertical-align:top">${mgrSel}</td>
     ${phCells}
     <td style="padding:6px;min-width:150px;vertical-align:top">${inp('ar-name','text',p.name||'','ชื่อโปรเจกต์ *')}</td>
+    <td style="padding:6px;min-width:110px;vertical-align:top">${clientCell}</td>
+    <td style="padding:6px;min-width:96px;vertical-align:top">${typeSel}</td>
     <td style="padding:6px;min-width:150px;vertical-align:top">${inp('ar-link','text',p.downloadLink||'','https://ลิงก์โหลดงาน')}<div style="margin-top:3px">${inp('ar-secret','text',p.secretKey||'','🔑 Secret key')}</div></td>
     <td style="padding:6px;min-width:120px;vertical-align:top">${inp('ar-note','text',p.note||'','หมายเหตุ')}</td>
     <td style="padding:6px;white-space:nowrap;vertical-align:top">
@@ -12088,6 +12173,8 @@ async function assignSaveRow(projId){
     downloadLink:(g('ar-link')?.value||'').trim(),
     secretKey:(g('ar-secret')?.value||'').trim(),
     note:(g('ar-note')?.value||'').trim(),
+    client:(g('ar-client')?.value||'').trim(),
+    type:g('ar-type')?.value||'',
   };
   const budgetEl=g('ar-budget');
   const budget=budgetEl?(parseFloat(budgetEl.value)||0):null;
@@ -12115,7 +12202,7 @@ async function assignSaveRow(projId){
     const phases={};
     _ASSIGN_PHASES.forEach(([k])=>{ const v=phVals[k]; if(v.deadline||v.note) phases[k]={startDate:'',deadline:v.deadline,submitTime:'',status:'none',note:v.note}; });
     const proj={
-      id:'P'+Date.now(), name, date:today, client:'', type:'',
+      id:'P'+Date.now(), name, date:today, client:vals.client||'', type:vals.type||'',
       budget:budget||0, budgetRate:budget||0, budgetType:'flat', budgetQty:0, duration:0,
       startDate:today, deadline:vals.deadline, cycle:'', note:vals.note,
       clientCode:vals.clientCode, seq:vals.seq, episodes:vals.episodes,
@@ -12183,6 +12270,8 @@ function renderAssign(){
       ${td(p.managerId&&mgrs[p.managerId]?`🗂️ ${esc(mgrs[p.managerId])}`:'👑 แอดมิน')}
       ${_ASSIGN_PHASES.map(([k])=>td(_assignDL(p,k),'white-space:nowrap')).join('')}
       ${td(`<span style="font-weight:700;cursor:pointer;color:var(--accent2)" onclick="openProjDetail('${p.id}')" title="เปิดรายละเอียด">${esc(p.name||'')}</span>`)}
+      ${td(p.client?esc(p.client):'<span style="opacity:.35">—</span>','max-width:110px;font-size:12px')}
+      ${td(p.type?esc(p.type):'<span style="opacity:.35">—</span>','font-size:12px;white-space:nowrap')}
       ${td(link,'max-width:180px')}
       ${td(p.note?esc(p.note):'<span style="opacity:.35">—</span>','max-width:160px;font-size:11.5px;color:var(--text2)')}
       ${td(`<button class="btn btn-sm btn-outline" style="padding:3px 9px;font-size:11px" onclick="assignEditRow('${p.id}')" title="แก้ในตาราง">✏️</button>
@@ -12191,9 +12280,9 @@ function renderAssign(){
   }).join('');
   const newRow=_assignAdding?_assignEditRowHTML(null):'';
   const emptyHint=(!list.length&&!_assignAdding)
-    ? `<tr><td colspan="16" style="padding:36px;text-align:center;color:var(--text2)">ไม่มีงานในมุมมองนี้ — กด "➕ มอบหมายงานใหม่" เพื่อเพิ่มแถวกรอกแบบชีท</td></tr>`:'';
+    ? `<tr><td colspan="18" style="padding:36px;text-align:center;color:var(--text2)">ไม่มีงานในมุมมองนี้ — กด "➕ มอบหมายงานใหม่" เพื่อเพิ่มแถวกรอกแบบชีท</td></tr>`:'';
   el.innerHTML=toolbar+`<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:1250px">
-    <thead><tr>${th('เดทไลน์')}${th('รหัส')}${th('ลำดับ')}${th('งบ')}${th('Ep.')}${th('ผู้รับผิดชอบ')}${_ASSIGN_PHASES.map(([,l])=>th('DL '+l)).join('')}${th('ชื่อโปรเจกต์')}${th('Link โหลดงาน')}${th('หมายเหตุ')}${th('')}</tr></thead>
+    <thead><tr>${th('เดทไลน์')}${th('รหัส')}${th('ลำดับ')}${th('งบ')}${th('Ep.')}${th('ผู้รับผิดชอบ')}${_ASSIGN_PHASES.map(([,l])=>th('DL '+l)).join('')}${th('ชื่อโปรเจกต์')}${th('ลูกค้า')}${th('ประเภท')}${th('Link โหลดงาน')}${th('หมายเหตุ')}${th('')}</tr></thead>
     <tbody>${rows}${emptyHint}${newRow}</tbody></table></div>`;
 }
 
@@ -16631,6 +16720,15 @@ function renderStaff(){
       tabsEl.innerHTML='';
       tabsEl.appendChild(wrap);
     }
+    // 🏷️ เติมตัวเลือกตัวกรอง Tag (เฉพาะ Tag ที่ยังใช้งาน) — คงค่าที่เลือกไว้
+    const _tf=document.getElementById('staff-tag-filter');
+    if(_tf){
+      const _cur=_tf.value;
+      const _master=getTagsMaster();
+      _tf.innerHTML='<option value="">🏷️ ทุก Tag</option>'
+        +Object.entries(_master).filter(([,v])=>v&&v.active!==false)
+          .map(([k,v])=>`<option value="${esc(k)}"${k===_cur?' selected':''}>🏷️ ${esc(v.label)}</option>`).join('');
+    }
     renderStaffGrid();
   }catch(e){
     console.error('renderStaff error:',e);
@@ -16642,6 +16740,7 @@ function renderStaffGrid(){
   const el=document.getElementById('staff-grid');
   if(!el){return;}
   const q=(document.getElementById('staff-search')||{}).value?.toLowerCase()||'';
+  const tagF=document.getElementById('staff-tag-filter')?.value||'';
   const cc={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
   let html='';
   const _left=getTeamLeft();
@@ -16650,7 +16749,7 @@ function renderStaffGrid(){
     if(activeStaffCat==='left') return; // แท็บ "ออกทีม" แสดงเฉพาะโซนด้านล่าง
     if(activeStaffCat!=='all'&&activeStaffCat!==key)return;
     // 🔍 ค้นหาก่อนแล้วค่อยยุบร่างซ้ำ — คนที่ record โดนยุบรวมกับตัวอื่นจะยังค้นเจอด้วยชื่อของ record ไหนก็ได้
-    const staff=_uniqByPerson((data[key]||[]).filter(s=>!_left[s.id]).filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q)||String(s.email||'').toLowerCase().includes(q)), _resolvePerson);
+    const staff=_uniqByPerson((data[key]||[]).filter(s=>!_left[s.id]).filter(s=>!q||(s.name||'').toLowerCase().includes(q)||(s.nickname||'').toLowerCase().includes(q)||String(s.email||'').toLowerCase().includes(q)).filter(s=>!tagF||(s.tags||[]).includes(tagF)), _resolvePerson);
     if(!staff.length)return;
     const color=cc[key]||'var(--text2)';
     html+='<div style="margin-bottom:20px;border-left:4px solid '+color+';border-radius:12px;overflow:hidden;background:var(--card)">';
@@ -20065,13 +20164,15 @@ function renderDocsHistory() {
   const quotations = (getDocsStore('quotations')||[]).map(d=>({...d,type:'quotation'}));
   const vouchers   = (getDocsStore('vouchers')||[]).map(d=>({...d,type:'voucher'}));
   const invoices   = (getDocsStore('invoices')||[]).map(d=>({...d,type:'invoice'}));
-  let all = [...quotations,...invoices,...vouchers].sort((a,b)=>b.createdAt?.localeCompare(a.createdAt||'')||0);
+  const receipts   = (getDocsStore('receipts')||[]).map(d=>({...d,type:'receipt'}));
+  let all = [...quotations,...invoices,...receipts,...vouchers].sort((a,b)=>b.createdAt?.localeCompare(a.createdAt||'')||0);
   if(docsHistFilter!=='all') all=all.filter(d=>d.type===docsHistFilter);
   if(q) all=all.filter(d=>(d.docNo||'').toLowerCase().includes(q)||(d.client||d.staffName||'').toLowerCase().includes(q)||(d.projName||'').toLowerCase().includes(q));
   if(!all.length){el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">ยังไม่มีเอกสาร</div>';return;}
   const typeInfo = {
     quotation:{ icon:'📋', label:'ใบเสนอราคา', color:'var(--accent2)', bg:'rgba(0,180,255,.1)', border:'rgba(0,180,255,.25)' },
     invoice:  { icon:'🧾', label:'ใบแจ้งหนี้', color:'var(--red)',     bg:'rgba(255,64,64,.1)', border:'rgba(255,64,64,.25)' },
+    receipt:  { icon:'🧾', label:'ใบเสร็จรับเงิน', color:'var(--green)', bg:'rgba(0,223,160,.1)', border:'rgba(0,223,160,.25)' },
     voucher:  { icon:'💸', label:'ใบสำคัญจ่าย', color:'var(--green)',  bg:'rgba(0,223,160,.1)', border:'rgba(0,223,160,.25)' },
   };
   el.innerHTML='<div class="table-wrap"><table><thead><tr><th>เลขที่</th><th>ประเภท</th><th>สถานะ</th><th>ถึง</th><th>โปรเจกต์</th><th>ยอด</th><th>วันที่</th><th>Action</th></tr></thead><tbody>'+
@@ -20108,6 +20209,7 @@ function renderDocsHistory() {
       <td><div style="display:flex;gap:5px;flex-wrap:wrap">
         <button class="btn btn-xs btn-outline" onclick="repreviewDoc('${d.type}','${d.docNo}')">👁️ ดู</button>
         ${d.type==='invoice'?'<button class="btn btn-xs" style="background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.35);color:var(--accent2)" onclick="editInvoice(\''+d.docNo+'\')">✏️ แก้ไข</button>':''}
+        ${d.type==='invoice'?'<button class="btn btn-xs" style="background:rgba(0,223,160,.12);border:1px solid rgba(0,223,160,.35);color:var(--green);font-weight:700" onclick="issueReceiptFromInvoice(\''+d.docNo+'\')" title="ลูกค้าจ่ายแล้ว → ออกใบเสร็จรับเงินจากใบแจ้งหนี้ใบนี้">🧾 ออกใบเสร็จ</button>':''}
         ${d.type==='quotation'?'<button class="btn btn-xs" style="background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.35);color:var(--accent2)" onclick="editQuotation(\''+d.docNo+'\')">✏️ แก้ไข</button>':''}
         ${d.type==='voucher'?'<button class="btn btn-xs" style="background:rgba(155,111,255,.12);border:1px solid rgba(155,111,255,.35);color:#9B6FFF;font-weight:700" onclick="_vcOpenGmailForVoucher(\''+d.docNo+'\')" title="เปิด Gmail พร้อมเนื้อหา">📧 ส่ง</button>':''}
         ${d.type==='voucher'?'<button class="btn btn-xs" style="background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.35);color:var(--orange);font-weight:700" onclick="revertVoucher(\''+d.docNo+'\')" title="ยกเลิกใบนี้ + คืนสถานะงานเป็น \'อนุมัติแล้ว\'">↩️ ยกเลิก</button>':''}
@@ -20119,7 +20221,7 @@ function renderDocsHistory() {
 
 function deleteDoc(type, docNo){
   if(!confirm('ลบเอกสาร '+docNo+' จริง ๆ ใช่ไหม?\n(เฉพาะในประวัติ ไฟล์ Drive จะยังอยู่)')) return;
-  const storeKey = type==='invoice'?'invoices' : type==='quotation'?'quotations' : 'vouchers';
+  const storeKey = type==='invoice'?'invoices' : type==='quotation'?'quotations' : type==='receipt'?'receipts' : 'vouchers';
   const arr = (getDocsStore(storeKey)||[]).filter(d=>d.docNo!==docNo);
   saveDocsStore(storeKey, arr);
   renderDocsHistory();
@@ -20189,6 +20291,13 @@ function repreviewDoc(type, docNo) {
     const el=document.getElementById('receipt-body');
     if(el) el.innerHTML=buildInvoiceHTML(d);
     window._lastReceiptCtx={staffId:null,vNo:docNo,type:'invoice',email:d.email||''};
+    openModal('modal-receipt');
+  } else if(type==='receipt'){
+    const d=(getDocsStore('receipts')||[]).find(x=>x.docNo===docNo);
+    if(!d){toast('ไม่พบข้อมูล','warn');return;}
+    const el=document.getElementById('receipt-body');
+    if(el) el.innerHTML=buildReceiptDocHTML(d);
+    window._lastReceiptCtx={staffId:null,vNo:docNo,type:'receipt',email:d.email||''};
     openModal('modal-receipt');
   } else {
     const d=(getDocsStore('vouchers')||[]).find(x=>x.docNo===docNo);
@@ -21431,8 +21540,9 @@ function startFirebaseSync() {
       const d=snap.val();
       if(d.quotations)ls('docs_quotations',d.quotations);
       if(d.history)ls('docs_history',d.history);
-      // 🔧 sync ใบสำคัญจ่าย + ใบแจ้งหนี้ ลงเครื่องนี้ด้วย (เดิมไม่ได้ทำ → ประวัติ/รายการไม่ขึ้นข้ามเครื่อง)
+      // 🔧 sync ใบสำคัญจ่าย + ใบแจ้งหนี้ + ใบเสร็จ ลงเครื่องนี้ด้วย (เดิมไม่ได้ทำ → ประวัติ/รายการไม่ขึ้นข้ามเครื่อง)
       if(d.vouchers)ls('docs_vouchers',d.vouchers);
+      if(d.receipts)ls('docs_receipts',d.receipts);
       if(d.invoices)ls('docs_invoices',d.invoices);
       // 🔧 อัปเดต seq ทั้ง localStorage และตัวแปรในหน่วยความจำ (กันออกเลขใบซ้ำข้ามเครื่อง)
       if(d.voucherSeq){
@@ -23717,6 +23827,158 @@ function buildInvoiceHTML(data){
     </div>
   </div>`;
 }
+// ══ 🧾 ใบเสร็จรับเงิน — ออกจากใบแจ้งหนี้ที่ลูกค้าจ่ายแล้ว ══
+function issueReceiptFromInvoice(invDocNo){
+  const inv=(getDocsStore('invoices')||[]).find(x=>x.docNo===invDocNo);
+  if(!inv){ toast('ไม่พบใบแจ้งหนี้','error'); return; }
+  const already=(getDocsStore('receipts')||[]).find(x=>x.fromInvoice===invDocNo);
+  const today=new Date().toISOString().split('T')[0];
+  _tagOverlayShow('🧾 ออกใบเสร็จรับเงิน — จาก '+esc(invDocNo), `
+    ${already?'<div style="background:rgba(255,158,0,.1);border:1px solid rgba(255,158,0,.35);border-radius:9px;padding:8px 12px;font-size:12px;color:var(--orange);margin-bottom:10px">⚠️ ใบแจ้งหนี้นี้เคยออกใบเสร็จแล้ว ('+esc(already.docNo)+') — ออกอีกใบได้ถ้าตั้งใจ</div>':''}
+    <div style="font-size:12.5px;margin-bottom:10px">ลูกค้า: <strong>${esc(inv.client||'—')}</strong> · ยอดตามใบแจ้งหนี้: <strong style="color:var(--green)">${fmtB(inv.total||0)}</strong></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <div><div style="font-size:11px;color:var(--text2);margin-bottom:3px">วันที่รับเงิน</div>
+        <input id="rcp-date" type="date" value="${today}" style="padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px"></div>
+      <div style="flex:1;min-width:150px"><div style="font-size:11px;color:var(--text2);margin-bottom:3px">วิธีรับเงิน</div>
+        <select id="rcp-method" class="form-input form-select" style="width:100%;padding:7px 26px 7px 10px;font-size:12.5px">
+          <option>โอนเข้าบัญชี</option><option>เงินสด</option><option>เช็ค</option><option>อื่น ๆ</option>
+        </select></div>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:3px">หมายเหตุ (ไม่บังคับ)</div>
+    <input id="rcp-note" class="form-input" style="width:100%;box-sizing:border-box;padding:7px 10px;font-size:12.5px" placeholder="เช่น รับชำระงวดสุดท้าย">
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-green" style="flex:1" onclick="_rcpCreate('${esc(invDocNo)}')">✅ ออกใบเสร็จ</button>
+      <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ยกเลิก</button>
+    </div>`, 520);
+}
+async function _rcpCreate(invDocNo){
+  const inv=(getDocsStore('invoices')||[]).find(x=>x.docNo===invDocNo);
+  if(!inv){ toast('ไม่พบใบแจ้งหนี้','error'); return; }
+  const rcp={
+    docNo: generateDocNo('RCP'),
+    fromInvoice: invDocNo,
+    client: inv.client||'', email: inv.email||'',
+    projIds: [...(inv.projIds||[])],
+    payAccountIds: [...(inv.payAccountIds||[])],
+    items: (inv.items||[]).map(x=>({...x})),
+    vat: inv.vat||0, total: inv.total||0,
+    date: document.getElementById('rcp-date')?.value||new Date().toISOString().split('T')[0],
+    method: document.getElementById('rcp-method')?.value||'โอนเข้าบัญชี',
+    note: (document.getElementById('rcp-note')?.value||'').trim(),
+    createdAt: new Date().toISOString(),
+    createdBy: currentUser?.nickname||currentUser?.email||'',
+    isDraft: false,
+  };
+  const arr=getDocsStore('receipts')||[]; arr.push(rcp);
+  saveDocsStore('receipts', arr);
+  try{ logAudit('doc.receipt', rcp.client||rcp.docNo, 'ออกใบเสร็จรับเงิน '+rcp.docNo+' ('+fmtB(rcp.total)+') จาก '+invDocNo); }catch(e){}
+  document.getElementById('tag-overlay')?.remove();
+  const el=document.getElementById('receipt-body');
+  if(el) el.innerHTML=buildReceiptDocHTML(rcp);
+  window._lastReceiptCtx={staffId:null,vNo:rcp.docNo,type:'receipt',email:rcp.email||''};
+  openModal('modal-receipt');
+  try{ renderDocsHistory(); }catch(e){}
+  toast('🧾 ออกใบเสร็จ '+rcp.docNo+' แล้ว','success');
+}
+// เอกสารใบเสร็จ (โครงเดียวกับใบแจ้งหนี้ แต่เป็นหลักฐาน "รับเงินแล้ว")
+function buildReceiptDocHTML(d){
+  const items=d.items||[];
+  const vat=d.vat||0;
+  const subtotal=items.reduce((a,x)=>a+(x.qty||1)*(x.price||0),0);
+  const vatAmt=Math.round(subtotal*vat/100);
+  const total=subtotal+vatAmt;
+  const thaiDate=x=>x?new Date(x).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}):'—';
+  const rows=items.map((x,i)=>'<tr style="border-bottom:1px solid #f3f4f6;background:'+(i%2?'#fafafa':'#fff')+'">'+
+    '<td style="padding:12px 14px"><div style="font-weight:600;color:#111827">'+(x.desc||'—')+'</div>'+(x.detail?'<div style="font-size:11px;color:#9ca3af;margin-top:2px">'+x.detail+'</div>':'')+'</td>'+
+    '<td style="padding:12px 8px;text-align:center;color:#374151">'+(x.qty||1)+'</td>'+
+    '<td style="padding:12px 8px;text-align:center;color:#6b7280">'+(x.unit||'งาน')+'</td>'+
+    '<td style="padding:12px 8px;text-align:right;color:#374151">฿'+(x.price||0).toLocaleString()+'</td>'+
+    '<td style="padding:12px 14px;text-align:right;font-weight:600;color:#111827">฿'+((x.qty||1)*(x.price||0)).toLocaleString()+'</td>'+
+    '</tr>').join('');
+  const adminSig=ls('admin_signature');
+  return `<div id="printable-receiptdoc" data-vno="${d.docNo}" style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:620px;margin:0 auto;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb">
+    <div style="background:#0d3d24;padding:26px 30px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:72px;object-fit:contain;display:block">
+          <div style="color:#a0e5c0;font-size:11px;margin-top:7px">penguinstudiovoice@gmail.com</div>
+        </div>
+        <div style="text-align:right">
+          <div style="color:#fff;font-size:20px;font-weight:700;letter-spacing:1px">ใบเสร็จรับเงิน</div>
+          <div style="color:#a0e5c0;font-size:10px;margin-top:2px;letter-spacing:0.5px">RECEIPT</div>
+          <div style="margin-top:10px;background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 12px">
+            <div style="color:#a0e5c0;font-size:10px;letter-spacing:1px">เลขที่</div>
+            <div style="color:#fff;font-size:15px;font-weight:600">${d.docNo}</div>
+            <div style="color:#a0e5c0;font-size:11px;margin-top:3px">${thaiDate(d.date)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="height:5px;background:linear-gradient(90deg,#00B37E,#00DFA0,#7CF5CB);-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important"></div>
+    <div style="padding:22px 30px 0">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:14px">
+        <div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ได้รับเงินจาก</div>
+          <div style="font-size:16px;font-weight:700;color:#111827">${d.client||'—'}</div>
+          ${d.email?'<div style="font-size:12px;color:#6b7280;margin-top:3px">'+d.email+'</div>':''}
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">ผู้รับเงิน</div>
+          <div style="font-size:16px;font-weight:700;color:#111827">Guin Home Studio</div>
+        </div>
+      </div>
+      <div style="padding:10px 14px;background:#effaf4;border:1px solid #b9ecd7;border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:12px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+        <div style="font-size:11px;color:#0d7a52;text-transform:uppercase;letter-spacing:1.5px;font-weight:700">✓ ชำระเงินเรียบร้อยแล้ว</div>
+        <div style="font-size:13px;font-weight:700;color:#0d7a52">${d.method||'โอนเข้าบัญชี'} · ${thaiDate(d.date)}${d.fromInvoice?' · อ้างถึง '+d.fromInvoice:''}</div>
+      </div>
+    </div>
+    <div style="height:1px;background:#f3f4f6;margin:18px 30px"></div>
+    <div style="padding:0 30px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:#0d3d24;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+            <th style="text-align:left;padding:10px 14px;color:#a0e5c0;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase">รายการ</th>
+            <th style="text-align:center;padding:10px 8px;color:#a0e5c0;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">จำนวน</th>
+            <th style="text-align:center;padding:10px 8px;color:#a0e5c0;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:55px">หน่วย</th>
+            <th style="text-align:right;padding:10px 8px;color:#a0e5c0;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:95px">ราคา/หน่วย</th>
+            <th style="text-align:right;padding:10px 14px;color:#a0e5c0;font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:105px">รวม</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:flex-end;padding:18px 30px">
+      <div style="min-width:240px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6">
+          <span style="font-size:13px;color:#6b7280">ราคารวม</span>
+          <span style="font-size:13px;color:#374151">฿${subtotal.toLocaleString()}</span>
+        </div>
+        ${vat>0?'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6"><span style="font-size:13px;color:#6b7280">VAT '+vat+'%</span><span style="font-size:13px;color:#374151">฿'+vatAmt.toLocaleString()+'</span></div>':''}
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:3px solid #0d3d24">
+          <span style="font-size:14px;font-weight:700;color:#111827">ยอดที่รับชำระ</span>
+          <span style="font-size:20px;font-weight:700;color:#00B37E">฿${(d.total||total).toLocaleString()}</span>
+        </div>
+      </div>
+    </div>
+    ${d.note?'<div style="padding:0 30px 10px;font-size:11px;color:#6b7280"><strong>หมายเหตุ:</strong> '+d.note+'</div>':''}
+    <div style="padding:0 30px 26px">
+      <div style="width:260px;margin-left:auto;text-align:center">
+        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="height:96px;max-width:220px;object-fit:contain;display:block;margin:0 auto 8px">
+        <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
+        <div style="font-size:13px;font-weight:700;color:#111827">ผู้รับเงิน / Guin Home Studio</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(d.date)}</div>
+      </div>
+    </div>
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:9px 30px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:10px;color:#9ca3af">GUIN HOME STUDIO · Payment System</div>
+      <div style="display:flex;gap:5px">
+        <div style="width:6px;height:6px;border-radius:50%;background:#00B37E"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#00DFA0"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#7CF5CB"></div>
+      </div>
+    </div>
+  </div>`;
+}
 function previewInvoice(){
   const data = getInvoiceData();
   if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
@@ -24165,6 +24427,16 @@ function renderSettings(){
 }
 
 function renderBackupHistory(){
+  // ☁️ สถานะสำรองอัตโนมัติรายวัน
+  const stEl=document.getElementById('auto-backup-status');
+  if(stEl){
+    const st=ls('auto_backup_status');
+    stEl.innerHTML = st
+      ? (st.ok
+        ? '☁️ สำรองอัตโนมัติล่าสุด: <strong style="color:var(--green)">'+new Date(st.at).toLocaleString('th-TH')+'</strong> — เก็บบน Firebase หมุน 7 วันล่าสุด'
+        : '⚠️ <span style="color:var(--orange)">สำรองอัตโนมัติครั้งล่าสุดไม่สำเร็จ ('+esc(st.error||'')+') — ระบบจะลองใหม่วันถัดไป</span>')
+      : '☁️ สำรองอัตโนมัติรายวัน: เปิดใช้แล้ว — จะสำรองครั้งแรกเมื่อแอดมินเปิดเว็บแบบออนไลน์';
+  }
   const el = document.getElementById('backup-history'); if(!el) return;
   const hist = ls('backup_history') || [];
   if(!hist.length){
@@ -24183,6 +24455,70 @@ function renderBackupHistory(){
     </div>`;
 }
 
+// ── 🕐 สำรองอัตโนมัติรายวัน → Firebase ──
+//    เก็บที่ backups/auto/d0-d6 (ตามวันในสัปดาห์ หมุนทับเอง = มีสำเนา 7 วันล่าสุดเสมอ)
+//    ทำงานเองวันละครั้งตอนแอดมินเปิดเว็บ — ไม่ต้องกดอะไร ไม่มีไฟล์เด้งดาวน์โหลด
+async function autoDailyBackup(){
+  try{
+    if(!_fbDatabase || currentUser?.role!=='admin') return;
+    const today=new Date().toISOString().split('T')[0];
+    if(ls('auto_backup_last')===today) return; // วันนี้สำรองไปแล้ว
+    const payload={
+      version:'guin-studio-v3', exportedAt:new Date().toISOString(),
+      exportedBy:(currentUser?.email||'auto'), auto:true,
+      data:{
+        projects:getProjects(), staff:ls('staff_v3')||{}, paymentAccounts:getPaymentAccounts(),
+        docs_invoices:getDocsStore('invoices'), docs_quotations:getDocsStore('quotations'),
+        docs_vouchers:getDocsStore('vouchers'), docs_receipts:getDocsStore('receipts'),
+        warnings:ls('warnings_v1')||[], appreciations:ls('appreciations_v1')||[],
+        calc_drafts:ls('calc_drafts_v1')||[], trkCards:ls('trk_cards_v3')||[],
+        admin_signature:ls('admin_signature')||'',
+      }
+    };
+    const day=new Date().getDay();
+    await _fbDatabase.ref('backups/auto/d'+day).set({date:today, at:payload.exportedAt, json:JSON.stringify(payload)});
+    ls('auto_backup_last', today);
+    ls('auto_backup_status', {ok:true, at:payload.exportedAt, slot:'d'+day});
+  }catch(e){
+    ls('auto_backup_status', {ok:false, at:new Date().toISOString(), error:String((e&&e.message)||e)});
+    console.warn('auto backup failed:', e);
+  }
+}
+// ดูรายการสำรองอัตโนมัติ + ดาวน์โหลดเป็นไฟล์ (เอาไปกดกู้คืนจากไฟล์ได้เลย)
+async function openAutoBackupList(){
+  if(!_fbDatabase){ toast('ต้องออนไลน์และล็อกอินก่อน','error'); return; }
+  showLoader(true);
+  try{
+    const snap=await _fbDatabase.ref('backups/auto').get();
+    const v=snap.exists()?snap.val():{};
+    const rows=Object.entries(v).map(([k,b])=>({slot:k, date:b.date||'', size:Math.round(String(b.json||'').length/1024)}))
+      .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    _tagOverlayShow('☁️ สำรองอัตโนมัติรายวัน — เก็บ 7 วันล่าสุดบน Firebase',
+      (rows.length
+        ? rows.map(x=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border2);font-size:13px">
+            <span style="flex:1">📦 ${fmtDate(x.date)} <span style="color:var(--text2);font-size:11px">(${x.size} KB)</span></span>
+            <button class="btn btn-sm btn-outline" onclick="downloadAutoBackup('${esc(x.slot)}')">⬇️ ดาวน์โหลด</button>
+          </div>`).join('')
+        : '<div style="color:var(--text2);padding:20px;text-align:center;font-size:12.5px;line-height:1.7">ยังไม่มีสำรองอัตโนมัติ<br>ระบบจะสำรองให้เองวันละครั้งเมื่อแอดมินเปิดเว็บ (ออนไลน์)</div>')
+      +'<div style="font-size:11px;color:var(--text2);margin-top:10px;line-height:1.6">ดาวน์โหลดแล้วเอาไฟล์ไปกดที่ "🔄 กู้คืนจากไฟล์" ได้เลย · ระบบหมุนทับไฟล์เก่าเองสัปดาห์ละรอบ</div>', 520);
+  }catch(e){ toast('โหลดรายการไม่ได้: '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+async function downloadAutoBackup(slot){
+  try{
+    const snap=await _fbDatabase.ref('backups/auto/'+slot).get();
+    if(!snap.exists()){ toast('ไม่พบข้อมูล','error'); return; }
+    const b=snap.val();
+    const blob=new Blob([b.json||''],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='guin-autobackup-'+(b.date||slot)+'.json';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast('⬇️ ดาวน์โหลดสำรองของวันที่ '+fmtDate(b.date)+' แล้ว','success');
+  }catch(e){ toast('ดาวน์โหลดไม่ได้: '+e.message,'error'); }
+}
+
 // ── EXPORT BACKUP ──
 function exportBackup(){
   try {
@@ -24197,6 +24533,7 @@ function exportBackup(){
         docs_invoices:    getDocsStore('invoices'),
         docs_quotations:  getDocsStore('quotations'),
         docs_vouchers:    getDocsStore('vouchers'),
+        docs_receipts:    getDocsStore('receipts'),
         warnings:         ls('warnings_v1') || [],
         appreciations:    ls('appreciations_v1') || [],
         calc_drafts:      ls('calc_drafts_v1') || [],
@@ -24334,6 +24671,7 @@ async function confirmRestore(){
     if(d.docs_invoices)   ls('docs_invoices', d.docs_invoices);
     if(d.docs_quotations) ls('docs_quotations', d.docs_quotations);
     if(d.docs_vouchers)   ls('docs_vouchers', d.docs_vouchers);
+    if(d.docs_receipts)   ls('docs_receipts', d.docs_receipts);
     if(d.warnings)        ls('warnings_v1', d.warnings);
     if(d.appreciations)   ls('appreciations_v1', d.appreciations);
     if(d.calc_drafts)     ls('calc_drafts_v1', d.calc_drafts);
@@ -24351,6 +24689,7 @@ async function confirmRestore(){
         if(d.docs_invoices)   await _fbDatabase.ref('docs/invoices').set(d.docs_invoices);
         if(d.docs_quotations) await _fbDatabase.ref('docs/quotations').set(d.docs_quotations);
         if(d.docs_vouchers)   await _fbDatabase.ref('docs/vouchers').set(d.docs_vouchers);
+        if(d.docs_receipts)   await _fbDatabase.ref('docs/receipts').set(d.docs_receipts);
       }catch(e){ console.error('Firebase restore partial fail:',e); }
     }
 
