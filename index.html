@@ -4295,7 +4295,7 @@ async function testDiscordChannels(){
 // ── จับคู่ชื่อ Discord กับทะเบียนทีม ──
 //    ชื่อใน Discord มักมีสร้อยโรล เช่น "ปอ พากย์ หญิง" / "คริส.พาร์ก/หญิง" → ตัดออกก่อนเทียบ
 function _dcCleanName(s){
-  return String(s||'')
+  return String(s||'').normalize('NFC')
     .replace(/[\[\(（].*?[\]\)）]/g,' ')                       // ตัดวงเล็บ
     .replace(/พากย์|นักพากย์|มิกซ์|ซับ|บท|เมเนเจอร์|QC|Mix|Sub|Dub/gi,' ')
     .replace(/ชาย|หญิง|male|female/gi,' ')
@@ -4321,17 +4321,24 @@ function matchStaffByDiscord(msg){
   const clean=_dcCleanName(raw);
   if(!clean) return {staff:null, how:'none'};
   const dTokens=_dcTokens(raw);
-  const cand=[];
+  // ⚠️ ทะเบียนเก็บคนหนึ่งคนแยกเรคคอร์ดต่อหมวด (เช่น อยู่ทั้งทีมพากย์+QC = 2 เรคคอร์ด id เดียวกัน)
+  //    ต้องรวมเป็นคนเดียวก่อน ไม่งั้นคนเดียวถูกมองเป็น "ชื่อซ้ำ 2 คน" แล้วระบบไม่กล้าจับคู่
+  const cand=[]; const candBy={};
+  const addCand=(s,score)=>{
+    const ex=candBy[s.id];
+    if(ex){ if(score>ex.score) ex.score=score; }
+    else { const c={s,score}; candBy[s.id]=c; cand.push(c); }
+  };
   all.forEach(s=>{
     const nick=_dcCleanName(s.nickname), name=_dcCleanName(s.name);
     if(!nick && !name) return;
     // เทียบแบบคำต่อคำ — "กอล์ฟ/Golf" มีคำว่า "กอล์ฟ" ตรงกับ "กอล์ฟ พากย์ ชาย"
     //   ใช้การตรงกันเป๊ะทั้งคำเท่านั้น กันเคส "ครีม" ไปแมตช์ "ครีมมี่"
     const nTokens=_dcTokens(s.nickname);
-    if(nick && clean===nick) cand.push({s,score:4});
-    else if(nTokens.some(t=>dTokens.includes(t))) cand.push({s,score:3});
-    else if(name && clean===name) cand.push({s,score:2});
-    else if(_dcTokens(s.name).some(t=>t.length>=3 && dTokens.includes(t))) cand.push({s,score:1});
+    if(nick && clean===nick) addCand(s,4);
+    else if(nTokens.some(t=>dTokens.includes(t))) addCand(s,3);
+    else if(name && clean===name) addCand(s,2);
+    else if(_dcTokens(s.name).some(t=>t.length>=3 && dTokens.includes(t))) addCand(s,1);
   });
   if(!cand.length) return {staff:null, how:'none'};
   cand.sort((a,b)=>b.score-a.score);
@@ -4389,7 +4396,8 @@ async function pullFromDiscord(silent, allHistory){
   if(!chId){ if(!silent){ toast('ยังไม่ได้ตั้ง ID ห้องของทีมนี้','error'); openDiscordSetup(); } return; }
   if(!silent) showLoader(true);
   try{
-    const res=await callAppsScript({action:'discordFetch', channelId:chId, afterId:r.postedMessageId||'', limit:100});
+    // allHistory = ดึง 100 ข้อความล่าสุดทั้งห้อง (ไม่สนว่าโพสของบอทอยู่ตรงไหน)
+    const res=await callAppsScript({action:'discordFetch', channelId:chId, afterId:(allHistory?'':(r.postedMessageId||'')), limit:100});
     let msgs=res.messages||[];
     const fetched=msgs.length;
     let skipped=0;
@@ -4425,12 +4433,20 @@ async function pullFromDiscord(silent, allHistory){
           return pullFromDiscord(false, true);
         }
         toast('ไม่พบคำตอบใหม่','info');
+      } else if(!msgs.length && r.postedMessageId && !allHistory){
+        // โพสผ่านบอทแล้วแต่ไม่เจอข้อความใหม่ — เคสทีมตอบไว้ก่อนโพส หรือเพิ่งกด "โพสใหม่" ทับ
+        if(confirm('ไม่พบข้อความใหม่หลังโพสล่าสุดของบอท\n(ถ้าทีมตอบไว้ก่อนโพส หรือเพิ่งกดโพสใหม่ทับ คำตอบจะอยู่ก่อนหน้าโพส)\n\nดึง 100 ข้อความล่าสุดของทั้งห้องมาตรวจแทนไหม?')){
+          showLoader(false);
+          return pullFromDiscord(false, true);
+        }
+        toast('ไม่พบคำตอบใหม่','info');
       } else {
-        toast(`🔄 ดึงมา ${msgs.length} ข้อความ · จับคู่ได้ ${n} คน${unmatched.length?' · ผูกชื่อไม่ได้ '+unmatched.length:''}${skipped?' · ข้ามข้อความเก่า '+skipped:''}`, unmatched.length?'warn':'success');
+        toast(`🔄 ดึงมา ${msgs.length} ข้อความ · จับคู่ได้ ${n} คน${unmatched.length?' · ผูกชื่อไม่ได้ '+unmatched.length+' (ดูกล่องส้ม)':''}${skipped?' · ข้ามข้อความเก่า '+skipped:''}`, unmatched.length?'warn':'success');
       }
     }
     renderAvailability();
-  }catch(e){ if(!silent) toast('ดึงไม่สำเร็จ: '+e.message,'error'); }
+    return {fetched:msgs.length, matched:n, unmatched:unmatched.length};
+  }catch(e){ if(!silent) toast('ดึงไม่สำเร็จ: '+e.message,'error'); return {fetched:0, matched:0, unmatched:0, error:String(e&&e.message||e)}; }
   finally{ if(!silent) showLoader(false); }
 }
 // กล่องรายชื่อที่ผูกไม่ได้
@@ -5340,15 +5356,22 @@ async function alcSavePrice(){
   if(res.ok){ toast('💾 บันทึกราคาแล้ว','success'); document.getElementById('tag-overlay')?.remove(); window._alcPriceCtx=null; renderAlloc(); }
   else toast('บันทึกไม่สำเร็จ: '+((res.error&&res.error.message)||''),'error');
 }
-// 🔄 ดึงคำตอบจาก Discord ของทุกรอบที่เปิดอยู่
+// 🔄 ดึงคำตอบจาก Discord ของทุกรอบที่เปิดอยู่ — รายงานผลรวมชัด ๆ ไม่เงียบ
 async function alcPullAll(){
   const rounds=getRounds().filter(r=>r.status==='open');
   if(!rounds.length){ toast('ยังไม่มีรอบลงคิวที่เปิดอยู่ — เปิดรอบที่หน้า 📌 ลงคิว','warn'); return; }
   const keep=_avRoundId;
   showLoader(true);
+  let fetched=0, matched=0, unm=0, errs=[];
   try{
-    for(const r of rounds){ _avRoundId=r.id; await pullFromDiscord(true); }
-    toast('🔄 ดึงคำตอบจาก '+rounds.length+' รอบที่เปิดอยู่แล้ว','success');
+    for(const r of rounds){
+      _avRoundId=r.id;
+      const st=await pullFromDiscord(true);
+      if(st){ fetched+=st.fetched||0; matched+=st.matched||0; unm+=st.unmatched||0; if(st.error) errs.push(st.error); }
+    }
+    if(errs.length) toast('ดึงไม่สำเร็จบางรอบ: '+errs[0],'error');
+    else if(!fetched) toast('ไม่พบข้อความใหม่ใน Discord — ถ้าทีมตอบไว้ก่อนโพสล่าสุด ให้ไปหน้า 📌 ลงคิว กด "ดึงคำตอบจาก Discord" ระบบจะเสนอดึงย้อนหลังทั้งห้องให้','warn');
+    else toast('🔄 ดึงมา '+fetched+' ข้อความ · จับคู่ได้ '+matched+' คน'+(unm?' · ผูกชื่อไม่ได้ '+unm+' คน — ดูกล่องส้มในช่องรายชื่อ':''), unm?'warn':'success');
   }catch(e){ toast('ดึงไม่สำเร็จ: '+e.message,'error'); }
   finally{ _avRoundId=keep; showLoader(false); renderAlloc(); }
 }
@@ -8407,86 +8430,34 @@ function renderDash(){
   const projCancelled = projs.filter(p => p.projStatus === 'cancelled').length;
   const projActive = projs.length - projCancelled;
   const urgent=projs.filter(p=>{if(!p.deadline)return false;const dl=new Date(p.deadline);dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));return diff>=0&&diff<=7}).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
-  // 📖 เรียงการ์ดเป็นเรื่องเดียวอ่านจากบนลงล่าง: 1) เงินจากลูกค้า → 2) ค่าจ้างทีม → 3) สรุปกำไร
-  const pctCollected = totalRevenue>0 ? Math.round(revenue/totalRevenue*100) : 0;
-  const cash = revenue - paid; // เงินสดที่ผ่านมือจริง = เงินลูกค้าที่เข้าแล้ว − ที่จ่ายทีมไปแล้ว
-  const _dsGroupH=(icon,title,sub)=>`<div style="display:flex;align-items:baseline;gap:9px;margin:0 2px 8px;flex-wrap:wrap"><span style="font-size:12.5px;font-weight:800;letter-spacing:.4px">${icon} ${title}</span><span style="font-size:11px;color:var(--text2)">${sub}</span></div>`;
+  // 💳 การ์ด 4 ใบ (ตามที่เจ้าของกำหนด): ยอดบิล → เก็บแล้ว → ค่าจ้างทีม → สรุปกำไร
+  const cash = revenue - paid; // เงินสดตอนนี้ = เงินลูกค้าที่เข้าแล้ว − ที่จ่ายทีมไปแล้ว
   const _dsEl=document.getElementById('dash-stats');
-  _dsEl.style.display='block';
+  _dsEl.style.display='';
   _dsEl.innerHTML=`
-    <div onclick="nav('projects')" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:10px 16px;margin-bottom:14px;cursor:pointer;font-size:12.5px">
-     <span style="font-size:16px">📁</span><strong>${projs.length} โปรเจกต์</strong>
-     <span style="color:var(--text2)">${projActive} ดำเนินการ${projCancelled?' · '+projCancelled+' ยกเลิก':''}</span>
-     <span style="margin-left:auto;color:var(--text2);font-size:11px">อ่านจากบนลงล่าง: เงินเข้า → จ่ายทีม → เหลือเป็นกำไร</span>
+    <div class="stat-card" onclick="nav('projects')" title="มูลค่างานทุกโปรเจกต์ตามบิล (ไม่นับงานที่ยกเลิก)">
+     <span class="stat-icon">🧾</span>
+     <div class="stat-label">ยอดตามบิลทั้งหมด</div>
+     <div class="stat-value">${fmtB(totalRevenue)}</div>
+     <div class="stat-delta">${projActive} โปรเจกต์${projCancelled?' · ยกเลิก '+projCancelled:''}</div>
     </div>
-    <div style="margin-bottom:14px">
-     ${_dsGroupH('💙','1. เงินจากลูกค้า','งานทั้งหมดตีเป็นเงินเท่าไหร่ · เข้ามาแล้วเท่าไหร่ · ค้างอีกเท่าไหร่')}
-     <div class="stats-grid" style="margin-bottom:0">
-      <div class="stat-card" onclick="nav('profit')" title="มูลค่างานทุกโปรเจกต์ตามบิล (ไม่นับงานที่ยกเลิก)">
-       <span class="stat-icon">🧾</span>
-       <div class="stat-label">ยอดตามบิลทั้งหมด</div>
-       <div class="stat-value">${fmtB(totalRevenue)}</div>
-       <div class="stat-delta">มูลค่างานทั้งหมดที่รับมา</div>
-      </div>
-      <div class="stat-card" onclick="openRevenueBreakdown()" title="เงินที่ลูกค้าจ่ายมาแล้วจริงเท่านั้น — ไม่นับงานที่ยังไม่ได้เก็บเงิน">
-       <span class="stat-icon">💰</span>
-       <div class="stat-label">เก็บเงินแล้ว</div>
-       <div class="stat-value" style="color:var(--green)">${fmtB(revenue)}</div>
-       <div class="stat-delta up">${pctCollected}% ของยอดบิล</div>
-      </div>
-      <div class="stat-card" onclick="nav('profit')" title="ยอดที่ยังไม่ได้เก็บเงินจากลูกค้า">
-       <span class="stat-icon">📋</span>
-       <div class="stat-label">รอเก็บอีก</div>
-       <div class="stat-value" style="color:${revenuePending?'var(--orange)':'var(--text2)'}">${fmtB(revenuePending)}</div>
-       <div class="stat-delta ${revenuePending?'down':'up'}">${F.overdue?'🔴 เลยกำหนดแล้ว '+fmtB(F.overdue):revenuePending?'ยังไม่ถึงกำหนด':'เก็บเงินครบแล้ว 🎉'}</div>
-      </div>
-     </div>
+    <div class="stat-card" onclick="openRevenueBreakdown()" title="เงินที่ลูกค้าจ่ายมาแล้วจริงเท่านั้น — ไม่นับงานที่ยังไม่ได้เก็บเงิน">
+     <span class="stat-icon">💰</span>
+     <div class="stat-label">เก็บเงินแล้ว</div>
+     <div class="stat-value" style="color:var(--green)">${fmtB(revenue)}</div>
+     <div class="stat-delta" style="color:${revenuePending?'var(--orange)':'var(--green)'}">${revenuePending?'รอเก็บอีก '+fmtB(revenuePending)+(F.overdue?' · 🔴 เลยกำหนด '+fmtB(F.overdue):''):'เก็บเงินครบทุกงาน 🎉'}</div>
     </div>
-    <div style="margin-bottom:14px">
-     ${_dsGroupH('🧡','2. ค่าจ้างทีมงาน','ต้นทุนทีมของทุกงาน · จ่ายไปแล้วเท่าไหร่ · ค้างอีกเท่าไหร่')}
-     <div class="stats-grid" style="margin-bottom:0">
-      <div class="stat-card" onclick="nav('queue')" title="ค่าจ้างทีมรวมของทุกงาน (หักภาษี ณ ที่จ่ายแล้ว)">
-       <span class="stat-icon">👥</span>
-       <div class="stat-label">ค่าจ้างทีมทั้งหมด</div>
-       <div class="stat-value">${fmtB(F.expense)}</div>
-       <div class="stat-delta">ต้นทุนทีมของทุกงาน</div>
-      </div>
-      <div class="stat-card" onclick="nav('queue')" title="จ่ายให้ทีมไปแล้วจริง">
-       <span class="stat-icon">💸</span>
-       <div class="stat-label">จ่ายทีมแล้ว</div>
-       <div class="stat-value" style="color:var(--green)">${fmtB(paid)}</div>
-       <div class="stat-delta up">${paidCount} คน รับเงินแล้ว</div>
-      </div>
-      <div class="stat-card" onclick="nav('queue')" title="ค่าจ้างทีมที่ยังไม่ได้จ่าย">
-       <span class="stat-icon">⏳</span>
-       <div class="stat-label">ค้างจ่ายทีมอีก</div>
-       <div class="stat-value" style="color:${pendingWorkers.length?'var(--orange)':'var(--green)'}">${fmtB(pending)}</div>
-       <div class="stat-delta ${pendingWorkers.length?'down':'up'}">${pendingWorkers.length?pendingWorkers.length+' คน รอดำเนินการ':'ไม่มีค้างจ่าย 🎉'}</div>
-      </div>
-     </div>
+    <div class="stat-card" onclick="nav('queue')" title="ค่าจ้างทีมรวมของทุกงาน (หักภาษี ณ ที่จ่ายแล้ว)">
+     <span class="stat-icon">💸</span>
+     <div class="stat-label">ค่าจ้างทีมทั้งหมด</div>
+     <div class="stat-value">${fmtB(F.expense)}</div>
+     <div class="stat-delta"><span style="color:var(--green)">จ่ายแล้ว ${fmtB(paid)}</span> · <span style="color:${pendingWorkers.length?'var(--orange)':'var(--green)'}">ค้างจ่าย ${fmtB(pending)}</span></div>
     </div>
-    <div>
-     ${_dsGroupH('💚','3. สรุปกำไร','เงินจากลูกค้า − ค่าจ้างทีม = เหลือเท่าไหร่')}
-     <div class="stats-grid" style="margin-bottom:0">
-      <div class="stat-card" onclick="nav('profit')" title="กำไรทั้งหมด = ยอดตามบิลทุกงาน − ค่าจ้างทีมทั้งหมด (คือกำไรที่จะได้เมื่อเก็บเงินลูกค้าครบ)">
-       <span class="stat-icon">📈</span>
-       <div class="stat-label">กำไรทั้งหมด</div>
-       <div class="stat-value" style="color:${profit>=0?'var(--green)':'var(--red)'}">${fmtB(profit)}</div>
-       <div class="stat-delta ${profit>=0?'up':'down'}">ยอดบิล ${fmtB(totalRevenue)} − ค่าจ้างทีม ${fmtB(F.expense)}</div>
-      </div>
-      <div class="stat-card" onclick="nav('profit')" title="กำไรสุทธิ = กำไรทั้งหมด − ค่าใช้จ่ายบริษัท (ค่าเช่า ซอฟต์แวร์ ฯลฯ)">
-       <span class="stat-icon">🏦</span>
-       <div class="stat-label">กำไรสุทธิ</div>
-       <div class="stat-value" style="color:${netProfit>=0?'var(--green)':'var(--red)'}">${fmtB(netProfit)}</div>
-       <div class="stat-delta ${netProfit>=0?'up':'down'}">${companyExp?'หักค่าใช้จ่ายบริษัท '+fmtB(companyExp):'ยังไม่ได้บันทึกค่าใช้จ่ายบริษัท'}</div>
-      </div>
-      <div class="stat-card" onclick="openRevenueBreakdown()" title="เงินลูกค้าที่เข้ามาแล้ว − ที่จ่ายทีมไปแล้ว = เงินสดที่ผ่านมือจริงตอนนี้">
-       <span class="stat-icon">👛</span>
-       <div class="stat-label">เงินสดตอนนี้</div>
-       <div class="stat-value" style="color:${cash>=0?'var(--cyan)':'var(--red)'}">${fmtB(cash)}</div>
-       <div class="stat-delta ${cash>=0?'up':'down'}">${cash>=0?'เก็บแล้ว '+fmtB(revenue)+' − จ่ายทีมแล้ว '+fmtB(paid):'⚠️ จ่ายทีมไปมากกว่าเงินที่เก็บมา — เร่งเก็บเงินลูกค้า'}</div>
-      </div>
-     </div>
+    <div class="stat-card" onclick="nav('profit')" title="สรุปกำไร = ยอดบิลทั้งหมด − ค่าจ้างทีมทั้งหมด${companyExp?' − ค่าใช้จ่ายบริษัท '+fmtB(companyExp):''} · เงินสดตอนนี้ = เงินที่เก็บแล้ว − ที่จ่ายทีมไปแล้ว">
+     <span class="stat-icon">📈</span>
+     <div class="stat-label">สรุปกำไร</div>
+     <div class="stat-value" style="color:${netProfit>=0?'var(--green)':'var(--red)'}">${fmtB(netProfit)}</div>
+     <div class="stat-delta" style="color:${cash>=0?'var(--cyan)':'var(--red)'}">เงินสดตอนนี้ ${fmtB(cash)}${companyExp?' · หักค่าใช้จ่ายบริษัทแล้ว':''}</div>
     </div>`;
   const urgentEl=document.getElementById('dash-queue');
   urgentEl.innerHTML=urgent.length?urgent.map(p=>{const dl=new Date(p.deadline);dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));const color=diff<=1?'var(--red)':diff<=3?'var(--orange)':'var(--text2)';
