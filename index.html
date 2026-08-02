@@ -1135,6 +1135,7 @@ body.sidebar-collapsed .main-content{
    <div class="nav-item" onclick="nav('queue')"><span class="nav-icon">💸</span><span>คิวจ่ายเงิน</span><span class="nav-badge hidden" id="queue-badge">0</span></div>
    <div class="nav-item" onclick="nav('payroll')"><span class="nav-icon">📆</span><span>รอบจ่ายรายเดือน</span></div>
    <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">🗓️</span><span>รอบขอคิว</span></div>
+   <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
    <div class="nav-item" onclick="nav('payment-history')"><span class="nav-icon">📜</span><span>ประวัติการจ่ายเงิน</span></div>
    <div class="nav-item" onclick="nav('profit')"><span class="nav-icon">📊</span><span>กำไร-ขาดทุน</span></div>
    <div class="nav-item" onclick="nav('docs')"><span class="nav-icon">🗂️</span><span>เอกสาร</span></div>
@@ -1159,6 +1160,7 @@ body.sidebar-collapsed .main-content{
    <div class="nav-item" onclick="nav('mgr-calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-item" onclick="nav('confirm-amount')"><span class="nav-icon">📥</span><span>ยืนยันยอด</span><span class="nav-badge hidden" id="ca-badge-mgr">0</span></div>
    <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">🗓️</span><span>รอบขอคิว</span></div>
+   <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
    <div class="nav-item" onclick="nav('mgr-team')"><span class="nav-icon">👥</span><span>จัดการทีม</span></div>
   </nav>
  </aside>
@@ -1516,6 +1518,70 @@ body.sidebar-collapsed .main-content{
    <div id="av-head" style="margin-bottom:12px"></div>
    <div id="av-table" style="overflow-x:auto"></div>
   </div>
+
+  <!-- ── 🎯 จัดสรรคนเข้าโปรเจกต์ — กระดานลากวาง (เฟส 4 · แบบ B จากแบบร่าง) ── -->
+  <div id="page-alloc" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">🎯 จัดสรรคน</div>
+    <div class="page-subtitle">ลากคนที่ตอบรับใน Discord เข้าโปรเจกต์ · แอดมิน/เมเนเจอร์เห็นกระดานเดียวกันแบบเรียลไทม์ · ยืนยันทีละโปรเจกต์แล้วใส่ราคาต่อได้เลย</div>
+    <div class="page-actions">
+     <input id="alc-proj-search" class="form-input" placeholder="🔍 ค้นหาโปรเจกต์" style="width:auto;min-width:150px;padding:7px 12px;font-size:13px" oninput="renderAlloc()">
+     <button class="btn btn-outline" onclick="nav('availability')" title="เปิดรอบ/โพสประกาศ/ผูกชื่อ Discord ที่หน้ารอบขอคิว">🗓️ ไปหน้ารอบขอคิว</button>
+     <button class="btn btn-outline" onclick="alcPullAll()" title="ดึงข้อความตอบรับล่าสุดจาก Discord ของทุกรอบที่เปิดอยู่">🔄 ดึงคำตอบล่าสุด</button>
+     <button class="btn btn-blue" onclick="openNewProject()">＋ สร้างโปรเจกต์ใหม่</button>
+    </div>
+   </div>
+   <div id="alc-body"></div>
+  </div>
+  <style>
+  /* ── 🎯 หน้าจัดสรรคน ── */
+  .alc-live{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:8px 13px;font-size:12px;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .alc-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:alcPulse 1.6s infinite;flex-shrink:0}
+  @keyframes alcPulse{50%{opacity:.35}}
+  .alc-layout{display:flex;gap:14px;align-items:flex-start}
+  .alc-pool{width:342px;flex-shrink:0;background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px 13px;position:sticky;top:10px;max-height:calc(100vh - 30px);overflow-y:auto}
+  @media(max-width:1000px){.alc-layout{flex-direction:column}.alc-pool{width:100%;position:static;max-height:none}}
+  .alc-bwrap{display:flex;gap:9px}
+  .alc-rail{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+  .alc-railbtn{width:46px;padding:7px 0;border-radius:10px;border:1.5px solid var(--border2);background:var(--bg2);text-align:center;cursor:pointer;transition:.13s;font-size:15px;line-height:1.15}
+  .alc-railbtn small{display:block;font-size:8.5px;color:var(--text2);font-weight:700}
+  .alc-railbtn:hover{border-color:var(--accent2)}
+  .alc-railbtn.on{border-color:var(--accent2);background:rgba(0,180,255,.12)}
+  .alc-blist{flex:1;min-width:0}
+  .alc-person{display:flex;align-items:center;gap:6px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;padding:6px 9px;margin-bottom:5px;cursor:grab;transition:.13s;flex-wrap:wrap}
+  .alc-person:hover{border-color:var(--accent2)}
+  .alc-person:active{cursor:grabbing}
+  .alc-person.alc-drag{opacity:.35}
+  .alc-person.alc-taken{border-color:rgba(155,111,255,.45);background:rgba(155,111,255,.08)}
+  .alc-p-n{font-size:12.5px;font-weight:800;white-space:nowrap}
+  .alc-roles{display:flex;gap:2px}
+  .alc-rl{font-size:10px;padding:1px 5px;border-radius:6px;background:rgba(255,255,255,.07);color:var(--text2)}
+  .alc-chip{font-size:9.5px;padding:2px 7px;border-radius:7px;font-weight:600;display:inline-block}
+  .alc-c-day{background:rgba(0,180,255,.14);color:var(--accent2)}
+  .alc-c-all{background:rgba(0,223,160,.15);color:var(--green)}
+  .alc-c-job{background:rgba(255,158,0,.14);color:var(--orange)}
+  .alc-c-free{background:rgba(0,223,160,.1);color:var(--green)}
+  .alc-c-warn{background:rgba(255,158,0,.16);color:var(--orange)}
+  .alc-c-in{background:rgba(155,111,255,.2);color:#CBB2FF}
+  .alc-divide{display:flex;align-items:center;gap:8px;margin:13px 0 8px;font-size:11.5px;font-weight:800;color:var(--purple)}
+  .alc-divide::after{content:'';flex:1;height:1px;background:rgba(155,111,255,.3)}
+  .alc-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(252px,1fr));gap:12px;align-items:start}
+  .alc-proj{background:var(--card);border:1.5px solid var(--border2);border-radius:12px;padding:11px 12px}
+  .alc-proj-n{font-size:13px;font-weight:800;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .alc-proj-n:hover{color:var(--accent2)}
+  .alc-proj-m{font-size:10.5px;color:var(--text2);margin:2px 0 8px;line-height:1.5}
+  .alc-prow{border:1.5px dashed var(--border2);border-radius:9px;padding:5px 8px;margin-bottom:5px;transition:.13s;min-height:29px}
+  .alc-prow.alc-over{border-color:var(--green);background:rgba(0,223,160,.07)}
+  .alc-prow-h{display:flex;align-items:center;font-size:10.5px;font-weight:700;gap:5px}
+  .alc-prow-c{margin-left:auto;font-size:9.5px;color:var(--text2)}
+  .alc-mini{display:inline-flex;align-items:center;gap:4px;border-radius:8px;padding:2px 8px;margin:4px 4px 0 0;font-size:10.5px;font-weight:700}
+  .alc-mini-old{background:var(--bg2);border:1px solid var(--border2);color:var(--text2)}
+  .alc-mini-new{background:rgba(155,111,255,.14);border:1px solid rgba(155,111,255,.4)}
+  .alc-x{cursor:pointer;color:var(--red);font-size:10.5px;opacity:.75}
+  .alc-x:hover{opacity:1}
+  .alc-newproj{border:2px dashed rgba(0,180,255,.35);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--accent2);cursor:pointer;min-height:150px;font-weight:700;font-size:12.5px;text-align:center;transition:.15s}
+  .alc-newproj:hover{background:rgba(0,180,255,.06)}
+  </style>
 
   <!-- ── 📆 รอบจ่ายรายเดือน — จ่าย + ออกเอกสารรายคนจบในที่เดียว ── -->
   <div id="page-payroll" class="page hidden">
@@ -4477,6 +4543,7 @@ function showRoundAnnounce(roundId){
     <textarea id="ra-text" rows="10" style="width:100%;padding:11px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:Kanit;font-size:13px;line-height:1.65;resize:vertical;box-sizing:border-box">${esc(txt)}</textarea>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="btn" style="flex:1" onclick="_raCopy()">📋 คัดลอกข้อความ</button>
+      ${r.postedMessageId?`<button class="btn btn-green" style="flex:1" onclick="updateRoundPost('${r.id}')" title="แก้ข้อความในโพสเดิมบน Discord — ไม่โพสใหม่ให้รก">🔄 อัปเดตโพสเดิมใน Discord</button>`:''}
       <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
     </div>
     <div style="font-size:11px;color:var(--text2);margin-top:10px;line-height:1.6">
@@ -4802,6 +4869,317 @@ function avCopyForChat(){
   }catch(e){
     _tagOverlayShow('📋 สรุปคิวว่าง', `<textarea readonly style="width:100%;height:260px;padding:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">${esc(txt)}</textarea>`, 600);
   }
+}
+
+// ══════════════════════════════════════════════
+// 🎯 จัดสรรคนเข้าโปรเจกต์ — กระดานลากวาง (เฟส 4 · แบบ B)
+//    ซ้าย: คนที่ตอบรับจากรอบขอคิวที่เปิดอยู่ (กรองตามหมวด + ค้นหา)
+//    ขวา: โปรเจกต์เรียงตามเดทไลน์ — ลากชื่อใส่ช่องตำแหน่ง → ✅ ยืนยันทีละโปรเจกต์ → ใส่ราคา
+//    การลากเป็น "ฉบับร่าง" เก็บใน misc/allocdraft → ทุกเครื่องเห็นพร้อมกันแบบเรียลไทม์
+// ══════════════════════════════════════════════
+const ALC_ROLE={adp:'✍️ เกลาบท',dub:'🎤 พากย์',mix:'🎧 มิกซ์',qc:'✅ QC',sub:'🎬 Sub',mgr:'🗂️ เมเนเจอร์'};
+const ALC_PRE=['adp','dub','mix','qc','sub','mgr'];
+const ALC_CAT2PRE={adaptation:'adp',dubbing:'dub',mix:'mix',qc:'qc',subVideo:'sub',manager:'mgr'};
+const ALC_TH_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+let _alcFilter='all', _alcSearch='', _alcShowAll=false, _alcDragSid=null;
+// Firebase อาจคืน array กลับมาเป็น object — แปลงให้เป็น array เสมอ
+function _alcArr(v){ return Array.isArray(v)?v:(v&&typeof v==='object'?Object.values(v):[]); }
+function getAllocDraft(){ const v=ls('allocdraft'); return (v&&typeof v==='object'&&!Array.isArray(v))?v:{}; }
+async function saveAllocDraft(d){ ls('allocdraft', d); try{ await fbSaveKeyed('allocdraft', d); }catch(e){} }
+function _alcDL(iso){ if(!iso) return '—'; const p=String(iso).split('-'); return p.length===3 ? p[2]+'/'+p[1] : String(iso); }
+function _alcPres(s){
+  const cats=Array.isArray(s.categories)&&s.categories.length ? s.categories : (s.category?[s.category]:[]);
+  const set=new Set(); cats.forEach(c=>{ const p=ALC_CAT2PRE[c]; if(p) set.add(p); });
+  return [...set];
+}
+function _alcRoundDays(r){
+  const out=[]; if(!r||!r.dateFrom||!r.dateTo) return out;
+  let d=new Date(r.dateFrom+'T00:00:00'); const end=new Date(r.dateTo+'T00:00:00'); let g=0;
+  while(d<=end && g<62){ out.push(new Date(d)); d.setDate(d.getDate()+1); g++; }
+  return out;
+}
+// รวมคนที่ตอบรับจากทุกรอบที่เปิดอยู่ (คนเดียวตอบหลายรอบได้)
+function _alcPeople(){
+  const rounds=getRounds().filter(r=>r.status==='open');
+  const map={};
+  rounds.forEach(r=>{
+    const reps=getRoundReplies(r.id)||{};
+    Object.entries(reps).forEach(([sid,e])=>{
+      if(!e || _avStatusOf(e)==='unavailable') return;
+      const s=getStaffById(sid); if(!s || !isStaffAssignable(s)) return;
+      if(!map[sid]) map[sid]={sid, staff:s, replies:[]};
+      map[sid].replies.push({cat:r.cat, freeText:e.freeText||'', at:e.updatedAt||'', round:r});
+    });
+  });
+  return Object.values(map);
+}
+// ฉบับร่างของคนนี้อยู่โปรเจกต์ไหนบ้าง
+function _alcDraftOf(sid){
+  const d=getAllocDraft(); const out=[];
+  Object.entries(d).forEach(([pid,arr])=>_alcArr(arr).forEach(x=>{ if(x&&x.sid===sid) out.push({projId:pid, pre:x.pre}); }));
+  return out;
+}
+function _alcAvailChip(rep){
+  if(!rep) return '';
+  const pf=parseFreeDays(rep.freeText, _alcRoundDays(rep.round));
+  if(pf.everyday) return '<span class="alc-chip alc-c-all">ว่างทุกวัน</span>';
+  if(pf.unclear || !pf.days.length) return '<span class="alc-chip alc-c-warn">ไม่ระบุวัน — อ่านข้อความ</span>';
+  const m=ALC_TH_M[pf.days[0].getMonth()]||'';
+  return '<span class="alc-chip alc-c-day">'+pf.days.map(x=>x.getDate()).join(', ')+' '+m+'</span>';
+}
+function _alcJobChip(sid){
+  const jobs=(typeof _avCurrentJobs==='function' ? _avCurrentJobs(sid) : [])||[];
+  if(!jobs.length) return '<span class="alc-chip alc-c-free">🟢 ว่าง</span>';
+  const j=jobs[0];
+  return '<span class="alc-chip alc-c-job" title="'+esc(jobs.map(x=>x.name+(x.dl?' ('+x.dl+')':'')).join(' · '))+'">🟠 ติด '+esc(j.name)+(j.dl?' ('+esc(j.dl)+')':'')+(jobs.length>1?' +'+(jobs.length-1):'')+'</span>';
+}
+function _alcDraftChips(sid){
+  return _alcDraftOf(sid).map(x=>{
+    const p=getProjects().find(q=>q.id===x.projId);
+    const nm=p ? String(p.name||'').slice(0,14) : '?';
+    return '<span class="alc-chip alc-c-in">📁 '+esc(nm)+' '+((ALC_ROLE[x.pre]||'').split(' ')[0])+' ('+_alcDL(p&&p.deadline)+')</span>';
+  }).join(' ');
+}
+function _alcPersonRow(o){
+  const s=o.staff;
+  const drafted=_alcDraftOf(o.sid).length>0;
+  const rep=[...o.replies].sort((a,b)=>String(b.at).localeCompare(String(a.at)))[0];
+  return '<div class="alc-person'+(drafted?' alc-taken':'')+'" draggable="true" data-sid="'+esc(o.sid)+'" title="'+esc(rep?rep.freeText:'')+'">'
+    +'<span class="alc-p-n">'+esc(s.nickname||s.name||'?')+'</span>'
+    +'<span class="alc-roles">'+_alcPres(s).map(p2=>'<span class="alc-rl">'+((ALC_ROLE[p2]||'').split(' ')[0])+'</span>').join('')+'</span>'
+    +_alcAvailChip(rep)+' '+_alcJobChip(o.sid)+(drafted?' '+_alcDraftChips(o.sid):'')
+    +'</div>';
+}
+function _alcProjs(){
+  const q=String(document.getElementById('alc-proj-search')?.value||'').trim().toLowerCase();
+  let list=getProjects().filter(p=>p && p.projStatus!=='cancelled' && p.projStatus!=='done');
+  if(q) list=list.filter(p=>String(p.name||'').toLowerCase().includes(q)||String(p.client||'').toLowerCase().includes(q));
+  return list.sort((a,b)=>String(a.deadline||'9999').localeCompare(String(b.deadline||'9999')));
+}
+function _alcProjCard(p){
+  const drafts=_alcArr(getAllocDraft()[p.id]);
+  const rows=ALC_PRE.map(pre=>{
+    const ex=(p.workers||[]).filter(w=>w&&w.id&&(w.slot||'').split('-')[0]===pre);
+    const dr=drafts.filter(x=>x&&x.pre===pre);
+    return '<div class="alc-prow" data-proj="'+esc(p.id)+'" data-pre="'+pre+'">'
+      +'<div class="alc-prow-h">'+ALC_ROLE[pre]+'<span class="alc-prow-c">'+(ex.length+dr.length ? (ex.length+dr.length)+' คน' : '')+'</span></div>'
+      +ex.map(w=>{const s=getStaffById(w.id);return '<span class="alc-mini alc-mini-old" title="อยู่ในโปรเจกต์แล้ว">'+esc(s?s.nickname:'?')+'</span>';}).join('')
+      +dr.map(x=>{const s=getStaffById(x.sid);return '<span class="alc-mini alc-mini-new" title="ฉบับร่าง — ยังไม่ยืนยัน · ลากโดย '+esc(x.by||'')+'">'+esc(s?s.nickname:'?')
+        +'<span class="alc-x" onclick="alcRemoveDraft(\''+esc(p.id)+'\',\''+esc(x.sid)+'\',\''+pre+'\')">✕</span></span>';}).join('')
+      +'</div>';
+  }).join('');
+  const mgr=p.managerId ? getStaffById(p.managerId) : null;
+  return '<div class="alc-proj">'
+    +'<div class="alc-proj-n" onclick="openProjDetail(\''+esc(p.id)+'\')" title="'+esc(p.name||'')+' — กดเพื่อเปิดรายละเอียด">📁 '+esc(p.name||'(ไม่มีชื่อ)')+'</div>'
+    +'<div class="alc-proj-m">เดทไลน์ '+_alcDL(p.deadline)+(p.episodes?' · '+esc(p.episodes)+' ตอน':'')+(mgr?' · 🗂️ '+esc(mgr.nickname):'')+'</div>'
+    +rows
+    +(drafts.length ? '<button class="btn btn-green btn-sm" style="width:100%;margin-top:5px" onclick="alcConfirm(\''+esc(p.id)+'\')">✅ ยืนยัน '+drafts.length+' คน เข้าโปรเจกต์</button>' : '')
+    +'</div>';
+}
+function renderAlloc(){
+  const body=document.getElementById('alc-body'); if(!body) return;
+  const role=currentUser?.role;
+  if(role!=='admin' && role!=='manager'){
+    body.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin และ Manager เท่านั้น</div>';
+    return;
+  }
+  const openRounds=getRounds().filter(r=>r.status==='open');
+  const people=_alcPeople();
+  const match=o=>{
+    if(_alcFilter!=='all' && !_alcPres(o.staff).includes(_alcFilter)) return false;
+    if(_alcSearch && !String((o.staff.nickname||'')+' '+(o.staff.name||'')).includes(_alcSearch)) return false;
+    return true;
+  };
+  const free=people.filter(o=>match(o) && !_alcDraftOf(o.sid).length);
+  const taken=people.filter(o=>match(o) && _alcDraftOf(o.sid).length);
+  const rail='<div class="alc-rail">'
+    +'<div class="alc-railbtn'+(_alcFilter==='all'?' on':'')+'" onclick="_alcFilter=\'all\';renderAlloc()">👥<small>ทั้งหมด</small></div>'
+    +ALC_PRE.map(pre=>{
+      const n=people.filter(o=>_alcPres(o.staff).includes(pre) && !_alcDraftOf(o.sid).length).length;
+      return '<div class="alc-railbtn'+(_alcFilter===pre?' on':'')+'" onclick="_alcFilter=\''+pre+'\';renderAlloc()">'+((ALC_ROLE[pre]||'').split(' ')[0])+'<small>'+(ALC_ROLE[pre]||'').split(' ').slice(1).join(' ')+' '+n+'</small></div>';
+    }).join('')+'</div>';
+  const roundChips=openRounds.map(r=>{const c=AV_CATS[r.cat]||{};return '<span class="alc-chip alc-c-day">'+(c.icon||'')+' '+esc(c.label||r.cat)+'</span>';}).join(' ');
+  const poolInner = !openRounds.length
+    ? '<div style="text-align:center;padding:26px 10px;color:var(--text2);font-size:12.5px;line-height:1.8">ยังไม่มีรอบขอคิวที่เปิดอยู่<br><button class="btn btn-blue btn-sm" onclick="nav(\'availability\')">🗓️ ไปเปิดรอบขอคิว</button></div>'
+    : !people.length
+    ? '<div style="text-align:center;padding:26px 10px;color:var(--text2);font-size:12.5px;line-height:1.8">ยังไม่มีคนตอบรับ<br>กด "🔄 ดึงคำตอบล่าสุด" ด้านบน หรือรอทีมพิมพ์ตอบใน Discord</div>'
+    : '<div class="alc-bwrap">'+rail+'<div class="alc-blist">'
+      +'<input class="form-input" id="alc-search" placeholder="🔍 ค้นหาชื่อ…" style="width:100%;margin-bottom:8px;padding:7px 11px;font-size:12.5px;box-sizing:border-box" value="'+esc(_alcSearch)+'" oninput="_alcSearch=this.value;renderAlloc();var i=document.getElementById(\'alc-search\');i.focus();i.setSelectionRange(i.value.length,i.value.length)">'
+      +(free.map(_alcPersonRow).join('')||'<div style="font-size:11.5px;color:var(--text2);padding:4px">— ไม่พบคนว่างในหมวดนี้ —</div>')
+      +(taken.length?'<div class="alc-divide">⬇️ ถูกลากเข้างานแล้ว '+taken.length+' คน (ลากเพิ่มได้)</div>'+taken.map(_alcPersonRow).join(''):'')
+      +'</div></div>';
+  const projs=_alcProjs();
+  const shown=_alcShowAll?projs:projs.slice(0,18);
+  body.innerHTML=
+    '<div class="alc-live"><span class="alc-dot"></span><strong>เรียลไทม์</strong> ใครลากใครไปไหน แอดมิน/เมเนเจอร์ทุกคนเห็นทันที · ชื่อที่ลากเป็น "ฉบับร่าง" (สีม่วง) จนกว่าจะกด ✅ ยืนยันของโปรเจกต์นั้น'
+    +(roundChips?' <span style="margin-left:auto">รอบที่เปิดอยู่: '+roundChips+'</span>':'')+'</div>'
+    +'<div class="alc-layout">'
+    +'<div class="alc-pool"><div style="font-size:13px;font-weight:800;margin-bottom:2px">👥 คนที่ตอบรับ</div>'
+    +'<div style="font-size:11px;color:var(--text2);margin-bottom:10px">กดไอคอนซ้ายเพื่อเลือกหมวด · ชี้เมาส์ค้างที่ชื่อเพื่อดูข้อความเต็ม · ลากชื่อไปวางในโปรเจกต์ทางขวา — คนเดียวลากได้หลายงาน</div>'
+    +poolInner+'</div>'
+    +'<div style="flex:1;min-width:0"><div class="alc-board">'
+    +shown.map(_alcProjCard).join('')
+    +'<div class="alc-newproj" onclick="openNewProject()"><div style="font-size:26px">＋</div>สร้างโปรเจกต์ใหม่<div style="font-size:10px;color:var(--text2);font-weight:400;padding:0 14px">กรอกชื่อ/เดทไลน์ก่อน<br>ค่อยลากคนเข้าทีหลัง</div></div>'
+    +'</div>'
+    +(projs.length>18&&!_alcShowAll?'<button class="btn btn-outline" style="margin-top:10px;width:100%" onclick="_alcShowAll=true;renderAlloc()">แสดงทั้งหมด '+projs.length+' โปรเจกต์</button>':'')
+    +'</div></div>';
+  _alcBindDnD();
+}
+function _alcBindDnD(){
+  document.querySelectorAll('#page-alloc .alc-person').forEach(el=>{
+    el.addEventListener('dragstart',()=>{ _alcDragSid=el.dataset.sid; el.classList.add('alc-drag'); });
+    el.addEventListener('dragend',()=>el.classList.remove('alc-drag'));
+  });
+  document.querySelectorAll('#page-alloc .alc-prow').forEach(el=>{
+    el.addEventListener('dragover',e=>{ e.preventDefault(); el.classList.add('alc-over'); });
+    el.addEventListener('dragleave',()=>el.classList.remove('alc-over'));
+    el.addEventListener('drop',e=>{
+      e.preventDefault(); el.classList.remove('alc-over');
+      if(!_alcDragSid) return;
+      alcAssign(el.dataset.proj, el.dataset.pre, _alcDragSid);
+      _alcDragSid=null;
+    });
+  });
+}
+async function alcAssign(projId, pre, sid){
+  const p=getProjects().find(x=>x.id===projId); const s=getStaffById(sid);
+  if(!p || !s) return;
+  if((p.workers||[]).some(w=>w&&w.id===sid&&(w.slot||'').split('-')[0]===pre)){ toast(esc(s.nickname)+' อยู่ในตำแหน่งนี้ของโปรเจกต์แล้ว','warn'); return; }
+  const d=getAllocDraft(); const arr=_alcArr(d[projId]);
+  if(arr.some(x=>x&&x.sid===sid&&x.pre===pre)){ toast('ลากคนนี้ไว้ที่ตำแหน่งนี้แล้ว','warn'); return; }
+  if(!_alcPres(s).includes(pre) && !confirm((s.nickname||'')+' ไม่ได้อยู่ทีม '+(ALC_ROLE[pre]||pre)+'\nจะจัดเข้าตำแหน่งนี้เลยไหม?')) return;
+  arr.push({sid, pre, by:(currentUser?.nickname||currentUser?.email||'แอดมิน'), at:new Date().toISOString()});
+  d[projId]=arr;
+  await saveAllocDraft(d);
+  renderAlloc();
+  const w=_alcDraftOf(sid);
+  if(w.length>1) toast('⚠️ '+esc(s.nickname)+' ถูกลากไว้ '+w.length+' งานแล้ว','warn');
+}
+async function alcRemoveDraft(projId, sid, pre){
+  const d=getAllocDraft();
+  const arr=_alcArr(d[projId]).filter(x=>!(x&&x.sid===sid&&x.pre===pre));
+  if(arr.length) d[projId]=arr; else delete d[projId];
+  await saveAllocDraft(d);
+  renderAlloc();
+}
+// ✅ ยืนยันฉบับร่าง → เพิ่มคนเข้าโปรเจกต์จริง → เปิดหน้าใส่ราคา
+async function alcConfirm(projId){
+  const d=getAllocDraft(); const drafts=_alcArr(d[projId]);
+  if(!drafts.length){ toast('ยังไม่มีชื่อในฉบับร่างของโปรเจกต์นี้','warn'); return; }
+  const p=getProjects().find(x=>x.id===projId); if(!p) return;
+  const names=drafts.map(x=>{const s=getStaffById(x.sid);return (s?s.nickname:'?')+' ('+((ALC_ROLE[x.pre]||x.pre).split(' ')[0])+')';});
+  if(!confirm('ยืนยันรายชื่อเข้าโปรเจกต์ "'+(p.name||'')+'"\n\n'+names.join(' · ')+'\n\nชื่อจะถูกเพิ่มเข้าโปรเจกต์จริง แล้วต่อด้วยหน้าใส่ราคา')) return;
+  const dur=parseFloat(p.duration)||0;
+  const rows=drafts.map(x=>{
+    const pre=x.pre;
+    // เรทอ้างอิงอัตโนมัติ: 1) เรทคนล่าสุดตำแหน่งเดียวกันในโปรเจกต์ 2) rateHints จากแบบร่างคำนวนราคา 3) 0
+    const lastSame=[...(p.workers||[])].reverse().find(w=>w&&(w.slot||'').split('-')[0]===pre&&(parseFloat(w.ratePerUnit)||0)>0);
+    const hint=(p.rateHints||{})[pre]||null;
+    const rate=lastSame?(parseFloat(lastSame.ratePerUnit)||0):(hint?(parseFloat(hint.rate)||0):0);
+    const unit=lastSame?(lastSame.unit||'นาที'):(hint?(hint.unit||'นาที'):'นาที');
+    const qty=hint?(parseFloat(hint.qty)||0):0;
+    return { id:x.sid, slot: pre==='dub'?'dub-main':pre+'-only',
+      amount:calcWorkerAmt({amount:rate,unit,qty},dur), ratePerUnit:rate, unit, qty,
+      status:'pending', note:'', comment:'', confirmStatus:'none' };
+  });
+  const res=await saveProjectMerge(projId, fresh=>{
+    fresh.workers=fresh.workers||[];
+    // กันซ้ำเผื่ออีกเครื่องกดยืนยันคนเดียวกันพร้อมกัน
+    rows.forEach(r0=>{ if(!fresh.workers.some(w=>w&&w.id===r0.id&&(w.slot||'').split('-')[0]===(r0.slot||'').split('-')[0])) fresh.workers.push(r0); });
+  });
+  if(!res.ok){ toast('บันทึกไม่สำเร็จ: '+((res.error&&res.error.message)||''),'error'); return; }
+  delete d[projId]; await saveAllocDraft(d);
+  try{ logAudit('alloc', p.name, 'ยืนยัน '+rows.length+' คนเข้าโปรเจกต์จากกระดานจัดสรรคน'); }catch(e){}
+  toast('✅ เพิ่ม '+rows.length+' คนเข้า "'+esc(p.name)+'" แล้ว','success');
+  renderAlloc();
+  alcOpenPrice(projId, drafts.map(x=>({sid:x.sid, pre:x.pre})));
+}
+// 💰 หน้าใส่ราคาหลังยืนยัน — เติมเรทอัตโนมัติ แก้ได้
+function alcOpenPrice(projId, items){
+  const p=getProjects().find(x=>x.id===projId); if(!p||!items||!items.length) return;
+  window._alcPriceCtx={projId, items};
+  const dur=parseFloat(p.duration)||0;
+  const rowsH=items.map((it,i)=>{
+    const w=[...(p.workers||[])].reverse().find(w=>w&&w.id===it.sid&&(w.slot||'').split('-')[0]===it.pre)||{};
+    const s=getStaffById(it.sid);
+    const unit=w.unit||'นาที', rate=w.ratePerUnit||0, qty=w.qty||0;
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">'
+      +'<span style="min-width:118px;font-weight:700">'+esc(s?s.nickname:'?')+' <span style="font-size:10.5px;color:var(--text2)">'+(ALC_ROLE[it.pre]||'')+'</span></span>'
+      +'<input id="alc-pr-r-'+i+'" type="number" value="'+rate+'" class="form-input" style="width:90px;padding:6px 9px" oninput="_alcPriceCalc('+i+')">'
+      +'<select id="alc-pr-u-'+i+'" class="form-input form-select" style="width:auto;padding:6px 26px 6px 9px" onchange="_alcPriceCalc('+i+')">'+PRICE_UNITS.map(u=>'<option'+(u===unit?' selected':'')+'>'+u+'</option>').join('')+'</select>'
+      +'<input id="alc-pr-q-'+i+'" type="number" value="'+qty+'" placeholder="จำนวน" class="form-input" style="width:72px;padding:6px 9px;'+(PRICE_QTY_UNITS.includes(unit)?'':'display:none')+'" oninput="_alcPriceCalc('+i+')">'
+      +'<span id="alc-pr-t-'+i+'" style="margin-left:auto;font-weight:800;color:var(--green)">'+fmtB(calcWorkerAmt({amount:rate,unit,qty},dur))+'</span>'
+      +'</div>';
+  }).join('');
+  _tagOverlayShow('💰 ใส่ราคา — '+esc(p.name||''),
+    '<div style="font-size:11.5px;color:var(--text2);margin-bottom:10px">เรทถูกเติมให้อัตโนมัติจากเรทเดิมของโปรเจกต์ (แก้ได้) · หน่วย "นาที" = เรท × ความยาว '+(dur||'?')+' นาที</div>'
+    +rowsH
+    +'<div style="display:flex;gap:8px;margin-top:12px">'
+    +'<button class="btn btn-green" style="flex:1" onclick="alcSavePrice()">💾 บันทึกราคา</button>'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'tag-overlay\')?.remove()">ไว้ทีหลัง</button>'
+    +'</div>'
+    +'<div style="font-size:11px;color:var(--text2);margin-top:9px">กด "ไว้ทีหลัง" ได้ — ชื่อเข้าโปรเจกต์แล้ว มาแก้ราคาที่หน้าโปรเจกต์ทีหลังได้เสมอ</div>', 640);
+}
+function _alcPriceCalc(i){
+  const ctx=window._alcPriceCtx; if(!ctx) return;
+  const p=getProjects().find(x=>x.id===ctx.projId); const dur=parseFloat(p&&p.duration)||0;
+  const rate=parseFloat(document.getElementById('alc-pr-r-'+i)?.value)||0;
+  const unit=document.getElementById('alc-pr-u-'+i)?.value||'นาที';
+  const qEl=document.getElementById('alc-pr-q-'+i);
+  if(qEl) qEl.style.display=PRICE_QTY_UNITS.includes(unit)?'':'none';
+  const qty=parseFloat(qEl?.value)||0;
+  const t=document.getElementById('alc-pr-t-'+i);
+  if(t) t.textContent=fmtB(calcWorkerAmt({amount:rate,unit,qty},dur));
+}
+async function alcSavePrice(){
+  const ctx=window._alcPriceCtx; if(!ctx) return;
+  const vals=ctx.items.map((it,i)=>({ sid:it.sid, pre:it.pre,
+    rate:parseFloat(document.getElementById('alc-pr-r-'+i)?.value)||0,
+    unit:document.getElementById('alc-pr-u-'+i)?.value||'นาที',
+    qty:parseFloat(document.getElementById('alc-pr-q-'+i)?.value)||0 }));
+  const res=await saveProjectMerge(ctx.projId, fresh=>{
+    const dur=parseFloat(fresh.duration)||0;
+    vals.forEach(v=>{
+      const w=[...(fresh.workers||[])].reverse().find(w=>w&&w.id===v.sid&&(w.slot||'').split('-')[0]===v.pre&&w.status!=='paid');
+      if(w){ w.ratePerUnit=v.rate; w.unit=v.unit; w.qty=v.qty; w.amount=calcWorkerAmt({amount:v.rate,unit:v.unit,qty:v.qty},dur); }
+    });
+  });
+  if(res.ok){ toast('💾 บันทึกราคาแล้ว','success'); document.getElementById('tag-overlay')?.remove(); window._alcPriceCtx=null; renderAlloc(); }
+  else toast('บันทึกไม่สำเร็จ: '+((res.error&&res.error.message)||''),'error');
+}
+// 🔄 ดึงคำตอบจาก Discord ของทุกรอบที่เปิดอยู่
+async function alcPullAll(){
+  const rounds=getRounds().filter(r=>r.status==='open');
+  if(!rounds.length){ toast('ยังไม่มีรอบขอคิวที่เปิดอยู่ — เปิดรอบที่หน้า 🗓️ รอบขอคิว','warn'); return; }
+  const keep=_avRoundId;
+  showLoader(true);
+  try{
+    for(const r of rounds){ _avRoundId=r.id; await pullFromDiscord(true); }
+    toast('🔄 ดึงคำตอบจาก '+rounds.length+' รอบที่เปิดอยู่แล้ว','success');
+  }catch(e){ toast('ดึงไม่สำเร็จ: '+e.message,'error'); }
+  finally{ _avRoundId=keep; showLoader(false); renderAlloc(); }
+}
+// ✏️ แก้ข้อความในโพสประกาศเดิมบน Discord (ไม่โพสใหม่ให้รก) — ต้องใช้ Worker เวอร์ชันที่มีคำสั่ง discordEdit
+async function updateRoundPost(roundId){
+  const r=getRound(roundId);
+  if(!r || !r.postedMessageId){ toast('รอบนี้ยังไม่เคยโพสผ่านบอท — กดโพสก่อน','warn'); return; }
+  const el=document.getElementById('ra-text');
+  const content=String(el?el.value:'').trim();
+  if(!content){ toast('ข้อความว่าง','error'); return; }
+  if(!confirm('อัปเดตข้อความในโพสเดิมบน Discord?\n(แก้โพสเดิม ไม่โพสใหม่ให้รก)')) return;
+  showLoader(true);
+  try{
+    await callAppsScript({action:'discordEdit', channelId:r.channelId, messageId:r.postedMessageId, content});
+    logAudit('recruit.round',(AV_CATS[r.cat]||{}).label||r.cat,'แก้ไขโพสประกาศใน Discord');
+    toast('🔄 แก้โพสเดิมใน Discord ให้แล้ว','success');
+    document.getElementById('tag-overlay')?.remove();
+  }catch(e){
+    const m=String(e.message||'');
+    toast(m.includes('ไม่รู้จักคำสั่ง')
+      ? 'ตัวกลาง Cloudflare Worker ยังเป็นเวอร์ชันเก่า — ต้องอัปเดตโค้ด worker.js ก่อนถึงจะแก้โพสได้'
+      : 'แก้โพสไม่สำเร็จ: '+m, 'error');
+  }
+  finally{ showLoader(false); }
 }
 
 // ══════════════════════════════════════════════
@@ -7356,7 +7734,7 @@ async function enterApp(){
   try { await loadMgrRequests(); await loadManagerUsers(); await loadMgrSuspended(); await loadTeamLeft(); } catch(e) {}
   try { await fbLoadKeyed('tags_master'); await fbLoadKeyed('brief_templates'); await fbLoadKeyed('company_expenses');
         await fbLoadKeyed('payroll_profiles'); await fbLoadKeyed('payroll_runs');
-        await fbLoadKeyed('recruit_rounds'); await fbLoadKeyed('discord_cfg'); } catch(e) {}
+        await fbLoadKeyed('recruit_rounds'); await fbLoadKeyed('discord_cfg'); await fbLoadKeyed('allocdraft'); } catch(e) {}
   try { logLogin(); startIdleWatch(); } catch(e) {}
   // Load tracking cards from Firebase
   try {
@@ -7617,7 +7995,7 @@ function nav(page){
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
   const renders={
-    dashboard:renderDash,track:renderTrack,assign:renderAssign,projects:renderProjects,profit:renderProfit,staff:renderStaff,'staff-detail':renderStaffDetail,queue:renderQueue,payroll:renderPayrollMonth,availability:renderAvailability,'payment-history':renderPaymentHistory,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
+    dashboard:renderDash,track:renderTrack,assign:renderAssign,projects:renderProjects,profit:renderProfit,staff:renderStaff,'staff-detail':renderStaffDetail,queue:renderQueue,payroll:renderPayrollMonth,availability:renderAvailability,alloc:renderAlloc,'payment-history':renderPaymentHistory,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
     'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar,'confirm-amount':renderConfirmAmountPage,
     'mgr-home':renderMgrHome,'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-team':renderMgrTeam,
     'mgr-calc':()=>renderCalcList('mgr-calc-list',true)
@@ -7788,9 +8166,9 @@ function renderDash(){
   const revenuePending = F.outstanding;  // ค้างเก็บจากลูกค้า
   const paid = F.expensePaid;            // จ่ายทีมไปแล้ว
   const pending = F.expensePending;      // ค้างจ่ายทีม
-  const profit = F.profitReal;           // กำไร = รายรับจริง − ค่าจ้างทีมทั้งหมด
+  const profit = F.profitBilled;         // กำไรทั้งหมด = ยอดตามบิลทุกงาน − ค่าจ้างทีมทั้งหมด (ไม่ติดลบเพราะรอเก็บเงิน)
   const companyExp = sumCompanyExpenses();
-  const netProfit = profit - companyExp; // กำไรสุทธิ = กำไร − ค่าใช้จ่ายบริษัท
+  const netProfit = profit - companyExp; // กำไรสุทธิ = กำไรทั้งหมด − ค่าใช้จ่ายบริษัท
   const pendingWorkers=[];
   projs.forEach(p=>{
     if(p.projStatus === 'cancelled') return;
@@ -7832,13 +8210,13 @@ function renderDash(){
      <div class="stat-value" style="color:var(--green)">${fmtB(paid)}</div>
      <div class="stat-delta up">${paidCount} คน รับเงินแล้ว</div>
     </div>
-    <div class="stat-card" onclick="nav('profit')" style="cursor:pointer" title="กำไร = รายรับจริง − ค่าจ้างทีมทั้งหมด">
+    <div class="stat-card" onclick="nav('profit')" style="cursor:pointer" title="กำไรทั้งหมด = ยอดตามบิลทุกงาน − ค่าจ้างทีมทั้งหมด (คือกำไรที่จะได้เมื่อเก็บเงินลูกค้าครบ)">
      <span class="stat-icon">📈</span>
-     <div class="stat-label">กำไร</div>
+     <div class="stat-label">กำไรทั้งหมด</div>
      <div class="stat-value" style="color:${profit>=0?'var(--green)':'var(--red)'}">${fmtB(profit)}</div>
-     <div class="stat-delta ${profit>=0?'up':'down'}">${fmtB(revenue)} − ค่าจ้างทีม ${fmtB(F.expense)}</div>
+     <div class="stat-delta ${profit>=0?'up':'down'}">ยอดบิล ${fmtB(totalRevenue)} − ค่าจ้างทีม ${fmtB(F.expense)}</div>
     </div>
-    <div class="stat-card" onclick="nav('profit')" style="cursor:pointer" title="กำไรสุทธิ = กำไร − ค่าใช้จ่ายบริษัท (ค่าเช่า ซอฟต์แวร์ ฯลฯ)">
+    <div class="stat-card" onclick="nav('profit')" style="cursor:pointer" title="กำไรสุทธิ = กำไรทั้งหมด − ค่าใช้จ่ายบริษัท (ค่าเช่า ซอฟต์แวร์ ฯลฯ)">
      <span class="stat-icon">🏦</span>
      <div class="stat-label">กำไรสุทธิ</div>
      <div class="stat-value" style="color:${netProfit>=0?'var(--green)':'var(--red)'}">${fmtB(netProfit)}</div>
@@ -20889,6 +21267,14 @@ function startFirebaseSync() {
       });
     }
   });
+  // 🎯 กระดานจัดสรรคน — ซิงก์ฉบับร่างการลากชื่อแบบเรียลไทม์ (แอดมิน/เมเนเจอร์เห็นกระดานเดียวกัน)
+  _fbDatabase.ref('misc/allocdraft').on('value', snap => {
+    try{
+      ls('allocdraft', snap.exists() ? snap.val() : {});
+      const pgA = document.getElementById('page-alloc');
+      if(pgA && !pgA.classList.contains('hidden')) renderAlloc();
+    }catch(e){}
+  });
   // Sync staff data in real-time
   _fbDatabase.ref('staff').on('value', snap => {
     try {
@@ -20996,6 +21382,9 @@ function startFirebaseSync() {
       if(pg&&!pg.classList.contains('hidden')) try{renderProjects();}catch(e){}
       const pgD = document.getElementById('page-dashboard');
       if(pgD&&!pgD.classList.contains('hidden')) try{renderDash();}catch(e){}
+      // 🎯 กระดานจัดสรรคน — โปรเจกต์เปลี่ยน (เช่น อีกคนกดยืนยัน) → วาดกระดานใหม่
+      const pgAl = document.getElementById('page-alloc');
+      if(pgAl&&!pgAl.classList.contains('hidden')) try{renderAlloc();}catch(e){}
       // 🔑 Refresh queue page เมื่อมี project update → admin จะเห็น staff confirm/reject ทันที
       const pgQ = document.getElementById('page-queue');
       if(pgQ&&!pgQ.classList.contains('hidden')) try{renderQueue();}catch(e){}
