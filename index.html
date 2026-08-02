@@ -1620,7 +1620,9 @@ body.sidebar-collapsed .main-content{
      <div class="page-title" style="margin:0">📊 รายงานการเงิน</div>
      <div class="page-subtitle" style="margin-top:2px" id="profit-subtitle">สรุปครบทุกโปรเจกต์</div>
     </div>
-    <div style="display:flex;gap:6px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+     <button class="btn btn-blue btn-sm" onclick="openFinanceReport()" title="รายงานรายรับ-รายจ่าย-กำไร เลือกช่วงเวลา + ดาวน์โหลด">📄 ออกรายงาน</button>
+     <button class="btn btn-outline btn-sm" onclick="openCompanyExpenses()" title="ค่าเช่า ซอฟต์แวร์ ค่าเน็ต ฯลฯ — ใช้คำนวณกำไรสุทธิ">🏦 ค่าใช้จ่ายบริษัท</button>
      <button class="btn btn-outline btn-sm" onclick="exportPaymentCSV()" title="ดาวน์โหลด CSV">⬇️ Export</button>
      <button class="btn btn-outline btn-sm" onclick="window.print()" title="พิมพ์รายงาน">🖨️ Print</button>
     </div>
@@ -2651,6 +2653,20 @@ body.sidebar-collapsed .main-content{
   </div>
   <select id="mgr-select" style="display:none" onchange="addWorkerToSlot('mgr','only')"></select>
 </div></div>
+   </div>
+
+   <!-- 💰 การรับเงินจากลูกค้า (เฟส 2 — บรีฟข้อ 3) -->
+   <div id="pj-income-block" style="margin-top:16px;padding:14px;background:rgba(0,223,160,.04);border:1px solid rgba(0,223,160,.18);border-radius:11px">
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:4px;flex-wrap:wrap">
+     <span style="font-size:16px">💰</span>
+     <div style="flex:1;min-width:170px">
+      <div style="font-size:13.5px;font-weight:800;color:var(--green)">การรับเงินจากลูกค้า</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:1px">แบ่งเป็นงวดได้ · <strong>รายงานรายรับจะนับเฉพาะงวดที่ติ๊กว่ารับเงินแล้ว</strong></div>
+     </div>
+     <button type="button" class="btn btn-sm btn-outline" onclick="pjIncomeAdd()">➕ เพิ่มงวด</button>
+    </div>
+    <div id="pj-income-rows"></div>
+    <div id="pj-income-summary" style="font-size:12px;color:var(--text2);margin-top:8px"></div>
    </div>
 
   </div>
@@ -3882,6 +3898,215 @@ function saveStaffTags(staffId){
 }
 
 // ══════════════════════════════════════════════
+// 🏦 ค่าใช้จ่ายบริษัท + 📄 รายงานการเงิน (เฟส 2 — บรีฟข้อ 3)
+// ══════════════════════════════════════════════
+const COMPANY_EXP_CATS = ['ค่าเช่า/สถานที่','ซอฟต์แวร์/สมัครสมาชิก','อุปกรณ์','การตลาด','เดินทาง','ค่าธรรมเนียม/ภาษี','อื่น ๆ'];
+function openCompanyExpenses(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const list=getCompanyExpenses().slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const rows = list.length ? list.map((e,i)=>`
+    <div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--border2)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px;color:var(--text)">${esc(e.label||'(ไม่มีชื่อ)')}</div>
+        <div style="font-size:11px;color:var(--text2)">${fmtDate(e.date)||'—'} · ${esc(e.cat||'อื่น ๆ')}</div>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--red);white-space:nowrap">${fmtB(e.amount)}</div>
+      <button class="btn btn-sm btn-outline" style="padding:3px 8px;font-size:11px;border-color:rgba(255,64,64,.35);color:var(--red)" onclick="delCompanyExpense('${escJs(e.id)}')">🗑️</button>
+    </div>`).join('') : '<div style="font-size:12.5px;color:var(--text2);padding:10px 0">ยังไม่มีรายการ</div>';
+  const total=list.reduce((a,e)=>a+(parseFloat(e.amount)||0),0);
+  _tagOverlayShow('🏦 ค่าใช้จ่ายบริษัท', `
+    <div style="font-size:11.5px;color:var(--text2);margin-bottom:10px;line-height:1.6">ค่าใช้จ่ายที่ไม่ใช่ค่าจ้างทีม เช่น ค่าเช่า ซอฟต์แวร์ อุปกรณ์ — ระบบจะนำไปหักจากกำไรเพื่อคำนวณ <strong>กำไรสุทธิ</strong></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      <input id="ce-label" placeholder="รายการ เช่น ค่าเช่าห้องอัด" style="flex:1;min-width:150px;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+      <input id="ce-amount" type="number" min="0" step="any" onwheel="this.blur()" placeholder="จำนวนเงิน" style="width:110px;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px;text-align:right">
+      <input id="ce-date" type="date" value="${new Date().toISOString().split('T')[0]}" style="width:145px;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+      <select id="ce-cat" style="padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+        ${COMPANY_EXP_CATS.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}
+      </select>
+      <button class="btn btn-sm" onclick="addCompanyExpense()">➕ เพิ่ม</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:2px">รวมทั้งหมด <strong style="color:var(--red)">${fmtB(total)}</strong> · ${list.length} รายการ</div>
+    ${rows}`, 620);
+}
+async function addCompanyExpense(){
+  const label=(document.getElementById('ce-label')?.value||'').trim();
+  const amount=parseFloat(document.getElementById('ce-amount')?.value)||0;
+  if(!label){ toast('กรอกชื่อรายการก่อน','error'); return; }
+  if(amount<=0){ toast('กรอกจำนวนเงิน','error'); return; }
+  const list=getCompanyExpenses();
+  list.push({ id:'CE'+Date.now(), label, amount,
+    date:document.getElementById('ce-date')?.value||new Date().toISOString().split('T')[0],
+    cat:document.getElementById('ce-cat')?.value||'อื่น ๆ', by:currentUser?.email||'' });
+  await saveCompanyExpenses(list);
+  logAudit('expense.company', label, fmtB(amount));
+  openCompanyExpenses();
+  try{ renderDash(); }catch(e){}
+  toast('เพิ่มค่าใช้จ่ายแล้ว','success');
+}
+async function delCompanyExpense(id){
+  const list=getCompanyExpenses();
+  const item=list.find(e=>e.id===id);
+  if(!item) return;
+  if(!confirm(`ลบ "${item.label}" (${fmtB(item.amount)}) ?`)) return;
+  await saveCompanyExpenses(list.filter(e=>e.id!==id));
+  logAudit('expense.company', item.label, 'ลบรายการ');
+  openCompanyExpenses();
+  try{ renderDash(); }catch(e){}
+}
+// ── รายงานการเงินตามช่วงเวลา ──
+function _reportRange(preset){
+  const now=new Date(), y=now.getFullYear(), m=now.getMonth();
+  const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  if(preset==='thismonth') return [iso(new Date(y,m,1)), iso(new Date(y,m+1,0))];
+  if(preset==='lastmonth') return [iso(new Date(y,m-1,1)), iso(new Date(y,m,0))];
+  if(preset==='thisquarter'){ const q=Math.floor(m/3); return [iso(new Date(y,q*3,1)), iso(new Date(y,q*3+3,0))]; }
+  if(preset==='thisyear') return [y+'-01-01', y+'-12-31'];
+  if(preset==='lastyear') return [(y-1)+'-01-01', (y-1)+'-12-31'];
+  return ['',''];
+}
+function openFinanceReport(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const [f,t]=_reportRange('thismonth');
+  _tagOverlayShow('📄 รายงานการเงิน', `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <select id="rp-preset" onchange="_rpPreset(this.value)" style="padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+        <option value="thismonth">เดือนนี้</option>
+        <option value="lastmonth">เดือนที่แล้ว</option>
+        <option value="thisquarter">ไตรมาสนี้</option>
+        <option value="thisyear">ปีนี้</option>
+        <option value="lastyear">ปีที่แล้ว</option>
+        <option value="custom">กำหนดเอง</option>
+      </select>
+      <input id="rp-from" type="date" value="${f}" onchange="document.getElementById('rp-preset').value='custom';renderFinanceReport()" style="padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+      <span style="color:var(--text2);font-size:12px">ถึง</span>
+      <input id="rp-to" type="date" value="${t}" onchange="document.getElementById('rp-preset').value='custom';renderFinanceReport()" style="padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+      <button class="btn btn-sm btn-outline" onclick="exportFinanceReportCSV()">⬇️ ดาวน์โหลด CSV</button>
+    </div>
+    <div id="rp-body"></div>`, 700);
+  renderFinanceReport();
+}
+function _rpPreset(v){
+  if(v==='custom'){ renderFinanceReport(); return; }
+  const [f,t]=_reportRange(v);
+  _setVal('rp-from',f); _setVal('rp-to',t);
+  renderFinanceReport();
+}
+// รวบรวมข้อมูลรายงานตามช่วง — รายรับนับตามวันที่ "รับเงินจริง" · รายจ่ายทีมนับตามวันที่จ่ายจริง
+function buildFinanceReport(from, to){
+  const inRange = d => !!d && (!from || d>=from) && (!to || d<=to);
+  let received=0, expensePaid=0, billedInRange=0;
+  const incomeRows=[], expenseRows=[], receivable=[];
+  const todayIso=new Date().toISOString().split('T')[0];
+  (getProjects()||[]).forEach(p=>{
+    if(p.projStatus==='cancelled') return;
+    const f=getProjectFinance(p);
+    const rows=Array.isArray(p.income)?p.income:[];
+    if(rows.length){
+      rows.forEach(e=>{
+        const amt=parseFloat(e.amount)||0;
+        if(e.paidAt && inRange(e.paidAt)){ received+=amt; incomeRows.push({date:e.paidAt, proj:p.name, label:e.label||'งวด', amount:amt}); }
+        if(!e.paidAt && amt>0) receivable.push({proj:p.name, client:p.client||'', label:e.label||'งวด', amount:amt, dueDate:e.dueDate||'', overdue:!!(e.dueDate&&e.dueDate<todayIso)});
+      });
+    } else if(f.legacyPaid){
+      const d=p.deadline||p.date||'';
+      if(inRange(d)){ received+=f.received; incomeRows.push({date:d, proj:p.name, label:'ยอดเต็ม (บันทึกแบบเดิม)', amount:f.received}); }
+    } else if(f.billed>0){
+      receivable.push({proj:p.name, client:p.client||'', label:'ยังไม่ระบุงวด', amount:f.billed, dueDate:p.deadline||'', overdue:!!(p.deadline&&p.deadline<todayIso)});
+    }
+    if(inRange(p.deadline||p.date||'')) billedInRange += f.billed;
+    const tax=p.tax||{};
+    (p.workers||[]).forEach(w=>{
+      if(w.status!=='paid') return;
+      const d=(w.paidAt||'').split('T')[0] || p.deadline || '';
+      if(!inRange(d)) return;
+      const pre=(w.slot||'').split('-')[0];
+      const net=Math.round((w.amount||0)*(1-(parseFloat(tax[pre])||0)/100));
+      expensePaid+=net;
+      const s=getStaffById(w.id);
+      expenseRows.push({date:d, proj:p.name, who:(s?(s.nickname||s.name):w.id), amount:net});
+    });
+  });
+  const company=getCompanyExpenses().filter(e=>inRange(e.date));
+  const companyTotal=company.reduce((a,e)=>a+(parseFloat(e.amount)||0),0);
+  const profit=received-expensePaid;
+  return { from,to, received, expensePaid, companyTotal, profit, netProfit:profit-companyTotal,
+           billedInRange, incomeRows, expenseRows, company, receivable,
+           receivableTotal: receivable.reduce((a,r)=>a+r.amount,0),
+           overdueTotal: receivable.filter(r=>r.overdue).reduce((a,r)=>a+r.amount,0) };
+}
+function renderFinanceReport(){
+  const el=document.getElementById('rp-body'); if(!el) return;
+  const from=document.getElementById('rp-from')?.value||'';
+  const to=document.getElementById('rp-to')?.value||'';
+  const r=buildFinanceReport(from,to);
+  window._lastReport=r;
+  const card=(label,val,color,sub)=>`<div style="flex:1;min-width:120px;padding:11px 13px;background:var(--bg2);border-radius:10px">
+    <div style="font-size:10.5px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">${label}</div>
+    <div style="font-size:17px;font-weight:800;margin-top:3px;color:${color}">${fmtB(val)}</div>
+    ${sub?`<div style="font-size:10.5px;color:var(--text2);margin-top:2px">${sub}</div>`:''}</div>`;
+  const list=(title,rows,mapper,empty)=>`<div style="margin-top:14px">
+    <div style="font-size:12.5px;font-weight:700;margin-bottom:6px">${title} <span style="color:var(--text2);font-weight:400">(${rows.length})</span></div>
+    ${rows.length? rows.slice(0,50).map(mapper).join('') : `<div style="font-size:12px;color:var(--text2);padding:6px 0">${empty}</div>`}
+    ${rows.length>50?`<div style="font-size:11px;color:var(--text2);padding:6px 0">… แสดง 50 จาก ${rows.length} รายการ — ดาวน์โหลด CSV เพื่อดูทั้งหมด</div>`:''}</div>`;
+  const row=(a,b,c)=>`<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--border2);font-size:12px">
+    <span style="color:var(--text2);width:88px;flex-shrink:0">${a}</span><span style="flex:1;min-width:0">${b}</span><span style="font-weight:700;white-space:nowrap">${c}</span></div>`;
+  el.innerHTML = `
+    <div style="font-size:11.5px;color:var(--text2);margin-bottom:9px;line-height:1.6">
+      📌 รายงานนี้นับ<strong>เงินที่เข้า-ออกจริงในช่วงที่เลือก</strong> (วันที่รับเงินจากลูกค้า / วันที่จ่ายทีม) — ตัวเลขจะต่างจากหน้าแรกที่แสดงภาพรวมสะสมทั้งหมด
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      ${card('เงินเข้าในช่วงนี้', r.received, 'var(--green)', 'ลูกค้าจ่ายจริง')}
+      ${card('จ่ายทีมในช่วงนี้', r.expensePaid, 'var(--red)', 'จ่ายออกจริง')}
+      ${card('ค่าใช้จ่ายบริษัท', r.companyTotal, 'var(--orange)', r.company.length+' รายการ')}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${card('เงินสดคงเหลือ', r.profit, r.profit>=0?'var(--green)':'var(--red)', 'เงินเข้า − จ่ายทีม')}
+      ${card('กำไรสุทธิช่วงนี้', r.netProfit, r.netProfit>=0?'var(--green)':'var(--red)', 'หักค่าใช้จ่ายบริษัทแล้ว')}
+      ${card('ลูกหนี้คงค้าง', r.receivableTotal, r.overdueTotal?'var(--red)':'var(--text2)', r.overdueTotal?('🔴 เลยกำหนด '+fmtB(r.overdueTotal)):'ยังไม่ถึงกำหนด')}
+    </div>
+    ${list('💰 รายรับที่รับเข้ามาในช่วงนี้', r.incomeRows.sort((a,b)=>a.date.localeCompare(b.date)),
+        x=>row(fmtDate(x.date), esc(x.proj)+' <span style="color:var(--text2)">· '+esc(x.label)+'</span>', fmtB(x.amount)),
+        'ไม่มีเงินเข้าในช่วงนี้')}
+    ${list('💸 รายจ่ายทีมที่จ่ายออกในช่วงนี้', r.expenseRows.sort((a,b)=>a.date.localeCompare(b.date)),
+        x=>row(fmtDate(x.date), esc(x.who)+' <span style="color:var(--text2)">· '+esc(x.proj)+'</span>', fmtB(x.amount)),
+        'ไม่มีการจ่ายเงินในช่วงนี้')}
+    ${list('🏦 ค่าใช้จ่ายบริษัท', r.company.sort((a,b)=>String(a.date).localeCompare(String(b.date))),
+        x=>row(fmtDate(x.date), esc(x.label)+' <span style="color:var(--text2)">· '+esc(x.cat||'')+'</span>', fmtB(x.amount)),
+        'ไม่มีรายการ')}
+    ${list('📋 ลูกหนี้ — งานที่ยังไม่ได้เก็บเงิน (ทุกช่วงเวลา)', r.receivable.sort((a,b)=>String(a.dueDate).localeCompare(String(b.dueDate))),
+        x=>row(x.dueDate?fmtDate(x.dueDate):'—',
+               (x.overdue?'🔴 ':'')+esc(x.proj)+' <span style="color:var(--text2)">· '+esc(x.label)+(x.client?' · '+esc(x.client):'')+'</span>', fmtB(x.amount)),
+        'เก็บเงินครบทุกงาน 🎉')}`;
+}
+function exportFinanceReportCSV(){
+  const r=window._lastReport; if(!r){ toast('ยังไม่มีข้อมูลรายงาน','error'); return; }
+  const esc2=v=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
+  const L=[];
+  L.push(['รายงานการเงิน Guin Home Studio'].map(esc2).join(','));
+  L.push(['ช่วงวันที่', r.from||'ทั้งหมด', 'ถึง', r.to||'ทั้งหมด'].map(esc2).join(','));
+  L.push([]);
+  L.push(['สรุป'].map(esc2).join(','));
+  [['เงินเข้าในช่วงนี้ (ลูกค้าจ่ายจริง)',r.received],['จ่ายทีมในช่วงนี้',r.expensePaid],['ค่าใช้จ่ายบริษัท',r.companyTotal],
+   ['เงินสดคงเหลือ',r.profit],['กำไรสุทธิช่วงนี้',r.netProfit],['ลูกหนี้คงค้าง (ทุกช่วงเวลา)',r.receivableTotal],['ในนั้นเลยกำหนดชำระ',r.overdueTotal]]
+    .forEach(([k,v])=>L.push([k,v].map(esc2).join(',')));
+  const section=(title,head,rows)=>{ L.push([]); L.push([title].map(esc2).join(',')); L.push(head.map(esc2).join(','));
+    rows.forEach(x=>L.push(x.map(esc2).join(','))); };
+  section('รายรับ',['วันที่รับเงิน','โปรเจกต์','งวด','จำนวนเงิน'], r.incomeRows.map(x=>[x.date,x.proj,x.label,x.amount]));
+  section('รายจ่ายทีม',['วันที่จ่าย','โปรเจกต์','ผู้รับเงิน','จำนวนเงิน'], r.expenseRows.map(x=>[x.date,x.proj,x.who,x.amount]));
+  section('ค่าใช้จ่ายบริษัท',['วันที่','รายการ','หมวด','จำนวนเงิน'], r.company.map(x=>[x.date,x.label,x.cat||'',x.amount]));
+  section('ลูกหนี้คงค้าง',['ครบกำหนด','โปรเจกต์','ลูกค้า','งวด','จำนวนเงิน','สถานะ'],
+    r.receivable.map(x=>[x.dueDate,x.proj,x.client,x.label,x.amount, x.overdue?'เลยกำหนด':'ยังไม่ถึงกำหนด']));
+  const blob=new Blob(['﻿'+L.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`รายงานการเงิน_${r.from||'all'}_${r.to||'all'}.csv`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  logAudit('report.export', (r.from||'ทั้งหมด')+' - '+(r.to||'ทั้งหมด'), 'ดาวน์โหลดรายงานการเงิน');
+  toast('ดาวน์โหลดรายงานแล้ว ✅','success');
+}
+
+// ══════════════════════════════════════════════
 // 📖 บรีฟงานกลางตามรหัสงาน (แทนชีทบรีฟ — เฟส 1)
 //    โน้ตจากแอดมินว่างานรหัสนี้ต้องทำอะไรบ้าง แยกหัวข้อตามทีม
 //    admin = เขียน/แก้ · manager = เปิดอ่านได้ทุกรหัส (โน้ตกลางของทีม)
@@ -3965,6 +4190,8 @@ const AUDIT_ACTIONS = {
   'data.restore':     {icon:'⚠️', label:'กู้คืนข้อมูลจากไฟล์'},
   'data.sync':        {icon:'🔄', label:'ซิงค์รายชื่อจากชีท'},
   'brief.edit':       {icon:'📖', label:'แก้บรีฟงาน'},
+  'expense.company':  {icon:'🏦', label:'ค่าใช้จ่ายบริษัท'},
+  'report.export':    {icon:'📄', label:'ดาวน์โหลดรายงานการเงิน'},
 };
 // เขียน log — ห้าม throw / ห้ามบล็อกงานหลักเด็ดขาด
 function logAudit(action, target, detail){
@@ -4288,6 +4515,71 @@ function statusBadge(s, projectId){
   return `<span class="badge badge-${s||'pending'}">${labels[s]||s}</span>`;
 }
 function getProjExpense(p){return(p.workers||[]).reduce((a,w)=>a+(w.amount||0),0)}
+
+// ══════════════════════════════════════════════
+// 💰 การเงินของโปรเจกต์ — ฟังก์ชันกลางชุดเดียว (Single Source of Truth)
+//    ทุกหน้า (dashboard / กำไร / รายงาน / การ์ดโปรเจกต์) ต้องเรียกตัวนี้ ห้ามคำนวณเอง
+//    รายรับ "จริง" = เฉพาะงวดที่ติ๊กว่ารับเงินแล้ว (paidAt) ตามบรีฟข้อ 3
+//    เข้ากันได้กับของเดิม: โปรเจกต์ที่ยังไม่มีงวด ใช้ปุ่ม "รับเงินจากลูกค้าแล้ว" (client_paid_) เหมือนเดิม
+// ══════════════════════════════════════════════
+function getProjectFinance(p){
+  const billed = p.budget || 0;
+  const rows = Array.isArray(p.income) ? p.income : [];
+  let received = 0, scheduled = 0, overdue = 0;
+  const todayIso = new Date().toISOString().split('T')[0];
+  rows.forEach(e=>{
+    const amt = parseFloat(e.amount) || 0;
+    scheduled += amt;
+    if(e.paidAt) received += amt;
+    else if(e.dueDate && e.dueDate < todayIso) overdue += amt;
+  });
+  const legacyPaid = !!ls('client_paid_'+p.id);
+  const usingLegacy = rows.length === 0;
+  if(usingLegacy){
+    scheduled = billed;
+    if(legacyPaid) received = billed;
+  }
+  // รายจ่ายทีม — หัก % ต่อหมวดเหมือนที่แสดงในฟอร์มโปรเจกต์
+  const tax = p.tax || {};
+  let expense = 0, expensePaid = 0, expensePending = 0;
+  (p.workers||[]).forEach(w=>{
+    const pre = (w.slot||'').split('-')[0];
+    const t = parseFloat(tax[pre]) || 0;
+    const net = Math.round((w.amount||0) * (1 - t/100));
+    expense += net;
+    if(w.status === 'paid') expensePaid += net; else expensePending += net;
+  });
+  const outstanding = Math.max(0, billed - received);
+  return {
+    billed, scheduled, received, outstanding, overdue,
+    expense, expensePaid, expensePending,
+    profitBilled: billed - expense,     // กำไรถ้าเก็บเงินได้ครบ
+    profitReal:  received - expense,    // กำไรจากเงินที่เข้าจริง
+    isFullyPaid: billed > 0 && received >= billed,
+    usingLegacy, legacyPaid,
+  };
+}
+// รวมการเงินหลายโปรเจกต์
+function sumProjectFinance(list){
+  const t = {billed:0,scheduled:0,received:0,outstanding:0,overdue:0,expense:0,expensePaid:0,expensePending:0,profitBilled:0,profitReal:0};
+  (list||[]).forEach(p=>{
+    if(p.projStatus === 'cancelled') return;
+    const f = getProjectFinance(p);
+    Object.keys(t).forEach(k=>{ t[k] += f[k] || 0; });
+  });
+  return t;
+}
+// ── ค่าใช้จ่ายบริษัท (นอกเหนือค่าจ้างทีม) — ใช้คำนวณ "กำไรสุทธิ" ──
+function getCompanyExpenses(){ const v = ls('company_expenses'); return Array.isArray(v) ? v : []; }
+async function saveCompanyExpenses(list){ ls('company_expenses', list); await fbSaveKeyed('company_expenses', list); }
+function sumCompanyExpenses(fromIso, toIso){
+  return getCompanyExpenses().reduce((a,e)=>{
+    const d = e.date || '';
+    if(fromIso && d < fromIso) return a;
+    if(toIso && d > toIso) return a;
+    return a + (parseFloat(e.amount)||0);
+  }, 0);
+}
 function getProjStatus(p){
   if(!p.workers||!p.workers.length)return'pending';
   if((p.workers||[]).every(w=>w.status==='paid'))return'paid';
@@ -5517,7 +5809,7 @@ async function enterApp(){
   try { await loadAppreciationsFromFirebase(); } catch(e) {}
   try { await loadCalcDraftsFromFirebase(); } catch(e) {}
   try { await loadMgrRequests(); await loadManagerUsers(); await loadMgrSuspended(); await loadTeamLeft(); } catch(e) {}
-  try { await fbLoadKeyed('tags_master'); await fbLoadKeyed('brief_templates'); } catch(e) {}
+  try { await fbLoadKeyed('tags_master'); await fbLoadKeyed('brief_templates'); await fbLoadKeyed('company_expenses'); } catch(e) {}
   try { logLogin(); startIdleWatch(); } catch(e) {}
   // Load tracking cards from Firebase
   try {
@@ -5941,32 +6233,22 @@ function renderDash(){
     return;
   }
   const projs=getProjects();
-  let paid=0,pending=0,revenue=0,revenuePending=0,pendingWorkers=[];
-  let recvCost=0;  // ค่าจ้างทีมของโปรเจกต์ที่ลูกค้าจ่ายแล้ว (ใช้คำนวณ "กำไรจริง")
   const today=new Date();today.setHours(0,0,0,0);
+  // 💰 ตัวเลขการเงินทั้งหมดมาจากฟังก์ชันกลางชุดเดียว (getProjectFinance) — หน้าอื่นใช้ตัวเดียวกัน
+  const F = sumProjectFinance(projs);
+  const revenue = F.received;            // รายรับจริง (ลูกค้าจ่ายแล้วเท่านั้น)
+  const revenuePending = F.outstanding;  // ค้างเก็บจากลูกค้า
+  const paid = F.expensePaid;            // จ่ายทีมไปแล้ว
+  const pending = F.expensePending;      // ค้างจ่ายทีม
+  const profit = F.profitReal;           // กำไร = รายรับจริง − ค่าจ้างทีมทั้งหมด
+  const companyExp = sumCompanyExpenses();
+  const netProfit = profit - companyExp; // กำไรสุทธิ = กำไร − ค่าใช้จ่ายบริษัท
+  const pendingWorkers=[];
   projs.forEach(p=>{
-    // ข้าม cancelled projects
     if(p.projStatus === 'cancelled') return;
-    const clientPaid = !!ls('client_paid_'+p.id);
-    const budget = p.budget||0;
-    const projWorkerCost = (p.workers||[]).reduce((a,w)=>a+(w.amount||0),0);
-    if(clientPaid){
-      revenue += budget;        // เงินจริงที่ได้รับจากลูกค้า
-      recvCost += projWorkerCost; // ค่าจ้างทีมในโปรเจกต์ที่รับเงินมาแล้ว
-    } else {
-      revenuePending += budget;  // ค้างรอลูกค้าจ่าย
-    }
-    (p.workers||[]).forEach(w=>{
-      if(w.status==='paid') paid+=w.amount||0;
-      else { pending+=w.amount||0; pendingWorkers.push({proj:p,worker:w}); }
-    });
+    (p.workers||[]).forEach(w=>{ if(w.status!=='paid') pendingWorkers.push({proj:p,worker:w}); });
   });
-  // กำไรจริง = รับจริงจากลูกค้า − ค่าจ้างทีมในโปรเจกต์ที่รับเงินมาแล้ว
-  //   (ไม่นับโปรเจกต์ที่ลูกค้ายังไม่จ่าย เพราะยังไม่ใช่กำไรจริง)
-  const totalRevenue = revenue + revenuePending; // budget รวมทุกโปรเจกต์ (ไม่นับ cancelled)
-  const totalCost = paid + pending;              // ค่าจ้างทีมรวมทั้งหมด
-  const profit = revenue - recvCost;             // กำไรจากโปรเจกต์ที่รับเงินมาแล้ว
-  const cashNet = revenue - paid;                // เงินสดสุทธิ (รับจริง - จ่ายจริง)
+  const totalRevenue = F.billed;
   const paidCount = projs.reduce((a,p) => a + (p.workers||[]).filter(w=>w.status==='paid').length, 0);
   const projCancelled = projs.filter(p => p.projStatus === 'cancelled').length;
   const projActive = projs.length - projCancelled;
@@ -5978,17 +6260,17 @@ function renderDash(){
      <div class="stat-value">${projs.length}</div>
      <div class="stat-delta up">${projActive} ดำเนินการ${projCancelled?' · '+projCancelled+' ยกเลิก':''}</div>
     </div>
-    <div class="stat-card" onclick="openRevenueBreakdown()" style="cursor:pointer" title="กดเพื่อดูรายโปรเจกต์ที่รับเงินแล้ว + กำไรแยกตามวัน">
+    <div class="stat-card" onclick="openRevenueBreakdown()" style="cursor:pointer" title="เงินที่ลูกค้าจ่ายมาแล้วจริงเท่านั้น — ไม่นับงานที่ยังไม่ได้เก็บเงิน">
      <span class="stat-icon">💰</span>
-     <div class="stat-label">รายได้รับแล้ว</div>
+     <div class="stat-label">รายรับจริง</div>
      <div class="stat-value" style="color:var(--green)">${fmtB(revenue)}</div>
-     <div class="stat-delta up">กดดูรายละเอียด →</div>
+     <div class="stat-delta up">จากยอดตามบิล ${fmtB(totalRevenue)} →</div>
     </div>
-    <div class="stat-card" title="รวม budget ของโปรเจกต์ที่ลูกค้ายังไม่จ่าย">
+    <div class="stat-card" onclick="nav('profit')" style="cursor:pointer" title="ยอดที่ส่งงานแล้วแต่ยังไม่ได้เก็บเงินจากลูกค้า">
      <span class="stat-icon">📋</span>
-     <div class="stat-label">รอลูกค้าจ่าย</div>
+     <div class="stat-label">รอเก็บเงินจากลูกค้า</div>
      <div class="stat-value" style="color:${revenuePending?'var(--orange)':'var(--text2)'}">${fmtB(revenuePending)}</div>
-     <div class="stat-delta ${revenuePending?'down':'up'}">${revenuePending?'รวม Budget ทั้งหมด '+fmtB(totalRevenue):'ลูกค้าจ่ายครบแล้ว 🎉'}</div>
+     <div class="stat-delta ${revenuePending?'down':'up'}">${F.overdue?'🔴 เลยกำหนดแล้ว '+fmtB(F.overdue):revenuePending?'ยังไม่ถึงกำหนด':'เก็บเงินครบแล้ว 🎉'}</div>
     </div>
     <div class="stat-card" onclick="nav('queue')">
      <span class="stat-icon">⏳</span>
@@ -6002,11 +6284,17 @@ function renderDash(){
      <div class="stat-value" style="color:var(--green)">${fmtB(paid)}</div>
      <div class="stat-delta up">${paidCount} คน รับเงินแล้ว</div>
     </div>
-    <div class="stat-card" onclick="nav('profit')" title="กำไรจริง = รับจริงจากลูกค้า − ค่าจ้างทีมในโปรเจกต์ที่รับเงินมาแล้ว">
+    <div class="stat-card" onclick="nav('profit')" style="cursor:pointer" title="กำไร = รายรับจริง − ค่าจ้างทีมทั้งหมด">
      <span class="stat-icon">📈</span>
-     <div class="stat-label">กำไรจริง (รับแล้ว)</div>
+     <div class="stat-label">กำไร</div>
      <div class="stat-value" style="color:${profit>=0?'var(--green)':'var(--red)'}">${fmtB(profit)}</div>
-     <div class="stat-delta ${profit>=0?'up':'down'}">${fmtB(revenue)} − ${fmtB(recvCost)}</div>
+     <div class="stat-delta ${profit>=0?'up':'down'}">${fmtB(revenue)} − ค่าจ้างทีม ${fmtB(F.expense)}</div>
+    </div>
+    <div class="stat-card" onclick="nav('profit')" style="cursor:pointer" title="กำไรสุทธิ = กำไร − ค่าใช้จ่ายบริษัท (ค่าเช่า ซอฟต์แวร์ ฯลฯ)">
+     <span class="stat-icon">🏦</span>
+     <div class="stat-label">กำไรสุทธิ</div>
+     <div class="stat-value" style="color:${netProfit>=0?'var(--green)':'var(--red)'}">${fmtB(netProfit)}</div>
+     <div class="stat-delta ${netProfit>=0?'up':'down'}">${companyExp?'หักค่าใช้จ่ายบริษัท '+fmtB(companyExp):'ยังไม่ได้บันทึกค่าใช้จ่ายบริษัท'}</div>
     </div>`;
   const urgentEl=document.getElementById('dash-queue');
   urgentEl.innerHTML=urgent.length?urgent.map(p=>{const dl=new Date(p.deadline);dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));const color=diff<=1?'var(--red)':diff<=3?'var(--orange)':'var(--text2)';
@@ -9450,6 +9738,7 @@ async function openNewProject(){
   if(_metaEl){ _metaEl.textContent=''; _metaEl.style.display='none'; }
   ['pj-name','pj-client','pj-budget','pj-budget-qty','pj-duration','pj-note','pj-clientcode','pj-seq','pj-episodes','pj-downloadlink','pj-secretkey'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   _fillClientCodeDatalist();
+  initFormIncome(null);
   toggleBudgetQty();
   const _ms=document.getElementById('pj-manager');if(_ms){const _mm=getAllManagerUsers();_ms.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+_mm.map(m=>`<option value="${m.uid}">${esc(m.nickname||m.email)}</option>`).join('');}
   const _mf=document.getElementById('pj-manager-fee');if(_mf)_mf.value='';
@@ -9502,6 +9791,86 @@ function toggleCat(key){
 }
 
 function _setVal(id,v){ const el=document.getElementById(id); if(el) el.value=v; }
+// ══════════════════════════════════════════════
+// 💰 งวดรับเงินจากลูกค้าในฟอร์มโปรเจกต์
+// ══════════════════════════════════════════════
+let formIncome = [];
+function initFormIncome(p){
+  formIncome = (p && Array.isArray(p.income)) ? JSON.parse(JSON.stringify(p.income)) : [];
+  // โปรเจกต์เก่าที่เคยกดปุ่ม "รับเงินจากลูกค้าแล้ว" → ตั้งงวดแรกให้อัตโนมัติ (ครั้งเดียว ไม่ทับของเดิม)
+  if(!formIncome.length && p && p.id && ls('client_paid_'+p.id)){
+    const d = ls('client_paid_date_'+p.id);
+    formIncome = [{ id:'IN'+Date.now(), label:'ยอดเต็ม (บันทึกไว้เดิม)', amount:p.budget||0,
+                    dueDate:p.deadline||'', paidAt:_thaiDateToIso(d) || (p.deadline||new Date().toISOString().split('T')[0]),
+                    method:'', note:'ย้ายจากปุ่มรับเงินเดิมอัตโนมัติ' }];
+  }
+  renderFormIncome();
+}
+function _thaiDateToIso(s){
+  if(!s) return '';
+  try{
+    const TM=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const m=String(s).match(/(\d{1,2})\s+(\S+)\s+(\d{4})/);
+    if(!m) return '';
+    const mi=TM.findIndex(x=>m[2].startsWith(x.replace('.','')));
+    if(mi<0) return '';
+    const y=parseInt(m[3])-543;
+    return y+'-'+String(mi+1).padStart(2,'0')+'-'+String(parseInt(m[1])).padStart(2,'0');
+  }catch(e){ return ''; }
+}
+// งบลูกค้ารวมจากช่องในฟอร์ม (เรท × หน่วย) — ใช้ร่วมกันทุกที่ในบล็อกงวดรับเงิน
+function _pjBudgetTotal(){
+  const rate = parseFloat(document.getElementById('pj-budget')?.value)||0;
+  const dur  = parseFloat(document.getElementById('pj-duration')?.value)||0;
+  const type = document.getElementById('pj-budget-type')?.value||'flat';
+  const qty  = parseFloat(document.getElementById('pj-budget-qty')?.value)||0;
+  try{ return calcBudgetTotal(rate,type,dur,qty); }catch(e){ return rate; }
+}
+function pjIncomeAdd(){
+  const already = formIncome.reduce((a,r)=>a+(parseFloat(r.amount)||0),0);
+  const total = _pjBudgetTotal();
+  formIncome.push({ id:'IN'+Date.now(), label:'งวดที่ '+(formIncome.length+1),
+    amount: Math.max(0, total-already) || 0,
+    dueDate: thaiToIso(document.getElementById('pj-deadline')?.value)||'', paidAt:'', method:'', note:'' });
+  renderFormIncome();
+}
+function pjIncomeDel(i){ formIncome.splice(i,1); renderFormIncome(); }
+function pjIncomeSet(i,field,val){
+  if(!formIncome[i]) return;
+  if(field==='paid'){ formIncome[i].paidAt = val ? (new Date().toISOString().split('T')[0]) : ''; renderFormIncome(); return; }
+  formIncome[i][field] = val;
+  // อัปเดตเฉพาะบรรทัดสรุป — ห้าม re-render ทั้งบล็อก ไม่งั้นเคอร์เซอร์หลุดขณะพิมพ์
+  if(field==='amount') _updateIncomeSummary();
+}
+function _updateIncomeSummary(){
+  const sum=document.getElementById('pj-income-summary'); if(!sum) return;
+  const total=formIncome.reduce((a,r)=>a+(parseFloat(r.amount)||0),0);
+  const got=formIncome.filter(r=>r.paidAt).reduce((a,r)=>a+(parseFloat(r.amount)||0),0);
+  const budget=_pjBudgetTotal();
+  const diff=Math.round(total-budget);
+  sum.innerHTML=`รวมงวด <strong>${fmtB(total)}</strong> · รับแล้ว <strong style="color:var(--green)">${fmtB(got)}</strong> · ค้างรับ <strong style="color:var(--orange)">${fmtB(total-got)}</strong>`
+    + (formIncome.length && budget>0 && Math.abs(diff)>1
+        ? ` <span style="color:var(--orange)">⚠️ ยอดรวมงวด${diff>0?'มากกว่า':'น้อยกว่า'}งบลูกค้า ${fmtB(Math.abs(diff))}</span>` : '');
+}
+function renderFormIncome(){
+  const box=document.getElementById('pj-income-rows'); if(!box) return;
+  const inp=(i,f,type,val,ph,style)=>`<input type="${type}" value="${esc(val==null?'':val)}" placeholder="${ph||''}"${type==='number'?' min="0" step="any" onwheel="this.blur()"':''} oninput="pjIncomeSet(${i},'${f}',this.value)" style="padding:6px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12.5px;${style||''}">`;
+  box.innerHTML = formIncome.length ? formIncome.map((r,i)=>{
+    const paid=!!r.paidAt;
+    return `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:7px 0;border-top:1px solid rgba(255,255,255,.06)">
+      <input type="text" value="${esc(r.label||'')}" placeholder="ชื่องวด" oninput="pjIncomeSet(${i},'label',this.value)" style="flex:1;min-width:110px;padding:6px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12.5px">
+      ${inp(i,'amount','number',r.amount,'จำนวนเงิน','width:104px;text-align:right')}
+      <span style="font-size:11px;color:var(--text2)">ครบกำหนด</span>
+      ${inp(i,'dueDate','date',r.dueDate,'','width:140px')}
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:${paid?'var(--green)':'var(--text2)'};cursor:pointer;font-weight:${paid?'700':'400'};white-space:nowrap">
+        <input type="checkbox" ${paid?'checked':''} onchange="pjIncomeSet(${i},'paid',this.checked)"> ${paid?'✅ รับเงินแล้ว':'รับเงินแล้ว'}
+      </label>
+      ${paid?inp(i,'paidAt','date',r.paidAt,'','width:140px'):''}
+      <button type="button" class="btn btn-sm btn-outline" style="padding:3px 9px;font-size:11px;border-color:rgba(255,64,64,.35);color:var(--red)" onclick="pjIncomeDel(${i})">🗑️</button>
+    </div>`;
+  }).join('') : '<div style="font-size:12px;color:var(--text2);padding:8px 0">ยังไม่มีงวด — ถ้าไม่ระบุ ระบบจะถือว่ายังไม่ได้รับเงินจากลูกค้า</div>';
+  _updateIncomeSummary();
+}
 // ══════════════════════════════════════════════
 // 📋 หน้ามอบหมายงาน — กรอกในตารางเหมือนกูเกิลชีท (inline) + กรองเดือน/เรียงลำดับ
 // ══════════════════════════════════════════════
@@ -9982,6 +10351,7 @@ function calcProjSummary(){
   document.getElementById('sum-expense').textContent=fmtB(Math.round(totalExp));
   document.getElementById('sum-deduction').textContent='฿0';
   const pe=document.getElementById('sum-profit');pe.textContent=fmtB(Math.round(profit));pe.style.color=profit>=0?'var(--green)':'var(--red)';
+  try{ _updateIncomeSummary(); }catch(e){}   // งบเปลี่ยน → เตือนยอดงวดไม่ตรงให้ทันที
   // Manager เห็นการเงินของโปรเจกต์ที่ตัวเองดูแลได้ (รายจ่าย/หัก/กำไร) — เหมือนแอดมิน
   const _sumGrid=document.getElementById('proj-calc-summary');if(_sumGrid)_sumGrid.style.gridTemplateColumns='repeat(4,1fr)';
   ['sum-expense','sum-deduction','sum-profit'].forEach(id=>{const c=document.getElementById(id);if(c&&c.parentElement)c.parentElement.style.display='';});
@@ -10025,6 +10395,11 @@ async function saveProject(){
     deadline:thaiToIso(document.getElementById('pj-deadline').value)||document.getElementById('pj-deadline').value,
     cycle:'',
     note:document.getElementById('pj-note')?.value||'',
+    income: formIncome.filter(r=>(parseFloat(r.amount)||0)>0 || (r.label||'').trim()).map(r=>({
+      id:r.id||('IN'+Date.now()+Math.random().toString(36).slice(2,6)),
+      label:(r.label||'').trim(), amount:parseFloat(r.amount)||0,
+      dueDate:r.dueDate||'', paidAt:r.paidAt||'', method:r.method||'', note:r.note||''
+    })),
     clientCode:(document.getElementById('pj-clientcode')?.value||'').trim().toUpperCase(),
     seq:parseInt(document.getElementById('pj-seq')?.value)||0,
     episodes:parseInt(document.getElementById('pj-episodes')?.value)||0,
@@ -10112,6 +10487,19 @@ async function saveProject(){
   window._formDirty = false;
   // Bridge phases → trkCard เพื่อให้หน้า Track/Calendar เดิมเห็นข้อมูลตรงกัน
   try{ syncPhasesToTrkCard(proj.id, proj.phases); }catch(e){}
+  // 💰 ถ้ากรอกงวดรับเงินครบทั้งก้อนแล้ว → ติ๊กสถานะ "รับเงินจากลูกค้าแล้ว" ให้คิวจ่ายเงินอัตโนมัติ
+  //    (ทางเดียว — ไม่ปลดติ๊กเอง เพื่อไม่ให้ไปรีเซ็ตสถานะจ่ายของทีมที่ทำไปแล้ว)
+  try{
+    if((proj.income||[]).length){
+      const f = getProjectFinance(proj);
+      if(f.isFullyPaid && !ls('client_paid_'+proj.id)){
+        ls('client_paid_'+proj.id, true);
+        const last = (proj.income||[]).filter(r=>r.paidAt).map(r=>r.paidAt).sort().pop();
+        ls('client_paid_date_'+proj.id, last ? fmtDate(last) : new Date().toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'}));
+        if(_fbDatabase) _fbDatabase.ref('misc/cpaid_'+proj.id).set(true).catch(()=>{});
+      }
+    }
+  }catch(e){}
   closeModal('modal-project');
   releasePresence();
   renderProjects();renderDash();
@@ -10467,6 +10855,7 @@ async function openEditProject(id){
   }
   document.getElementById('pj-name').value=p.name||'';
   document.getElementById('pj-client').value=p.client||'';
+  initFormIncome(p);
   // 📋 ข้อมูลชีทคิวเมเนเจอร์
   _setVal('pj-clientcode', p.clientCode||'');
   _setVal('pj-seq', p.seq||'');
@@ -10474,7 +10863,7 @@ async function openEditProject(id){
   _setVal('pj-downloadlink', p.downloadLink||'');
   _setVal('pj-secretkey', p.secretKey||'');
   _fillClientCodeDatalist();
-  // Populate manager dropdown
+  // Populate manager dropdown (income ถูกโหลดไว้แล้วด้านบน)
   const mgrSel=document.getElementById('pj-manager');
   if(mgrSel){
     const managers=getAllManagerUsers();
@@ -13864,22 +14253,12 @@ function renderProfit(){
   if(sub) sub.textContent = `แสดง ${filtered.length} จาก ${projs.length} โปรเจกต์${window._profitState.filters.length?' · มี '+window._profitState.filters.length+' filter':''}`;
 
   // === Totals สำหรับการ์ดหลัก (ของทั้งหมดที่ filter แล้ว) ===
-  let revenue=0, cost=0, paidCost=0, pendingCost=0, recvRevenue=0, pendingRevenue=0;
+  // 💰 ใช้ฟังก์ชันกลางชุดเดียวกับ dashboard/รายงาน
+  const _F = sumProjectFinance(filtered);
+  const revenue = _F.billed, cost = _F.expense, paidCost = _F.expensePaid, pendingCost = _F.expensePending;
+  const recvRevenue = _F.received, pendingRevenue = _F.outstanding;
   let workerCount = 0;
-  filtered.forEach(p => {
-    const budget = p.budget||0;
-    const cp = !!ls('client_paid_'+p.id);
-    revenue += budget;
-    if(cp) recvRevenue += budget;
-    else pendingRevenue += budget;
-    (p.workers||[]).forEach(w => {
-      const amt = w.amount||0;
-      cost += amt;
-      workerCount++;
-      if(w.status === 'paid') paidCost += amt;
-      else pendingCost += amt;
-    });
-  });
+  filtered.forEach(p => { if(p.projStatus!=='cancelled') workerCount += (p.workers||[]).length; });
   const profit = revenue - cost;
   const margin = revenue>0 ? (profit/revenue*100).toFixed(1) : 0;
 
