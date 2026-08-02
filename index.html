@@ -4468,18 +4468,104 @@ function _roundRangeLabel(r){
     ? `${s.getDate()}-${e.getDate()} ${_TH_MONTH_FULL[e.getMonth()]}`
     : `${s.getDate()} ${_TH_M[s.getMonth()]} – ${e.getDate()} ${_TH_M[e.getMonth()]}`;
 }
-// ข้อความประกาศสำหรับวางใน Discord
-function roundAnnounceText(r){
-  const c=AV_CATS[r.cat]||AV_CATS.dubbing;
-  const lines=[];
-  lines.push(`สวัสดีค่ะ${c.label}ทุกท่าน`);
-  lines.push(`ขออนุญาตขอคิวช่วง ${_roundRangeLabel(r)} หน่อยค่ะ`);
-  if((r.note||'').trim()){ lines.push(''); lines.push(r.note.trim()); }
-  if(r.nda) lines.push('รบกวนแจ้งด้วยว่าสะดวกเซ็น NDA ไหมคะ');
-  lines.push('');
-  lines.push('รบกวนพิมพ์ตอบใต้โพสนี้ว่าสะดวกวันไหนบ้างนะคะ 🙏');
-  lines.push(c.mention);
-  return lines.join('\n');
+// ══ ข้อความประกาศ = เทมเพลตใช้ซ้ำทุกรอบ ══
+//    เขียนครั้งเดียว มีช่อง {วันที่} {แท็ก} {หมายเหตุ} ให้ระบบเติมเองตามรอบที่เปิด
+//    แยก 2 สำนวน: หญิง (ค่ะ/ค่า) กับ ชาย (ครับ) · แท็กต่อทีมตั้งค่าเก็บถาวรได้
+const _ANN_TPL_DEFAULT={
+  female:'สวัสดีค่า ขอคิวทุกท่านช่วงวันที่ {วันที่} หน่อยค่า\n\nหรือหากใครมีเงื่อนไขเพิ่มเติม หรือสะดวกรับมากกว่า 1 งาน สามารถพิมพ์แจ้งไว้ข้างล่างได้เลยค่า 🙏🏻\n{แท็ก}',
+  male:'สวัสดีครับ ขอคิวทุกท่านช่วงวันที่ {วันที่} หน่อยครับ\n\nหรือหากใครมีเงื่อนไขเพิ่มเติม หรือสะดวกรับมากกว่า 1 งาน สามารถพิมพ์แจ้งไว้ข้างล่างได้เลยครับ 🙏🏻\n{แท็ก}'
+};
+function getAnnounceTpl(){
+  const v=ls('announcetpl');
+  return { female:(v&&v.female)||_ANN_TPL_DEFAULT.female, male:(v&&v.male)||_ANN_TPL_DEFAULT.male };
+}
+async function saveAnnounceTpl(t){ ls('announcetpl', t); try{ await fbSaveKeyed('announcetpl', t); }catch(e){} }
+function getAnnounceGender(){ return ls('announcegender')==='male' ? 'male' : 'female'; }
+// แท็กของทีม — ค่าที่ตั้งเองใน discord_cfg มาก่อน ถ้าไม่ตั้งใช้ค่าเริ่มต้นของทีมนั้น
+function _annMention(cat){
+  const m=(getDiscordCfg().mentions||{})[cat];
+  return (m!==undefined && m!==null && String(m).trim()!=='') ? String(m).trim() : ((AV_CATS[cat]||{}).mention||'');
+}
+// ช่วงวันแบบเลข 2 หลัก เช่น "02-09 สิงหาคม" (ข้ามเดือน: "30 กรกฎาคม - 05 สิงหาคม")
+function _annRangeLabel(r){
+  if(!r||!r.dateFrom) return '—';
+  const p2=n=>String(n).padStart(2,'0');
+  const s=new Date(r.dateFrom), e=new Date(r.dateTo||r.dateFrom);
+  const same=s.getMonth()===e.getMonth() && s.getFullYear()===e.getFullYear();
+  return same
+    ? `${p2(s.getDate())}-${p2(e.getDate())} ${_TH_MONTH_FULL[e.getMonth()]}`
+    : `${p2(s.getDate())} ${_TH_MONTH_FULL[s.getMonth()]} - ${p2(e.getDate())} ${_TH_MONTH_FULL[e.getMonth()]}`;
+}
+function roundAnnounceText(r, gender){
+  const g=gender||getAnnounceGender();
+  let t=getAnnounceTpl()[g]||'';
+  const note=(r.note||'').trim();
+  // หมายเหตุ + คำถาม NDA แทรกก่อนบรรทัดแท็ก (ถ้าเทมเพลตไม่ได้กำหนดจุดวาง {หมายเหตุ} เอง)
+  let extra='';
+  if(note && !t.includes('{หมายเหตุ}')) extra+='📌 '+note+'\n';
+  if(r.nda) extra+=(g==='male'?'รบกวนแจ้งด้วยว่าสะดวกเซ็น NDA ด้วยนะครับ':'รบกวนแจ้งด้วยว่าสะดวกเซ็น NDA ด้วยนะคะ')+'\n';
+  if(extra){
+    if(t.includes('{แท็ก}')) t=t.replace('{แท็ก}', extra+'{แท็ก}');
+    else t+='\n'+extra.trim();
+  }
+  t=t.split('{วันที่}').join(_annRangeLabel(r));
+  t=t.split('{แท็ก}').join(_annMention(r.cat));
+  t=t.split('{หมายเหตุ}').join(note);
+  return t.replace(/\n{3,}/g,'\n\n').trim();
+}
+// สลับสำนวนในกล่องประกาศ — จำตัวเลือกไว้ในเครื่อง
+function _raSetGender(g, roundId){
+  ls('announcegender', g);
+  const r=getRound(roundId); const el=document.getElementById('ra-text');
+  if(r && el) el.value=roundAnnounceText(r, g);
+}
+// ⚙️ แก้เทมเพลต + แท็กของแต่ละทีม (แอดมินเท่านั้น — เก็บถาวร ใช้ทุกรอบ)
+function openAnnounceTplEditor(roundId){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมินแก้เทมเพลตได้','error'); return; }
+  const t=getAnnounceTpl();
+  const ta='width:100%;padding:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px;line-height:1.6;resize:vertical;box-sizing:border-box';
+  _tagOverlayShow('⚙️ เทมเพลตประกาศขอคิว — เขียนครั้งเดียว ใช้ซ้ำทุกรอบ', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.7;margin-bottom:10px">
+      ตรงไหนพิมพ์ <code>{วันที่}</code> ระบบจะเติมช่วงวันของรอบให้ (เช่น 02-09 สิงหาคม) ·
+      <code>{แท็ก}</code> จะกลายเป็นแท็กของทีมที่เปิดรอบ (ตั้งด้านล่าง) ·
+      พิมพ์ <code>{หมายเหตุ}</code> ได้ถ้าอยากกำหนดจุดวางหมายเหตุของรอบเอง
+    </div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:4px">👩 สำนวนหญิง (ค่ะ/ค่า)</div>
+    <textarea id="tpl-f" rows="5" style="${ta}">${esc(t.female)}</textarea>
+    <div style="font-size:12px;font-weight:700;margin:10px 0 4px">👨 สำนวนชาย (ครับ)</div>
+    <textarea id="tpl-m" rows="5" style="${ta}">${esc(t.male)}</textarea>
+    <div style="font-size:12px;font-weight:700;margin:14px 0 6px;padding-top:10px;border-top:1px solid var(--border2)">แท็กของแต่ละทีม — ใช้แทน {แท็ก} ตามห้องที่เปิดรอบ</div>
+    ${Object.entries(AV_CATS).map(([k,v])=>`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="width:118px;font-size:12px;flex-shrink:0">${v.icon} ${esc(v.label)}</span>
+        <input id="tpl-tag-${k}" value="${esc(_annMention(k))}" placeholder="เช่น @นักพากย์หญิง @นักพากย์ชาย"
+          style="flex:1;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+      </div>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-green" style="flex:1" onclick="saveAnnounceTplEditor('${roundId||''}')">💾 บันทึกเทมเพลต</button>
+      <button class="btn btn-outline" onclick="resetAnnounceTpl('${roundId||''}')">↩️ คืนค่าเริ่มต้น</button>
+      <button class="btn btn-outline" onclick="${roundId?`showRoundAnnounce('${roundId}')`:`document.getElementById('tag-overlay')?.remove()`}">ยกเลิก</button>
+    </div>`, 660);
+}
+async function saveAnnounceTplEditor(roundId){
+  const t={ female:(document.getElementById('tpl-f')?.value||'').trim(), male:(document.getElementById('tpl-m')?.value||'').trim() };
+  if(!t.female||!t.male){ toast('เทมเพลตห้ามว่าง','error'); return; }
+  if((!t.female.includes('{วันที่}')||!t.male.includes('{วันที่}')) && !confirm('เทมเพลตไม่มี {วันที่} — ข้อความจะไม่บอกช่วงวันของรอบ บันทึกเลยไหม?')) return;
+  await saveAnnounceTpl(t);
+  const cfg=getDiscordCfg(); cfg.mentions=cfg.mentions||{};
+  Object.keys(AV_CATS).forEach(k=>{
+    const v=(document.getElementById('tpl-tag-'+k)?.value||'').trim();
+    if(v) cfg.mentions[k]=v; else delete cfg.mentions[k];
+  });
+  await saveDiscordCfg(cfg);
+  toast('💾 บันทึกเทมเพลตแล้ว — ใช้กับทุกรอบต่อจากนี้','success');
+  if(roundId) showRoundAnnounce(roundId); else document.getElementById('tag-overlay')?.remove();
+}
+async function resetAnnounceTpl(roundId){
+  if(!confirm('คืนเทมเพลตทั้งสองสำนวนกลับค่าเริ่มต้น?')) return;
+  ls('announcetpl', null); try{ await fbSaveKeyed('announcetpl', null); }catch(e){}
+  toast('คืนค่าเริ่มต้นแล้ว','success');
+  openAnnounceTplEditor(roundId||'');
 }
 function openNewRound(){
   const role=currentUser?.role;
@@ -4537,9 +4623,16 @@ async function createRound(){
 function showRoundAnnounce(roundId){
   const r=getRound(roundId); if(!r) return;
   const c=AV_CATS[r.cat]||AV_CATS.dubbing;
-  const txt=roundAnnounceText(r);
+  const g=getAnnounceGender();
+  const txt=roundAnnounceText(r, g);
   _tagOverlayShow('📢 ข้อความประกาศ — คัดลอกไปโพสใน Discord', `
-    <div style="font-size:11.5px;color:var(--text2);margin-bottom:8px">แนะนำให้โพสในห้อง <strong style="color:var(--accent2)"># ${esc(c.channel)}</strong></div>
+    <div style="font-size:11.5px;color:var(--text2);margin-bottom:8px">แนะนำให้โพสในห้อง <strong style="color:var(--accent2)"># ${esc(c.channel)}</strong> · ระบบเติมช่วงวันที่ <strong style="color:var(--accent2)">${esc(_annRangeLabel(r))}</strong> และแท็กของทีมให้จากเทมเพลตอัตโนมัติ</div>
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap;font-size:12.5px">
+      <span style="font-weight:700">สำนวน:</span>
+      <label style="cursor:pointer"><input type="radio" name="ra-g" value="female" ${g==='female'?'checked':''} onchange="_raSetGender('female','${r.id}')"> 👩 หญิง (ค่ะ/ค่า)</label>
+      <label style="cursor:pointer"><input type="radio" name="ra-g" value="male" ${g==='male'?'checked':''} onchange="_raSetGender('male','${r.id}')"> 👨 ชาย (ครับ)</label>
+      <button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="openAnnounceTplEditor('${r.id}')">⚙️ แก้เทมเพลต & แท็ก</button>
+    </div>
     <textarea id="ra-text" rows="10" style="width:100%;padding:11px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:Kanit;font-size:13px;line-height:1.65;resize:vertical;box-sizing:border-box">${esc(txt)}</textarea>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="btn" style="flex:1" onclick="_raCopy()">📋 คัดลอกข้อความ</button>
@@ -4547,8 +4640,8 @@ function showRoundAnnounce(roundId){
       <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
     </div>
     <div style="font-size:11px;color:var(--text2);margin-top:10px;line-height:1.6">
-      หลังโพสแล้ว ทีมจะพิมพ์ตอบใต้โพส — เอาคำตอบมากรอกในตารางด้านหลังนี้ได้เลย (หรือให้บอทเติมให้อัตโนมัติเมื่อทำบอทเสร็จ)
-    </div>`, 600);
+      เทมเพลตเดียวใช้ซ้ำทุกรอบ — รอบหน้าแค่เลือกช่วงวันตอนเปิดรอบ ระบบเติมให้เอง · อยากแก้ข้อความเฉพาะรอบนี้ พิมพ์ในกล่องได้เลยก่อนคัดลอก/อัปเดตโพส
+    </div>`, 620);
 }
 function _raCopy(){
   const el=document.getElementById('ra-text'); if(!el) return;
@@ -7734,7 +7827,7 @@ async function enterApp(){
   try { await loadMgrRequests(); await loadManagerUsers(); await loadMgrSuspended(); await loadTeamLeft(); } catch(e) {}
   try { await fbLoadKeyed('tags_master'); await fbLoadKeyed('brief_templates'); await fbLoadKeyed('company_expenses');
         await fbLoadKeyed('payroll_profiles'); await fbLoadKeyed('payroll_runs');
-        await fbLoadKeyed('recruit_rounds'); await fbLoadKeyed('discord_cfg'); await fbLoadKeyed('allocdraft'); } catch(e) {}
+        await fbLoadKeyed('recruit_rounds'); await fbLoadKeyed('discord_cfg'); await fbLoadKeyed('allocdraft'); await fbLoadKeyed('announcetpl'); } catch(e) {}
   try { logLogin(); startIdleWatch(); } catch(e) {}
   // Load tracking cards from Firebase
   try {
@@ -8179,48 +8272,86 @@ function renderDash(){
   const projCancelled = projs.filter(p => p.projStatus === 'cancelled').length;
   const projActive = projs.length - projCancelled;
   const urgent=projs.filter(p=>{if(!p.deadline)return false;const dl=new Date(p.deadline);dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));return diff>=0&&diff<=7}).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
-  document.getElementById('dash-stats').innerHTML=`
-    <div class="stat-card" onclick="nav('projects')">
-     <span class="stat-icon">📁</span>
-     <div class="stat-label">โปรเจกต์ทั้งหมด</div>
-     <div class="stat-value">${projs.length}</div>
-     <div class="stat-delta up">${projActive} ดำเนินการ${projCancelled?' · '+projCancelled+' ยกเลิก':''}</div>
+  // 📖 เรียงการ์ดเป็นเรื่องเดียวอ่านจากบนลงล่าง: 1) เงินจากลูกค้า → 2) ค่าจ้างทีม → 3) สรุปกำไร
+  const pctCollected = totalRevenue>0 ? Math.round(revenue/totalRevenue*100) : 0;
+  const cash = revenue - paid; // เงินสดที่ผ่านมือจริง = เงินลูกค้าที่เข้าแล้ว − ที่จ่ายทีมไปแล้ว
+  const _dsGroupH=(icon,title,sub)=>`<div style="display:flex;align-items:baseline;gap:9px;margin:0 2px 8px;flex-wrap:wrap"><span style="font-size:12.5px;font-weight:800;letter-spacing:.4px">${icon} ${title}</span><span style="font-size:11px;color:var(--text2)">${sub}</span></div>`;
+  const _dsEl=document.getElementById('dash-stats');
+  _dsEl.style.display='block';
+  _dsEl.innerHTML=`
+    <div onclick="nav('projects')" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:10px 16px;margin-bottom:14px;cursor:pointer;font-size:12.5px">
+     <span style="font-size:16px">📁</span><strong>${projs.length} โปรเจกต์</strong>
+     <span style="color:var(--text2)">${projActive} ดำเนินการ${projCancelled?' · '+projCancelled+' ยกเลิก':''}</span>
+     <span style="margin-left:auto;color:var(--text2);font-size:11px">อ่านจากบนลงล่าง: เงินเข้า → จ่ายทีม → เหลือเป็นกำไร</span>
     </div>
-    <div class="stat-card" onclick="openRevenueBreakdown()" style="cursor:pointer" title="เงินที่ลูกค้าจ่ายมาแล้วจริงเท่านั้น — ไม่นับงานที่ยังไม่ได้เก็บเงิน">
-     <span class="stat-icon">💰</span>
-     <div class="stat-label">รายรับจริง</div>
-     <div class="stat-value" style="color:var(--green)">${fmtB(revenue)}</div>
-     <div class="stat-delta up">จากยอดตามบิล ${fmtB(totalRevenue)} →</div>
+    <div style="margin-bottom:14px">
+     ${_dsGroupH('💙','1. เงินจากลูกค้า','งานทั้งหมดตีเป็นเงินเท่าไหร่ · เข้ามาแล้วเท่าไหร่ · ค้างอีกเท่าไหร่')}
+     <div class="stats-grid" style="margin-bottom:0">
+      <div class="stat-card" onclick="nav('profit')" title="มูลค่างานทุกโปรเจกต์ตามบิล (ไม่นับงานที่ยกเลิก)">
+       <span class="stat-icon">🧾</span>
+       <div class="stat-label">ยอดตามบิลทั้งหมด</div>
+       <div class="stat-value">${fmtB(totalRevenue)}</div>
+       <div class="stat-delta">มูลค่างานทั้งหมดที่รับมา</div>
+      </div>
+      <div class="stat-card" onclick="openRevenueBreakdown()" title="เงินที่ลูกค้าจ่ายมาแล้วจริงเท่านั้น — ไม่นับงานที่ยังไม่ได้เก็บเงิน">
+       <span class="stat-icon">💰</span>
+       <div class="stat-label">เก็บเงินแล้ว</div>
+       <div class="stat-value" style="color:var(--green)">${fmtB(revenue)}</div>
+       <div class="stat-delta up">${pctCollected}% ของยอดบิล</div>
+      </div>
+      <div class="stat-card" onclick="nav('profit')" title="ยอดที่ยังไม่ได้เก็บเงินจากลูกค้า">
+       <span class="stat-icon">📋</span>
+       <div class="stat-label">รอเก็บอีก</div>
+       <div class="stat-value" style="color:${revenuePending?'var(--orange)':'var(--text2)'}">${fmtB(revenuePending)}</div>
+       <div class="stat-delta ${revenuePending?'down':'up'}">${F.overdue?'🔴 เลยกำหนดแล้ว '+fmtB(F.overdue):revenuePending?'ยังไม่ถึงกำหนด':'เก็บเงินครบแล้ว 🎉'}</div>
+      </div>
+     </div>
     </div>
-    <div class="stat-card" onclick="nav('profit')" style="cursor:pointer" title="ยอดที่ส่งงานแล้วแต่ยังไม่ได้เก็บเงินจากลูกค้า">
-     <span class="stat-icon">📋</span>
-     <div class="stat-label">รอเก็บเงินจากลูกค้า</div>
-     <div class="stat-value" style="color:${revenuePending?'var(--orange)':'var(--text2)'}">${fmtB(revenuePending)}</div>
-     <div class="stat-delta ${revenuePending?'down':'up'}">${F.overdue?'🔴 เลยกำหนดแล้ว '+fmtB(F.overdue):revenuePending?'ยังไม่ถึงกำหนด':'เก็บเงินครบแล้ว 🎉'}</div>
+    <div style="margin-bottom:14px">
+     ${_dsGroupH('🧡','2. ค่าจ้างทีมงาน','ต้นทุนทีมของทุกงาน · จ่ายไปแล้วเท่าไหร่ · ค้างอีกเท่าไหร่')}
+     <div class="stats-grid" style="margin-bottom:0">
+      <div class="stat-card" onclick="nav('queue')" title="ค่าจ้างทีมรวมของทุกงาน (หักภาษี ณ ที่จ่ายแล้ว)">
+       <span class="stat-icon">👥</span>
+       <div class="stat-label">ค่าจ้างทีมทั้งหมด</div>
+       <div class="stat-value">${fmtB(F.expense)}</div>
+       <div class="stat-delta">ต้นทุนทีมของทุกงาน</div>
+      </div>
+      <div class="stat-card" onclick="nav('queue')" title="จ่ายให้ทีมไปแล้วจริง">
+       <span class="stat-icon">💸</span>
+       <div class="stat-label">จ่ายทีมแล้ว</div>
+       <div class="stat-value" style="color:var(--green)">${fmtB(paid)}</div>
+       <div class="stat-delta up">${paidCount} คน รับเงินแล้ว</div>
+      </div>
+      <div class="stat-card" onclick="nav('queue')" title="ค่าจ้างทีมที่ยังไม่ได้จ่าย">
+       <span class="stat-icon">⏳</span>
+       <div class="stat-label">ค้างจ่ายทีมอีก</div>
+       <div class="stat-value" style="color:${pendingWorkers.length?'var(--orange)':'var(--green)'}">${fmtB(pending)}</div>
+       <div class="stat-delta ${pendingWorkers.length?'down':'up'}">${pendingWorkers.length?pendingWorkers.length+' คน รอดำเนินการ':'ไม่มีค้างจ่าย 🎉'}</div>
+      </div>
+     </div>
     </div>
-    <div class="stat-card" onclick="nav('queue')">
-     <span class="stat-icon">⏳</span>
-     <div class="stat-label">ค้างจ่ายทีม</div>
-     <div class="stat-value" style="color:${pendingWorkers.length?'var(--orange)':'var(--green)'}">${fmtB(pending)}</div>
-     <div class="stat-delta ${pendingWorkers.length?'down':'up'}">${pendingWorkers.length?pendingWorkers.length+' คน รอดำเนินการ':'ไม่มีค้างจ่าย 🎉'}</div>
-    </div>
-    <div class="stat-card" onclick="nav('queue')" style="cursor:pointer">
-     <span class="stat-icon">💸</span>
-     <div class="stat-label">จ่ายทีมไปแล้ว</div>
-     <div class="stat-value" style="color:var(--green)">${fmtB(paid)}</div>
-     <div class="stat-delta up">${paidCount} คน รับเงินแล้ว</div>
-    </div>
-    <div class="stat-card" onclick="nav('profit')" style="cursor:pointer" title="กำไรทั้งหมด = ยอดตามบิลทุกงาน − ค่าจ้างทีมทั้งหมด (คือกำไรที่จะได้เมื่อเก็บเงินลูกค้าครบ)">
-     <span class="stat-icon">📈</span>
-     <div class="stat-label">กำไรทั้งหมด</div>
-     <div class="stat-value" style="color:${profit>=0?'var(--green)':'var(--red)'}">${fmtB(profit)}</div>
-     <div class="stat-delta ${profit>=0?'up':'down'}">ยอดบิล ${fmtB(totalRevenue)} − ค่าจ้างทีม ${fmtB(F.expense)}</div>
-    </div>
-    <div class="stat-card" onclick="nav('profit')" style="cursor:pointer" title="กำไรสุทธิ = กำไรทั้งหมด − ค่าใช้จ่ายบริษัท (ค่าเช่า ซอฟต์แวร์ ฯลฯ)">
-     <span class="stat-icon">🏦</span>
-     <div class="stat-label">กำไรสุทธิ</div>
-     <div class="stat-value" style="color:${netProfit>=0?'var(--green)':'var(--red)'}">${fmtB(netProfit)}</div>
-     <div class="stat-delta ${netProfit>=0?'up':'down'}">${companyExp?'หักค่าใช้จ่ายบริษัท '+fmtB(companyExp):'ยังไม่ได้บันทึกค่าใช้จ่ายบริษัท'}</div>
+    <div>
+     ${_dsGroupH('💚','3. สรุปกำไร','เงินจากลูกค้า − ค่าจ้างทีม = เหลือเท่าไหร่')}
+     <div class="stats-grid" style="margin-bottom:0">
+      <div class="stat-card" onclick="nav('profit')" title="กำไรทั้งหมด = ยอดตามบิลทุกงาน − ค่าจ้างทีมทั้งหมด (คือกำไรที่จะได้เมื่อเก็บเงินลูกค้าครบ)">
+       <span class="stat-icon">📈</span>
+       <div class="stat-label">กำไรทั้งหมด</div>
+       <div class="stat-value" style="color:${profit>=0?'var(--green)':'var(--red)'}">${fmtB(profit)}</div>
+       <div class="stat-delta ${profit>=0?'up':'down'}">ยอดบิล ${fmtB(totalRevenue)} − ค่าจ้างทีม ${fmtB(F.expense)}</div>
+      </div>
+      <div class="stat-card" onclick="nav('profit')" title="กำไรสุทธิ = กำไรทั้งหมด − ค่าใช้จ่ายบริษัท (ค่าเช่า ซอฟต์แวร์ ฯลฯ)">
+       <span class="stat-icon">🏦</span>
+       <div class="stat-label">กำไรสุทธิ</div>
+       <div class="stat-value" style="color:${netProfit>=0?'var(--green)':'var(--red)'}">${fmtB(netProfit)}</div>
+       <div class="stat-delta ${netProfit>=0?'up':'down'}">${companyExp?'หักค่าใช้จ่ายบริษัท '+fmtB(companyExp):'ยังไม่ได้บันทึกค่าใช้จ่ายบริษัท'}</div>
+      </div>
+      <div class="stat-card" onclick="openRevenueBreakdown()" title="เงินลูกค้าที่เข้ามาแล้ว − ที่จ่ายทีมไปแล้ว = เงินสดที่ผ่านมือจริงตอนนี้">
+       <span class="stat-icon">👛</span>
+       <div class="stat-label">เงินสดตอนนี้</div>
+       <div class="stat-value" style="color:${cash>=0?'var(--cyan)':'var(--red)'}">${fmtB(cash)}</div>
+       <div class="stat-delta ${cash>=0?'up':'down'}">${cash>=0?'เก็บแล้ว '+fmtB(revenue)+' − จ่ายทีมแล้ว '+fmtB(paid):'⚠️ จ่ายทีมไปมากกว่าเงินที่เก็บมา — เร่งเก็บเงินลูกค้า'}</div>
+      </div>
+     </div>
     </div>`;
   const urgentEl=document.getElementById('dash-queue');
   urgentEl.innerHTML=urgent.length?urgent.map(p=>{const dl=new Date(p.deadline);dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));const color=diff<=1?'var(--red)':diff<=3?'var(--orange)':'var(--text2)';
