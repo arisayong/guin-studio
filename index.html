@@ -347,6 +347,26 @@ tr:hover td{background:rgba(255,255,255,.015)}
 .section-title{font-size:12px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;
   color:var(--text2);text-transform:uppercase;letter-spacing:1px}
 
+/* ── หน้าตั้งค่า: แท็บ + แถวเครื่องมือ ── */
+.set-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;border-bottom:1px solid var(--border2);padding-bottom:10px}
+.set-tab{padding:8px 16px;border-radius:9px;background:transparent;border:1px solid var(--border2);
+  color:var(--text2);font-family:Kanit;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.set-tab:hover{color:var(--text);border-color:var(--accent2)}
+.set-tab.active{background:var(--accent2);border-color:var(--accent2);color:#fff}
+.set-head{display:flex;align-items:flex-start;gap:11px;margin-bottom:13px}
+.set-ico{font-size:21px;line-height:1.2;flex-shrink:0}
+.set-title{font-size:15px;font-weight:800;color:var(--text)}
+.set-sub{font-size:11.5px;color:var(--text2);margin-top:2px;line-height:1.55;max-width:66ch}
+.set-fields{display:flex;flex-direction:column;gap:4px}
+.set-lbl{font-size:11px;font-weight:700;color:var(--text2);margin-top:7px}
+.set-input{width:100%;padding:8px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;
+  color:var(--text);font-family:Kanit;font-size:12.5px;box-sizing:border-box;outline:none}
+.set-input:focus{border-color:var(--accent2)}
+.set-toolrow{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid var(--border2)}
+.set-toolname{font-size:13px;font-weight:700;color:var(--text)}
+.set-toolsub{font-size:11px;color:var(--text2);margin-top:2px;line-height:1.5}
+.set-toolres:not(:empty){margin:0 0 12px;padding:11px 13px;background:var(--bg2);border-radius:9px}
+
 /* CATEGORY BLOCKS */
 .cat-block{border-radius:11px;margin-bottom:12px;overflow:hidden}
 .cat-block-head{padding:11px 15px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;cursor:pointer;flex-wrap:wrap;gap:8px}
@@ -1229,359 +1249,227 @@ body.sidebar-collapsed .main-content{
   <!-- ── ⚙️ SETTINGS & BACKUP ── -->
   <div id="page-settings" class="page hidden">
    <div class="page-header">
-    <div class="page-title">🛠️ ตั้งค่า & สำรองข้อมูล</div>
-    <div class="page-subtitle">จัดการความปลอดภัยของข้อมูล · ปุ่มอันตรายและทำงานไม่สามารถกู้คืนได้</div>
+    <div class="page-title">🛠️ ตั้งค่า</div>
+    <div class="page-subtitle">ตั้งค่าระบบ · เชื่อมต่อข้อมูล · สำรองข้อมูล · เครื่องมือซ่อมข้อมูล</div>
    </div>
 
-   <!-- Admin Contact + Staff Edit Form Links -->
-   <div class="section-card" style="border-left:4px solid var(--cyan);margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🔗</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--cyan)">ลิงก์ติดต่อ & แก้ไขข้อมูล</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">ใส่ลิงก์ที่จะแสดงในหน้าโปรไฟล์ของสต๊าฟ เมื่อสต๊าฟต้องการเปลี่ยนบัญชีธนาคาร</div>
-     </div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-     <div>
-      <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">✏️ ลิงก์แก้ไขแบบฟอร์ม</label>
-      <input id="setting-form-url" type="url" placeholder="https://forms.gle/..." style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;box-sizing:border-box" oninput="saveContactSetting('staff_edit_form_url',this.value)">
-     </div>
-     <div>
-      <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">💬 ลิงก์ LINE (URL หรือ LINE ID)</label>
-      <input id="setting-line-url" type="text" placeholder="https://line.me/ti/p/... หรือ @guinhome" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;box-sizing:border-box" oninput="saveContactSetting('admin_contact_line',this.value)">
-     </div>
-     <div>
-      <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">📧 อีเมลติดต่อ</label>
-      <input id="setting-email-url" type="email" placeholder="admin@example.com" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;box-sizing:border-box" oninput="saveContactSetting('admin_contact_email',this.value)">
-     </div>
-    </div>
-    <div style="font-size:11px;color:var(--text2);margin-top:8px;background:rgba(0,223,160,.05);border:1px solid rgba(0,223,160,.15);border-radius:8px;padding:8px 12px;line-height:1.6">
-     ✅ บันทึกอัตโนมัติทุกครั้งที่พิมพ์ · สต๊าฟจะเห็นลิงก์เหล่านี้เมื่อเปิดหน้าโปรไฟล์
-    </div>
+   <div class="set-tabs" id="set-tabs">
+    <button class="set-tab active" data-settab="general" onclick="settingsTab('general')">⚙️ ทั่วไป</button>
+    <button class="set-tab" data-settab="sync" onclick="settingsTab('sync')">🔄 เชื่อมต่อข้อมูล</button>
+    <button class="set-tab" data-settab="data" onclick="settingsTab('data')">💾 ข้อมูล & สำรอง</button>
+    <button class="set-tab" data-settab="log" onclick="settingsTab('log')">📜 บันทึกการใช้งาน</button>
+    <button class="set-tab" data-settab="tools" onclick="settingsTab('tools')">🧰 เครื่องมือซ่อมข้อมูล</button>
    </div>
 
-   <!-- Google Sheet Sync — Apps Script Web App Config -->
-   <div class="section-card" style="border-left:4px solid var(--accent2);margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🔄</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--accent2)">ซิงค์รายชื่อจาก Google Sheet</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">ตั้งค่า URL + Secret ของ Apps Script เพื่อให้ปุ่ม 🔄 ขวาบนกดซิงค์ได้โดยไม่ต้องสลับไปที่ชีท</div>
-     </div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-     <div>
-      <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">🌐 Apps Script Web App URL</label>
-      <input id="setting-ascript-url" type="url" placeholder="https://script.google.com/macros/s/AKfycb.../exec" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box" oninput="saveSyncConfig('url',this.value.trim())">
-     </div>
-     <div>
-      <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">🔑 Shared Secret <span style="color:var(--text2);font-weight:400">(รหัสลับที่ต้องตรงกับในสคริปต์)</span></label>
-      <input id="setting-ascript-secret" type="password" placeholder="ตั้งรหัสลับยาว ๆ สัก 20-30 ตัวอักษร" style="width:100%;padding:9px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box" oninput="saveSyncConfig('secret',this.value.trim())">
-     </div>
-     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-blue btn-sm" onclick="syncFromSheet()" style="padding:8px 14px">🔄 ทดสอบซิงค์</button>
-      <button class="btn btn-outline btn-sm" onclick="clearSyncConfig()" style="padding:8px 14px">🗑️ ล้างค่า</button>
-     </div>
-    </div>
-    <div style="font-size:11px;color:var(--text2);margin-top:10px;background:rgba(0,180,255,.05);border:1px solid rgba(0,180,255,.15);border-radius:8px;padding:10px 12px;line-height:1.7">
-     💡 <strong>วิธีใช้งาน:</strong><br>
-     1. เปิดชีท → Extensions → Apps Script<br>
-     2. วางโค้ดใหม่ (ไฟล์ <code>AppsScript.gs</code> ที่ Claude ให้ไป) ทับของเดิม<br>
-     3. ตั้งค่า <code>WEB_APP_SECRET</code> ในโค้ดให้ตรงกับช่องข้างบน (รหัสลับเดียวกัน)<br>
-     4. กด <strong>Deploy → New Deployment → Web App</strong> → Execute as: Me, Anyone with link → กด Deploy<br>
-     5. Copy URL ที่ได้ (ลงท้ายด้วย <code>/exec</code>) มาใส่ช่องบน<br>
-     6. เปิดเมนูใน Apps Script → กด <strong>ตั้งค่า Auto-sync ตอนมีคนกรอกฟอร์ม</strong> ครั้งเดียว<br>
-     ✅ จากนั้นใครกรอกฟอร์มใหม่ → โผล่ในเว็บทันที พร้อม toast แจ้งเตือน
-    </div>
-    <div style="font-size:11px;color:var(--text2);margin-top:8px;background:rgba(155,111,255,.06);border:1px solid rgba(155,111,255,.25);border-radius:8px;padding:10px 12px;line-height:1.7">
-     🔐 <strong>Business Continuity:</strong> ถ้า Firebase Rules ตั้งค่าให้ <code>admin_config</code> เปิดให้ admin อ่าน/เขียน → URL + Secret จะซิงค์ระหว่าง admin ทุกคนอัตโนมัติ · ไม่ต้องบอกรหัสซ้ำ · ตั้งครั้งเดียวที่เดียว admin คนอื่นใช้ได้ทันที<br>
-     <span style="color:var(--text2)">ยังไม่ได้ตั้ง Rules? ค่าจะเซฟเฉพาะเบราว์เซอร์นี้ (มี toast เตือน) — ยังใช้งานได้ปกติแต่ admin คนอื่นต้องตั้งเองที่เครื่องตัวเอง</span>
-    </div>
-   </div>
+   <!-- ══ แท็บ 1: ทั่วไป ══ -->
+   <div class="set-pane" id="setpane-general">
 
-   <!-- Debug Tool: ตรวจ worker ↔ staff mismatch -->
-   <div class="section-card" style="border-left:4px solid var(--red);margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🔍</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--red)">ตรวจข้อมูลโปรเจกต์ ↔ สต๊าฟ</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">สแกนหาโปรเจกต์ที่มี worker id ชี้ไปสต๊าฟที่ไม่มีอยู่ในระบบ · ปัญหานี้มักเกิดหลังกด Sync Sheet หลายครั้ง</div>
+    <div class="section-card" style="margin-bottom:14px">
+     <div class="set-head"><span class="set-ico">🎨</span><div><div class="set-title">ธีมของระบบ</div><div class="set-sub">เลือกโหมดสี — ระบบจำไว้ในเบราว์เซอร์นี้</div></div></div>
+     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button data-theme-opt="dark" onclick="setTheme('dark')" style="padding:13px;background:#0C1828;color:#E4EFFF;border:2px solid var(--border);border-radius:11px;font-family:Kanit;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:10px;justify-content:center">
+       <span style="font-size:20px">🌙</span><div style="text-align:left"><div style="font-size:13.5px">โหมดมืด</div><div style="font-size:10px;opacity:.7;font-weight:400">สบายตายามค่ำคืน</div></div>
+      </button>
+      <button data-theme-opt="light" onclick="setTheme('light')" style="padding:13px;background:#FFFFFF;color:#0F1E3A;border:2px solid var(--border);border-radius:11px;font-family:Kanit;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:10px;justify-content:center">
+       <span style="font-size:20px">☀️</span><div style="text-align:left"><div style="font-size:13.5px">โหมดสว่าง</div><div style="font-size:10px;opacity:.7;font-weight:400">อ่านง่ายตอนกลางวัน</div></div>
+      </button>
      </div>
-     <button class="btn btn-outline" onclick="runProjectStaffAudit()" style="padding:10px 18px;border-color:var(--red);color:var(--red)">🔍 สแกนตรวจ</button>
     </div>
-    <div id="audit-result" style="margin-top:10px"></div>
-   </div>
 
-   <!-- Audit: Email mismatch (Login ↔ Staff record) -->
-   <div class="section-card" style="border-left:4px solid var(--orange);margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">📧</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--orange)">ตรวจ Email ไม่ตรงกัน (Login ↔ ข้อมูลทีม)</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">สแกนบัญชีที่ email ที่ใช้ login ไม่ตรงกับ email ในข้อมูลทีม · เป็นสาเหตุที่สต๊าฟเห็น "บัญชียังไม่ผูกกับข้อมูลทีม"</div>
-     </div>
-     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-outline" onclick="healAllUsersEmail()" style="padding:10px 16px;border-color:var(--green);color:var(--green);font-size:12px" title="ดึง email จาก Firebase Auth → save ทับ users/{uid}/email สำหรับ users ที่ email ว่าง">🩹 Heal Email ว่าง</button>
-      <button class="btn btn-outline" onclick="runEmailMismatchAudit()" style="padding:10px 18px;border-color:var(--orange);color:var(--orange)">🔍 สแกนตรวจ</button>
+    <div class="section-card" style="margin-bottom:14px">
+     <div class="set-head">
+      <span class="set-ico">🙈</span>
+      <div style="flex:1"><div class="set-title">Safe Mode — ซ่อนยอดเงิน</div><div class="set-sub">เปลี่ยนตัวเลขทุกที่เป็น ฿*** สำหรับตอนแชร์จอ · ไม่กระทบข้อมูลจริง</div></div>
+      <label class="toggle" style="margin-left:auto"><input type="checkbox" id="safe-mode-toggle" onchange="toggleSafeMode(this.checked)"><span class="toggle-slider"></span></label>
      </div>
     </div>
-    <div id="email-audit-result" style="margin-top:10px"></div>
-   </div>
 
-   <!-- Staff Coverage Audit — สแกนหาคนเห็นงานไม่ครบ -->
-   <div class="section-card" style="border-left:4px solid #9B6FFF;margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🔬</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:#9B6FFF">ตรวจทีมงานเห็นงานครบไหม</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">หาทีมงานที่มีงานกระจายอยู่ใน staff records หลายตัว (id ต่างกัน แต่ email/ชื่อเดียวกัน) → ทำให้ staff เห็นงานไม่ครบ</div>
+    <div class="section-card" style="margin-bottom:14px">
+     <div class="set-head">
+      <span class="set-ico">🔒</span>
+      <div style="flex:1"><div class="set-title">ออกจากระบบอัตโนมัติ</div><div class="set-sub">ถ้าเปิดเว็บทิ้งไว้โดยไม่ได้ใช้งานนานเกินกำหนด ระบบจะออกจากระบบให้เอง — กันคนอื่นมาใช้เครื่องต่อ</div></div>
+      <select id="idle-limit-sel" class="set-input" style="width:auto;min-width:190px" onchange="setIdleLimit(this.value)"></select>
      </div>
-     <button class="btn btn-outline" onclick="runStaffCoverageAudit()" style="padding:10px 18px;border-color:#9B6FFF;color:#9B6FFF">🔬 สแกน</button>
     </div>
-    <div id="coverage-audit-result" style="margin-top:10px"></div>
-   </div>
 
-   <!-- Duplicate Staff Detector — หาสมาชิกซ้ำ -->
-   <div class="section-card" style="border-left:4px solid #FF80AB;margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">👥</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:#FF80AB">ตรวจสมาชิกซ้ำ</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">หาสมาชิกที่อาจเป็นคนเดียวกันแต่มี 2 records (email/เลขบัญชี/ชื่อ-นามสกุล ตรงกัน) · รวมเป็น record เดียวเพื่อกันข้อมูลกระจัด</div>
-     </div>
-     <button class="btn btn-outline" onclick="findDuplicateStaff()" style="padding:10px 18px;border-color:#FF80AB;color:#FF80AB">🔍 สแกนตรวจ</button>
+    <div class="section-card" style="margin-bottom:14px">
+     <div class="set-head"><span class="set-ico">🔔</span><div><div class="set-title">การแจ้งเตือน</div><div class="set-sub">เตือนเมื่อมีการสร้าง/แก้ไขโปรเจกต์ และงานที่เกี่ยวข้องกับคุณ</div></div></div>
+     <div id="notif-status" style="background:var(--bg2);border-radius:9px;padding:11px 13px;margin-bottom:10px;font-size:12px;color:var(--text2);line-height:1.7"></div>
+     <button id="btn-notif-request" class="btn btn-outline btn-sm" onclick="requestNotifPermission()">🔔 ขออนุญาตแจ้งเตือนบนเบราว์เซอร์</button>
     </div>
-    <div id="duplicate-result" style="margin-top:10px"></div>
-   </div>
 
-   <!-- 🚑 กู้คืนสมาชิกที่หาย — record ถูกลบแต่บัญชี/งานยังอ้างถึง -->
-   <div class="section-card" style="border-left:4px solid var(--red);margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🚑</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--red)">กู้คืนสมาชิกที่หาย</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">คนที่ record ถูกลบ/รวมร่างจนหาย แต่บัญชีหรืองานในโปรเจกต์ยังอ้างถึง — กู้ข้อมูลเต็มจาก backup · ต่อสายงาน+บัญชีกลับ · ปลดบล็อก sync ให้อัตโนมัติ (ไม่สร้างข้อมูลเบิ้ล)</div>
+    <div class="section-card" style="margin-bottom:14px">
+     <div class="set-head"><span class="set-ico">🔗</span><div><div class="set-title">ลิงก์ติดต่อสำหรับทีมงาน</div><div class="set-sub">แสดงในหน้าโปรไฟล์ของทีม เมื่อต้องการแก้ไขข้อมูลหรือติดต่อแอดมิน · บันทึกอัตโนมัติ</div></div></div>
+     <div class="set-fields">
+      <label class="set-lbl">✏️ ลิงก์แบบฟอร์มแก้ไขข้อมูล</label>
+      <input id="setting-form-url" type="url" class="set-input" placeholder="https://forms.gle/..." oninput="saveContactSetting('staff_edit_form_url',this.value)">
+      <label class="set-lbl">💬 ลิงก์ LINE (URL หรือ LINE ID)</label>
+      <input id="setting-line-url" type="text" class="set-input" placeholder="https://line.me/ti/p/... หรือ @guinhome" oninput="saveContactSetting('admin_contact_line',this.value)">
+      <label class="set-lbl">📧 อีเมลติดต่อ</label>
+      <input id="setting-email-url" type="email" class="set-input" placeholder="admin@example.com" oninput="saveContactSetting('admin_contact_email',this.value)">
      </div>
-     <button class="btn btn-outline" onclick="rescueMissingStaffScan()" style="padding:10px 18px;border-color:var(--red);color:var(--red)">🔍 สแกนหาคนหาย</button>
     </div>
-    <div id="rescue-result" style="margin-top:10px"></div>
-   </div>
 
-   <!-- 🔕 ล้างแจ้งเตือนใบยืนยันที่ค้าง -->
-   <div class="section-card" style="border-left:4px solid var(--purple);margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🔕</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--purple)">ล้างแจ้งเตือนใบยืนยันที่ค้าง</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">กวาดแจ้งเตือน "ใบยืนยันยอด" ที่กระดิ่งของทีมทุกคน ที่ตัวใบถูกยกเลิกไปแล้ว (ไม่มีใบจริงให้กด) — เก็บตกใบที่ยกเลิกก่อนอัปเดตเวอร์ชันนี้</div>
+    <div class="section-card">
+     <div class="set-head"><span class="set-ico">ℹ️</span><div><div class="set-title">ข้อมูลระบบ</div></div></div>
+     <div id="system-info" style="font-size:12px;color:var(--text2);line-height:1.8"></div>
+     <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2);display:flex;flex-wrap:wrap;gap:8px">
+      <button class="btn btn-sm btn-outline" onclick="showKeyboardHelp()">⌨️ ทางลัดแป้นพิมพ์</button>
+      <button class="btn btn-sm btn-outline" onclick="resetFirstTimeTour()">🎓 ดู Tour อีกครั้ง</button>
      </div>
-     <button class="btn btn-outline" onclick="sweepStaleConfirmNotifs()" style="padding:10px 18px;border-color:var(--purple);color:var(--purple)">🔕 กวาดล้างทั้งระบบ</button>
-    </div>
-    <div id="sweep-notif-result" style="margin-top:6px"></div>
-   </div>
-
-   <!-- Repair Broken staffId — ซ่อม users ที่ staffId ชี้ไปคนที่ถูกลบ -->
-   <div class="section-card" style="border-left:4px solid #00DFA0;margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🔧</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--green)">ซ่อม staffId ที่เสียหาย</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">ตรวจ users ที่ staffId ชี้ไปคนที่ไม่มีในระบบ (ลบไปแล้ว/merge ไปแล้ว) → ลอง re-resolve จาก email · แก้ปัญหา "บัญชียังไม่ผูกกับข้อมูลทีม" หลัง merge</div>
-     </div>
-     <button class="btn btn-outline" onclick="repairBrokenStaffIds()" style="padding:10px 18px;border-color:var(--green);color:var(--green)">🔧 สแกน + ซ่อม</button>
-    </div>
-    <div id="repair-result" style="margin-top:10px"></div>
-   </div>
-
-   <!-- Worker Inspector — debug tool หางานในโปรเจกต์เฉพาะ -->
-   <div class="section-card" style="border-left:4px solid #00B4FF;margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🔎</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--accent2)">ตรวจ workers ในโปรเจกต์</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">ดูว่าโปรเจกต์มี worker คนไหนบ้าง · เปรียบ id แต่ละ worker กับ staff record ปัจจุบัน · ใช้แก้ปัญหา "ข้อมูลขึ้นไม่ครบ"</div>
-     </div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-     <input id="worker-search-proj" placeholder="ชื่อโปรเจกต์ (เช่น C02, C15)" style="flex:1;min-width:160px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12px;outline:none">
-     <input id="worker-search-staff" placeholder="ชื่อสต๊าฟ (เว้นว่าง = ทุกคน)" style="flex:1;min-width:160px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12px;outline:none">
-     <button class="btn btn-blue btn-sm" onclick="inspectWorkers()" style="padding:8px 16px">🔎 ค้นหา</button>
-    </div>
-    <div id="inspect-result" style="margin-top:6px"></div>
-   </div>
-
-   <!-- Excluded Sync List — คนที่ admin ลบ (ห้าม sync กลับ) -->
-   <div class="section-card" style="border-left:4px solid var(--purple);margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🚫</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--purple)">รายชื่อบล็อก Sync</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">คนที่ admin ลบจากเว็บ — ระบบจะไม่ sync กลับจากชีทอีก · กดปุ่ม ↩️ คืน ถ้าต้องการให้กลับ</div>
-     </div>
-     <button class="btn btn-outline" onclick="loadExcludedList()" style="padding:10px 18px;border-color:var(--purple);color:var(--purple)">📋 โหลดรายชื่อ</button>
-    </div>
-    <div id="excluded-list-result" style="margin-top:10px"></div>
-   </div>
-
-   <!-- Emergency: รีเซ็ตสถานะจ่ายของโปรเจกต์ -->
-   <div class="section-card" style="border-left:4px solid var(--orange);margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🔄</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--orange)">รีเซ็ตสถานะจ่ายของโปรเจกต์</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">กรณีโปรเจกต์ค้าง "รับเงินแล้ว" ทั้งที่กดยกเลิกแล้ว — รีเซ็ต worker.status ของทุกคนในโปรเจกต์กลับเป็น "อนุมัติแล้ว" (รอจ่าย)</div>
-     </div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
-     <select id="reset-paid-proj" style="flex:1;min-width:200px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px">
-      <option value="">— เลือกโปรเจกต์ —</option>
-     </select>
-     <button class="btn btn-outline" onclick="resetProjectPaymentStatus()" style="padding:10px 18px;border-color:var(--orange);color:var(--orange)">🔄 รีเซ็ต</button>
     </div>
    </div>
 
-   <!-- Theme section -->
-   <div class="section-card" style="border-left:4px solid var(--purple);margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🎨</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--purple)">ธีม (Theme)</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">เลือกโหมดสีที่ถนัด — ระบบจะจำไว้ในเบราว์เซอร์นี้</div>
+   <!-- ══ แท็บ 2: เชื่อมต่อข้อมูล ══ -->
+   <div class="set-pane hidden" id="setpane-sync">
+    <div class="section-card" style="margin-bottom:14px">
+     <div class="set-head"><span class="set-ico">🔄</span><div><div class="set-title">ซิงค์รายชื่อจาก Google Sheet</div><div class="set-sub">ตั้งค่าครั้งเดียว แล้วกดปุ่ม 🔄 มุมขวาบนซิงค์ได้เลย ไม่ต้องเปิดชีท</div></div></div>
+     <div class="set-fields">
+      <label class="set-lbl">🌐 Apps Script Web App URL</label>
+      <input id="setting-ascript-url" type="url" class="set-input" style="font-family:monospace;font-size:12px" placeholder="https://script.google.com/macros/s/AKfycb.../exec" oninput="saveSyncConfig('url',this.value.trim())">
+      <label class="set-lbl">🔑 Shared Secret <span style="font-weight:400">(ต้องตรงกับ WEB_APP_SECRET ในสคริปต์)</span></label>
+      <input id="setting-ascript-secret" type="password" class="set-input" style="font-family:monospace;font-size:12px" placeholder="รหัสลับยาว 20-30 ตัวอักษร" oninput="saveSyncConfig('secret',this.value.trim())">
      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-     <button data-theme-opt="dark" onclick="setTheme('dark')" style="padding:14px;background:#0C1828;color:#E4EFFF;border:2px solid var(--border);border-radius:12px;font-family:Kanit;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:10px;justify-content:center;transition:border-color .2s">
-      <span style="font-size:22px">🌙</span>
-      <div style="text-align:left">
-       <div style="font-size:14px">โหมดมืด</div>
-       <div style="font-size:10px;opacity:.7;font-weight:400">สบายตายามค่ำคืน</div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn btn-blue btn-sm" onclick="syncFromSheet()">🔄 ทดสอบซิงค์</button>
+      <button class="btn btn-outline btn-sm" onclick="clearSyncConfig()">🗑️ ล้างค่า</button>
+     </div>
+     <details style="margin-top:12px">
+      <summary style="cursor:pointer;font-size:12px;color:var(--accent2);font-weight:700">📖 วิธีตั้งค่าครั้งแรก</summary>
+      <div style="font-size:11.5px;color:var(--text2);margin-top:8px;line-height:1.8;padding-left:4px">
+       1. เปิดชีท → Extensions → Apps Script<br>
+       2. วางโค้ดสคริปต์ทับของเดิม<br>
+       3. ตั้ง <code>WEB_APP_SECRET</code> ในโค้ดให้ตรงกับช่องด้านบน<br>
+       4. Deploy → New Deployment → Web App (Execute as: Me · Anyone with link)<br>
+       5. คัดลอก URL ที่ลงท้าย <code>/exec</code> มาใส่ช่องด้านบน<br>
+       6. ในเมนูสคริปต์ กด "ตั้งค่า Auto-sync ตอนมีคนกรอกฟอร์ม" ครั้งเดียว<br>
+       <span style="color:var(--green)">✅ จากนั้นคนกรอกฟอร์มใหม่จะขึ้นในเว็บอัตโนมัติ</span><br><br>
+       🔐 ถ้า Firebase Rules เปิด <code>admin_config</code> ให้แอดมิน URL+Secret จะซิงค์ให้แอดมินทุกคนอัตโนมัติ ไม่ต้องตั้งซ้ำ
       </div>
-     </button>
-     <button data-theme-opt="light" onclick="setTheme('light')" style="padding:14px;background:#FFFFFF;color:#0F1E3A;border:2px solid var(--border);border-radius:12px;font-family:Kanit;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:10px;justify-content:center;transition:border-color .2s">
-      <span style="font-size:22px">☀️</span>
-      <div style="text-align:left">
-       <div style="font-size:14px">โหมดสว่าง</div>
-       <div style="font-size:10px;opacity:.7;font-weight:400">อ่านง่ายตอนกลางวัน</div>
+     </details>
+    </div>
+
+    <div class="section-card">
+     <div class="set-head"><span class="set-ico">🔐</span><div><div class="set-title">อัปเดตรายชื่อสำหรับหน้าสมัคร</div><div class="set-sub">ใช้เมื่อสมาชิกใหม่สมัครแล้วระบบไม่รู้จัก หรือขึ้น "บัญชียังไม่ผูกกับข้อมูลทีม" · ส่งเฉพาะ ชื่อ/ชื่อเล่น/ประเภทงาน/อีเมล (ไม่ส่งข้อมูลธนาคารหรือเบอร์)</div></div></div>
+     <button class="btn btn-outline btn-sm" onclick="syncPublicStaffList()">🔐 อัปเดตรายชื่อเดี๋ยวนี้</button>
+     <div id="public-sync-status" style="margin-top:10px"></div>
+    </div>
+   </div>
+
+   <!-- ══ แท็บ 3: ข้อมูล & สำรอง ══ -->
+   <div class="set-pane hidden" id="setpane-data">
+    <div class="section-card" style="margin-bottom:14px">
+     <div class="set-head"><span class="set-ico">💾</span><div><div class="set-title">สำรองข้อมูล</div><div class="set-sub">ดาวน์โหลดข้อมูลทั้งระบบเป็นไฟล์ JSON · แนะนำสำรองทุกสัปดาห์ หรือก่อนแก้ไขครั้งใหญ่</div></div></div>
+     <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-green" onclick="exportBackup()">💾 สำรองเดี๋ยวนี้</button>
+      <button class="btn btn-outline" onclick="openRestoreModal()">🔄 กู้คืนจากไฟล์</button>
+     </div>
+     <div id="backup-history" style="margin-top:14px"></div>
+    </div>
+
+    <div class="section-card" style="border-left:3px solid var(--red);background:rgba(255,64,64,.03)">
+     <div class="set-head"><span class="set-ico">⚠️</span><div><div class="set-title" style="color:var(--red)">เขตอันตราย</div><div class="set-sub">ลบข้อมูลถาวร กู้คืนไม่ได้ — ต้องพิมพ์คำยืนยันก่อนเสมอ แนะนำสำรองข้อมูลก่อน</div></div></div>
+     <div class="set-toolrow">
+      <div style="flex:1;min-width:170px"><div class="set-toolname">🧹 ล้างโปรเจกต์ซ้ำ</div><div class="set-toolsub">ลบโปรเจกต์ที่ชื่อมี [คัดลอก] ทั้งหมด</div></div>
+      <button class="btn btn-sm btn-red" onclick="adminCleanDuplicates()">ล้างซ้ำ</button>
+     </div>
+    </div>
+   </div>
+
+   <!-- ══ แท็บ 4: บันทึกการใช้งาน ══ -->
+   <div class="set-pane hidden" id="setpane-log">
+    <div class="section-card">
+     <div class="set-head">
+      <span class="set-ico">📜</span>
+      <div style="flex:1"><div class="set-title">บันทึกการใช้งาน</div><div class="set-sub">ใครทำอะไรกับข้อมูลบ้าง · บันทึกอัตโนมัติและ<strong>ลบไม่ได้</strong> แม้แต่แอดมิน — ใช้ตรวจย้อนหลังเมื่อข้อมูลผิดพลาด</div></div>
+      <button class="btn btn-sm btn-outline" onclick="renderAuditLog()">🔄 โหลดใหม่</button>
+     </div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <button class="btn btn-sm" id="logview-actions" onclick="setLogView('actions')">🗂️ การกระทำ</button>
+      <button class="btn btn-sm btn-outline" id="logview-logins" onclick="setLogView('logins')">🔑 การเข้าสู่ระบบ</button>
+      <select id="log-filter-action" class="set-input" style="width:auto;min-width:170px" onchange="renderAuditLog()"><option value="">ทุกประเภท</option></select>
+     </div>
+     <div id="audit-log-list"><div style="color:var(--text2);font-size:12.5px;padding:14px 0">กด "🔄 โหลดใหม่" เพื่อดูบันทึก</div></div>
+    </div>
+   </div>
+
+   <!-- ══ แท็บ 5: เครื่องมือซ่อมข้อมูล ══ -->
+   <div class="set-pane hidden" id="setpane-tools">
+    <div class="section-card" style="margin-bottom:14px">
+     <div class="set-head"><span class="set-ico">🩺</span><div><div class="set-title">ตรวจสอบข้อมูลทีมงาน</div><div class="set-sub">ใช้เมื่อทีมงานเห็นงานไม่ครบ · ชื่อซ้ำ · หรือขึ้นว่าบัญชียังไม่ผูกกับข้อมูลทีม — กดสแกนดูผลก่อนเสมอ ยังไม่แก้อะไรจนกว่าจะยืนยัน</div></div></div>
+
+     <div class="set-toolrow">
+      <div style="flex:1;min-width:190px"><div class="set-toolname">👥 สมาชิกซ้ำ</div><div class="set-toolsub">คนเดียวกันมีหลายรายชื่อ (อีเมล/เบอร์/ชื่อตรงกัน) → รวมเป็นรายการเดียว</div></div>
+      <button class="btn btn-sm btn-outline" onclick="findDuplicateStaff()">สแกน</button>
+     </div>
+     <div id="duplicate-result" class="set-toolres"></div>
+
+     <div class="set-toolrow">
+      <div style="flex:1;min-width:190px"><div class="set-toolname">🔬 ทีมงานเห็นงานครบไหม</div><div class="set-toolsub">หาคนที่งานกระจายอยู่หลายรายการจนเห็นงานไม่ครบ</div></div>
+      <button class="btn btn-sm btn-outline" onclick="runStaffCoverageAudit()">สแกน</button>
+     </div>
+     <div id="coverage-audit-result" class="set-toolres"></div>
+
+     <div class="set-toolrow">
+      <div style="flex:1;min-width:190px"><div class="set-toolname">📧 อีเมลล็อกอินไม่ตรงกับข้อมูลทีม</div><div class="set-toolsub">สาเหตุหลักของ "บัญชียังไม่ผูกกับข้อมูลทีม"</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+       <button class="btn btn-sm btn-outline" onclick="healAllUsersEmail()" title="เติมอีเมลที่ว่างจากระบบล็อกอิน">🩹 เติมอีเมลว่าง</button>
+       <button class="btn btn-sm btn-outline" onclick="runEmailMismatchAudit()">สแกน</button>
       </div>
-     </button>
-    </div>
-   </div>
+     </div>
+     <div id="email-audit-result" class="set-toolres"></div>
 
-   <!-- Notifications section -->
-   <div class="section-card" style="border-left:4px solid var(--orange);margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🔔</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--orange)">การแจ้งเตือน</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">เตือนเมื่อแอดมินคนอื่นสร้าง/แก้ไขโปรเจกต์</div>
+     <div class="set-toolrow">
+      <div style="flex:1;min-width:190px"><div class="set-toolname">🔧 ซ่อมการผูกบัญชีที่เสีย</div><div class="set-toolsub">บัญชีที่ผูกกับรายชื่อที่ถูกลบ/รวมร่างไปแล้ว → ผูกใหม่จากอีเมล</div></div>
+      <button class="btn btn-sm btn-outline" onclick="repairBrokenStaffIds()">สแกน + ซ่อม</button>
      </div>
-    </div>
-    <div id="notif-status" style="background:var(--bg2);border-radius:10px;padding:12px;margin-bottom:10px;font-size:12px;color:var(--text2);line-height:1.7"></div>
-    <button id="btn-notif-request" class="btn btn-outline" onclick="requestNotifPermission()" style="display:flex;align-items:center;gap:8px">🔔 ขออนุญาตแจ้งเตือน</button>
-    <div style="font-size:11px;color:var(--text2);margin-top:10px;line-height:1.6">
-     💡 ในแอปจะเด้ง toast อัตโนมัติ · ถ้าอนุญาต browser notification จะได้รับเมื่อ tab อยู่ background ด้วย
-    </div>
-   </div>
+     <div id="repair-result" class="set-toolres"></div>
 
-   <!-- Backup section -->
-   <div class="section-card" style="border-left:4px solid var(--green);margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
-     <span style="font-size:28px">💾</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--green)">สำรองข้อมูล (Backup)</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">ดาวน์โหลดข้อมูลทั้งหมดเป็นไฟล์ — กู้คืนได้เมื่อต้องการ</div>
+     <div class="set-toolrow">
+      <div style="flex:1;min-width:190px"><div class="set-toolname">🚑 กู้คืนสมาชิกที่หาย</div><div class="set-toolsub">รายชื่อถูกลบไปแล้วแต่บัญชี/งานยังอ้างถึง → กู้จากไฟล์สำรองในเครื่อง</div></div>
+      <button class="btn btn-sm btn-outline" onclick="rescueMissingStaffScan()">สแกน</button>
      </div>
-    </div>
-    <div style="background:rgba(0,223,160,.06);border:1px solid rgba(0,223,160,.2);border-radius:10px;padding:14px;margin-bottom:12px">
-     <div style="font-size:12px;color:var(--text2);line-height:1.7">
-      💡 <strong style="color:var(--green)">แนะนำ:</strong> สำรองข้อมูลทุกสัปดาห์ หรือก่อนทำการแก้ไขสำคัญ<br>
-      📁 ไฟล์ที่ได้เป็น JSON ขนาดเล็ก — เก็บใน Google Drive/OneDrive/โฟลเดอร์ในเครื่อง
-     </div>
-    </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-     <button class="btn btn-green" onclick="exportBackup()" style="display:flex;align-items:center;gap:8px">💾 สำรองเดี๋ยวนี้ (ดาวน์โหลด)</button>
-     <button class="btn btn-outline" onclick="openRestoreModal()" style="display:flex;align-items:center;gap:8px">🔄 กู้คืนจากไฟล์สำรอง</button>
-    </div>
-    <div id="backup-history" style="margin-top:14px"></div>
-   </div>
+     <div id="rescue-result" class="set-toolres"></div>
 
-   <!-- Public Staff Sync — migration helper -->
-   <div class="section-card" style="border-left:4px solid #9B6FFF;margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🔐</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:#9B6FFF">Sync รายชื่อสำหรับหน้าสมัคร</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">อัพเดท public/staff_list เพื่อให้สมาชิกใหม่สมัครได้ (จำเป็นหลังเปลี่ยน security rules)</div>
+     <div class="set-toolrow">
+      <div style="flex:1;min-width:190px"><div class="set-toolname">🚫 รายชื่อบล็อกซิงค์</div><div class="set-toolsub">คนที่ลบออกแล้ว ระบบจะไม่ดึงกลับจากชีท — กดคืนได้ที่นี่</div></div>
+      <button class="btn btn-sm btn-outline" onclick="loadExcludedList()">โหลดรายชื่อ</button>
      </div>
+     <div id="excluded-list-result" class="set-toolres"></div>
     </div>
-    <div style="background:rgba(155,111,255,.06);border:1px solid rgba(155,111,255,.2);border-radius:10px;padding:14px;margin-bottom:12px">
-     <div style="font-size:12px;color:var(--text);line-height:1.7">
-      💡 <strong style="color:#9B6FFF">เมื่อใช้:</strong> หลัง sync จาก Google Sheet · หรือเมื่อสมาชิกใหม่ login แต่ระบบไม่รู้จัก<br>
-      🔒 <strong>ข้อมูลที่ copy:</strong> ชื่อ + ชื่อเล่น + ประเภทงาน + email (จำเป็นสำหรับ resolve staffId ตอน login)<br>
-      🚫 <strong>ไม่ copy:</strong> ธนาคาร · เบอร์โทร · QR · ข้อมูลส่วนตัวอื่นๆ<br>
-      ⚙️ <strong>ใช้แก้ปัญหา:</strong> "บัญชียังไม่ผูกกับข้อมูลทีม" / "ข้อมูลไม่ขึ้นในระบบ"
-     </div>
-    </div>
-    <button class="btn" style="background:rgba(155,111,255,.15);border:1px solid rgba(155,111,255,.35);color:#9B6FFF;display:flex;align-items:center;gap:8px" onclick="syncPublicStaffList()">🔐 Sync รายชื่อสู่ Public List เดี๋ยวนี้</button>
-    <div id="public-sync-status" style="margin-top:10px"></div>
-   </div>
 
-   <!-- Safe Mode section -->
-   <div class="section-card" style="border-left:4px solid var(--accent2);margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-     <span style="font-size:28px">🙈</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--accent2)">Safe Mode (ซ่อนยอดเงิน)</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">ซ่อนตัวเลขทุกที่ในเว็บ — ใช้ตอนโชว์ในที่สาธารณะ</div>
-     </div>
-     <label class="toggle" style="margin-left:auto">
-      <input type="checkbox" id="safe-mode-toggle" onchange="toggleSafeMode(this.checked)">
-      <span class="toggle-slider"></span>
-     </label>
-    </div>
-    <div style="font-size:12px;color:var(--text2);padding:10px 14px;background:var(--bg2);border-radius:8px;line-height:1.6">
-     💡 เมื่อเปิด: ตัวเลขทั้งหมดจะเปลี่ยนเป็น <code style="background:rgba(0,0,0,.3);padding:2px 6px;border-radius:3px">฿***</code><br>
-     🔓 ปิดเมื่อไหร่ก็ได้ — ไม่กระทบข้อมูลจริง
-    </div>
-   </div>
+    <div class="section-card">
+     <div class="set-head"><span class="set-ico">🗃️</span><div><div class="set-title">ตรวจสอบข้อมูลโปรเจกต์</div><div class="set-sub">ใช้เมื่อข้อมูลในโปรเจกต์แสดงไม่ครบ หรือสถานะการจ่ายเงินค้าง</div></div></div>
 
-   <!-- Danger Zone -->
-   <div class="section-card" style="border-left:4px solid var(--red);margin-bottom:16px;background:rgba(255,64,64,.04)">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
-     <span style="font-size:28px">⚠️</span>
-     <div style="flex:1;min-width:200px">
-      <div style="font-size:17px;font-weight:800;color:var(--red)">⚠️ Danger Zone (เขตอันตราย)</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">ปุ่มเหล่านี้ลบข้อมูลถาวรไม่กู้คืนได้ — ใช้ด้วยความระมัดระวัง</div>
+     <div class="set-toolrow">
+      <div style="flex:1;min-width:190px"><div class="set-toolname">🔍 โปรเจกต์ที่อ้างถึงคนที่ไม่มีในระบบ</div><div class="set-toolsub">มักเกิดหลังซิงค์ชีทหลายรอบ</div></div>
+      <button class="btn btn-sm btn-outline" onclick="runProjectStaffAudit()">สแกน</button>
      </div>
-    </div>
-    <div style="background:rgba(255,64,64,.08);border:1px solid rgba(255,64,64,.25);border-radius:10px;padding:14px;margin-bottom:12px">
-     <div style="font-size:12px;color:var(--text);line-height:1.7">
-      ⚠️ <strong style="color:var(--red)">คำเตือน:</strong> ปุ่มในส่วนนี้จะต้องพิมพ์คำยืนยันก่อนลบทุกครั้ง<br>
-      💾 แนะนำให้ <strong style="color:var(--green)">สำรองข้อมูลก่อน</strong> เสมอ
-     </div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-     <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;flex-wrap:wrap">
-      <div style="flex:1;min-width:180px">
-       <div style="font-size:13px;font-weight:700">🧹 ล้างโปรเจกต์ซ้ำ</div>
-       <div style="font-size:11px;color:var(--text2);margin-top:2px">ลบโปรเจกต์ชื่อที่มี [คัดลอก] ทั้งหมด</div>
+     <div id="audit-result" class="set-toolres"></div>
+
+     <div class="set-toolrow" style="flex-wrap:wrap">
+      <div style="flex:1;min-width:190px"><div class="set-toolname">🔎 ดูรายชื่อในโปรเจกต์</div><div class="set-toolsub">ตรวจว่าโปรเจกต์มีใครบ้าง และข้อมูลตรงกับทะเบียนทีมไหม</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:240px">
+       <input id="worker-search-proj" class="set-input" style="flex:1;min-width:120px" placeholder="ชื่อโปรเจกต์">
+       <input id="worker-search-staff" class="set-input" style="flex:1;min-width:120px" placeholder="ชื่อคน (ว่าง = ทุกคน)">
+       <button class="btn btn-sm btn-blue" onclick="inspectWorkers()">ค้นหา</button>
       </div>
-      <button class="btn btn-sm btn-red" onclick="adminCleanDuplicates()">🧹 ล้างซ้ำ</button>
      </div>
-    </div>
-   </div>
+     <div id="inspect-result" class="set-toolres"></div>
 
-   <!-- Info section -->
-   <div class="section-card" style="border-left:4px solid #8b8fa8">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-     <span style="font-size:20px">ℹ️</span>
-     <div style="font-size:14px;font-weight:700">ข้อมูลระบบ</div>
-    </div>
-    <div id="system-info" style="font-size:12px;color:var(--text2);line-height:1.8"></div>
-    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border2);display:flex;flex-wrap:wrap;gap:8px">
-     <button class="btn btn-sm btn-outline" onclick="showKeyboardHelp()" title="ดูทางลัดแป้นพิมพ์">⌨️ ทางลัดแป้นพิมพ์</button>
-     <button class="btn btn-sm btn-outline" onclick="resetFirstTimeTour()" title="รีเซ็ต tour — จะเจอตอน login ครั้งหน้า">🎓 ดู Tour อีกครั้ง (login หน้า)</button>
+     <div class="set-toolrow" style="flex-wrap:wrap">
+      <div style="flex:1;min-width:190px"><div class="set-toolname">🔄 รีเซ็ตสถานะจ่ายเงินของโปรเจกต์</div><div class="set-toolsub">กรณีค้างสถานะ "จ่ายแล้ว" ทั้งที่ยกเลิกไปแล้ว → กลับเป็นรอจ่าย</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:240px">
+       <select id="reset-paid-proj" class="set-input" style="flex:1;min-width:150px"><option value="">— เลือกโปรเจกต์ —</option></select>
+       <button class="btn btn-sm btn-outline" onclick="resetProjectPaymentStatus()" style="border-color:var(--orange);color:var(--orange)">รีเซ็ต</button>
+      </div>
+     </div>
+
+     <div class="set-toolrow">
+      <div style="flex:1;min-width:190px"><div class="set-toolname">🔕 ล้างแจ้งเตือนใบยืนยันที่ค้าง</div><div class="set-toolsub">กวาดแจ้งเตือนใบยืนยันยอดที่ตัวใบถูกยกเลิกไปแล้ว</div></div>
+      <button class="btn btn-sm btn-outline" onclick="sweepStaleConfirmNotifs()">กวาดล้าง</button>
+     </div>
+     <div id="sweep-notif-result" class="set-toolres"></div>
     </div>
    </div>
   </div>
@@ -1618,7 +1506,7 @@ body.sidebar-collapsed .main-content{
     <div class="page-actions">
      <button class="btn btn-outline btn-sm" id="assign-toggle-all" onclick="assignToggleAll()">👁 แสดงงานที่จบแล้วด้วย</button>
      <button class="btn btn-outline" onclick="openBriefLibrary()" title="โน้ตกลางจากแอดมิน: งานแต่ละรหัสต้องทำอะไรบ้าง">📖 บรีฟงาน</button>
-     <button class="btn btn-blue" onclick="openNewProject()">➕ มอบหมายงานใหม่</button>
+     <button class="btn btn-blue" onclick="assignAddRow()">➕ มอบหมายงานใหม่</button>
     </div>
    </div>
    <div id="assign-table" style="overflow-x:auto"></div>
@@ -4056,6 +3944,109 @@ async function saveBriefLibrary(){
 }
 
 // ══════════════════════════════════════════════
+// 📜 บันทึกการใช้งาน (Audit Log) + ประวัติเข้าสู่ระบบ + ล็อกเอาต์อัตโนมัติ
+//    เขียนแบบ append-only — Firebase Rules ล็อกไม่ให้แก้/ลบ แม้แต่แอดมิน
+// ══════════════════════════════════════════════
+const AUDIT_ACTIONS = {
+  'project.create':   {icon:'📁', label:'สร้างโปรเจกต์'},
+  'project.edit':     {icon:'✏️', label:'แก้ไขโปรเจกต์'},
+  'project.delete':   {icon:'🗑️', label:'ลบโปรเจกต์'},
+  'project.assign':   {icon:'📋', label:'มอบหมายงาน'},
+  'payment.pay':      {icon:'💸', label:'บันทึกการจ่ายเงิน'},
+  'payment.cancel':   {icon:'🚫', label:'ยกเลิกใบยืนยันยอด'},
+  'staff.edit':       {icon:'👤', label:'แก้ข้อมูลทีมงาน'},
+  'staff.status':     {icon:'🔄', label:'เปลี่ยนสถานะทีมงาน'},
+  'staff.delete':     {icon:'🗑️', label:'ลบสมาชิกถาวร'},
+  'staff.leave':      {icon:'🚪', label:'ให้ออกจากทีม'},
+  'staff.rejoin':     {icon:'↩️', label:'รับกลับเข้าทีม'},
+  'staff.merge':      {icon:'🔗', label:'รวมร่างสมาชิกซ้ำ'},
+  'role.change':      {icon:'👑', label:'เปลี่ยนสิทธิ์บัญชี'},
+  'doc.wht':          {icon:'🏛️', label:'ออกใบ 50 ทวิ'},
+  'data.restore':     {icon:'⚠️', label:'กู้คืนข้อมูลจากไฟล์'},
+  'data.sync':        {icon:'🔄', label:'ซิงค์รายชื่อจากชีท'},
+  'brief.edit':       {icon:'📖', label:'แก้บรีฟงาน'},
+};
+// เขียน log — ห้าม throw / ห้ามบล็อกงานหลักเด็ดขาด
+function logAudit(action, target, detail){
+  try{
+    const rec = {
+      at: new Date().toISOString(),
+      uid: currentUser?.uid || '',
+      email: currentUser?.email || '',
+      who: currentUser?.nickname || currentUser?.email || 'ไม่ทราบ',
+      role: currentUser?.role || '',
+      action,
+      target: String(target||'').slice(0,120),
+      detail: String(detail||'').slice(0,300),
+    };
+    const local = ls('audit_local') || [];
+    local.unshift(rec);
+    ls('audit_local', local.slice(0,300));
+    if(_fbDatabase && currentUser?.uid){
+      _fbDatabase.ref('audit_logs').push().set(rec).catch(()=>{});
+    }
+  }catch(e){ /* log ต้องไม่ทำให้งานหลักพัง */ }
+}
+async function loadAuditLogs(limit){
+  if(!_fbDatabase) return ls('audit_local')||[];
+  try{
+    const snap = await _fbDatabase.ref('audit_logs').limitToLast(limit||300).get();
+    if(!snap.exists()) return ls('audit_local')||[];
+    return Object.values(snap.val()||{}).sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+  }catch(e){ return ls('audit_local')||[]; }
+}
+function logLogin(){
+  try{
+    if(!_fbDatabase || !currentUser?.uid) return;
+    const ua = navigator.userAgent||'';
+    const dev = /Android|iPhone|iPad|Mobile/i.test(ua) ? '📱 มือถือ/แท็บเล็ต' : '💻 คอมพิวเตอร์';
+    const brw = /Edg\//.test(ua)?'Edge':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':/Firefox\//.test(ua)?'Firefox':'อื่น ๆ';
+    _fbDatabase.ref('login_history/'+currentUser.uid).push().set({
+      at:new Date().toISOString(), email:currentUser.email||'', who:currentUser.nickname||'', device:dev+' · '+brw
+    }).catch(()=>{});
+  }catch(e){}
+}
+async function loadLoginHistory(){
+  if(!_fbDatabase) return [];
+  try{
+    const snap = await _fbDatabase.ref('login_history').limitToLast(200).get();
+    if(!snap.exists()) return [];
+    const out=[];
+    Object.entries(snap.val()||{}).forEach(([uid,items])=>{
+      Object.values(items||{}).forEach(r=>out.push({...r, uid}));
+    });
+    return out.sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+  }catch(e){ return []; }
+}
+// ── ล็อกเอาต์อัตโนมัติเมื่อไม่ได้ใช้งานนาน ──
+const IDLE_CHOICES = [
+  {v:0,     label:'ปิด (ไม่ล็อกเอาต์อัตโนมัติ)'},
+  {v:4*60,  label:'4 ชั่วโมง'},
+  {v:8*60,  label:'8 ชั่วโมง (แนะนำ)'},
+  {v:24*60, label:'24 ชั่วโมง'},
+];
+function getIdleLimitMin(){ const v=ls('idle_logout_min'); return (v===null||v===undefined)?480:parseInt(v)||0; }
+function setIdleLimit(min){ ls('idle_logout_min', parseInt(min)||0); _idleTouch(); toast('บันทึกแล้ว','success'); }
+let _idleLast = Date.now(), _idleTimer = null;
+function _idleTouch(){ _idleLast = Date.now(); }
+function startIdleWatch(){
+  ['click','keydown','mousemove','touchstart','visibilitychange'].forEach(ev=>
+    document.addEventListener(ev, _idleTouch, {passive:true}));
+  if(_idleTimer) clearInterval(_idleTimer);
+  _idleTimer = setInterval(()=>{
+    const lim = getIdleLimitMin();
+    if(!lim) return;
+    if(Date.now() - _idleLast > lim*60000){
+      clearInterval(_idleTimer);
+      try{ logAudit('auth.idle_logout','','ไม่ได้ใช้งานเกิน '+lim+' นาที'); }catch(e){}
+      alert('🔒 ออกจากระบบอัตโนมัติ เนื่องจากไม่ได้ใช้งานเป็นเวลานาน\n\nกรุณาเข้าสู่ระบบใหม่');
+      try{ doLogout(); }catch(e){}
+      window.location.reload();
+    }
+  }, 60000);
+}
+
+// ══════════════════════════════════════════════
 // PROJECT HELPERS
 // ══════════════════════════════════════════════
 async function loadProjects(){
@@ -5527,6 +5518,7 @@ async function enterApp(){
   try { await loadCalcDraftsFromFirebase(); } catch(e) {}
   try { await loadMgrRequests(); await loadManagerUsers(); await loadMgrSuspended(); await loadTeamLeft(); } catch(e) {}
   try { await fbLoadKeyed('tags_master'); await fbLoadKeyed('brief_templates'); } catch(e) {}
+  try { logLogin(); startIdleWatch(); } catch(e) {}
   // Load tracking cards from Firebase
   try {
     if(_fbDatabase){
@@ -6308,12 +6300,29 @@ function syncPhasesToTrkCard(projId, phases){
     saveTrkCards(cards);
   }catch(e){ console.warn('syncPhasesToTrkCard error:', e); }
 }
+let _trkMgrFilter='';
+function setTrkMgrFilter(uid){ _trkMgrFilter=uid||''; renderTrack(); }
+function _trkMgrFilterHTML(){
+  if(currentUser?.role!=='admin') return '';
+  let ms=[]; try{ ms=getAllManagerUsers()||[]; }catch(e){}
+  return `<select class="trk-cal-year-sel" onchange="setTrkMgrFilter(this.value)" title="กรองตามเมเนเจอร์ผู้รับผิดชอบ">
+    <option value="">🗂️ เมเนเจอร์ทุกคน</option>
+    <option value="__admin"${_trkMgrFilter==='__admin'?' selected':''}>👑 แอดมินจัดการเอง</option>
+    ${ms.map(m=>`<option value="${esc(m.uid)}"${_trkMgrFilter===m.uid?' selected':''}>${esc(m.nickname||m.email)}</option>`).join('')}
+  </select>`;
+}
 function renderTrack(){
   // Admin → เห็นทุกโปรเจกต์ · Manager → เฉพาะโปรเจกต์ที่ดูแล (scope filter) · Staff → ห้าม
   if(currentUser?.role === 'manager'){
     window._trkScope = new Set(getMgrProjects().map(p=>p.id));
   } else if(currentUser?.role === 'admin'){
-    window._trkScope = null;
+    // 📅 บรีฟข้อ 7: admin กรองดูเฉพาะโปรเจกต์ของเมเนเจอร์คนใดคนหนึ่งได้
+    window._trkScope = _trkMgrFilter
+      ? new Set((getProjects()||[]).filter(p=>{
+          const mid=(p.managerId&&p.managerId!=='undefined')?p.managerId:'';
+          return _trkMgrFilter==='__admin' ? !mid : mid===_trkMgrFilter;
+        }).map(p=>p.id))
+      : null;
   } else {
     const cal = document.getElementById('trk-calendar');
     if(cal) cal.innerHTML = '<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin / Manager เท่านั้น</div>';
@@ -6463,6 +6472,7 @@ function renderTrkCalendar() {
           ${years.map(y => `<option value="${y}"${y === trkCalYear ? ' selected' : ''}>${y + 543}</option>`).join('')}
         </select>
         <button onclick="trkCalMonth=new Date().getMonth();trkCalYear=new Date().getFullYear();renderTrkCalendar()" style="padding:5px 12px;border-radius:7px;background:var(--accent2);border:none;color:#fff;font-family:Kanit;font-size:12px;font-weight:700;cursor:pointer">วันนี้</button>
+        ${_trkMgrFilterHTML()}
         <button onclick="trkCalToggleView()" title="สลับ โหมดย่อ (1 โปรเจกต์=1 แถว) / โหมดเต็ม (เห็นทุกเฟส)" style="padding:5px 12px;border-radius:7px;background:${viewMode==='compact'?'#9B6FFF':'#e8edf7'};border:none;color:${viewMode==='compact'?'#fff':'#41547a'};font-family:Kanit;font-size:12px;font-weight:700;cursor:pointer">${viewMode==='compact'?'👁️ โหมดย่อ':'📋 โหมดเต็ม'}</button>
       </div>
       <button class="trk-cal-nav-btn" onclick="trkCalNext()">หน้า ›</button>
@@ -9493,16 +9503,24 @@ function toggleCat(key){
 
 function _setVal(id,v){ const el=document.getElementById(id); if(el) el.value=v; }
 // ══════════════════════════════════════════════
-// 📋 หน้ามอบหมายงาน — ตารางคิวแบบชีทเดิม (เฟส 1 บรีฟข้อ 9)
+// 📋 หน้ามอบหมายงาน — กรอกในตารางเหมือนกูเกิลชีท (inline) + กรองเดือน/เรียงลำดับ
 // ══════════════════════════════════════════════
-let _assignShowAll=false;
+let _assignShowAll=false, _assignMonth='', _assignSort='deadline-asc', _assignEditId=null, _assignAdding=false;
 function assignToggleAll(){
   _assignShowAll=!_assignShowAll;
   const b=document.getElementById('assign-toggle-all');
   if(b) b.textContent=_assignShowAll?'🙈 ซ่อนงานที่จบแล้ว':'👁 แสดงงานที่จบแล้วด้วย';
   renderAssign();
 }
+function assignAddRow(){
+  _assignAdding=true; _assignEditId=null; renderAssign();
+  setTimeout(()=>{ document.getElementById('assign-newrow')?.scrollIntoView({block:'center'}); document.getElementById('ar-deadline')?.focus(); },60);
+}
+function assignCancelRow(){ _assignAdding=false; _assignEditId=null; renderAssign(); }
+function assignEditRow(id){ _assignAdding=false; _assignEditId=id; renderAssign(); }
 const _ASSIGN_PHASES=[['adaptation','บท'],['dubbing','พากย์'],['qc','QC'],['mix','มิกซ์'],['subVideo','ซับ']];
+const _TH_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+function _thaiMonthLabel(ym){ const p=ym.split('-'); return _TH_M[parseInt(p[1])-1]+' '+(parseInt(p[0])+543); }
 function _assignDL(p,key){
   const ph=p?.phases?.[key]||{};
   const base=ph.deadline?fmtDate(ph.deadline):'<span style="opacity:.35">—</span>';
@@ -9515,26 +9533,158 @@ function toggleSecretKey(btnId,spanId,key){
   if(sp.dataset.shown==='1'){ sp.textContent='••••••••'; sp.dataset.shown='0'; if(b)b.textContent='👁'; }
   else { sp.textContent=key; sp.dataset.shown='1'; if(b)b.textContent='🙈'; }
 }
+function _assignCodes(){
+  return [...new Set([
+    ...(getProjects()||[]).map(p=>(p.clientCode||'').trim().toUpperCase()).filter(Boolean),
+    ...Object.keys(typeof getBriefTemplates==='function'?getBriefTemplates():{})
+  ])].sort();
+}
+// ── แถวกรอก (ใหม่/แก้ไข) — ช่องเรียงตามหัวคอลัมน์ชีทเดิม ──
+function _assignEditRowHTML(p){
+  p=p||{};
+  const isNew=!p.id;
+  const inp=(id,type,val,ph)=>`<input id="${id}" type="${type}" value="${esc(val==null?'':val)}" placeholder="${ph||''}"${type==='number'?' onwheel="this.blur()" min="0"':''} style="width:100%;min-width:0;padding:5px 7px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px">`;
+  const codes=_assignCodes();
+  const curCode=(p.clientCode||'').toUpperCase();
+  const codeSel=`<select id="ar-code" style="width:100%;padding:5px 4px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px" onchange="document.getElementById('ar-code-new').style.display=this.value==='__new'?'block':'none'">
+      <option value="">—</option>
+      ${codes.map(c=>`<option value="${esc(c)}"${curCode===c?' selected':''}>${esc(c)}</option>`).join('')}
+      <option value="__new">+ ใหม่…</option>
+    </select>
+    <input id="ar-code-new" placeholder="รหัสใหม่" maxlength="6" style="display:none;margin-top:3px;width:100%;padding:4px 6px;background:var(--bg2);border:1px solid var(--accent2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px;text-transform:uppercase">`;
+  let mgrSel;
+  if(currentUser?.role==='manager'){
+    mgrSel=`<div style="font-size:12px;padding:5px 0">🗂️ ฉันเอง</div>`;
+  } else {
+    const ms=(typeof getAllManagerUsers==='function'?getAllManagerUsers():[]);
+    mgrSel=`<select id="ar-mgr" style="width:100%;padding:5px 4px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px">
+      <option value="">👑 แอดมิน</option>
+      ${ms.map(m=>`<option value="${esc(m.uid)}"${p.managerId===m.uid?' selected':''}>${esc(m.nickname||m.email)}</option>`).join('')}
+    </select>`;
+  }
+  const phCells=_ASSIGN_PHASES.map(([k,l])=>{
+    const ph=(p.phases||{})[k]||{};
+    return `<td style="padding:6px;vertical-align:top;min-width:112px">${inp('ar-ph-'+k,'date',ph.deadline||'')}<div style="margin-top:3px">${inp('ar-phn-'+k,'text',ph.note||'','📝 โน้ต')}</div></td>`;
+  }).join('');
+  const budgetLocked=!isNew && p.budgetType && p.budgetType!=='flat';
+  const budgetCell=budgetLocked
+    ? `<td style="padding:6px;font-size:11px;color:var(--text2);vertical-align:top" title="งบเป็นแบบคิดตามหน่วย — แก้ได้ในฟอร์มเต็ม (ปุ่ม 👥)">${fmtB(p.budget||0)}<br>🔒</td>`
+    : `<td style="padding:6px;min-width:84px;vertical-align:top">${inp('ar-budget','number',p.budget||'','งบ')}</td>`;
+  return `<tr id="${isNew?'assign-newrow':'assign-editrow'}" style="background:rgba(0,180,255,.06)">
+    <td style="padding:6px;min-width:126px;vertical-align:top">${inp('ar-deadline','date',p.deadline||'')}</td>
+    <td style="padding:6px;min-width:88px;vertical-align:top">${codeSel}</td>
+    <td style="padding:6px;min-width:58px;vertical-align:top">${inp('ar-seq','number',p.seq||'','ลำดับ')}</td>
+    ${budgetCell}
+    <td style="padding:6px;min-width:58px;vertical-align:top">${inp('ar-episodes','number',p.episodes||'','Ep.')}</td>
+    <td style="padding:6px;min-width:112px;vertical-align:top">${mgrSel}</td>
+    ${phCells}
+    <td style="padding:6px;min-width:150px;vertical-align:top">${inp('ar-name','text',p.name||'','ชื่อโปรเจกต์ *')}</td>
+    <td style="padding:6px;min-width:150px;vertical-align:top">${inp('ar-link','text',p.downloadLink||'','https://ลิงก์โหลดงาน')}<div style="margin-top:3px">${inp('ar-secret','text',p.secretKey||'','🔑 Secret key')}</div></td>
+    <td style="padding:6px;min-width:120px;vertical-align:top">${inp('ar-note','text',p.note||'','หมายเหตุ')}</td>
+    <td style="padding:6px;white-space:nowrap;vertical-align:top">
+      <button class="btn btn-sm" style="padding:4px 10px;font-size:12px" onclick="assignSaveRow('${p.id||''}')" title="บันทึก">✅</button>
+      <button class="btn btn-sm btn-outline" style="padding:4px 8px;font-size:12px" onclick="assignCancelRow()" title="ยกเลิก">✖</button>
+    </td>
+  </tr>`;
+}
+async function assignSaveRow(projId){
+  const g=id=>document.getElementById(id);
+  const name=(g('ar-name')?.value||'').trim();
+  if(!name){ toast('กรอกชื่อโปรเจกต์ก่อน','error'); g('ar-name')?.focus(); return; }
+  let code=(g('ar-code')?.value||'');
+  if(code==='__new') code=(g('ar-code-new')?.value||'');
+  code=code.trim().toUpperCase();
+  const vals={
+    deadline:g('ar-deadline')?.value||'',
+    clientCode:code,
+    seq:parseInt(g('ar-seq')?.value)||0,
+    episodes:parseInt(g('ar-episodes')?.value)||0,
+    managerId:(currentUser?.role==='manager')?currentUser.uid:(g('ar-mgr')?.value||''),
+    name,
+    downloadLink:(g('ar-link')?.value||'').trim(),
+    secretKey:(g('ar-secret')?.value||'').trim(),
+    note:(g('ar-note')?.value||'').trim(),
+  };
+  const budgetEl=g('ar-budget');
+  const budget=budgetEl?(parseFloat(budgetEl.value)||0):null;
+  const phVals={};
+  _ASSIGN_PHASES.forEach(([k])=>{ phVals[k]={deadline:g('ar-ph-'+k)?.value||'', note:(g('ar-phn-'+k)?.value||'').trim()}; });
+  if(projId){
+    let mgrChanged=false;
+    const res=await saveProjectMerge(projId, p=>{
+      if(currentUser?.role==='admin' && vals.managerId!==(p.managerId||'')) mgrChanged=true;
+      Object.assign(p, vals);
+      if(budgetEl && budget!=null){ p.budget=budget; p.budgetRate=budget; if(!p.budgetType||p.budgetType==='flat') p.budgetType='flat'; }
+      p.phases=p.phases||{};
+      _ASSIGN_PHASES.forEach(([k])=>{
+        const v=phVals[k];
+        if(v.deadline||v.note){
+          p.phases[k]=Object.assign({startDate:'',submitTime:'',status:'none'}, p.phases[k]||{}, {deadline:v.deadline, note:v.note});
+        } else if(p.phases[k]){ p.phases[k].deadline=''; p.phases[k].note=''; }
+      });
+    });
+    if(res&&res.ok===false){ toast('บันทึกไม่สำเร็จ','error'); return; }
+    if(mgrChanged&&vals.managerId){ try{ addNotification({type:'project',title:`📁 คุณได้รับมอบหมายโปรเจกต์ "${vals.name}"`,recipientUid:vals.managerId,projId}); }catch(e){} }
+    toast('บันทึกแล้ว ✅','success');
+  } else {
+    const today=new Date().toISOString().split('T')[0];
+    const phases={};
+    _ASSIGN_PHASES.forEach(([k])=>{ const v=phVals[k]; if(v.deadline||v.note) phases[k]={startDate:'',deadline:v.deadline,submitTime:'',status:'none',note:v.note}; });
+    const proj={
+      id:'P'+Date.now(), name, date:today, client:'', type:'',
+      budget:budget||0, budgetRate:budget||0, budgetType:'flat', budgetQty:0, duration:0,
+      startDate:today, deadline:vals.deadline, cycle:'', note:vals.note,
+      clientCode:vals.clientCode, seq:vals.seq, episodes:vals.episodes,
+      downloadLink:vals.downloadLink, secretKey:vals.secretKey,
+      managerId:vals.managerId, workers:[], tax:{}, evidenceLogs:[], snapshot:null,
+      createdAt:new Date().toISOString(), phases
+    };
+    await saveProjectDB(proj);
+    if(vals.managerId && vals.managerId!==currentUser?.uid){ try{ addNotification({type:'project',title:`📁 คุณได้รับมอบหมายโปรเจกต์ "${vals.name}"`,recipientUid:vals.managerId,projId:proj.id}); }catch(e){} }
+    toast('เพิ่มงานใหม่แล้ว ✅ — กด 👥 ที่แถวเพื่อจัดทีม/ราคา','success');
+  }
+  _assignAdding=false; _assignEditId=null;
+  renderAssign();
+}
 function renderAssign(){
   const el=document.getElementById('assign-table'); if(!el) return;
   let list=(getProjects()||[]).slice();
   if(currentUser?.role==='manager') list=list.filter(p=>p.managerId===currentUser.uid);
   if(!_assignShowAll) list=list.filter(p=>p.projStatus!=='done'&&p.projStatus!=='cancelled');
-  list.sort((a,b)=>(a.deadline||'9999').localeCompare(b.deadline||'9999'));
-  if(!list.length){
-    el.innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)">ยังไม่มีงานในคิว — กด "➕ มอบหมายงานใหม่" เพื่อเริ่ม</div>';
-    return;
-  }
+  const months=[...new Set(list.map(p=>(p.deadline||'').slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
+  if(_assignMonth) list=list.filter(p=>(p.deadline||'').slice(0,7)===_assignMonth);
+  const sorters={
+    'deadline-asc':(a,b)=>(a.deadline||'9999').localeCompare(b.deadline||'9999'),
+    'deadline-desc':(a,b)=>(b.deadline||'').localeCompare(a.deadline||''),
+    'code':(a,b)=>((a.clientCode||'~')).localeCompare(b.clientCode||'~')||((a.seq||0)-(b.seq||0)),
+    'newest':(a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')),
+  };
+  list.sort(sorters[_assignSort]||sorters['deadline-asc']);
+  const toolbar=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+    <select onchange="_assignMonth=this.value;renderAssign()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+      <option value="">📅 ทุกเดือน</option>
+      ${months.map(m=>`<option value="${m}"${_assignMonth===m?' selected':''}>${_thaiMonthLabel(m)}</option>`).join('')}
+    </select>
+    <select onchange="_assignSort=this.value;renderAssign()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
+      <option value="deadline-asc"${_assignSort==='deadline-asc'?' selected':''}>⏫ เดทไลน์ใกล้สุดก่อน</option>
+      <option value="deadline-desc"${_assignSort==='deadline-desc'?' selected':''}>⏬ เดทไลน์ไกลสุดก่อน</option>
+      <option value="code"${_assignSort==='code'?' selected':''}>🔤 ตามรหัส / ลำดับ</option>
+      <option value="newest"${_assignSort==='newest'?' selected':''}>🆕 เพิ่มล่าสุดก่อน</option>
+    </select>
+    <span style="font-size:12px;color:var(--text2)">${list.length} งาน</span>
+  </div>`;
   const mgrs={}; try{ getAllManagerUsers().forEach(m=>{ mgrs[m.uid]=m.nickname||m.email||''; }); }catch(e){}
   const codeColors={}; const palette=['#FF6FAE','#9B6FFF','#00B4FF','#00DFA0','#FF9E00','#FF6060','#5AD1E6'];
   let ci=0;
   const th=t=>`<th style="padding:8px 10px;font-size:11.5px;color:var(--text2);font-weight:700;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border2)">${t}</th>`;
   const td=(t,extra='')=>`<td style="padding:8px 10px;font-size:12.5px;vertical-align:top;border-bottom:1px solid rgba(255,255,255,.05);${extra}">${t}</td>`;
+  const todayIso=new Date().toISOString().split('T')[0];
   const rows=list.map((p,ri)=>{
+    if(p.id===_assignEditId) return _assignEditRowHTML(p);
     const code=(p.clientCode||'').toUpperCase();
     if(code && !codeColors[code]){ codeColors[code]=palette[ci++%palette.length]; }
     const cc=codeColors[code]||'var(--text2)';
-    const overdue=p.deadline && p.deadline < new Date().toISOString().split('T')[0] && p.projStatus!=='done';
+    const overdue=p.deadline && p.deadline<todayIso && p.projStatus!=='done';
     const secId='askey-'+ri;
     const link=p.downloadLink
       ? `<a href="${esc(p.downloadLink)}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:12px;word-break:break-all">🔗 เปิดลิงก์</a>`
@@ -9551,13 +9701,18 @@ function renderAssign(){
       ${td(`<span style="font-weight:700;cursor:pointer;color:var(--accent2)" onclick="openProjDetail('${p.id}')" title="เปิดรายละเอียด">${esc(p.name||'')}</span>`)}
       ${td(link,'max-width:180px')}
       ${td(p.note?esc(p.note):'<span style="opacity:.35">—</span>','max-width:160px;font-size:11.5px;color:var(--text2)')}
-      ${td(`<button class="btn btn-sm btn-outline" style="padding:3px 10px;font-size:11px" onclick="openEditProject('${p.id}')">✏️</button>`)}
+      ${td(`<button class="btn btn-sm btn-outline" style="padding:3px 9px;font-size:11px" onclick="assignEditRow('${p.id}')" title="แก้ในตาราง">✏️</button>
+            <button class="btn btn-sm btn-outline" style="padding:3px 9px;font-size:11px" onclick="openEditProject('${p.id}')" title="ฟอร์มเต็ม: จัดทีม/ราคา">👥</button>`,'white-space:nowrap')}
     </tr>`;
   }).join('');
-  el.innerHTML=`<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:1150px">
+  const newRow=_assignAdding?_assignEditRowHTML(null):'';
+  const emptyHint=(!list.length&&!_assignAdding)
+    ? `<tr><td colspan="16" style="padding:36px;text-align:center;color:var(--text2)">ไม่มีงานในมุมมองนี้ — กด "➕ มอบหมายงานใหม่" เพื่อเพิ่มแถวกรอกแบบชีท</td></tr>`:'';
+  el.innerHTML=toolbar+`<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:1250px">
     <thead><tr>${th('เดทไลน์')}${th('รหัส')}${th('ลำดับ')}${th('งบ')}${th('Ep.')}${th('ผู้รับผิดชอบ')}${_ASSIGN_PHASES.map(([,l])=>th('DL '+l)).join('')}${th('ชื่อโปรเจกต์')}${th('Link โหลดงาน')}${th('หมายเหตุ')}${th('')}</tr></thead>
-    <tbody>${rows}</tbody></table></div>`;
+    <tbody>${rows}${emptyHint}${newRow}</tbody></table></div>`;
 }
+
 // datalist รหัสงาน — รวบรวมจากโปรเจกต์ที่มีอยู่ (เช่น G, M) ให้เลือกซ้ำง่าย
 function _fillClientCodeDatalist(){
   const dl=document.getElementById('pj-clientcode-list'); if(!dl) return;
@@ -15465,6 +15620,17 @@ function _whtPickStaff(){
   const id=document.getElementById('wht-staff-sel')?.value; if(!id)return;
   const s=getStaffById(id); if(!s)return;
   const nEl=document.getElementById('wht-payee-name'); if(nEl)nEl.value=s.name||'';
+  // 🪪 เติมเลขบัตร/ที่อยู่อัตโนมัติ:
+  //   1) จาก record ทีมงาน (รองรับชีทอนาคตที่จะเติม field: taxId/idCard/address ให้)
+  //   2) ไม่มีใน record → ดูใบ 50 ทวิใบล่าสุดของคนเดียวกัน (เคยกรอกครั้งเดียว ระบบจำให้)
+  const taxid=s.taxId||s.taxid||s.idCard||s.citizenId||'';
+  const addr=s.address||s.addr||'';
+  let prev=null;
+  if(!taxid||!addr){
+    prev=(getWhtDocs()||[]).find(d=>d&&d.payee&&(d.payee.staffId===id||(s.name&&d.payee.name===s.name)));
+  }
+  const tEl=document.getElementById('wht-payee-taxid'); if(tEl)tEl.value=taxid||prev?.payee?.taxid||'';
+  const aEl=document.getElementById('wht-payee-addr'); if(aEl)aEl.value=addr||prev?.payee?.addr||'';
 }
 function _whtToggleManualTax(){
   const on=document.getElementById('wht-manual-tax')?.checked;
@@ -15497,7 +15663,7 @@ function renderWhtRecent(){
 }
 async function issueWht(){
   const payer={ name:document.getElementById('wht-payer-name')?.value?.trim()||'', taxid:document.getElementById('wht-payer-taxid')?.value?.trim()||'', addr:document.getElementById('wht-payer-addr')?.value?.trim()||'' };
-  const payee={ name:document.getElementById('wht-payee-name')?.value?.trim()||'', taxid:document.getElementById('wht-payee-taxid')?.value?.trim()||'', addr:document.getElementById('wht-payee-addr')?.value?.trim()||'' };
+  const payee={ name:document.getElementById('wht-payee-name')?.value?.trim()||'', taxid:document.getElementById('wht-payee-taxid')?.value?.trim()||'', addr:document.getElementById('wht-payee-addr')?.value?.trim()||'', staffId:document.getElementById('wht-staff-sel')?.value||'' };
   if(!payer.name){ toast('กรอกชื่อผู้จ่ายเงินก่อน','error'); return; }
   if(!payee.name){ toast('กรอกชื่อผู้รับเงินก่อน','error'); return; }
   const {amt,tax}=_whtCalc();
@@ -15514,6 +15680,10 @@ async function issueWht(){
     createdAt:new Date().toISOString(), createdBy:currentUser?.nickname||currentUser?.email||''
   };
   const all=getWhtDocs(); all.unshift(doc); await saveWhtDocs(all);
+  // 🪪 จำเลขบัตร/ที่อยู่กลับเข้า record ทีมงาน — ครั้งหน้าเลือกชื่อแล้วเติมให้เอง (ชีทอนาคตเขียน field เดียวกันนี้ได้)
+  if(payee.staffId && (payee.taxid||payee.addr)){
+    try{ _updateStaffRecords(payee.staffId, s=>{ if(payee.taxid) s.taxId=payee.taxid; if(payee.addr) s.address=payee.addr; }); }catch(e){}
+  }
   renderWhtRecent();
   printWhtDoc(JSON.stringify(doc));
   toast('🏛️ ออกใบ 50 ทวิ แล้ว — '+docNo,'success');
@@ -21317,7 +21487,81 @@ function resetFirstTimeTour(){
 
 
 
+function settingsTab(name){
+  document.querySelectorAll('#set-tabs .set-tab').forEach(b=>b.classList.toggle('active', b.dataset.settab===name));
+  ['general','sync','data','log','tools'].forEach(k=>{
+    const p=document.getElementById('setpane-'+k);
+    if(p) p.classList.toggle('hidden', k!==name);
+  });
+  ls('settings_tab', name);
+  if(name==='log'){ try{ renderAuditLog(); }catch(e){} }
+}
+// ── หน้าอ่านบันทึกการใช้งาน ──
+let _logView='actions';
+function setLogView(v){
+  _logView=v;
+  const a=document.getElementById('logview-actions'), l=document.getElementById('logview-logins');
+  if(a) a.className='btn btn-sm'+(v==='actions'?'':' btn-outline');
+  if(l) l.className='btn btn-sm'+(v==='logins'?'':' btn-outline');
+  const f=document.getElementById('log-filter-action'); if(f) f.style.display=(v==='actions')?'':'none';
+  renderAuditLog();
+}
+function _logWhen(iso){
+  try{
+    const d=new Date(iso), now=new Date();
+    const mins=Math.floor((now-d)/60000);
+    if(mins<1) return 'เมื่อสักครู่';
+    if(mins<60) return mins+' นาทีที่แล้ว';
+    if(mins<1440) return Math.floor(mins/60)+' ชั่วโมงที่แล้ว';
+    return fmtDate(iso.split('T')[0])+' '+d.toTimeString().slice(0,5)+' น.';
+  }catch(e){ return iso||''; }
+}
+async function renderAuditLog(){
+  const el=document.getElementById('audit-log-list'); if(!el) return;
+  el.innerHTML='<div style="color:var(--text2);font-size:12.5px;padding:14px 0">⏳ กำลังโหลด…</div>';
+  if(_logView==='logins'){
+    const rows=await loadLoginHistory();
+    el.innerHTML = rows.length ? rows.map(r=>`
+      <div class="set-toolrow" style="padding:9px 0">
+        <span style="font-size:17px">🔑</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12.5px;color:var(--text)"><strong>${esc(r.who||r.email||'ไม่ทราบ')}</strong> เข้าสู่ระบบ</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:1px">${esc(r.device||'')} · ${esc(r.email||'')}</div>
+        </div>
+        <div style="font-size:11px;color:var(--text2);white-space:nowrap">${_logWhen(r.at)}</div>
+      </div>`).join('')
+      : '<div style="color:var(--text2);font-size:12.5px;padding:14px 0">ยังไม่มีประวัติการเข้าสู่ระบบ (เริ่มบันทึกตั้งแต่เวอร์ชันนี้เป็นต้นไป)</div>';
+    return;
+  }
+  const all=await loadAuditLogs(300);
+  // เติมตัวเลือกในตัวกรอง
+  const sel=document.getElementById('log-filter-action');
+  if(sel && sel.options.length<=1){
+    const used=[...new Set(all.map(r=>r.action).filter(a=>AUDIT_ACTIONS[a]))];
+    sel.innerHTML='<option value="">ทุกประเภท</option>'+used.map(a=>`<option value="${esc(a)}">${AUDIT_ACTIONS[a].icon} ${esc(AUDIT_ACTIONS[a].label)}</option>`).join('');
+  }
+  const filter=sel?sel.value:'';
+  const rows=filter?all.filter(r=>r.action===filter):all;
+  el.innerHTML = rows.length ? rows.slice(0,200).map(r=>{
+    const meta=AUDIT_ACTIONS[r.action]||{icon:'•',label:r.action||''};
+    return `<div class="set-toolrow" style="padding:9px 0">
+      <span style="font-size:17px">${meta.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px;color:var(--text)"><strong>${esc(r.who||'ไม่ทราบ')}</strong> · ${esc(meta.label)}${r.target?` <span style="color:var(--accent2)">${esc(r.target)}</span>`:''}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:1px">${esc(r.detail||'')}${r.email?` · ${esc(r.email)}`:''}</div>
+      </div>
+      <div style="font-size:11px;color:var(--text2);white-space:nowrap">${_logWhen(r.at)}</div>
+    </div>`;
+  }).join('')
+  : '<div style="color:var(--text2);font-size:12.5px;padding:14px 0">ยังไม่มีบันทึก — ระบบจะเริ่มบันทึกเมื่อมีการสร้าง/แก้ไข/ลบข้อมูลตั้งแต่นี้เป็นต้นไป</div>';
+}
 function renderSettings(){
+  try{ settingsTab(ls('settings_tab')||'general'); }catch(e){}
+  try{
+    const isel=document.getElementById('idle-limit-sel');
+    if(isel){ const cur=getIdleLimitMin();
+      isel.innerHTML=IDLE_CHOICES.map(c=>`<option value="${c.v}"${cur===c.v?' selected':''}>${c.label}</option>`).join(''); }
+  }catch(e){}
   // Sync safe mode toggle with saved state
   const sm = ls('safe_mode') === '1';
   const tgl = document.getElementById('safe-mode-toggle');
@@ -23387,6 +23631,66 @@ function renderMgrHome(){
 
 // ── Upgrade role in saveStaff ──
 const _origSaveStaff = window.saveStaff;
+
+// ══════════════════════════════════════════════
+// 📜 AUDIT HOOKS — ครอบฟังก์ชันเดิมเพื่อบันทึก log
+//    วางท้ายสุดหลังฟังก์ชันทุกตัวถูกประกาศแล้ว · ไม่แก้โค้ดเดิมแม้แต่บรรทัดเดียว
+//    ถ้า logAudit พังต้องไม่กระทบงานหลัก (ทุกจุดหุ้ม try/catch)
+// ══════════════════════════════════════════════
+(function installAuditHooks(){
+  function wrap(name, before, after){
+    const orig = window[name];
+    if(typeof orig !== 'function') return;
+    window[name] = function(...args){
+      let ctx = {};
+      try{ if(before) ctx = before.apply(this, args) || {}; }catch(e){}
+      // บันทึกเฉพาะตอนที่ทำงานสำเร็จจริง — ถ้าฟังก์ชันเดิมหยุดกลางคัน (เช่นกรอกไม่ครบ) จะไม่ log
+      const done = () => { try{ if(after && !ctx.skip) after(ctx, args); }catch(e){} };
+      let r;
+      try{ r = orig.apply(this, args); }
+      catch(e){ done(); throw e; }
+      if(r && typeof r.then === 'function'){ return r.then(v=>{ done(); return v; }, e=>{ throw e; }); }
+      done();
+      return r;
+    };
+  }
+  const projName = id => { try{ return (getProjects()||[]).find(p=>p.id===id)?.name || id; }catch(e){ return id; } };
+  const staffName = id => { try{ const s=getStaffById(id); return s?(s.nickname||s.name):id; }catch(e){ return id; } };
+
+  wrap('saveProject',
+    () => { const n=document.getElementById('pj-name')?.value?.trim()||'';
+            return { editing: !!window.editingProjId, id: window.editingProjId, name:n, skip:!n }; },
+    ctx => logAudit(ctx.editing?'project.edit':'project.create', ctx.name, ctx.editing?('รหัสงาน '+(ctx.id||'')):'สร้างจากฟอร์มโปรเจกต์'));
+  wrap('assignSaveRow',
+    (projId) => { const n=document.getElementById('ar-name')?.value?.trim()||'';
+                  return { projId, name:n, skip:!n }; },
+    ctx => logAudit(ctx.projId?'project.edit':'project.assign', ctx.name, ctx.projId?'แก้ในตารางมอบหมายงาน':'เพิ่มแถวในหน้ามอบหมายงาน'));
+  wrap('deleteProjectDB', (id)=>({name:projName(id), id}), ctx => logAudit('project.delete', ctx.name, 'id '+ctx.id));
+  wrap('savePayAmt', null, () => logAudit('payment.pay','','บันทึกยอดจ่ายรายคน'));
+  wrap('markSelectedPaidFromCart', null, () => logAudit('payment.pay','','ทำเครื่องหมายจ่ายแล้ว (จากตะกร้า)'));
+  wrap('cancelConfirmAll', (projId)=>({name:projName(projId)}), ctx => logAudit('payment.cancel', ctx.name,'ยกเลิกใบยืนยันทั้งโปรเจกต์'));
+  wrap('saveStaff', null, () => logAudit('staff.edit','','บันทึกจากฟอร์มสมาชิก'));
+  wrap('saveStaffDetailInline', null, () => logAudit('staff.edit','','แก้ในหน้ารายละเอียดสมาชิก'));
+  wrap('setStaffStatus', (id,st)=>({n:staffName(id), st, skip:!STAFF_STATUSES[st] || !getStaffById(id)}),
+    ctx => logAudit('staff.status', ctx.n, STAFF_STATUSES[ctx.st]?.label||ctx.st));
+  wrap('deleteStaff', (id)=>({n:staffName(id)}), ctx => logAudit('staff.delete', ctx.n,'ลบถาวร + บล็อกซิงค์'));
+  wrap('adminLeaveTeam', (id,nm)=>({n:nm||staffName(id)}), ctx => logAudit('staff.leave', ctx.n,''));
+  wrap('adminRejoinTeam', (id,nm)=>({n:nm||staffName(id)}), ctx => logAudit('staff.rejoin', ctx.n,''));
+  wrap('mergeDuplicateStaff', (keepId,removeIds,keepName)=>({n:keepName||staffName(keepId), c:(removeIds||[]).length}),
+    ctx => logAudit('staff.merge', ctx.n,'รวม '+ctx.c+' รายการซ้ำเข้าด้วยกัน'));
+  wrap('bulkMergeAllDuplicates', null, () => logAudit('staff.merge','ทั้งระบบ','รวมร่างอัตโนมัติทุกกลุ่ม'));
+  wrap('saveStaffRoleIfChanged', (id)=>({n:staffName(id)}), ctx => logAudit('role.change', ctx.n,'ตั้งสิทธิ์ตามหมวดในทะเบียนทีม'));
+  wrap('issueWht', ()=>{ const n=document.getElementById('wht-payee-name')?.value?.trim()||'';
+                         const payer=document.getElementById('wht-payer-name')?.value?.trim()||'';
+                         const amt=parseFloat(document.getElementById('wht-amount')?.value)||0;
+                         return { n, skip:!n || !payer || amt<=0 }; },
+    ctx => logAudit('doc.wht', ctx.n,'ออกหนังสือรับรองหัก ณ ที่จ่าย'));
+  // กู้คืนสำเร็จ = โมดัลถูกปิดไปแล้ว (ถ้าพิมพ์คำยืนยันผิด/ยกเลิก โมดัลยังอยู่ → ไม่ log)
+  wrap('confirmRestore', ()=>({skip:!window._pendingRestore}),
+    () => { if(!document.getElementById('restore-modal')) logAudit('data.restore','','กู้คืนข้อมูลทับทั้งระบบ'); });
+  wrap('syncFromSheet', (opts)=>({silent:!!(opts&&opts.silent)}), ctx => { if(!ctx.silent) logAudit('data.sync','','ซิงค์รายชื่อจาก Google Sheet'); });
+  wrap('saveBriefLibrary', ()=>({code:window._briefCurCode||''}), ctx => logAudit('brief.edit','รหัส '+ctx.code,'แก้บรีฟงานกลาง'));
+})();
 
 </script>
 
