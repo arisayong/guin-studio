@@ -1108,6 +1108,7 @@ body.sidebar-collapsed .main-content{
    <div class="nav-item active" onclick="nav('dashboard')"><span class="nav-icon">🏠</span><span>หน้าหลัก</span></div>
    <div class="nav-section">งาน</div>
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span><span class="nav-badge hidden" id="track-badge">0</span></div>
+   <div class="nav-item" onclick="nav('assign')"><span class="nav-icon">📋</span><span>มอบหมายงาน</span></div>
    <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span><span class="nav-badge hidden" id="deadline-badge">0</span></div>
    <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-section">การเงิน</div>
@@ -1130,6 +1131,7 @@ body.sidebar-collapsed .main-content{
   <nav class="sidebar-nav hidden" id="manager-nav">
    <div class="nav-section">ของฉัน</div>
    <div class="nav-item active" onclick="nav('mgr-home')"><span class="nav-icon">🏠</span><span>ภาพรวม</span></div>
+   <div class="nav-item" onclick="nav('assign')"><span class="nav-icon">📋</span><span>มอบหมายงาน</span></div>
    <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
    <div class="nav-item" onclick="nav('mgr-calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
@@ -1608,6 +1610,20 @@ body.sidebar-collapsed .main-content{
    <div id="calc-list"></div>
   </div>
 
+  <!-- ── 📋 มอบหมายงาน (แทนชีทคิวเมเนเจอร์ — เฟส 1 บรีฟข้อ 9) ── -->
+  <div id="page-assign" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">📋 มอบหมายงาน</div>
+    <div class="page-subtitle">คิวสั่งงานเมเนเจอร์ — มุมมองเดียวกับชีทเดิม กดยืนยันแล้วสร้างโปรเจกต์ให้อัตโนมัติ</div>
+    <div class="page-actions">
+     <button class="btn btn-outline btn-sm" id="assign-toggle-all" onclick="assignToggleAll()">👁 แสดงงานที่จบแล้วด้วย</button>
+     <button class="btn btn-outline" onclick="openBriefLibrary()" title="โน้ตกลางจากแอดมิน: งานแต่ละรหัสต้องทำอะไรบ้าง">📖 บรีฟงาน</button>
+     <button class="btn btn-blue" onclick="openNewProject()">➕ มอบหมายงานใหม่</button>
+    </div>
+   </div>
+   <div id="assign-table" style="overflow-x:auto"></div>
+  </div>
+
   <div id="page-projects" class="page hidden">
    <div class="page-header">
     <div class="page-title">📁 โปรเจกต์ทั้งหมด</div>
@@ -1864,6 +1880,7 @@ body.sidebar-collapsed .main-content{
     <div class="page-subtitle">สมาชิกทั้งหมดในสตูดิโอ</div>
     <div class="page-actions">
      <div class="search-bar" style="margin:0;flex:1;max-width:260px"><span class="icon">🔍</span><input placeholder="ค้นหาสมาชิก..." id="staff-search" oninput="renderStaffGrid()"></div>
+     <button class="btn btn-outline" onclick="openTagManager()" title="สร้าง/ลบหัวข้อ Tag หมายเหตุประจำตัว">🏷️ จัดการ Tag</button>
      <button class="btn btn-blue" onclick="openAddStaff()">➕ เพิ่มสมาชิก</button>
     </div>
    </div>
@@ -2499,6 +2516,16 @@ body.sidebar-collapsed .main-content{
    <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">ชื่อ / URL ลูกค้า</label><input class="form-input" id="pj-client" placeholder="ชื่อลูกค้า หรือ link"></div>
    </div>
+   <!-- 📋 ข้อมูลจากชีทคิวเมเนเจอร์ (เฟส 1 — บรีฟข้อ 9) -->
+   <div style="display:grid;grid-template-columns:90px 90px 1fr;gap:12px;margin-bottom:12px">
+    <div class="form-group" style="margin:0"><label class="form-label">รหัสงาน</label><input class="form-input" id="pj-clientcode" list="pj-clientcode-list" placeholder="เช่น G" maxlength="6" style="text-transform:uppercase"><datalist id="pj-clientcode-list"></datalist></div>
+    <div class="form-group" style="margin:0"><label class="form-label">ลำดับ</label><input class="form-input" id="pj-seq" type="number" placeholder="1" min="0" onwheel="this.blur()"></div>
+    <div class="form-group" style="margin:0"><label class="form-label">จำนวนตอน (Ep.)</label><input class="form-input" id="pj-episodes" type="number" placeholder="เช่น 100" min="0" onwheel="this.blur()"></div>
+   </div>
+   <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:12px;margin-bottom:12px">
+    <div class="form-group" style="margin:0"><label class="form-label">🔗 Link โหลดงาน</label><input class="form-input" id="pj-downloadlink" placeholder="https://..."></div>
+    <div class="form-group" style="margin:0"><label class="form-label">🔑 Secret key (ถ้ามี)</label><input class="form-input" id="pj-secretkey" placeholder="เห็นเฉพาะทีมที่เกี่ยวข้อง"></div>
+   </div>
    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">วันเริ่มงาน</label>
       <div style="position:relative;display:flex;align-items:center">
@@ -2562,6 +2589,7 @@ body.sidebar-collapsed .main-content{
      <input type="date" id="ph-adp-deadline" onchange="onPhaseDateChange('adp','deadline',this.value)">
      <span class="ph-lbl">🕒 เวลา</span>
      <input type="text" id="ph-adp-time" placeholder="00:00" maxlength="5" oninput="this.value=this.value.replace(/[^0-9:.]/g,'')" onchange="validatePhaseTime(this,'adp')"><span id="ph-adp-time-lbl" style="font-size:10px;color:var(--text2);margin-left:6px;align-self:center"></span>
+     <input type="text" id="ph-adp-note" placeholder="📝 โน้ตแบ่งงาน เช่น ใช้ 4 คน · คนที่1 Ep.1-21" onchange="onPhaseDateChange('adp','note',this.value)" style="flex:1;min-width:150px">
     </div>
     <div class="cat-block-body"><div id="adp-list"></div><div class="worker-dropdown-wrap">
   <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('adp-select')">
@@ -2591,6 +2619,7 @@ body.sidebar-collapsed .main-content{
      <input type="date" id="ph-dub-deadline" onchange="onPhaseDateChange('dub','deadline',this.value)">
      <span class="ph-lbl">🕒 เวลา</span>
      <input type="text" id="ph-dub-time" placeholder="00:00" maxlength="5" oninput="this.value=this.value.replace(/[^0-9:.]/g,'')" onchange="validatePhaseTime(this,'dub')"><span id="ph-dub-time-lbl" style="font-size:10px;color:var(--text2);margin-left:6px;align-self:center"></span>
+     <input type="text" id="ph-dub-note" placeholder="📝 โน้ตแบ่งงาน เช่น ใช้ 4 คน · คนที่1 Ep.1-21" onchange="onPhaseDateChange('dub','note',this.value)" style="flex:1;min-width:150px">
     </div>
     <div class="cat-block-body">
      <div style="font-size:11px;color:var(--text2);margin-bottom:7px;font-weight:700;letter-spacing:1px">🌟 นักพากย์หลัก</div>
@@ -2635,6 +2664,7 @@ body.sidebar-collapsed .main-content{
      <input type="date" id="ph-mix-deadline" onchange="onPhaseDateChange('mix','deadline',this.value)">
      <span class="ph-lbl">🕒 เวลา</span>
      <input type="text" id="ph-mix-time" placeholder="00:00" maxlength="5" oninput="this.value=this.value.replace(/[^0-9:.]/g,'')" onchange="validatePhaseTime(this,'mix')"><span id="ph-mix-time-lbl" style="font-size:10px;color:var(--text2);margin-left:6px;align-self:center"></span>
+     <input type="text" id="ph-mix-note" placeholder="📝 โน้ตแบ่งงาน เช่น ใช้ 4 คน · คนที่1 Ep.1-21" onchange="onPhaseDateChange('mix','note',this.value)" style="flex:1;min-width:150px">
     </div>
     <div class="cat-block-body"><div id="mix-list"></div><div class="worker-dropdown-wrap">
   <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('mix-select')">
@@ -2663,6 +2693,7 @@ body.sidebar-collapsed .main-content{
      <input type="date" id="ph-qc-deadline" onchange="onPhaseDateChange('qc','deadline',this.value)">
      <span class="ph-lbl">🕒 เวลา</span>
      <input type="text" id="ph-qc-time" placeholder="00:00" maxlength="5" oninput="this.value=this.value.replace(/[^0-9:.]/g,'')" onchange="validatePhaseTime(this,'qc')"><span id="ph-qc-time-lbl" style="font-size:10px;color:var(--text2);margin-left:6px;align-self:center"></span>
+     <input type="text" id="ph-qc-note" placeholder="📝 โน้ตแบ่งงาน เช่น ใช้ 4 คน · คนที่1 Ep.1-21" onchange="onPhaseDateChange('qc','note',this.value)" style="flex:1;min-width:150px">
     </div>
     <div class="cat-block-body"><div id="qc-list"></div><div class="worker-dropdown-wrap">
   <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('qc-select')">
@@ -2691,6 +2722,7 @@ body.sidebar-collapsed .main-content{
      <input type="date" id="ph-sub-deadline" onchange="onPhaseDateChange('sub','deadline',this.value)">
      <span class="ph-lbl">🕒 เวลา</span>
      <input type="text" id="ph-sub-time" placeholder="00:00" maxlength="5" oninput="this.value=this.value.replace(/[^0-9:.]/g,'')" onchange="validatePhaseTime(this,'sub')"><span id="ph-sub-time-lbl" style="font-size:10px;color:var(--text2);margin-left:6px;align-self:center"></span>
+     <input type="text" id="ph-sub-note" placeholder="📝 โน้ตแบ่งงาน เช่น ใช้ 4 คน · คนที่1 Ep.1-21" onchange="onPhaseDateChange('sub','note',this.value)" style="flex:1;min-width:150px">
     </div>
     <div class="cat-block-body"><div id="sub-list"></div><div class="worker-dropdown-wrap">
   <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('sub-select')">
@@ -2719,6 +2751,7 @@ body.sidebar-collapsed .main-content{
      <input type="date" id="ph-mgr-deadline" onchange="onPhaseDateChange('mgr','deadline',this.value)">
      <span class="ph-lbl">🕒 เวลา</span>
      <input type="text" id="ph-mgr-time" placeholder="00:00" maxlength="5" oninput="this.value=this.value.replace(/[^0-9:.]/g,'')" onchange="validatePhaseTime(this,'mgr')"><span id="ph-mgr-time-lbl" style="font-size:10px;color:var(--text2);margin-left:6px;align-self:center"></span>
+     <input type="text" id="ph-mgr-note" placeholder="📝 โน้ตแบ่งงาน เช่น ใช้ 4 คน · คนที่1 Ep.1-21" onchange="onPhaseDateChange('mgr','note',this.value)" style="flex:1;min-width:150px">
     </div>
     <div class="cat-block-body"><div id="mgr-list"></div><div class="worker-dropdown-wrap">
   <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('mgr-select')">
@@ -3585,6 +3618,16 @@ const _demoUsers = {
 
 
 // ══════════════════════════════════════════════
+// 🛡️ escape ข้อมูลผู้ใช้ก่อนประกอบเป็น HTML — กัน XSS จากชื่อ/หมายเหตุที่กรอกผ่านฟอร์ม
+function esc(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// สำหรับค่าที่จะฝังใน onclick='...' (single-quoted JS string ใน attribute)
+function escJs(s){
+  return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'\\x3C');
+}
 function ls(k,v){
   if(v===undefined){try{return JSON.parse(localStorage.getItem('guin3_'+k))}catch{return null}}
   localStorage.setItem('guin3_'+k,JSON.stringify(v));
@@ -3822,6 +3865,195 @@ function getAllStaff(){
   return a;
 }
 function getStaffById(id){return getAllStaff().find(s=>s.id===id)}
+
+// ══════════════════════════════════════════════
+// 👥 สถานะทีมงานแบบรวม + ระบบ Tag (เฟส 1 — บรีฟ 2026-08 ข้อ 5)
+//    status ใหม่เก็บใน staff record (field `status`) — ของเก่า (mgrSuspended/teamLeft)
+//    ยังอ่านต่อเป็น fallback เพื่อไม่กระทบข้อมูลเดิม
+// ══════════════════════════════════════════════
+const STAFF_STATUSES = {
+  active:    {label:'🟢 Active',     color:'var(--green)',  badge:''},
+  suspended: {label:'⏸️ พักงาน',    color:'#FF9E00',       badge:'⏸️ พักงาน'},
+  inactive:  {label:'🚫 ปิดใช้งาน', color:'#9AA0B4',       badge:'🚫 ปิดใช้งาน'},
+  resigned:  {label:'🚪 ลาออก',     color:'var(--red)',    badge:'🚪 ลาออก'},
+};
+function getStaffStatus(s){
+  if(!s) return 'active';
+  if(s.status && STAFF_STATUSES[s.status]) return s.status;
+  try{ if(typeof isStaffLeft==='function' && isStaffLeft(s.id)) return 'resigned'; }catch(e){}
+  try{ if(typeof getMgrSuspended==='function' && getMgrSuspended()[s.id]) return 'suspended'; }catch(e){}
+  return 'active';
+}
+function isStaffAssignable(s){ return getStaffStatus(s)==='active'; }
+// อัปเดต record ของคนเดียวกันทุกหมวด (คน 1 คนมีหลาย record แยกตาม category)
+function _updateStaffRecords(staffId, mut){
+  const d=getStaffData(); let n=0;
+  Object.keys(d||{}).forEach(cat=>{
+    const arr=Array.isArray(d[cat])?d[cat]:Object.values(d[cat]||{});
+    arr.filter(Boolean).forEach(s=>{ if(s.id===staffId){ mut(s); n++; } });
+    d[cat]=arr;
+  });
+  if(n) saveStaffData(d);
+  return n;
+}
+function setStaffStatus(staffId, status){
+  if(!STAFF_STATUSES[status]) return;
+  const n=_updateStaffRecords(staffId, s=>{ s.status=status; s.statusAt=new Date().toISOString(); s.statusBy=currentUser?.email||''; });
+  if(n){
+    toast(`เปลี่ยนสถานะเป็น ${STAFF_STATUSES[status].label} แล้ว`,'success');
+    try{ if(typeof renderStaff==='function') renderStaff(); }catch(e){}
+  } else toast('ไม่พบสมาชิก','error');
+}
+function staffStatusBadgeHTML(s){
+  const k=getStaffStatus(s);
+  if(k==='active') return '';
+  const v=STAFF_STATUSES[k];
+  return `<span style="padding:1px 7px;border-radius:8px;background:${k==='suspended'?'rgba(255,158,0,.18)':k==='resigned'?'rgba(255,64,64,.15)':'rgba(150,154,180,.18)'};color:${v.color};font-size:10px;font-weight:700;margin-left:4px">${v.badge}</span>`;
+}
+// ── Tag master — admin สร้างหัวข้อเอง เก็บที่ misc/tags_master ──
+function getTagsMaster(){ return ls('tags_master')||{}; }
+async function saveTagsMaster(t){ ls('tags_master',t); await fbSaveKeyed('tags_master', t); }
+function staffTagChipsHTML(s){
+  const master=getTagsMaster();
+  const tags=(s?.tags||[]).filter(k=>master[k]&&master[k].active!==false);
+  if(!tags.length) return '';
+  return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">`+
+    tags.map(k=>`<span style="font-size:10px;padding:1px 8px;border-radius:8px;background:rgba(0,180,255,.12);color:var(--cyan);font-weight:600">🏷️ ${esc(master[k].label)}</span>`).join('')+`</div>`;
+}
+function _tagOverlayShow(title, bodyHTML, maxW){
+  document.getElementById('tag-overlay')?.remove();
+  const ov=document.createElement('div');
+  ov.id='tag-overlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  ov.innerHTML=`<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;max-width:${maxW||420}px;width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border2)">
+      <div style="font-weight:800;font-size:14px">${title}</div>
+      <span style="cursor:pointer;opacity:.7;font-size:16px;padding:0 4px" onclick="document.getElementById('tag-overlay')?.remove()">✕</span>
+    </div>
+    <div id="tag-overlay-body" style="padding:14px 16px;overflow-y:auto">${bodyHTML}</div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+// จัดการหัวข้อ Tag ทั้งระบบ (admin)
+function openTagManager(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const master=getTagsMaster();
+  const rows=Object.entries(master).filter(([,v])=>v&&v.active!==false).map(([k,v])=>
+    `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg2);border-radius:8px;margin-bottom:6px">
+      <span style="flex:1;font-size:13px">🏷️ ${esc(v.label)}</span>
+      <button class="btn btn-sm btn-outline" style="padding:3px 9px;font-size:11px;border-color:rgba(255,64,64,.35);color:var(--red)" onclick="delMasterTag('${k}')">ลบ</button>
+    </div>`).join('') || '<div style="color:var(--text2);font-size:12px;text-align:center;padding:10px">ยังไม่มี Tag — เพิ่มอันแรกด้านล่าง</div>';
+  _tagOverlayShow('🏷️ จัดการ Tag ทีมงาน', `
+    ${rows}
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <input id="new-tag-label" type="text" placeholder="เช่น ไม่รับงาน AI / รับเฉพาะ QC" style="flex:1;padding:8px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px">
+      <button class="btn btn-sm" onclick="addMasterTag()">+ เพิ่ม</button>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-top:8px">Tag ใช้ติดหมายเหตุประจำตัว เช่น "หยง ไม่รับงาน AI" — ติดให้สมาชิกได้ที่ปุ่ม 🏷️ บนการ์ดแต่ละคน</div>`);
+}
+async function addMasterTag(){
+  const inp=document.getElementById('new-tag-label');
+  const label=(inp?.value||'').trim();
+  if(!label){ toast('พิมพ์ชื่อ Tag ก่อน','error'); return; }
+  const master=getTagsMaster();
+  if(Object.values(master).some(v=>v&&v.active!==false&&v.label===label)){ toast('มี Tag นี้อยู่แล้ว','warn'); return; }
+  master['tg_'+Date.now()]={label, active:true, createdBy:currentUser?.email||'', createdAt:new Date().toISOString()};
+  await saveTagsMaster(master);
+  openTagManager();
+  toast('เพิ่ม Tag แล้ว','success');
+}
+async function delMasterTag(key){
+  const master=getTagsMaster();
+  if(!master[key]) return;
+  if(!confirm(`ลบ Tag "${master[key].label}" ? (ชิปจะหายจากทุกคนที่ติดอยู่)`)) return;
+  master[key].active=false;
+  await saveTagsMaster(master);
+  openTagManager();
+  try{ if(typeof renderStaff==='function') renderStaff(); }catch(e){}
+}
+// ติด/ถอด Tag รายคน (admin)
+function openStaffTagEditor(staffId){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const s=getStaffById(staffId); if(!s){ toast('ไม่พบสมาชิก','error'); return; }
+  const master=getTagsMaster();
+  const cur=new Set(s.tags||[]);
+  const items=Object.entries(master).filter(([,v])=>v&&v.active!==false);
+  const body= (items.length? items.map(([k,v])=>
+    `<label style="display:flex;align-items:center;gap:9px;padding:8px 10px;background:var(--bg2);border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px">
+      <input type="checkbox" data-tagkey="${k}" ${cur.has(k)?'checked':''}> 🏷️ ${esc(v.label)}
+    </label>`).join('') : '<div style="color:var(--text2);font-size:12px">ยังไม่มีหัวข้อ Tag — สร้างที่ปุ่ม "🏷️ จัดการ Tag" ก่อน</div>')
+    +`<button class="btn" style="width:100%;margin-top:10px" onclick="saveStaffTags('${staffId}')">💾 บันทึก</button>`;
+  _tagOverlayShow(`🏷️ Tag ของ ${esc(s.nickname||s.name)}`, body);
+}
+function saveStaffTags(staffId){
+  const keys=[...document.querySelectorAll('#tag-overlay-body input[data-tagkey]:checked')].map(el=>el.dataset.tagkey);
+  const n=_updateStaffRecords(staffId, s=>{ s.tags=keys; });
+  document.getElementById('tag-overlay')?.remove();
+  if(n){ toast('บันทึก Tag แล้ว','success'); try{ if(typeof renderStaff==='function') renderStaff(); }catch(e){} }
+}
+
+// ══════════════════════════════════════════════
+// 📖 บรีฟงานกลางตามรหัสงาน (แทนชีทบรีฟ — เฟส 1)
+//    โน้ตจากแอดมินว่างานรหัสนี้ต้องทำอะไรบ้าง แยกหัวข้อตามทีม
+//    admin = เขียน/แก้ · manager = เปิดอ่านได้ทุกรหัส (โน้ตกลางของทีม)
+// ══════════════════════════════════════════════
+const BRIEF_TEAMS=[['manager','🗂️ เมเนเจอร์'],['adaptation','✍️ ทีมบท'],['dubbing','🎤 ทีมพากย์'],['mix','🎧 ทีมมิกซ์'],['qc','✅ ทีม QC'],['subVideo','🎬 ทีมซับ/วิดีโอ']];
+function getBriefTemplates(){ return ls('brief_templates')||{}; }
+async function saveBriefTemplates(t){ ls('brief_templates',t); await fbSaveKeyed('brief_templates', t); }
+let _briefCurCode='';
+function openBriefLibrary(code){
+  const role=currentUser?.role;
+  if(role!=='admin'&&role!=='manager'){ toast('เฉพาะแอดมิน/เมเนเจอร์','error'); return; }
+  const lib=getBriefTemplates();
+  const codes=[...new Set([
+    ...Object.keys(lib),
+    ...((getProjects()||[]).map(p=>(p.clientCode||'').trim().toUpperCase()).filter(Boolean))
+  ])].sort();
+  _briefCurCode = (code && codes.includes(code)) ? code
+    : (_briefCurCode && codes.includes(_briefCurCode)) ? _briefCurCode : (codes[0]||'');
+  const canEdit = role==='admin';
+  const chips = codes.map(c=>
+    `<button class="btn btn-sm ${c===_briefCurCode?'btn-blue':'btn-outline'}" style="padding:3px 12px;font-size:12px" onclick="openBriefLibrary('${escJs(c)}')">${esc(c)}</button>`).join(' ')
+    + (canEdit?` <input id="brief-new-code" placeholder="+ รหัสใหม่" maxlength="6" style="width:92px;padding:4px 8px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px;text-transform:uppercase" onkeydown="if(event.key==='Enter')briefAddCode()"> <button class="btn btn-sm btn-outline" onclick="briefAddCode()">เพิ่ม</button>`:'');
+  const rec=lib[_briefCurCode]||null;
+  const cur=(rec&&rec.sections)||{};
+  let body='';
+  if(!_briefCurCode){
+    body=`<div style="color:var(--text2);font-size:12.5px;padding:10px 0">ยังไม่มีรหัสงานในระบบ — ${canEdit?'เพิ่มรหัสในช่องด้านบนก่อน':'รอแอดมินสร้างบรีฟ'}</div>`;
+  } else if(canEdit){
+    body=BRIEF_TEAMS.map(([k,l])=>
+      `<div style="margin-bottom:10px"><div style="font-size:12px;font-weight:700;margin-bottom:4px">${l}</div>
+       <textarea id="brief-sec-${k}" rows="3" placeholder="— ว่าง = ไม่แสดงหัวข้อนี้ —" style="width:100%;padding:8px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px;resize:vertical">${esc(cur[k]||'')}</textarea></div>`).join('')
+      +`<button class="btn" style="width:100%;margin-top:4px" onclick="saveBriefLibrary()">💾 บันทึกบรีฟรหัส ${esc(_briefCurCode)}</button>`;
+  } else {
+    const secs=BRIEF_TEAMS.filter(([k])=>String(cur[k]||'').trim());
+    body= secs.length
+      ? secs.map(([k,l])=>`<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px">${l}</div><div style="white-space:pre-wrap;font-size:12.5px;line-height:1.55;background:var(--bg2);border-radius:8px;padding:9px 12px">${esc(cur[k])}</div></div>`).join('')
+      : `<div style="color:var(--text2);font-size:12.5px;padding:10px 0">รหัส ${esc(_briefCurCode)} ยังไม่มีบรีฟจากแอดมิน</div>`;
+  }
+  const meta=(rec&&rec.updatedAt)?`<div style="font-size:10.5px;color:var(--text2);margin-top:8px">อัปเดตล่าสุด ${fmtDate((rec.updatedAt||'').split('T')[0])} · โดย ${esc(rec.updatedBy||'')}</div>`:'';
+  _tagOverlayShow('📖 บรีฟงานกลาง (ตามรหัสงาน)',
+    `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;align-items:center">${chips}</div>${body}${meta}`, 680);
+}
+function briefAddCode(){
+  const v=(document.getElementById('brief-new-code')?.value||'').trim().toUpperCase();
+  if(!v){ toast('พิมพ์รหัสก่อน','error'); return; }
+  const lib=getBriefTemplates();
+  if(!lib[v]) { lib[v]={sections:{},updatedAt:'',updatedBy:''}; ls('brief_templates',lib); }
+  openBriefLibrary(v);
+}
+async function saveBriefLibrary(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  if(!_briefCurCode) return;
+  const lib=getBriefTemplates();
+  const sections={};
+  BRIEF_TEAMS.forEach(([k])=>{ sections[k]=document.getElementById('brief-sec-'+k)?.value||''; });
+  lib[_briefCurCode]={sections, updatedAt:new Date().toISOString(), updatedBy:currentUser?.email||''};
+  await saveBriefTemplates(lib);
+  toast(`บันทึกบรีฟรหัส ${_briefCurCode} แล้ว ✅`,'success');
+  openBriefLibrary(_briefCurCode);
+}
 
 // ══════════════════════════════════════════════
 // PROJECT HELPERS
@@ -4146,8 +4378,8 @@ function filterRegStaff(){
     <div onclick="selectRegStaff('${s.id}','${(s.nickname||s.name||'').replace(/'/g,"\\'")}','${(s.name||'').replace(/'/g,"\\'")}')" 
          style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border2)"
          onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
-      <span style="font-weight:700">${s.nickname||s.name}</span>
-      <span style="color:var(--text2);font-size:11px;margin-left:6px">${s.name||''} · ${s.category||''}</span>
+      <span style="font-weight:700">${esc(s.nickname||s.name)}</span>
+      <span style="color:var(--text2);font-size:11px;margin-left:6px">${esc(s.name||'')} · ${esc(s.category||'')}</span>
     </div>`).join('');
 }
 function selectRegStaff(id, nickname, fullName){
@@ -5294,6 +5526,7 @@ async function enterApp(){
   try { await loadAppreciationsFromFirebase(); } catch(e) {}
   try { await loadCalcDraftsFromFirebase(); } catch(e) {}
   try { await loadMgrRequests(); await loadManagerUsers(); await loadMgrSuspended(); await loadTeamLeft(); } catch(e) {}
+  try { await fbLoadKeyed('tags_master'); await fbLoadKeyed('brief_templates'); } catch(e) {}
   // Load tracking cards from Firebase
   try {
     if(_fbDatabase){
@@ -5535,10 +5768,10 @@ async function seedDemo(){
 // ══════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════
-const ADMIN_PAGES=['dashboard','track','projects','project-detail','queue','payment-history','profit','staff','staff-detail','docs','calc','payment','settings'];
+const ADMIN_PAGES=['dashboard','track','assign','projects','project-detail','queue','payment-history','profit','staff','staff-detail','docs','calc','payment','settings'];
 const MANAGER_PAGES=['mgr-home','mgr-projects','mgr-track','mgr-calc','mgr-team'];
 // Manager เข้าถึงหน้า admin บางหน้าได้ (track = ติดตามงาน แต่กรองเฉพาะโปรเจกต์ที่ดูแล)
-const MGR_ALLOWED_ADMIN_PAGES=['track','projects'];
+const MGR_ALLOWED_ADMIN_PAGES=['track','projects','assign'];
 function nav(page){
   const role=currentUser?.role||'staff';
   if(role!=='admin'&&ADMIN_PAGES.includes(page)&&!(role==='manager'&&MGR_ALLOWED_ADMIN_PAGES.includes(page))){toast('ไม่มีสิทธิ์เข้าถึง 🔒','error');return}
@@ -5552,7 +5785,7 @@ function nav(page){
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
   const renders={
-    dashboard:renderDash,track:renderTrack,projects:renderProjects,profit:renderProfit,staff:renderStaff,'staff-detail':renderStaffDetail,queue:renderQueue,'payment-history':renderPaymentHistory,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
+    dashboard:renderDash,track:renderTrack,assign:renderAssign,projects:renderProjects,profit:renderProfit,staff:renderStaff,'staff-detail':renderStaffDetail,queue:renderQueue,'payment-history':renderPaymentHistory,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
     'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar,'confirm-amount':renderConfirmAmountPage,
     'mgr-home':renderMgrHome,'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-team':renderMgrTeam,
     'mgr-calc':()=>renderCalcList('mgr-calc-list',true)
@@ -5789,7 +6022,7 @@ function renderDash(){
     :'<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:20px">✅ ไม่มี deadline ใน 7 วัน</td></tr>';
   const projTb=document.getElementById('dash-projects');
   projTb.innerHTML=pendingWorkers.length?pendingWorkers.slice(0,8).map(({proj:p,worker:w})=>{const s=getStaffById(w.id);if(!s)return'';
-    return`<tr><td><strong>${s.nickname}</strong></td><td style="font-size:12px;color:var(--text2)">${p.name}</td><td style="color:var(--accent2);font-weight:700">${fmtB(w.amount)}</td><td>${statusBadge(w.status, p.id)}</td></tr>`}).join('')
+    return`<tr><td><strong>${esc(s.nickname)}</strong></td><td style="font-size:12px;color:var(--text2)">${esc(p.name)}</td><td style="color:var(--accent2);font-weight:700">${fmtB(w.amount)}</td><td>${statusBadge(w.status, p.id)}</td></tr>`}).join('')
     :'<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:20px">🎉 ไม่มีค้างจ่าย</td></tr>';
 }
 
@@ -9004,7 +9237,7 @@ const SHORT_FROM_PHASE_KEY = { adaptation:'adp', dubbing:'dub', mix:'mix', qc:'q
 function initFormPhases(){
   formPhases = {};
   ['adp','dub','mix','qc','sub','mgr'].forEach(c=>{
-    formPhases[c] = { startDate:'', deadline:'', submitTime:'', status:'none' };
+    formPhases[c] = { startDate:'', deadline:'', submitTime:'', status:'none', note:'' };
   });
 }
 
@@ -9034,6 +9267,8 @@ function populateFormPhasesUI(){
     if(dEl) dEl.value = ph.deadline || '';
     if(tEl) tEl.value = ph.submitTime || '';
     if(lblEl) lblEl.textContent = ph.submitTime ? formatThaiTimeLabel(ph.submitTime) : '';
+    const nEl = document.getElementById('ph-'+c+'-note');
+    if(nEl) nEl.value = ph.note || '';
   });
 }
 
@@ -9054,6 +9289,8 @@ function onPhaseDateChange(cat, field, value){
     if(value) cascadePhaseDeadlines(cat, value);
   } else if(field === 'time'){
     formPhases[cat].submitTime = value;
+  } else if(field === 'note'){
+    formPhases[cat].note = value;
   }
 }
 
@@ -9098,7 +9335,8 @@ function collectFormPhasesForSave(){
       startDate: ph.startDate || '',
       deadline: ph.deadline || '',
       submitTime: ph.submitTime || '',
-      status: ph.status || 'none'
+      status: ph.status || 'none',
+      note: ph.note || ''
     };
   });
   return out;
@@ -9115,7 +9353,8 @@ function loadPhasesFromProject(p){
       startDate: ph.startDate || '',
       deadline: ph.deadline || '',
       submitTime: ph.submitTime || '',
-      status: ph.status || 'none'
+      status: ph.status || 'none',
+      note: ph.note || ''
     };
   });
 }
@@ -9199,9 +9438,10 @@ async function openNewProject(){
   document.getElementById('proj-modal-title').textContent='โปรเจกต์ใหม่';
   const _metaEl = document.getElementById('proj-modal-meta');
   if(_metaEl){ _metaEl.textContent=''; _metaEl.style.display='none'; }
-  ['pj-name','pj-client','pj-budget','pj-budget-qty','pj-duration','pj-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['pj-name','pj-client','pj-budget','pj-budget-qty','pj-duration','pj-note','pj-clientcode','pj-seq','pj-episodes','pj-downloadlink','pj-secretkey'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  _fillClientCodeDatalist();
   toggleBudgetQty();
-  const _ms=document.getElementById('pj-manager');if(_ms){const _mm=getAllManagerUsers();_ms.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+_mm.map(m=>`<option value="${m.uid}">${m.nickname||m.email}</option>`).join('');}
+  const _ms=document.getElementById('pj-manager');if(_ms){const _mm=getAllManagerUsers();_ms.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+_mm.map(m=>`<option value="${m.uid}">${esc(m.nickname||m.email)}</option>`).join('');}
   const _mf=document.getElementById('pj-manager-fee');if(_mf)_mf.value='';
   const _mfw=document.getElementById('pj-manager-fee-wrap');if(_mfw)_mfw.style.display='none';
   window._mgrFeeStaffId='';
@@ -9251,6 +9491,79 @@ function toggleCat(key){
   }
 }
 
+function _setVal(id,v){ const el=document.getElementById(id); if(el) el.value=v; }
+// ══════════════════════════════════════════════
+// 📋 หน้ามอบหมายงาน — ตารางคิวแบบชีทเดิม (เฟส 1 บรีฟข้อ 9)
+// ══════════════════════════════════════════════
+let _assignShowAll=false;
+function assignToggleAll(){
+  _assignShowAll=!_assignShowAll;
+  const b=document.getElementById('assign-toggle-all');
+  if(b) b.textContent=_assignShowAll?'🙈 ซ่อนงานที่จบแล้ว':'👁 แสดงงานที่จบแล้วด้วย';
+  renderAssign();
+}
+const _ASSIGN_PHASES=[['adaptation','บท'],['dubbing','พากย์'],['qc','QC'],['mix','มิกซ์'],['subVideo','ซับ']];
+function _assignDL(p,key){
+  const ph=p?.phases?.[key]||{};
+  const base=ph.deadline?fmtDate(ph.deadline):'<span style="opacity:.35">—</span>';
+  const note=(ph.note||'').trim();
+  return note?`<span title="${esc(note)}" style="cursor:help;border-bottom:1px dotted var(--text2)">${base} 📝</span>`:base;
+}
+function toggleSecretKey(btnId,spanId,key){
+  const sp=document.getElementById(spanId); const b=document.getElementById(btnId);
+  if(!sp) return;
+  if(sp.dataset.shown==='1'){ sp.textContent='••••••••'; sp.dataset.shown='0'; if(b)b.textContent='👁'; }
+  else { sp.textContent=key; sp.dataset.shown='1'; if(b)b.textContent='🙈'; }
+}
+function renderAssign(){
+  const el=document.getElementById('assign-table'); if(!el) return;
+  let list=(getProjects()||[]).slice();
+  if(currentUser?.role==='manager') list=list.filter(p=>p.managerId===currentUser.uid);
+  if(!_assignShowAll) list=list.filter(p=>p.projStatus!=='done'&&p.projStatus!=='cancelled');
+  list.sort((a,b)=>(a.deadline||'9999').localeCompare(b.deadline||'9999'));
+  if(!list.length){
+    el.innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)">ยังไม่มีงานในคิว — กด "➕ มอบหมายงานใหม่" เพื่อเริ่ม</div>';
+    return;
+  }
+  const mgrs={}; try{ getAllManagerUsers().forEach(m=>{ mgrs[m.uid]=m.nickname||m.email||''; }); }catch(e){}
+  const codeColors={}; const palette=['#FF6FAE','#9B6FFF','#00B4FF','#00DFA0','#FF9E00','#FF6060','#5AD1E6'];
+  let ci=0;
+  const th=t=>`<th style="padding:8px 10px;font-size:11.5px;color:var(--text2);font-weight:700;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border2)">${t}</th>`;
+  const td=(t,extra='')=>`<td style="padding:8px 10px;font-size:12.5px;vertical-align:top;border-bottom:1px solid rgba(255,255,255,.05);${extra}">${t}</td>`;
+  const rows=list.map((p,ri)=>{
+    const code=(p.clientCode||'').toUpperCase();
+    if(code && !codeColors[code]){ codeColors[code]=palette[ci++%palette.length]; }
+    const cc=codeColors[code]||'var(--text2)';
+    const overdue=p.deadline && p.deadline < new Date().toISOString().split('T')[0] && p.projStatus!=='done';
+    const secId='askey-'+ri;
+    const link=p.downloadLink
+      ? `<a href="${esc(p.downloadLink)}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:12px;word-break:break-all">🔗 เปิดลิงก์</a>`
+        + (p.secretKey?`<div style="margin-top:3px;font-size:11px;color:var(--text2)">🔑 <span id="${secId}" data-shown="0" style="font-family:monospace">••••••••</span> <button id="${secId}-b" class="btn btn-sm btn-outline" style="padding:0 6px;font-size:10px" onclick="toggleSecretKey('${secId}-b','${secId}','${escJs(p.secretKey)}')">👁</button></div>`:'')
+      : '<span style="opacity:.35">—</span>';
+    return `<tr style="background:${overdue?'rgba(255,64,64,.05)':''}">
+      ${td(`<span style="font-weight:700;color:${overdue?'var(--red)':'var(--text)'}">${p.deadline?fmtDate(p.deadline):'—'}</span>`)}
+      ${td(code?`<span style="padding:2px 10px;border-radius:8px;background:${cc}22;color:${cc};font-weight:800;font-size:12px;cursor:pointer" onclick="openBriefLibrary('${escJs(code)}')" title="เปิดบรีฟงานรหัส ${esc(code)}">${esc(code)}</span>`:'<span style="opacity:.35">—</span>')}
+      ${td(p.seq||'<span style="opacity:.35">—</span>','text-align:center')}
+      ${td(p.budget?fmtB(p.budget):'<span style="opacity:.35">—</span>')}
+      ${td(p.episodes||'<span style="opacity:.35">—</span>','text-align:center')}
+      ${td(p.managerId&&mgrs[p.managerId]?`🗂️ ${esc(mgrs[p.managerId])}`:'👑 แอดมิน')}
+      ${_ASSIGN_PHASES.map(([k])=>td(_assignDL(p,k),'white-space:nowrap')).join('')}
+      ${td(`<span style="font-weight:700;cursor:pointer;color:var(--accent2)" onclick="openProjDetail('${p.id}')" title="เปิดรายละเอียด">${esc(p.name||'')}</span>`)}
+      ${td(link,'max-width:180px')}
+      ${td(p.note?esc(p.note):'<span style="opacity:.35">—</span>','max-width:160px;font-size:11.5px;color:var(--text2)')}
+      ${td(`<button class="btn btn-sm btn-outline" style="padding:3px 10px;font-size:11px" onclick="openEditProject('${p.id}')">✏️</button>`)}
+    </tr>`;
+  }).join('');
+  el.innerHTML=`<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:1150px">
+    <thead><tr>${th('เดทไลน์')}${th('รหัส')}${th('ลำดับ')}${th('งบ')}${th('Ep.')}${th('ผู้รับผิดชอบ')}${_ASSIGN_PHASES.map(([,l])=>th('DL '+l)).join('')}${th('ชื่อโปรเจกต์')}${th('Link โหลดงาน')}${th('หมายเหตุ')}${th('')}</tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+// datalist รหัสงาน — รวบรวมจากโปรเจกต์ที่มีอยู่ (เช่น G, M) ให้เลือกซ้ำง่าย
+function _fillClientCodeDatalist(){
+  const dl=document.getElementById('pj-clientcode-list'); if(!dl) return;
+  const codes=[...new Set((getProjects()||[]).map(p=>(p.clientCode||'').trim().toUpperCase()).filter(Boolean))].sort();
+  dl.innerHTML=codes.map(c=>`<option value="${esc(c)}"></option>`).join('');
+}
 function buildWorkerList(){
   // ดึง staff data และ normalize ทุก format ที่ Firebase อาจส่งมา
   const raw = ls('staff_v3');
@@ -9262,12 +9575,13 @@ function buildWorkerList(){
       if(s && s.id && s.name) map[s.id] = s;
     });
   });
-  return Object.values(map).sort((a,b) => (a.nickname||a.name||'').localeCompare(b.nickname||b.name||'','th'));
+  // 🚫 บรีฟข้อ 5: ตอนเลือกคนเข้าโปรเจกต์ ไม่แสดงคน ลาออก/พักงาน/ปิดใช้งาน (หน้าจัดการทีมยังเห็นครบ)
+  return Object.values(map).filter(s=>isStaffAssignable(s)).sort((a,b) => (a.nickname||a.name||'').localeCompare(b.nickname||b.name||'','th'));
 }
 function populateWorkerSelects(){
   _workerListCache = buildWorkerList();
-  const opts = '<option value="">+ เพิ่มสมาชิก</option>' + 
-    _workerListCache.map(s => '<option value="'+s.id+'">'+(s.nickname||'')+' '+s.name+'</option>').join('');
+  const opts = '<option value="">+ เพิ่มสมาชิก</option>' +
+    _workerListCache.map(s => '<option value="'+s.id+'">'+esc((s.nickname||'')+' '+s.name)+'</option>').join('');
   ['dub-main-select','dub-sub-select','adp-select','mix-select','qc-select','sub-select','mgr-select'].forEach(id => {
     const el = document.getElementById(id); if(el) el.innerHTML = opts;
   });
@@ -9318,7 +9632,7 @@ function renderWorkerList(cat,slot){
     const hasPerson=!!s;
     const col=catColors[cat]||'var(--text)';
     const nameBadge=hasPerson
-      ? `<span class="worker-name-badge" style="color:${col};cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px" onclick="openReplaceWorker('${cat}','${slot}',${i},event)" title="คลิกเพื่อเปลี่ยนคน">${s.nickname} <span style="font-size:9px;opacity:.55">🔄</span></span>`
+      ? `<span class="worker-name-badge" style="color:${col};cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px" onclick="openReplaceWorker('${cat}','${slot}',${i},event)" title="คลิกเพื่อเปลี่ยนคน">${esc(s.nickname)} <span style="font-size:9px;opacity:.55">🔄</span></span>`
       : `<span class="worker-name-badge" style="color:#FF9E00;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;border:1px dashed rgba(255,158,0,.5);border-radius:7px;padding:3px 9px;background:rgba(255,158,0,.06)" onclick="openReplaceWorker('${cat}','${slot}',${i},event)" title="คลิกเพื่อเลือกคน">👤 + เลือกคน</span>`;
     const calcAmt=calcWorkerAmt(w,dur);
     const tax=parseFloat((document.getElementById(cat+'-tax')||{}).value)||0;
@@ -9426,7 +9740,7 @@ function renderReplaceList(q){
   const qq=(q||'').toLowerCase().trim();
   const filtered=qq?all.filter(s=>(s.nickname||'').toLowerCase().includes(qq)||(s.name||'').toLowerCase().includes(qq)):all;
   if(!filtered.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px">ไม่พบสมาชิก</div>';return;}
-  listEl.innerHTML=filtered.map(s=>`<div onclick="doReplaceWorker('${s.id}')" style="padding:8px 12px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text)" onmouseover="this.style.background='var(--dim)';this.style.color='var(--accent2)'" onmouseout="this.style.background='';this.style.color='var(--text)'"><strong>${s.nickname||s.name}</strong> <span style="color:var(--text2);font-size:11px">· ${(s.name||'').split(' ')[0]||''}</span></div>`).join('');
+  listEl.innerHTML=filtered.map(s=>`<div onclick="doReplaceWorker('${s.id}')" style="padding:8px 12px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text)" onmouseover="this.style.background='var(--dim)';this.style.color='var(--accent2)'" onmouseout="this.style.background='';this.style.color='var(--text)'"><strong>${esc(s.nickname||s.name)}</strong> <span style="color:var(--text2);font-size:11px">· ${esc((s.name||'').split(' ')[0]||'')}</span></div>`).join('');
 }
 function doReplaceWorker(newId){
   const t=window._rwTarget;if(!t)return;
@@ -9556,6 +9870,11 @@ async function saveProject(){
     deadline:thaiToIso(document.getElementById('pj-deadline').value)||document.getElementById('pj-deadline').value,
     cycle:'',
     note:document.getElementById('pj-note')?.value||'',
+    clientCode:(document.getElementById('pj-clientcode')?.value||'').trim().toUpperCase(),
+    seq:parseInt(document.getElementById('pj-seq')?.value)||0,
+    episodes:parseInt(document.getElementById('pj-episodes')?.value)||0,
+    downloadLink:(document.getElementById('pj-downloadlink')?.value||'').trim(),
+    secretKey:(document.getElementById('pj-secretkey')?.value||'').trim(),
     managerId:(currentUser?.role==='manager')?currentUser.uid:(document.getElementById('pj-manager')?.value||''),
     workers,tax,evidenceLogs:[],snapshot:null,createdAt:new Date(),
     phases: collectFormPhasesForSave()
@@ -9770,7 +10089,7 @@ async function openViewProject(id){
               : '<span style="font-size:10px;background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.3);color:var(--orange);padding:2px 8px;border-radius:8px">⌛ รอจ่าย</span>';
             return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg2);border-radius:8px;margin-bottom:4px">
               <div style="flex:1">
-                <div style="font-weight:700;font-size:13px">${s.name} <span style="color:var(--text2);font-size:11px">(${s.nickname||''})</span></div>
+                <div style="font-weight:700;font-size:13px">${esc(s.name)} <span style="color:var(--text2);font-size:11px">(${esc(s.nickname||'')})</span></div>
                 <div style="font-size:11px;color:var(--text2)">${s.bank||''} ${s.account||''}</div>
               </div>
               <div style="font-weight:800;color:var(--accent2);font-size:14px">${fmtB(w.amount||0)}</div>
@@ -9993,11 +10312,18 @@ async function openEditProject(id){
   }
   document.getElementById('pj-name').value=p.name||'';
   document.getElementById('pj-client').value=p.client||'';
+  // 📋 ข้อมูลชีทคิวเมเนเจอร์
+  _setVal('pj-clientcode', p.clientCode||'');
+  _setVal('pj-seq', p.seq||'');
+  _setVal('pj-episodes', p.episodes||'');
+  _setVal('pj-downloadlink', p.downloadLink||'');
+  _setVal('pj-secretkey', p.secretKey||'');
+  _fillClientCodeDatalist();
   // Populate manager dropdown
   const mgrSel=document.getElementById('pj-manager');
   if(mgrSel){
     const managers=getAllManagerUsers();
-    mgrSel.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+managers.map(m=>`<option value="${m.uid}"${p.managerId===m.uid?' selected':''}>${m.nickname||m.email}</option>`).join('');
+    mgrSel.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+managers.map(m=>`<option value="${m.uid}"${p.managerId===m.uid?' selected':''}>${esc(m.nickname||m.email)}</option>`).join('');
   }
   // Restore budget type & rate
   const _btEl=document.getElementById('pj-budget-type');
@@ -10095,6 +10421,16 @@ function renderProjDetail(){
   document.getElementById('det-meta').textContent=`${p.client||''} | ${p.type||''} | ${fmtDate(p.date)} | ${_mgrTxt}`;
   const sb=document.getElementById('det-snapshot');
   if(p.snapshot){sb.style.display='';sb.innerHTML=`🔒 Snapshot ล็อค ${fmtDate(p.snapshot.date)} — ยอดรวม ${fmtB(p.snapshot.total)}`}else sb.style.display='none';
+  // 🔗 Link โหลดงาน + Secret key (จากหน้ามอบหมายงาน)
+  let _lb=document.getElementById('det-linkbar');
+  if(!_lb && sb){ _lb=document.createElement('div'); _lb.id='det-linkbar'; sb.insertAdjacentElement('afterend',_lb); }
+  if(_lb){
+    if(p.downloadLink||p.secretKey){
+      _lb.style.cssText='display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:9px 14px;margin:8px 0;background:rgba(0,180,255,.06);border:1px solid rgba(0,180,255,.2);border-radius:9px;font-size:12.5px';
+      _lb.innerHTML=(p.downloadLink?`<a href="${esc(p.downloadLink)}" target="_blank" rel="noopener" style="color:var(--accent2);font-weight:700">🔗 Link โหลดงาน</a>`:'')+
+        (p.secretKey?`<span style="color:var(--text2)">🔑 Secret key: <span id="det-seckey" data-shown="0" style="font-family:monospace">••••••••</span> <button id="det-seckey-b" class="btn btn-sm btn-outline" style="padding:0 7px;font-size:10px" onclick="toggleSecretKey('det-seckey-b','det-seckey','${escJs(p.secretKey)}')">👁</button></span>`:'');
+    } else { _lb.style.display='none'; _lb.innerHTML=''; }
+  }
   const el=document.getElementById('det-workers');el.innerHTML='';
   const grouped={};(p.workers||[]).forEach(w=>{const parts=w.slot.split('-');const cat=parts[0];if(!grouped[cat])grouped[cat]=[];grouped[cat].push(w)});
   const catKeyMap={dub:'dubbing',adp:'adaptation',mix:'mix',qc:'qc',sub:'subVideo',mgr:'manager'};
@@ -10104,9 +10440,9 @@ function renderProjDetail(){
       wArr.map(w=>{const s=getStaffById(w.id);if(!s)return'';
         const slotPre2=(w.slot||'').split('-')[0];const slotLabelMap={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};const slotLabel=(slotLabelMap[slotPre2]||CATS[s.category]?.label||'')+( w.slot.includes('main')?' · หลัก':w.slot.includes('-sub')?' · รอง':'');
         return`<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border2)">
-          <div style="width:36px;height:36px;border-radius:50%;background:${cat?.color||'var(--accent)'}22;color:${cat?.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">${s.nickname[0]}</div>
+          <div style="width:36px;height:36px;border-radius:50%;background:${cat?.color||'var(--accent)'}22;color:${cat?.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">${esc(s.nickname[0])}</div>
           <div style="flex:1">
-           <div style="font-weight:700">${s.name} <span style="color:var(--text2);font-size:12px">(${s.nickname}${slotLabel?' · '+slotLabel:''})</span></div>
+           <div style="font-weight:700">${esc(s.name)} <span style="color:var(--text2);font-size:12px">(${esc(s.nickname)}${slotLabel?' · '+slotLabel:''})</span></div>
            <div style="font-size:11px;color:var(--text2)">🏦 ${s.bank} ${s.account}${s.promptpay?' · 📱 '+s.promptpay:''}</div>
           </div>
           ${s.qrUrl?`<div style="flex-shrink:0" title="QR โอนเงิน">${_qrImgHtml(s.qrUrl,'thumb',{staffName:s.nickname||s.name,clickToView:true})}</div>`:''}
@@ -10154,7 +10490,7 @@ function openPayAmt(projId,workerId,slot){
   const slotKey = (slot||'').split('-')[0];
   const slotLbl = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
   const roleLabel = slotLbl[slotKey] || CATS[s.category]?.label || '';
-  document.getElementById('payamt-info').innerHTML=`<div style="padding:12px;background:var(--bg2);border-radius:10px"><div style="font-weight:700">${s.name} (${s.nickname})</div><div style="font-size:12px;color:var(--text2)">${roleLabel} | ${s.bank||''} ${s.account||''}</div></div>`;
+  document.getElementById('payamt-info').innerHTML=`<div style="padding:12px;background:var(--bg2);border-radius:10px"><div style="font-weight:700">${esc(s.name)} (${esc(s.nickname)})</div><div style="font-size:12px;color:var(--text2)">${roleLabel} | ${esc(s.bank||'')} ${esc(s.account||'')}</div></div>`;
   document.getElementById('payamt-val').value=w?.amount||0;
   document.getElementById('payamt-note').value=w?.note||'';
   openModal('modal-payamt');
@@ -10183,7 +10519,7 @@ function openSlipModal(projId,workerId,slot){
   slipTarget={projId,workerId,slot};
   const p=getProjects().find(x=>x.id===projId);const w=p?.workers.find(x=>x.id===workerId&&x.slot===slot);const s=getStaffById(workerId);
   const sel=document.getElementById('slip-worker');
-  if(sel&&s){sel.innerHTML=`<option value="${workerId}|${slot}">${s.name} (${s.nickname})</option>`}
+  if(sel&&s){sel.innerHTML=`<option value="${workerId}|${slot}">${esc(s.name)} (${esc(s.nickname)})</option>`}
   if(w)document.getElementById('slip-amount').value=w.amount||0;
   if(s)document.getElementById('slip-bank').value=`${s.bank} ${s.account}`;
   document.getElementById('slip-date').value=isoToThai(new Date().toISOString().split('T')[0]);
@@ -10468,7 +10804,7 @@ function initQueueMonthFilter(){ try {
 
 function openEvModal(){
   evType='';const p=getProjects().find(x=>x.id===currentProjId);if(!p)return;
-  document.getElementById('ev-worker').innerHTML=(p.workers||[]).map(w=>{const s=getStaffById(w.id);return s?`<option value="${w.id}">${s.name} (${s.nickname})</option>`:''}).join('');
+  document.getElementById('ev-worker').innerHTML=(p.workers||[]).map(w=>{const s=getStaffById(w.id);return s?`<option value="${w.id}">${esc(s.name)} (${esc(s.nickname)})</option>`:''}).join('');
   document.getElementById('ev-amount').value='';document.getElementById('ev-date').value=new Date().toISOString().split('T')[0];document.getElementById('ev-note').value='';
   openModal('modal-ev');
 }
@@ -10975,10 +11311,10 @@ function renderQueue() {
       return `<div style="display:flex;align-items:center;gap:14px;padding:13px 18px;border-top:1px solid rgba(255,255,255,.04);background:${isPaid?'rgba(0,223,160,.02)':readyToPayTeam?'rgba(0,223,160,.05)':isApproved?'rgba(255,215,0,.04)':''}">
         <!-- Avatar + name -->
         <div style="display:flex;align-items:center;gap:10px;min-width:170px">
-          <div style="width:34px;height:34px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">${s.nickname[0]}</div>
+          <div style="width:34px;height:34px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">${esc(s.nickname[0])}</div>
           <div>
-            <div style="font-weight:700;font-size:13px">${s.name}</div>
-            <div style="font-size:10px;color:${color};margin-top:1px">${(()=>{const pre=(w.slot||'').split('-')[0];const suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return (lbl[pre]||CATS[s.category]?.label||'')+suf;})()} · ${s.nickname}</div>
+            <div style="font-weight:700;font-size:13px">${esc(s.name)}</div>
+            <div style="font-size:10px;color:${color};margin-top:1px">${(()=>{const pre=(w.slot||'').split('-')[0];const suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return (lbl[pre]||CATS[s.category]?.label||'')+suf;})()} · ${esc(s.nickname)}</div>
           </div>
         </div>
         <!-- Amount -->
@@ -11336,7 +11672,7 @@ function askSendConfirmRequest(projId, workerId, slot){
   // เพิ่มเข้าตะกร้า ไม่ใช่ส่งทันที
   const ok = addToConfirmCart(projId, workerId, slot);
   if(ok){
-    toast(`🛒 เพิ่ม ${s.nickname} (${p.name}) เข้าตะกร้าแล้ว`, 'success');
+    toast(`🛒 เพิ่ม ${esc(s.nickname)} (${esc(p.name)}) เข้าตะกร้าแล้ว`, 'success');
     try { renderQueue(); } catch(e){}
   }
 }
@@ -11373,7 +11709,7 @@ async function sendConfirmRequest(projId, workerId, slot){
     }
   } catch(e){ console.warn('notify confirm:', e); }
 
-  toast(`📤 ส่งใบยืนยันให้ ${s.nickname} แล้ว — รอตอบกลับ`,'success');
+  toast(`📤 ส่งใบยืนยันให้ ${esc(s.nickname)} แล้ว — รอตอบกลับ`,'success');
   renderQueue();
 }
 
@@ -12087,7 +12423,7 @@ function renderConfirmCart(){
         <input type="checkbox" data-cart-staff="${staffId}" checked style="cursor:pointer;width:18px;height:18px;accent-color:#9B6FFF;flex-shrink:0" onchange="toggleCartStaffCheck('${staffId}',this.checked)" title="เลือก/ไม่เลือกทั้งหมดของคนนี้">
         <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,180,255,.2);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">${String(nick[0]||'?').toUpperCase()}</div>
         <div style="flex:1;min-width:140px">
-          <div style="font-size:14.5px;font-weight:800;color:var(--text)">${s?.name || nick}${s?.nickname ? ` <span style="color:var(--text2);font-weight:500;font-size:11.5px">(${s.nickname})</span>` : ''}</div>
+          <div style="font-size:14.5px;font-weight:800;color:var(--text)">${esc(s?.name || nick)}${s?.nickname ? ` <span style="color:var(--text2);font-weight:500;font-size:11.5px">(${esc(s.nickname)})</span>` : ''}</div>
           <div style="font-size:11px;color:var(--text2);margin-top:2px">${s?.bank||'—'} ${s?.account||''}${s?.promptpay?' · 📱 '+s.promptpay:''}</div>
         </div>
         <div style="text-align:right">
@@ -12752,7 +13088,7 @@ function qPay(projId, workerId, slot) {
   const w = p?.workers.find(x => x.id === workerId && x.slot === slot);
   const s = getStaffById(workerId); if (!s) return;
   const sel = document.getElementById('slip-worker');
-  if (sel) sel.innerHTML = `<option value="${workerId}|${slot}">${s.name} (${s.nickname}) — ${s.bank} ${s.account}</option>`;
+  if (sel) sel.innerHTML = `<option value="${workerId}|${slot}">${esc(s.name)} (${esc(s.nickname)}) — ${esc(s.bank)} ${esc(s.account)}</option>`;
   document.getElementById('slip-amount').value = w?.amount || 0;
   document.getElementById('slip-bank').value = `${s.bank} ${s.account}${s.promptpay ? ' / PromptPay: ' + s.promptpay : ''}`;
   document.getElementById('slip-date').value = new Date().toISOString().split('T')[0];
@@ -14946,7 +15282,7 @@ function myExportPDF(){
             <div style="font-size:11px;color:#a0c0ff;margin-top:4px">Earnings Statement</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:13px;font-weight:700">${s.name}</div>
+            <div style="font-size:13px;font-weight:700">${esc(s.name)}</div>
             <div style="font-size:11px;color:#a0c0ff;margin-top:3px">ออก: ${dateStr}</div>
           </div>
         </div>
@@ -15116,7 +15452,7 @@ function initWhtTab(){
   const sel=document.getElementById('wht-staff-sel');
   if(sel && sel.options.length<=1){
     const list=(typeof buildWorkerList==='function'?buildWorkerList():[]);
-    sel.innerHTML='<option value="">— เลือกทีมงาน / กรอกเอง —</option>'+list.map(s=>`<option value="${s.id}">${s.nickname||''} ${s.name||''}</option>`).join('');
+    sel.innerHTML='<option value="">— เลือกทีมงาน / กรอกเอง —</option>'+list.map(s=>`<option value="${s.id}">${esc(s.nickname||'')} ${esc(s.name||'')}</option>`).join('');
   }
   _whtCalc(); renderWhtRecent();
   // ดึงประวัติจาก Firebase (misc/wht_docs) มาอัปเดต
@@ -15853,7 +16189,7 @@ function _vcRenderRetroSection(){
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <div style="width:34px;height:34px;border-radius:50%;background:rgba(255,158,0,.2);color:var(--orange);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px">${String((s.nickname||s.name||'?')[0]).toUpperCase()}</div>
           <div style="flex:1;min-width:0">
-            <div style="font-size:14px;font-weight:800;color:var(--text)">${s.name||s.nickname}${(s.nickname && s.name!==s.nickname)?` <span style="color:var(--text2);font-weight:500;font-size:12px">(${s.nickname})</span>`:''} ${statusBadge}</div>
+            <div style="font-size:14px;font-weight:800;color:var(--text)">${esc(s.name||s.nickname)}${(s.nickname && s.name!==s.nickname)?` <span style="color:var(--text2);font-weight:500;font-size:12px">(${esc(s.nickname)})</span>`:''} ${statusBadge}</div>
             <div style="font-size:11px;color:var(--text2);margin-top:2px">🏦 ${s.bank||'—'} ${s.account||''}${hasEmail?(' · 📧 '+s.email):' · <span style="color:var(--orange)">⚠️ ไม่มี email</span>'}</div>
           </div>
           <div style="text-align:right">
@@ -16032,7 +16368,7 @@ function renderVcByPerson(){
       <div onclick="toggleVcPersonExpand('${staffId}')" style="display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.02)'" onmouseout="this.style.background=''">
         <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,180,255,.2);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">${String((s.nickname||s.name||'?')[0]).toUpperCase()}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:14.5px;font-weight:800;color:var(--text)">${s.name||s.nickname}${s.nickname && s.name!==s.nickname?` <span style="color:var(--text2);font-weight:500;font-size:12px">(${s.nickname})</span>`:''}</div>
+          <div style="font-size:14.5px;font-weight:800;color:var(--text)">${esc(s.name||s.nickname)}${s.nickname && s.name!==s.nickname?` <span style="color:var(--text2);font-weight:500;font-size:12px">(${esc(s.nickname)})</span>`:''}</div>
           <div style="font-size:11px;color:var(--text2);margin-top:2px;display:flex;flex-wrap:wrap;gap:8px">
             <span>🏦 ${s.bank||'—'} ${s.account||''}</span>
             ${hasEmail ? `<span>📧 ${s.email}</span>` : '<span style="color:var(--orange)">⚠️ ไม่มี email</span>'}
@@ -16652,9 +16988,9 @@ function renderVcWorkerList() {
            onmouseover="this.style.borderColor='var(--accent2)'"
            onmouseout="this.style.borderColor='${on?'var(--accent2)':'var(--border2)'}'">
         <div id="vchk-${kid}" style="width:20px;height:20px;border-radius:5px;border:2px solid ${on?'var(--accent2)':'var(--border)'};background:${on?'var(--accent2)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s">${on?'<span style="color:#fff;font-size:11px;font-weight:800">✓</span>':''}</div>
-        <div style="width:32px;height:32px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">${s.nickname[0]}</div>
+        <div style="width:32px;height:32px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">${esc(s.nickname[0])}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:13px">${s.name} <span style="color:var(--text2);font-size:11px">(${s.nickname})</span></div>
+          <div style="font-weight:700;font-size:13px">${esc(s.name)} <span style="color:var(--text2);font-size:11px">(${esc(s.nickname)})</span></div>
           <div style="font-size:11px;color:${color}">${(()=>{const pre=(w.slot||'').split('-')[0];const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return lbl[pre]||CATS[s.category]?.label||'';})()}</div>
         </div>
         ${s.qrUrl?`<div style="flex-shrink:0" title="QR โอนเงิน">${_qrImgHtml(s.qrUrl,'thumb',{staffName:s.nickname||s.name,clickToView:true})}</div>`:''}
@@ -16768,8 +17104,8 @@ function buildVoucherHTML(projId, workerId, slot, vNo, issueDate, note) {
     <div style="display:grid;grid-template-columns:1fr 1fr;padding:22px 30px 0;gap:18px">
       <div>
         <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">จ่ายให้</div>
-        <div style="font-size:16px;font-weight:700;color:#111827">${s.name}</div>
-        <div style="font-size:12px;color:#6b7280;margin-top:2px">${s.nickname||''}</div>
+        <div style="font-size:16px;font-weight:700;color:#111827">${esc(s.name)}</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px">${esc(s.nickname||'')}</div>
         <div style="display:inline-block;margin-top:6px;background:#E3F2FF;color:#1565FF;font-size:10px;font-weight:600;padding:2px 10px;border-radius:20px">${catLabel}${slotLabel?' · '+slotLabel:''}</div>
       </div>
       <div>
@@ -17364,9 +17700,9 @@ function renderBillingStaffCards() {
       </div>`).join('');
     return `<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;margin-bottom:10px;overflow:hidden">
       <div style="display:flex;align-items:center;gap:12px;padding:13px 16px">
-        <div style="width:38px;height:38px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0">${s.nickname[0]}</div>
+        <div style="width:38px;height:38px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0">${esc(s.nickname[0])}</div>
         <div style="flex:1">
-          <div style="font-weight:700;font-size:14px">${s.name} <span style="color:var(--text2);font-size:12px">(${s.nickname})</span></div>
+          <div style="font-weight:700;font-size:14px">${esc(s.name)} <span style="color:var(--text2);font-size:12px">(${esc(s.nickname)})</span></div>
           <div style="font-size:11px;color:${color};margin-top:1px">${slotRoleLabel} · ${items.length} โปรเจกต์</div>
           <div style="font-size:11px;color:var(--text2);margin-top:1px">🏦 ${s.bank} ${s.account}${s.promptpay?' · 📱 '+s.promptpay:''}</div>
         </div>
@@ -17382,7 +17718,7 @@ function renderBillingStaffCards() {
         <button class="btn btn-xs btn-outline" onclick="openSlipUploadOnly('${s.id}')" style="border-color:rgba(0,180,255,.4);color:var(--cyan)">📎 ${ls('billing_slip_'+s.id+'_'+billingYearSelected+'_'+billingMonthSelected+'_'+billingCycleSelected)?'ดูสลิป':'แนบสลิป'}</button>
         ${hasEmail
           ? `<button class="btn btn-xs btn-blue" onclick="sendBillingVoucherEmail('${s.id}')">📧 ส่ง Email</button>`
-          : `<button class="btn btn-xs" style="background:rgba(255,64,64,.1);color:var(--red);border:1px solid rgba(255,64,64,.25)" onclick="toast('กรุณาเพิ่ม Email ของ ${s.nickname} ในหน้าจัดการทีมก่อน','error')">⚠️ เพิ่ม Email ก่อน</button>`}
+          : `<button class="btn btn-xs" style="background:rgba(255,64,64,.1);color:var(--red);border:1px solid rgba(255,64,64,.25)" onclick="toast('กรุณาเพิ่ม Email ของ ${escJs(s.nickname)} ในหน้าจัดการทีมก่อน','error')">⚠️ เพิ่ม Email ก่อน</button>`}
       </div>
     </div>`;
   }).join('');
@@ -17446,8 +17782,8 @@ function buildBillingVoucherHTML(staffId) {
     <div style="display:grid;grid-template-columns:1fr 1fr;padding:22px 30px 0;gap:18px">
       <div>
         <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;font-weight:600">จ่ายให้</div>
-        <div style="font-size:16px;font-weight:700;color:#111827">${s.name}</div>
-        <div style="font-size:12px;color:#6b7280;margin-top:2px">${s.nickname||''}</div>
+        <div style="font-size:16px;font-weight:700;color:#111827">${esc(s.name)}</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px">${esc(s.nickname||'')}</div>
         <div style="display:inline-block;margin-top:6px;background:#E3F2FF;color:#1565FF;font-size:10px;font-weight:600;padding:2px 10px;border-radius:20px">${catLabel}</div>
       </div>
       <div>
@@ -17615,7 +17951,7 @@ function showSlipUploadModal(staffId) {
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
   div.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:520px;max-width:98vw;animation:slideUp .3s ease">
     <div style="font-size:17px;font-weight:800;margin-bottom:4px">📎 แนบไฟล์ก่อนส่ง</div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:18px">สำหรับ <strong>${s.name} (${s.nickname})</strong></div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:18px">สำหรับ <strong>${esc(s.name)} (${esc(s.nickname)})</strong></div>
 
     <!-- สลิปโอนเงิน -->
     <div style="margin-bottom:16px">
@@ -17973,7 +18309,7 @@ function openSlipUploadOnly(staffId) {
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
   div.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:500px;max-width:98vw">
     <div style="font-size:17px;font-weight:800;margin-bottom:4px">📎 แนบสลิปโอนเงิน</div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:18px">สำหรับ <strong>${s.name} (${s.nickname})</strong></div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:18px">สำหรับ <strong>${esc(s.name)} (${esc(s.nickname)})</strong></div>
     ${existing ? `<div style="background:rgba(0,223,160,.1);border:1px solid rgba(0,223,160,.25);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--green);margin-bottom:14px;display:flex;align-items:center;gap:8px">
       <span>✅</span><span>มีสลิปบันทึกไว้แล้ว: <strong>${existing.name}</strong></span>
       <button onclick="viewSavedSlip('${slipKey}')" style="margin-left:auto;background:none;border:1px solid rgba(0,223,160,.3);border-radius:6px;color:var(--green);font-family:Kanit;font-size:11px;padding:2px 8px;cursor:pointer">👁️ ดูสลิป</button>
@@ -18608,7 +18944,7 @@ function startFirebaseSync() {
         const projModal=document.getElementById('modal-project');
         if(mgrSel && projModal && !projModal.classList.contains('hidden')){
           const cur=mgrSel.value; const ms=getAllManagerUsers();
-          mgrSel.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+ms.map(m=>`<option value="${m.uid}"${cur===m.uid?' selected':''}>${m.nickname||m.email}</option>`).join('');
+          mgrSel.innerHTML='<option value="">— ไม่มี / แอดมินจัดการเอง —</option>'+ms.map(m=>`<option value="${m.uid}"${cur===m.uid?' selected':''}>${esc(m.nickname||m.email)}</option>`).join('');
         }
         // ถ้าเปิดหน้าทีมของ Manager อยู่ → รีเฟรช
         const mgrTeamPg=document.getElementById('page-mgr-team');
@@ -21842,7 +22178,7 @@ function _teamRankOf(s){
 function teamMemberCardHTML(s, col, viewer){
   const wc=(typeof getWarnings==='function'?getWarnings(s.id):[]).length;
   const ac=(typeof getAppreciations==='function'?getAppreciations(s.id):[]).length;
-  const isSusp=!!(getMgrSuspended()[s.id]);
+  const isSusp=getStaffStatus(s)==='suspended';
   const rank=_teamRankOf(s);
   // admin ทำได้กับทุกคนยกเว้น admin · manager ทำได้เฉพาะ staff (ยศต่ำกว่า)
   const canAct = viewer==='admin' ? (rank!=='admin') : (rank==='');
@@ -21861,6 +22197,16 @@ function teamMemberCardHTML(s, col, viewer){
         <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(255,64,64,.4);color:var(--red)" onclick="event.stopPropagation();deleteStaff('${s.id}')" title="ลบออกจากระบบถาวร + บล็อกไม่ให้ซิงค์กลับจากชีท (คืนได้ที่ ตั้งค่า → รายชื่อบล็อก Sync)">🗑️ ลบถาวร</button>
       </div>`;
     }
+    // 👥 สถานะ + 🏷️ Tag — เฉพาะแอดมิน
+    if(viewer==='admin'){
+      const _st=getStaffStatus(s);
+      actions+=`<div style="display:flex;gap:6px;margin-top:6px;align-items:center" onclick="event.stopPropagation()">
+        <select onchange="setStaffStatus('${s.id}',this.value)" title="สถานะสมาชิก" style="flex:1;padding:5px 6px;border-radius:7px;background:var(--bg2);border:1px solid var(--border2);color:var(--text);font-family:Kanit;font-size:11px;cursor:pointer">
+          ${Object.entries(STAFF_STATUSES).map(([k,v])=>`<option value="${k}"${_st===k?' selected':''}>${v.label}</option>`).join('')}
+        </select>
+        <button class="btn btn-sm btn-outline" style="padding:5px 9px;font-size:11px" onclick="openStaffTagEditor('${s.id}')" title="ติด Tag หมายเหตุประจำตัว">🏷️</button>
+      </div>`;
+    }
     // 🎨 สีประจำเมเนเจอร์ — โชว์เฉพาะการ์ดคนที่เป็น manager (admin เลือกให้)
     if(viewer==='admin' && rank==='manager'){
       const _mUid=_mgrUidForStaff(s);
@@ -21874,15 +22220,16 @@ function teamMemberCardHTML(s, col, viewer){
   }
   return `<div ${clickAttr} style="display:flex;flex-direction:column;padding:12px 14px;background:${isSusp?'rgba(255,158,0,.06)':'var(--bg2)'};border:1px solid ${isSusp?'rgba(255,158,0,.35)':'rgba(255,255,255,.12)'};border-radius:11px;box-shadow:0 1px 3px rgba(0,0,0,.25);${viewer==='admin'?'cursor:pointer;transition:border-color .12s,transform .12s':''}" ${viewer==='admin'?`onmouseover="this.style.borderColor='${col}88';this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='rgba(255,255,255,.12)';this.style.transform=''"`:''}>
     <div style="display:flex;align-items:center;gap:10px">
-      <span style="width:32px;height:32px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${(s.nickname||s.name||'?')[0]}</span>
+      <span style="width:32px;height:32px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${esc((s.nickname||s.name||'?')[0])}</span>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:700;color:var(--text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.nickname||s.name} <span style="font-size:11px;color:var(--text2);font-weight:400">${s.name||''}</span>
-          ${isSusp?'<span style="padding:1px 7px;border-radius:8px;background:rgba(255,158,0,.18);color:#FF9E00;font-size:10px;font-weight:700;margin-left:4px">⏸️</span>':''}
+        <div style="font-weight:700;color:var(--text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.nickname||s.name)} <span style="font-size:11px;color:var(--text2);font-weight:400">${esc(s.name||'')}</span>
+          ${staffStatusBadgeHTML(s)}
           ${wc?`<span title="ใบเตือน" style="padding:1px 7px;border-radius:8px;background:rgba(255,64,64,.15);color:#FF6060;font-size:10px;font-weight:700;margin-left:4px">⚠️${wc}</span>`:''}
           ${ac?`<span title="ใบชื่นชม" style="padding:1px 7px;border-radius:8px;background:rgba(255,199,0,.15);color:#FFC700;font-size:10px;font-weight:700;margin-left:4px">⭐${ac}</span>`:''}
         </div>
-        ${s.promptpay?`<div style="font-size:11px;color:var(--text2)">${s.promptpay}</div>`:''}
-        ${(rank===''&&s.email)?`<div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${s.email}">📧 ${s.email}</div>`:''}
+        ${s.promptpay?`<div style="font-size:11px;color:var(--text2)">${esc(s.promptpay)}</div>`:''}
+        ${(rank===''&&s.email)?`<div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(s.email)}">📧 ${esc(s.email)}</div>`:''}
+        ${staffTagChipsHTML(s)}
       </div>
       ${viewer==='admin'?'<span style="color:var(--text2);font-size:14px;flex-shrink:0">›</span>':''}
     </div>
@@ -21998,8 +22345,8 @@ function renderStaffDetail(){
         <div style="background:linear-gradient(135deg,rgba(21,101,255,.14),rgba(21,101,255,.02));padding:20px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
           <div style="width:60px;height:60px;border-radius:50%;background:rgba(21,101,255,.2);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:26px;flex-shrink:0">${(s.nickname||s.name||'?')[0]}</div>
           <div style="flex:1;min-width:0">
-            <div style="font-size:20px;font-weight:800">${s.name||''}</div>
-            <div style="font-size:13px;color:var(--text2);margin-top:2px">${s.nickname?'('+s.nickname+')':''} ${s.gender||''}</div>
+            <div style="font-size:20px;font-weight:800">${esc(s.name||'')}</div>
+            <div style="font-size:13px;color:var(--text2);margin-top:2px">${s.nickname?'('+esc(s.nickname)+')':''} ${esc(s.gender||'')}</div>
             <div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap">${catBadges} ${rankBadge}</div>
           </div>
         </div>
@@ -22204,7 +22551,7 @@ function renderMgrProjects() {
         : `<div style="font-size:12px;color:var(--text2)" title="ดูได้เฉพาะแอดมิน">—</div>`;
       const meBadge = isMe ? '<span style="padding:1px 7px;border-radius:8px;background:rgba(0,180,255,.15);color:var(--accent2);font-size:9px;font-weight:700;margin-left:5px">ของฉัน</span>' : '';
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(0,0,0,.25);border-radius:9px;margin-bottom:6px;border:1px solid rgba(255,255,255,.05)">
-        <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--text)">${s.name} (${s.nickname})${meBadge}</div><div style="font-size:11px;color:var(--text2)">${(_lbl[_pre]||'')+_suf}</div></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--text)">${esc(s.name)} (${esc(s.nickname)})${meBadge}</div><div style="font-size:11px;color:var(--text2)">${(_lbl[_pre]||'')+_suf}</div></div>
         ${amtCell}
         <span style="font-size:11px;padding:2px 9px;border-radius:20px;${w.status==='paid'?'background:rgba(0,223,160,.1);color:#00DFA0;border:1px solid rgba(0,223,160,.2)':'background:rgba(255,158,0,.12);color:#FF9E00;border:1px solid rgba(255,158,0,.25)'}">${w.status==='paid'?'จ่ายแล้ว':'รอจ่าย'}</span>
       </div>`;
@@ -22531,7 +22878,7 @@ function renderMgrTeam() {
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:8px;padding:12px 16px">${admins.map(s=>`
           <div style="display:flex;align-items:center;gap:10px;padding:9px 13px;background:rgba(0,0,0,.2);border:1px solid ${acol}22;border-radius:10px">
             <span style="width:30px;height:30px;border-radius:50%;background:${acol}22;color:${acol};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${(s.nickname||s.name||'?')[0]}</span>
-            <div style="flex:1;min-width:0"><div style="font-weight:700;color:var(--text);font-size:13px">${s.nickname||s.name} <span style="font-size:11px;color:var(--text2);font-weight:400">${s.name||''}</span></div>${s.email?`<div style="font-size:11px;color:var(--text2)">📧 ${s.email}</div>`:''}</div>
+            <div style="flex:1;min-width:0"><div style="font-weight:700;color:var(--text);font-size:13px">${esc(s.nickname||s.name)} <span style="font-size:11px;color:var(--text2);font-weight:400">${esc(s.name||'')}</span></div>${s.email?`<div style="font-size:11px;color:var(--text2)">📧 ${esc(s.email)}</div>`:''}</div>
             <span style="font-size:10px;padding:1px 8px;border-radius:8px;background:${acol}18;color:${acol};font-weight:700">👑 Admin</span>
           </div>`).join('')}</div>
       </div>`;
