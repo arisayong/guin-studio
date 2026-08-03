@@ -5713,9 +5713,26 @@ async function callProjBot(payload){
   const url=(cfg.projWorkerUrl||cfg.workerUrl||'').trim(), secret=(cfg.projWorkerSecret||cfg.workerSecret||'').trim();
   if(!url||!secret) throw new Error('ยังไม่ได้ตั้งค่าบอท — กดปุ่ม 🤖 ตั้งค่าบอทโปรเจกต์');
   const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json;charset=utf-8'},body:JSON.stringify({secret,...payload})});
-  let d; try{ d=await res.json(); }catch(e){ throw new Error('บอทตอบผิดรูปแบบ (HTTP '+res.status+') — เช็ค URL/Deploy'); }
+  let d; try{ d=await res.json(); }catch(e){ throw new Error('ปลายทางไม่ใช่ Worker ของบอท (HTTP '+res.status+') — URL ต้องเป็นลิงก์ที่ลงท้าย .workers.dev (ไม่ใช่ลิงก์หน้า dash.cloudflare.com หรือ Apps Script) เช็คที่ปุ่ม 🤖 ตั้งค่าบอทโปรเจกต์ แล้วกด 🧪 ทดสอบ'); }
   if(!d.ok) throw new Error(d.error||'ไม่ทราบสาเหตุ');
   return d;
+}
+// 🧪 ทดสอบว่าค่าที่กรอกใช้ได้จริง — ถามชื่อบอทกลับมาให้เห็นเลย
+async function prTestBot(){
+  const url=(document.getElementById('prb-url')?.value||'').trim();
+  const secret=(document.getElementById('prb-secret')?.value||'').trim();
+  const cfg=getDiscordCfg();
+  const useUrl=url||cfg.workerUrl||'', useSecret=secret||cfg.workerSecret||'';
+  if(!useUrl){ toast('กรอก URL ก่อน (หรือเว้นว่างเพื่อใช้บอทลงคิว — แต่ต้องตั้งค่าบอทลงคิวไว้แล้ว)','warn'); return; }
+  showLoader(true);
+  try{
+    const res=await fetch(useUrl,{method:'POST',headers:{'Content-Type':'application/json;charset=utf-8'},body:JSON.stringify({secret:useSecret,action:'discordMe'})});
+    let d; try{ d=await res.json(); }
+    catch(e){ toast('❌ ปลายทางไม่ใช่ Worker (HTTP '+res.status+') — URL ต้องลงท้าย .workers.dev ที่ได้จากหน้า Worker ไม่ใช่ลิงก์หน้าเว็บ Cloudflare','error'); return; }
+    if(d.ok) toast('✅ เชื่อมต่อได้ — บอทชื่อ "'+((d.bot&&d.bot.username)||'?')+'" พร้อมใช้งาน','success');
+    else toast('❌ '+(d.error||'ไม่สำเร็จ'),'error');
+  }catch(e){ toast('❌ เชื่อมต่อไม่ได้: '+e.message,'error'); }
+  finally{ showLoader(false); }
 }
 function openProjBotSetup(){
   if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
@@ -5731,8 +5748,10 @@ function openProjBotSetup(){
     <input id="prb-secret" type="password" class="pr-in" value="${esc(cfg.projWorkerSecret||'')}" style="font-family:monospace">
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="btn btn-green" style="flex:1" onclick="saveProjBotSetup()">💾 บันทึก</button>
+      <button class="btn btn-outline btn-sm" onclick="prTestBot()">🧪 ทดสอบการเชื่อมต่อ</button>
       <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
-    </div>`, 520);
+    </div>
+    <div style="font-size:10.5px;color:var(--text2);margin-top:8px;line-height:1.6">⚠️ URL ที่ถูกต้องได้จากหน้า Worker ใน Cloudflare (กดชื่อ Worker แล้วดูใต้ชื่อ) — ลงท้ายด้วย <strong>.workers.dev</strong> เสมอ ไม่ใช่ลิงก์ dash.cloudflare.com</div>`, 520);
 }
 async function saveProjBotSetup(){
   const cfg=getDiscordCfg();
@@ -5776,7 +5795,21 @@ function _prFillTpl(p){
   };
   let t=getProjPostTpl();
   Object.entries(map).forEach(([k,v])=>{ t=t.split(k).join(String(v)); });
-  return t.slice(0,1900);
+  return t;
+}
+// ✂️ แบ่งข้อความยาวเป็นก้อน ๆ ละไม่เกิน 1,900 ตัวอักษร (ลิมิต Discord = 2,000) — ตัดตามบรรทัด ไม่ตัดกลางคำ
+function _prChunks(txt){
+  const out=[]; let cur='';
+  String(txt||'').split('\n').forEach(line=>{
+    while(line.length>1900){ // บรรทัดเดียวยาวเว่อร์ — ตัดแข็ง
+      if(cur){ out.push(cur); cur=''; }
+      out.push(line.slice(0,1900)); line=line.slice(1900);
+    }
+    if((cur?cur.length+1:0)+line.length>1900){ out.push(cur); cur=line; }
+    else cur=cur?cur+'\n'+line:line;
+  });
+  if(cur.trim()) out.push(cur);
+  return out.length?out:[''];
 }
 function openProjPostTplEditor(){
   if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมินแก้เทมเพลตได้','error'); return; }
@@ -5868,21 +5901,17 @@ function renderProjRoom(){
 async function createProjRoomCat(projId){
   const cat=(document.getElementById('pr-catname')?.value||'').trim();
   if(!cat){ toast('ตั้งชื่อหมวดหมู่ก่อน','error'); return; }
-  const postTxt=String(document.getElementById('pr-post')?.value||'').trim();
   showLoader(true);
   try{
     const c1=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'📁│project'});
     let c2=null; try{ c2=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'🎙│พูดคุย'}); }catch(e){}
-    let msgId='';
-    if(postTxt){ try{ const r=await callProjBot({action:'discordPost', channelId:c1.channelId, content:postTxt}); msgId=r.messageId||''; }catch(e){} }
     await saveProjectMerge(projId, f=>{
       f.discordCategoryName=cat; f.discordChannelId=c1.channelId; f.discordChannelName=c1.channelName||'📁│project';
       if(c2) f.discordTalkId=c2.channelId;
-      if(msgId) f.discordMsgId=msgId;
     });
-    try{ logAudit('project.discord', cat, 'สร้างหมวด+ห้องโปรเจกต์ใน Discord'+(msgId?' + โพสต์คู่มือ':'')); }catch(e){}
-    toast('🏗️ สร้างหมวด "'+cat+'" + ห้องแล้ว'+(msgId?' · 📣 โพสต์คู่มือแล้ว':''),'success');
-    renderProjRoom();
+    try{ logAudit('project.discord', cat, 'สร้างหมวด+ห้องโปรเจกต์ใน Discord'); }catch(e){}
+    toast('🏗️ สร้างหมวด "'+cat+'" + ห้องแล้ว','success');
+    await postProjRoomMsg(projId);   // โพสต์คู่มือต่อเลย (แบ่งก้อนอัตโนมัติถ้ายาว)
   }catch(e){
     toast(String(e.message||'').includes('ไม่รู้จักคำสั่ง')
       ? 'Worker ของบอทยังเป็นเวอร์ชันเก่า — วางโค้ด worker.js ล่าสุดแล้ว Deploy ก่อน'
@@ -5892,19 +5921,28 @@ async function createProjRoomCat(projId){
 async function postProjRoomMsg(projId){
   const p=getProjects().find(x=>x.id===projId);
   if(!p||!p.discordChannelId){ toast('ยังไม่มีห้อง — สร้างห้องก่อน','warn'); return; }
-  const txt=String(document.getElementById('pr-post')?.value||'').trim();
+  const txt=String(document.getElementById('pr-post')?.value||_prFillTpl(p)).trim();
   if(!txt){ toast('ข้อความว่าง','error'); return; }
   showLoader(true);
   try{
-    if(p.discordMsgId){
-      await callProjBot({action:'discordEdit', channelId:p.discordChannelId, messageId:p.discordMsgId, content:txt});
-      toast('📣 แก้โพสต์เดิมให้ตรงข้อมูลล่าสุดแล้ว','success');
-    }else{
-      const r=await callProjBot({action:'discordPost', channelId:p.discordChannelId, content:txt});
-      await saveProjectMerge(projId, f=>{ f.discordMsgId=r.messageId; });
-      toast('📣 โพสต์คู่มือลง #project แล้ว','success');
+    // ยาวแค่ไหนก็โพสต์ได้ — แบ่งก้อนอัตโนมัติ แล้วตอนอัปเดตก็แก้ครบทุกก้อน
+    const chunks=_prChunks(txt);
+    const oldIds=(Array.isArray(p.discordMsgIds)&&p.discordMsgIds.length)?[...p.discordMsgIds]:(p.discordMsgId?[p.discordMsgId]:[]);
+    const newIds=[];
+    const n=Math.max(chunks.length, oldIds.length);
+    for(let i=0;i<n;i++){
+      const content=chunks[i]||'—';   // ก้อนเก่าที่เกินจำนวนใหม่ → เคลียร์เหลือขีดเดียว
+      if(oldIds[i]){
+        await callProjBot({action:'discordEdit', channelId:p.discordChannelId, messageId:oldIds[i], content});
+        if(chunks[i]!==undefined) newIds.push(oldIds[i]);
+      } else if(chunks[i]!==undefined){
+        const r=await callProjBot({action:'discordPost', channelId:p.discordChannelId, content});
+        newIds.push(r.messageId);
+      }
     }
-    try{ logAudit('project.discord', p.name, 'โพสต์/อัปเดตคู่มืองานใน Discord'); }catch(e){}
+    await saveProjectMerge(projId, f=>{ f.discordMsgId=newIds[0]||''; f.discordMsgIds=newIds; });
+    toast('📣 '+(oldIds.length?'อัปเดตโพสต์แล้ว':'โพสต์คู่มือแล้ว')+(chunks.length>1?' ('+chunks.length+' ก้อนต่อกัน)':''),'success');
+    try{ logAudit('project.discord', p.name, 'โพสต์/อัปเดตคู่มืองานใน Discord ('+chunks.length+' ก้อน)'); }catch(e){}
     renderProjRoom();
   }catch(e){ toast('โพสต์ไม่สำเร็จ: '+e.message,'error'); }
   finally{ showLoader(false); }
