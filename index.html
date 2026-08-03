@@ -4269,8 +4269,10 @@ async function callAppsScript(payload){
   const cfg=getDiscordCfg();
   const url=(cfg.workerUrl||'').trim(), secret=(cfg.workerSecret||'').trim();
   if(!url||!secret) throw new Error('ยังไม่ได้ตั้งค่าตัวกลาง Discord — กดปุ่ม 🐧 ห้อง Discord แล้วกรอก URL + รหัสลับของ Worker');
+  // 🏠 ถ้าบอทอยู่หลายเซิร์ฟเวอร์ (เช่น ดิสเทส + ดิสจริง) ให้ล็อกด้วย ID เซิร์ฟเวอร์ที่ตั้งไว้ — ไม่งั้น Worker หยิบเซิร์ฟแรกที่เจอ
+  const gid=(cfg.guildId||'').trim();
   const res=await fetch(url,{ method:'POST', headers:{'Content-Type':'application/json;charset=utf-8'},
-    body: JSON.stringify({secret, ...payload}) });
+    body: JSON.stringify({secret, ...(gid?{guildId:gid}:{}), ...payload}) });
   let data;
   try{ data=await res.json(); }
   catch(e){ throw new Error('ตัวกลางตอบกลับผิดรูปแบบ (HTTP '+res.status+') — เช็คว่า URL ถูกต้องและ Deploy โค้ดแล้ว'); }
@@ -4289,6 +4291,9 @@ function openDiscordSetup(){
     <input id="dc-worker-url" value="${esc(cfg.workerUrl||'')}" placeholder="https://guin-discord.xxx.workers.dev"
       style="width:100%;padding:8px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box;margin-bottom:6px">
     <input id="dc-worker-secret" type="password" value="${esc(cfg.workerSecret||'')}" placeholder="รหัสลับ (ค่าเดียวกับ WEB_SECRET ใน Worker)"
+      style="width:100%;padding:8px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box">
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin:8px 0 4px">🏠 <strong>ID เซิร์ฟเวอร์</strong> — ใส่เมื่อบอทอยู่หลายเซิร์ฟเวอร์ (เช่น ดิสเทส + ดิสจริง) เพื่อล็อกให้ทำงานกับเซิร์ฟที่ต้องการเท่านั้น · วิธีเอา ID: เปิด Discord → ตั้งค่า → ขั้นสูง → เปิดโหมดนักพัฒนา → คลิกขวาชื่อเซิร์ฟเวอร์ → คัดลอก ID · เว้นว่าง = ใช้เซิร์ฟแรกที่บอทอยู่</div>
+    <input id="dc-guild-id" value="${esc(cfg.guildId||'')}" placeholder="ID เซิร์ฟเวอร์ (ไม่บังคับ)"
       style="width:100%;padding:8px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box">
 
     <div style="font-size:12px;font-weight:700;margin:14px 0 5px;padding-top:12px;border-top:1px solid var(--border2)">2. ห้องลงคิวของแต่ละทีม</div>
@@ -4428,6 +4433,7 @@ async function saveDiscordSetup(){
   const cfg=getDiscordCfg();
   cfg.workerUrl=(document.getElementById('dc-worker-url')?.value||'').trim();
   cfg.workerSecret=(document.getElementById('dc-worker-secret')?.value||'').trim();
+  cfg.guildId=(document.getElementById('dc-guild-id')?.value||'').trim();
   cfg.channels=cfg.channels||{};
   Object.keys(AV_CATS).forEach(k=>{
     const v=(document.getElementById('dc-ch-'+k)?.value||'').trim();
@@ -5908,7 +5914,8 @@ async function callProjBot(payload){
   const cfg=getDiscordCfg();
   const url=(cfg.projWorkerUrl||cfg.workerUrl||'').trim(), secret=(cfg.projWorkerSecret||cfg.workerSecret||'').trim();
   if(!url||!secret) throw new Error('ยังไม่ได้ตั้งค่าบอท — กดปุ่ม 🤖 ตั้งค่าบอทโปรเจกต์');
-  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json;charset=utf-8'},body:JSON.stringify({secret,...payload})});
+  const gid=(cfg.guildId||'').trim();
+  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json;charset=utf-8'},body:JSON.stringify({secret,...(gid?{guildId:gid}:{}),...payload})});
   let d; try{ d=await res.json(); }catch(e){ throw new Error('ปลายทางไม่ใช่ Worker ของบอท (HTTP '+res.status+') — URL ต้องเป็นลิงก์ที่ลงท้าย .workers.dev (ไม่ใช่ลิงก์หน้า dash.cloudflare.com หรือ Apps Script) เช็คที่ปุ่ม 🤖 ตั้งค่าบอทโปรเจกต์ แล้วกด 🧪 ทดสอบ'); }
   if(!d.ok) throw new Error(d.error||'ไม่ทราบสาเหตุ');
   return d;
@@ -6192,6 +6199,7 @@ function renderProjRoom(){
     <textarea id="pr-post" rows="13" class="pr-in" style="line-height:1.6;resize:vertical">${esc(_prFillTpl(p))}</textarea>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       ${has?`<button class="btn btn-green" style="flex:1" onclick="postProjRoomMsg('${esc(p.id)}')">📣 ${p.discordMsgId?'อัปเดตโพสต์ (แก้โพสต์เดิม)':'โพสต์ลง #project'}</button>`:'<span style="font-size:11.5px;color:var(--text2);align-self:center">สร้างห้องก่อน (ขั้นที่ 2) แล้วปุ่มโพสต์จะใช้ได้ — หรือแก้ข้อความในกล่องได้เลย จะถูกใช้ตอนสร้างห้อง</span>'}
+      <button class="btn btn-outline btn-sm" onclick="prInsertMention()" title="เลือกคนจากทะเบียนทีม แทรกแท็กลงข้อความตรงตำแหน่งเคอร์เซอร์ — คนที่ผูก Discord แล้วจะถูก ping จริง">👤 แท็กคน</button>
       <button class="btn btn-outline btn-sm" onclick="renderProjRoom()" title="ดึงข้อมูลล่าสุดของโปรเจกต์มาเติมเทมเพลตใหม่ (ทับที่แก้ไว้ในกล่อง)">↻ รีเฟรชจากเทมเพลต</button>
     </div></div>`;
   el.innerHTML=sel+step2+step3;
@@ -6312,6 +6320,36 @@ async function postProjRoomMsg(projId){
   }
   finally{ showLoader(false); }
 }
+// 👤 ปุ่มแท็กคน — เลือกจากทะเบียนแล้วแทรกแท็กลงกล่องข้อความตรงตำแหน่งเคอร์เซอร์
+//    ผูก Discord แล้ว → แทรก <@id> (ping จริงตอนโพสต์) · ยังไม่ผูก → แทรกเป็น @ชื่อ ธรรมดา
+function prInsertMention(){
+  const ta=document.getElementById('pr-post');
+  if(!ta){ toast('เลือกโปรเจกต์ก่อน','warn'); return; }
+  window._prMentionPos={s:ta.selectionStart??ta.value.length, e:ta.selectionEnd??ta.value.length};
+  const all=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s&&s.id&&isStaffAssignable(s));
+  const seen=new Set();
+  const opts=all.filter(s=>{ if(seen.has(s.id))return false; seen.add(s.id); return true; })
+    .sort((a,b)=>((b.discordId?1:0)-(a.discordId?1:0)) || String(a.nickname||a.name||'').localeCompare(String(b.nickname||b.name||''),'th'));
+  _tagOverlayShow('👤 แท็กคนลงข้อความ', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:8px">กดชื่อ = แทรกแท็กตรงจุดที่พิมพ์ค้างไว้ · 🔗 = ผูก Discord แล้ว จะ ping จริง · คนที่ยังไม่ผูกจะแทรกเป็นชื่อเฉย ๆ (ไม่ ping — ผูกได้ที่ปุ่ม "🔗 ผูกทั้งทีมกับ Discord")</div>
+    <input placeholder="🔍 ค้นหาชื่อ..." class="pr-in" style="margin-bottom:8px" oninput="var q=this.value.toLowerCase();[...document.querySelectorAll('.prm-row')].forEach(function(r){r.style.display=r.dataset.nm.indexOf(q)>=0?'flex':'none'})">
+    <div style="max-height:340px;overflow-y:auto">
+      ${opts.map(s=>`<div class="prm-row" data-nm="${esc(((s.nickname||'')+' '+(s.name||'')).toLowerCase())}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border2)">
+        <span style="flex:1;min-width:0;font-size:12.5px">${esc(s.nickname||s.name)} <span style="font-size:10.5px;color:var(--text2)">${esc(s.name||'')}</span> ${s.discordId?'🔗':'<span style="font-size:10px;color:var(--orange)">ยังไม่ผูก</span>'}</span>
+        <button class="btn btn-sm ${s.discordId?'':'btn-outline'}" onclick="prPickMention('${esc(s.id)}')">แทรก</button>
+      </div>`).join('')||'<div style="color:var(--text2);text-align:center;padding:14px">ไม่มีสมาชิกในทะเบียน</div>'}
+    </div>`, 480);
+}
+function prPickMention(staffId){
+  const s=getStaffById(staffId); if(!s) return;
+  const tag=s.discordId?('<@'+s.discordId+'>'):('@'+(s.nickname||s.name||''));
+  document.getElementById('tag-overlay')?.remove();
+  const ta=document.getElementById('pr-post'); if(!ta) return;
+  const pos=window._prMentionPos||{s:ta.value.length, e:ta.value.length};
+  ta.value=ta.value.slice(0,pos.s)+tag+' '+ta.value.slice(pos.e);
+  ta.focus();
+  ta.selectionStart=ta.selectionEnd=pos.s+tag.length+1;
+}
 async function prPullTeam(projId){
   const p=getProjects().find(x=>x.id===projId); if(!p) return;
   const team=[...new Set((p.workers||[]).map(w=>w&&w.id).filter(Boolean))].map(id=>getStaffById(id)).filter(s=>s&&s.discordId);
@@ -6348,10 +6386,17 @@ let _drSel='', _drParent='', _drSub='', _drSubs=[], _drProjFolders=[];
 const _DR_TPL_DEFAULT=['1.DUBING (ส่งเสียงพากย์)','2.Videos Original (คลิปแยกตอน)','3.SUB Original','4.QC (ไฟล์อัพคลิปให้คิวซี)','5.{รหัส}_FINAL (ส่งไฟล์ไฟนอลลูกค้า)','-1.{รหัส}_FULL MIX.wav','-2.{รหัส}_DUB + TIMING - DRY.wav','-3.{รหัส}_SUB FINAL.Srt/Ass','-4.{รหัส}_Video Full + Sub.MP4'].join('\n');
 function getDriveCfg(){ const v=ls('drivecfg'); return (v&&typeof v==='object')?v:{}; }
 async function saveDriveCfg(c){ ls('drivecfg', c); try{ await fbSaveKeyed('drivecfg', c); }catch(e){} }
+// 🧑‍💼 ทีมมี 2 ไดรฟ์: แอดมินใช้ไดรฟ์หลัก (เมลใหญ่) · เมเนเจอร์ใช้ไดรฟ์ทีม (อีกเมล — ถ้าตั้งค่าไว้)
+//    แต่ละบัญชีมี Apps Script + รายการโฟลเดอร์หลักของตัวเอง — ไม่ปนกัน
+function _drIsMgrAcct(){ return currentUser?.role==='manager' && !!(getDriveCfg().mgrGasUrl||'').trim(); }
+function _drActive(cfg){ return _drIsMgrAcct() ? {url:(cfg.mgrGasUrl||''), secret:(cfg.mgrSecret||'')} : {url:(cfg.gasUrl||''), secret:(cfg.secret||'')}; }
+function _drDefKey(){ return _drIsMgrAcct()?'mgrDefaultParentId':'defaultParentId'; }
+function _drParentsKey(){ return _drIsMgrAcct()?'mgrParents':'parents'; }
 async function callDrive(payload){
   const cfg=getDriveCfg();
-  if(!(cfg.gasUrl||'').trim()) throw new Error('ยังไม่ได้ตั้งค่า — กดปุ่ม 🔧 ตั้งค่า Drive');
-  const res=await fetch(cfg.gasUrl.trim(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({secret:(cfg.secret||'').trim(),...payload})});
+  const acct=_drActive(cfg);
+  if(!(acct.url||'').trim()) throw new Error('ยังไม่ได้ตั้งค่า — กดปุ่ม 🔧 ตั้งค่า Drive');
+  const res=await fetch(acct.url.trim(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({secret:(acct.secret||'').trim(),...payload})});
   let d; try{ d=await res.json(); }catch(e){ throw new Error('Apps Script ตอบผิดรูปแบบ — เช็คว่า Deploy เป็น Web App แล้ว (ทุกคนเข้าถึงได้)'); }
   if(!d.ok) throw new Error(d.error||'ไม่ทราบสาเหตุ');
   return d;
@@ -6370,9 +6415,19 @@ function openDriveSetup(){
     <input id="drs-secret" type="password" class="pr-in" value="${esc(cfg.secret||'')}" style="font-family:monospace">
     <div class="pr-lbl">ลิงก์ไฟล์เทมเพลตบท (สเปรดชีต Script/CV ต้นฉบับ — ใช้ก๊อปปี้เป็นไฟล์บทของแต่ละงาน)</div>
     <input id="drs-scripttpl" class="pr-in" value="${esc(cfg.scriptTplId||'')}" placeholder="วางลิงก์ไฟล์ Script/CV_ ต้นฉบับ">
-    <div style="display:flex;gap:8px;margin-top:12px">
+    <div style="font-size:12px;font-weight:700;margin:14px 0 4px;padding-top:12px;border-top:1px solid var(--border2)">🧑‍💼 ไดรฟ์ทีมสำหรับเมเนเจอร์ (ไม่บังคับ)</div>
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.7;margin-bottom:6px">
+      ทีมมี 2 ไดรฟ์? เอาไฟล์ <strong>AppsScript-จัดไฟล์ไดรฟ์.gs</strong> ไปติดตั้งซ้ำอีกรอบด้วย<strong>บัญชีเมลทีม</strong> (ขั้นตอนเดียวกับหัวไฟล์) แล้วเอา URL + รหัสลับมากรอกตรงนี้ —
+      <strong>เมเนเจอร์จะทำงานบนไดรฟ์ทีมอัตโนมัติ</strong> ส่วนแอดมินใช้ไดรฟ์หลักด้านบนเหมือนเดิม · เว้นว่าง = ทุกคนใช้ไดรฟ์หลักร่วมกัน
+    </div>
+    <div class="pr-lbl">URL Web App ของไดรฟ์ทีม</div>
+    <input id="drs-mgr-url" class="pr-in" value="${esc(cfg.mgrGasUrl||'')}" placeholder="https://script.google.com/macros/s/…/exec" style="font-family:monospace">
+    <div class="pr-lbl">รหัสลับของไดรฟ์ทีม</div>
+    <input id="drs-mgr-secret" type="password" class="pr-in" value="${esc(cfg.mgrSecret||'')}" style="font-family:monospace">
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button class="btn btn-green" style="flex:1" onclick="saveDriveSetup()">💾 บันทึก</button>
-      <button class="btn btn-outline btn-sm" onclick="drTestConn()">🧪 ทดสอบการเชื่อมต่อ</button>
+      <button class="btn btn-outline btn-sm" onclick="drTestConn()">🧪 ทดสอบไดรฟ์หลัก</button>
+      <button class="btn btn-outline btn-sm" onclick="drTestConnMgr()">🧪 ทดสอบไดรฟ์ทีม</button>
       <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
     </div>`, 560);
 }
@@ -6380,22 +6435,26 @@ async function saveDriveSetup(){
   const cfg=getDriveCfg();
   cfg.gasUrl=(document.getElementById('drs-url')?.value||'').trim();
   cfg.secret=(document.getElementById('drs-secret')?.value||'').trim();
+  cfg.mgrGasUrl=(document.getElementById('drs-mgr-url')?.value||'').trim();
+  cfg.mgrSecret=(document.getElementById('drs-mgr-secret')?.value||'').trim();
   cfg.scriptTplId=_drIdFromLink(document.getElementById('drs-scripttpl')?.value||'');
   await saveDriveCfg(cfg);
   toast('บันทึกแล้ว ✅','success');
   document.getElementById('tag-overlay')?.remove();
   renderDrivePage();
 }
-async function drTestConn(){
-  const url=(document.getElementById('drs-url')?.value||'').trim();
-  const secret=(document.getElementById('drs-secret')?.value||'').trim();
-  if(!url){ toast('กรอก URL ก่อน','error'); return; }
+async function drTestConn(){ await _drTestConnBy('drs-url','drs-secret','ไดรฟ์หลัก'); }
+async function drTestConnMgr(){ await _drTestConnBy('drs-mgr-url','drs-mgr-secret','ไดรฟ์ทีม'); }
+async function _drTestConnBy(urlId, secretId, label){
+  const url=(document.getElementById(urlId)?.value||'').trim();
+  const secret=(document.getElementById(secretId)?.value||'').trim();
+  if(!url){ toast('กรอก URL ของ'+label+'ก่อน','error'); return; }
   showLoader(true);
   try{
     const res=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({secret,action:'ping'})});
     const d=await res.json();
-    toast(d.ok?'✅ เชื่อมต่อได้ — ไดรฟ์ของ '+(d.email||''):'❌ '+(d.error||'ไม่สำเร็จ'), d.ok?'success':'error');
-  }catch(e){ toast('เชื่อมต่อไม่ได้: '+e.message,'error'); }
+    toast(d.ok?'✅ '+label+' เชื่อมต่อได้ — ไดรฟ์ของ '+(d.email||''):'❌ '+label+': '+(d.error||'ไม่สำเร็จ'), d.ok?'success':'error');
+  }catch(e){ toast(label+' เชื่อมต่อไม่ได้: '+e.message,'error'); }
   finally{ showLoader(false); }
 }
 async function drAddParent(){
@@ -6403,8 +6462,8 @@ async function drAddParent(){
   if(!link) return;
   const name=prompt('ตั้งชื่อเรียกโฟลเดอร์นี้ (เช่น 01. Project_Work หรือ ส่งงานลูกค้า):');
   if(!name) return;
-  const cfg=getDriveCfg(); cfg.parents=cfg.parents||[];
-  cfg.parents.push({id:_drIdFromLink(link), name:name.trim()});
+  const cfg=getDriveCfg(); const pk=_drParentsKey(); cfg[pk]=cfg[pk]||[];
+  cfg[pk].push({id:_drIdFromLink(link), name:name.trim()});
   await saveDriveCfg(cfg);
   _drParent=_drIdFromLink(link);
   renderDrivePage();
@@ -6446,9 +6505,9 @@ async function drBrowseParent(start){
   }finally{ showLoader(false); }
 }
 async function drPickParent(id, name){
-  const cfg=getDriveCfg(); cfg.parents=cfg.parents||[];
-  if(!cfg.parents.some(x=>x.id===id)) cfg.parents.push({id, name});
-  cfg.defaultParentId=id;   // จำเป็นค่าเริ่มต้น — เปิดหน้ามาครั้งหน้าเลือกให้เลย
+  const cfg=getDriveCfg(); const pk=_drParentsKey(); cfg[pk]=cfg[pk]||[];
+  if(!cfg[pk].some(x=>x.id===id)) cfg[pk].push({id, name});
+  cfg[_drDefKey()]=id;   // จำเป็นค่าเริ่มต้น — เปิดหน้ามาครั้งหน้าเลือกให้เลย
   await saveDriveCfg(cfg);
   _drParent=id; _drSub=''; _drSubs=[];
   document.getElementById('tag-overlay')?.remove();
@@ -6571,7 +6630,7 @@ function renderDrivePage(){
   const role=currentUser?.role;
   if(role!=='admin'&&role!=='manager'){ el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin และ Manager เท่านั้น</div>'; return; }
   const cfg=getDriveCfg();
-  if(!(cfg.gasUrl||'').trim()){
+  if(!(_drActive(cfg).url||'').trim()){
     el.innerHTML=`<div class="pr-step" style="border-left:3px solid var(--orange)">
       <div class="pr-step-t">🔧 ตั้งค่าครั้งแรก (ครั้งเดียวจบ)</div>
       <div style="font-size:12.5px;line-height:1.9;color:var(--text2)">
@@ -6579,7 +6638,7 @@ function renderDrivePage(){
         1. เปิดไฟล์ <strong style="color:var(--text)">AppsScript-จัดไฟล์ไดรฟ์.gs</strong> ในโฟลเดอร์เว็บ — มีคู่มือทีละขั้นอยู่หัวไฟล์<br>
         2. ทำตามคู่มือ (วางโค้ดใน script.google.com → Deploy เป็น Web App)<br>
         3. กดปุ่มด้านล่าง เอา URL + รหัสลับมากรอก</div>
-      <button class="btn btn-blue" style="margin-top:10px" onclick="openDriveSetup()">🔧 ตั้งค่า Drive</button>
+      ${role==='admin'?'<button class="btn btn-blue" style="margin-top:10px" onclick="openDriveSetup()">🔧 ตั้งค่า Drive</button>':'<div style="margin-top:10px;font-size:12px;color:var(--orange)">รอแอดมินตั้งค่าตัวเชื่อมก่อน</div>'}
     </div>`;
     return;
   }
@@ -6588,9 +6647,10 @@ function renderDrivePage(){
   list.sort((a,b)=>String(a.deadline||'9999').localeCompare(String(b.deadline||'9999')));
   if(_drSel && !list.some(p=>p.id===_drSel)) _drSel='';
   const p=list.find(x=>x.id===_drSel);
-  const parents=cfg.parents||[];
-  // เปิดหน้ามาเลือกโฟลเดอร์หลักที่จำไว้ให้เลย (จำตัวล่าสุดที่เคยเลือกใน cfg.defaultParentId)
-  if(!_drParent && parents.length) _drParent=parents.some(x=>x.id===cfg.defaultParentId)?cfg.defaultParentId:parents[0].id;
+  const parents=cfg[_drParentsKey()]||[];
+  // เปิดหน้ามาเลือกโฟลเดอร์หลักที่จำไว้ให้เลย (จำแยกบัญชี: แอดมิน/ไดรฟ์ทีม)
+  const _defId=cfg[_drDefKey()];
+  if(!_drParent && parents.length) _drParent=parents.some(x=>x.id===_defId)?_defId:parents[0].id;
   const code=p?_drCodeOf(p):'';
   // เทมเพลตแบบรายการ — แถวละโฟลเดอร์ มีปุ่มแก้/ลบ/เพิ่ม (index อิงบรรทัดจริงใน cfg.tpl)
   const tplLines=_drTplLines();
@@ -6626,8 +6686,8 @@ function renderDrivePage(){
     </div>
     <div class="pr-step"><div class="pr-step-t">2️⃣ ที่เก็บในไดรฟ์</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-        <div style="flex:1;min-width:160px"><div class="pr-lbl">โฟลเดอร์หลัก (ระบบจำตัวที่เลือกล่าสุดเป็นค่าเริ่มต้น)</div>
-          <select class="pr-in" onchange="_drParent=this.value;_drSub='';_drSubs=[];const c=getDriveCfg();c.defaultParentId=this.value;saveDriveCfg(c);renderDrivePage();drLoadSubs(true)">
+        <div style="flex:1;min-width:160px"><div class="pr-lbl">โฟลเดอร์หลัก (จำตัวล่าสุดเป็นค่าเริ่มต้น)${_drIsMgrAcct()?' · <span style="color:var(--accent2)">🧑‍💼 ไดรฟ์ทีม</span>':''}</div>
+          <select class="pr-in" onchange="_drParent=this.value;_drSub='';_drSubs=[];const c=getDriveCfg();c[_drDefKey()]=this.value;saveDriveCfg(c);renderDrivePage();drLoadSubs(true)">
             ${parents.length?parents.map(x=>`<option value="${esc(x.id)}"${x.id===_drParent?' selected':''}>${esc(x.name)}</option>`).join(''):'<option value="">— ยังไม่มี กด 📂 เลือกจากไดรฟ์ —</option>'}
           </select></div>
         <button class="btn btn-blue btn-sm" onclick="drBrowseParent(true)" title="เปิดดูโฟลเดอร์ในไดรฟ์จริง แล้วคลิกเลือกได้เลย">📂 เลือกจากไดรฟ์</button>
