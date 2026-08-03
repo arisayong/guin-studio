@@ -1135,10 +1135,10 @@ body.sidebar-collapsed .main-content{
    <div class="nav-item" onclick="nav('projroom')"><span class="nav-icon">🐧</span><span>ห้องโปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('assign')"><span class="nav-icon">📋</span><span>มอบหมายงาน</span></div>
    <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
-   <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span><span class="nav-badge hidden" id="deadline-badge">0</span></div>
    <div class="nav-item" onclick="nav('drive')"><span class="nav-icon">📂</span><span>จัดไฟล์งาน</span></div>
-   <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span><span class="nav-badge hidden" id="track-badge">0</span></div>
+   <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span><span class="nav-badge hidden" id="deadline-badge">0</span></div>
    <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
+   <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span><span class="nav-badge hidden" id="track-badge">0</span></div>
    <div class="nav-section">การเงิน</div>
    <div class="nav-item" onclick="nav('queue')"><span class="nav-icon">💸</span><span>คิวจ่ายเงิน</span><span class="nav-badge hidden" id="queue-badge">0</span></div>
    <div class="nav-item" onclick="nav('payroll')"><span class="nav-icon">📆</span><span>รอบจ่ายรายเดือน</span></div>
@@ -1164,10 +1164,10 @@ body.sidebar-collapsed .main-content{
    <div class="nav-item" onclick="nav('projroom')"><span class="nav-icon">🐧</span><span>ห้องโปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('assign')"><span class="nav-icon">📋</span><span>มอบหมายงาน</span></div>
    <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
-   <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('drive')"><span class="nav-icon">📂</span><span>จัดไฟล์งาน</span></div>
-   <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
+   <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('mgr-calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
+   <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
    <div class="nav-item" onclick="nav('confirm-amount')"><span class="nav-icon">📥</span><span>ยืนยันยอด</span><span class="nav-badge hidden" id="ca-badge-mgr">0</span></div>
    <div class="nav-item" onclick="nav('mgr-team')"><span class="nav-icon">👥</span><span>จัดการทีม</span></div>
   </nav>
@@ -12933,7 +12933,7 @@ function _assignEditRowHTML(p){
     return `<td style="padding:6px;vertical-align:top;min-width:158px">${inp('ar-ph-'+k,'datetime-local',_dtVal(ph.deadline))}
       <div id="ar-ph2wrap-${k}" style="margin-top:3px;${has2?'':'display:none'}">${inp('ar-ph2-'+k,'datetime-local',_dtVal(ph.deadline2))}</div>
       <div style="margin-top:3px">${inp('ar-phn-'+k,'text',ph.note||'','📝 โน้ต')}</div>
-      <div style="margin-top:2px"><span onclick="var w=document.getElementById('ar-ph2wrap-${k}');w.style.display=w.style.display==='none'?'block':'none'" style="font-size:10px;color:var(--accent2);cursor:pointer;user-select:none">＋ เดทไลน์รอบ 2</span></div>
+      <div style="margin-top:2px"><span onclick="var w=document.getElementById('ar-ph2wrap-${k}');var i=document.getElementById('ar-ph2-${k}');if(w.style.display==='none'){w.style.display='block'}else{w.style.display='none';if(i)i.value='';}" style="font-size:10px;color:var(--accent2);cursor:pointer;user-select:none" title="กดเปิดเพื่อเพิ่ม · กดซ้ำเพื่อลบรอบ 2 ออก">＋/✕ เดทไลน์รอบ 2</span></div>
     </td>`;
   }).join('');
   const budgetLocked=!isNew && p.budgetType && p.budgetType!=='flat';
