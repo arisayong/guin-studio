@@ -7613,7 +7613,7 @@ function buildFinanceSummaryDocHTML(r, periodLabel){
 //    โน้ตจากแอดมินว่างานรหัสนี้ต้องทำอะไรบ้าง แยกหัวข้อตามทีม
 //    admin = เขียน/แก้ · manager = เปิดอ่านได้ทุกรหัส (โน้ตกลางของทีม)
 // ══════════════════════════════════════════════
-const BRIEF_TEAMS=[['manager','🗂️ เมเนเจอร์'],['adaptation','✍️ ทีมบท'],['dubbing','🎤 ทีมพากย์'],['mix','🎧 ทีมมิกซ์'],['qc','✅ ทีม QC'],['subVideo','🎬 ทีมซับ/วิดีโอ']];
+const BRIEF_TEAMS=[['manager','🗂️ เมเนเจอร์'],['translation','🌐 ทีมแปล'],['adaptation','✍️ ทีมบท'],['dubbing','🎤 ทีมพากย์'],['mix','🎧 ทีมมิกซ์'],['qc','✅ ทีม QC'],['subVideo','🎬 ทีมซับ/วิดีโอ']];
 function getBriefTemplates(){ return ls('brief_templates')||{}; }
 async function saveBriefTemplates(t){ ls('brief_templates',t); await fbSaveKeyed('brief_templates', t); }
 let _briefCurCode='';
