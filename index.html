@@ -382,6 +382,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 .cat-mix .cat-block-phase{border-color:rgba(0,223,160,.2);background:rgba(0,223,160,.05)}
 .cat-qc  .cat-block-phase{border-color:rgba(155,111,255,.2);background:rgba(155,111,255,.05)}
 .cat-sub .cat-block-phase{border-color:rgba(255,64,64,.2);background:rgba(255,64,64,.05)}
+.cat-trn .cat-block-phase{border-color:rgba(255,111,174,.2);background:rgba(255,111,174,.05)}
 .cat-mgr .cat-block-phase{border-color:rgba(21,101,255,.2);background:rgba(21,101,255,.05)}
 .cat-dub .cat-block-head{background:rgba(255,158,0,.12);color:var(--orange)}
 .cat-dub .cat-block-body{border-color:rgba(255,158,0,.2);background:rgba(255,158,0,.03)}
@@ -393,6 +394,8 @@ tr:hover td{background:rgba(255,255,255,.015)}
 .cat-qc .cat-block-body{border-color:rgba(155,111,255,.2);background:rgba(155,111,255,.03)}
 .cat-sub .cat-block-head{background:rgba(255,64,64,.12);color:var(--red)}
 .cat-sub .cat-block-body{border-color:rgba(255,64,64,.2);background:rgba(255,64,64,.03)}
+.cat-trn .cat-block-head{background:rgba(255,111,174,.12);color:#FF6FAE}
+.cat-trn .cat-block-body{border-color:rgba(255,111,174,.2);background:rgba(255,111,174,.03)}
 .cat-mgr .cat-block-head{background:rgba(21,101,255,.12);color:var(--accent2)}
 .cat-mgr .cat-block-body{border-color:rgba(21,101,255,.2);background:rgba(21,101,255,.03)}
 
@@ -1012,6 +1015,7 @@ body.sidebar-collapsed .main-content{
       <label onclick="toggleRegRole(this)" style="display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(0,223,160,.3);background:rgba(0,223,160,.06);cursor:pointer;transition:all .15s;user-select:none;font-size:12px;font-weight:600;color:#00DFA0"><input type="checkbox" value="mix" name="reg-role" style="display:none">🎧 Mix</label>
       <label onclick="toggleRegRole(this)" style="display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(155,111,255,.3);background:rgba(155,111,255,.06);cursor:pointer;transition:all .15s;user-select:none;font-size:12px;font-weight:600;color:#9B6FFF"><input type="checkbox" value="qc" name="reg-role" style="display:none">✅ QC</label>
       <label onclick="toggleRegRole(this)" style="display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(255,64,64,.3);background:rgba(255,64,64,.06);cursor:pointer;transition:all .15s;user-select:none;font-size:12px;font-weight:600;color:#FF4040"><input type="checkbox" value="subVideo" name="reg-role" style="display:none">🎬 Sub & Video</label>
+      <label onclick="toggleRegRole(this)" style="display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(255,111,174,.3);background:rgba(255,111,174,.06);cursor:pointer;transition:all .15s;user-select:none;font-size:12px;font-weight:600;color:#FF6FAE"><input type="checkbox" value="translation" name="reg-role" style="display:none">🌐 นักแปล</label>
       <label onclick="toggleRegRole(this)" style="display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(21,101,255,.3);background:rgba(21,101,255,.06);cursor:pointer;transition:all .15s;user-select:none;font-size:12px;font-weight:600;color:#1565FF"><input type="checkbox" value="manager" name="reg-role" style="display:none">🗂️ Manager</label>
      </div>
     </div>
@@ -1127,12 +1131,14 @@ body.sidebar-collapsed .main-content{
    <div class="nav-section">ภาพรวม</div>
    <div class="nav-item active" onclick="nav('dashboard')"><span class="nav-icon">🏠</span><span>หน้าหลัก</span></div>
    <div class="nav-section">งาน</div>
-   <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span><span class="nav-badge hidden" id="track-badge">0</span></div>
-   <div class="nav-item" onclick="nav('assign')"><span class="nav-icon">📋</span><span>มอบหมายงาน</span></div>
-   <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span><span class="nav-badge hidden" id="deadline-badge">0</span></div>
-   <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">📌</span><span>ลงคิว</span></div>
+   <div class="nav-item" onclick="nav('projroom')"><span class="nav-icon">🐧</span><span>ห้องโปรเจกต์</span></div>
+   <div class="nav-item" onclick="nav('assign')"><span class="nav-icon">📋</span><span>มอบหมายงาน</span></div>
    <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
+   <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span><span class="nav-badge hidden" id="deadline-badge">0</span></div>
+   <div class="nav-item" onclick="nav('drive')"><span class="nav-icon">📂</span><span>จัดไฟล์งาน</span></div>
+   <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span><span class="nav-badge hidden" id="track-badge">0</span></div>
+   <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-section">การเงิน</div>
    <div class="nav-item" onclick="nav('queue')"><span class="nav-icon">💸</span><span>คิวจ่ายเงิน</span><span class="nav-badge hidden" id="queue-badge">0</span></div>
    <div class="nav-item" onclick="nav('payroll')"><span class="nav-icon">📆</span><span>รอบจ่ายรายเดือน</span></div>
@@ -1154,12 +1160,14 @@ body.sidebar-collapsed .main-content{
   <nav class="sidebar-nav hidden" id="manager-nav">
    <div class="nav-section">ของฉัน</div>
    <div class="nav-item active" onclick="nav('mgr-home')"><span class="nav-icon">🏠</span><span>ภาพรวม</span></div>
+   <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">📌</span><span>ลงคิว</span></div>
+   <div class="nav-item" onclick="nav('projroom')"><span class="nav-icon">🐧</span><span>ห้องโปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('assign')"><span class="nav-icon">📋</span><span>มอบหมายงาน</span></div>
+   <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
    <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
+   <div class="nav-item" onclick="nav('drive')"><span class="nav-icon">📂</span><span>จัดไฟล์งาน</span></div>
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
    <div class="nav-item" onclick="nav('mgr-calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
-   <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">📌</span><span>ลงคิว</span></div>
-   <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
    <div class="nav-item" onclick="nav('confirm-amount')"><span class="nav-icon">📥</span><span>ยืนยันยอด</span><span class="nav-badge hidden" id="ca-badge-mgr">0</span></div>
    <div class="nav-item" onclick="nav('mgr-team')"><span class="nav-icon">👥</span><span>จัดการทีม</span></div>
   </nav>
@@ -1380,6 +1388,11 @@ body.sidebar-collapsed .main-content{
       <div style="flex:1;min-width:170px"><div class="set-toolname">🧹 ล้างโปรเจกต์ซ้ำ</div><div class="set-toolsub">ลบโปรเจกต์ที่ชื่อมี [คัดลอก] ทั้งหมด</div></div>
       <button class="btn btn-sm btn-red" onclick="adminCleanDuplicates()">ล้างซ้ำ</button>
      </div>
+     <div class="set-toolrow" style="border-top:1px solid rgba(255,64,64,.25);margin-top:10px;padding-top:10px">
+      <div style="flex:1;min-width:170px"><div class="set-toolname">🚨 ล้างข้อมูลฉุกเฉิน (ทั้งระบบ)</div><div class="set-toolsub">ด่านสุดท้ายกันข้อมูลรั่วไหล — ลบข้อมูลทั้งเครื่อง+Firebase ต้องใส่รหัสฉุกเฉินที่ตั้งไว้เท่านั้น</div></div>
+      <button class="btn btn-sm btn-outline" onclick="setWipeCode()">🔑 ตั้ง/เปลี่ยนรหัส</button>
+      <button class="btn btn-sm btn-red" onclick="openEmergencyWipe()">🚨 ล้างทั้งหมด</button>
+     </div>
     </div>
    </div>
 
@@ -1555,6 +1568,11 @@ body.sidebar-collapsed .main-content{
   .alc-person:active{cursor:grabbing}
   .alc-person.alc-drag{opacity:.35}
   .alc-person.alc-taken{border-color:rgba(155,111,255,.45);background:rgba(155,111,255,.08)}
+  .alc-person.alc-busy{opacity:.8;cursor:default;border-color:rgba(255,64,64,.3)}
+  .alc-person.alc-busy:hover{border-color:rgba(255,64,64,.5)}
+  .alc-p-quote{flex-basis:100%;font-size:10.5px;color:var(--text2);background:rgba(0,0,0,.25);border-radius:7px;padding:4px 8px;line-height:1.5;margin-top:3px}
+  .alc-tgl{cursor:pointer;font-size:10px;padding:2px 8px;border-radius:8px;border:1px solid var(--border2);color:var(--text2);margin-left:auto;white-space:nowrap}
+  .alc-tgl:hover{border-color:var(--accent2);color:var(--accent2)}
   .alc-p-n{font-size:12.5px;font-weight:800;white-space:nowrap}
   .alc-roles{display:flex;gap:2px}
   .alc-rl{font-size:10px;padding:1px 5px;border-radius:6px;background:rgba(255,255,255,.07);color:var(--text2)}
@@ -1583,7 +1601,36 @@ body.sidebar-collapsed .main-content{
   .alc-x:hover{opacity:1}
   .alc-newproj{border:2px dashed rgba(0,180,255,.35);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--accent2);cursor:pointer;min-height:150px;font-weight:700;font-size:12.5px;text-align:center;transition:.15s}
   .alc-newproj:hover{background:rgba(0,180,255,.06)}
+  .pr-step{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:13px 15px;margin-bottom:12px}
+  .pr-step-t{font-size:13px;font-weight:800;margin-bottom:8px}
+  .pr-in{width:100%;box-sizing:border-box;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px}
+  .pr-lbl{font-size:11px;color:var(--text2);margin:8px 0 3px}
   </style>
+
+  <!-- ── 🐧 ห้องโปรเจกต์ — สร้างหมวด+ห้องใน Discord และโพสต์รายละเอียดโปรเจกต์ (บอทตัวที่ 2) ── -->
+  <div id="page-projroom" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">🐧 ห้องโปรเจกต์</div>
+    <div class="page-subtitle">สร้างหมวดหมู่ + ห้อง #📁project + #🎙พูดคุย ใน Discord แล้วโพสต์คู่มือ/รายละเอียดงานจากเทมเพลต · แก้ข้อมูลแล้วกดอัปเดต โพสต์เดิมถูกแก้ตาม</div>
+    <div class="page-actions">
+     <button class="btn btn-outline" onclick="openProjBotSetup()">🤖 ตั้งค่าบอทโปรเจกต์</button>
+     <button class="btn btn-outline" onclick="openProjPostTplEditor()">⚙️ แก้เทมเพลตโพสต์</button>
+    </div>
+   </div>
+   <div id="pr-body"></div>
+  </div>
+
+  <!-- ── 📂 จัดไฟล์งาน — สร้าง/จัดโฟลเดอร์ Google Drive ตามเทมเพลต + อัปโหลดไฟล์ จบในเว็บ ── -->
+  <div id="page-drive" class="page hidden">
+   <div class="page-header">
+    <div class="page-title">📂 จัดไฟล์งาน</div>
+    <div class="page-subtitle">สร้างโฟลเดอร์งานใน Google Drive ตามเทมเพลต · สร้างไฟล์บทจากเทมเพลตเดิม · โยนไฟล์เข้าโฟลเดอร์ · สร้างโฟลเดอร์ส่งงานลูกค้า — จบงานได้ในเว็บ</div>
+    <div class="page-actions">
+     <button class="btn btn-outline" onclick="openDriveSetup()">🔧 ตั้งค่า Drive</button>
+    </div>
+   </div>
+   <div id="dr-body"></div>
+  </div>
 
   <!-- ── 📆 รอบจ่ายรายเดือน — จ่าย + ออกเอกสารรายคนจบในที่เดียว ── -->
   <div id="page-payroll" class="page hidden">
@@ -1651,6 +1698,8 @@ body.sidebar-collapsed .main-content{
     <div class="page-actions">
      <button class="btn btn-outline btn-sm" onclick="openEditProject(currentProjId)">✏️ แก้ไขโปรเจกต์</button>
      <button class="btn btn-outline btn-sm" onclick="lockSnapshot()">🔒 อัปเดทยอด Final</button>
+     <button class="btn btn-outline btn-sm" onclick="_prSel=currentProjId;nav('projroom')" style="border-color:rgba(88,101,242,.5);color:#98A5FF">🐧 ห้องโปรเจกต์</button>
+     <button class="btn btn-outline btn-sm" onclick="_drSel=currentProjId;nav('drive')">📂 จัดไฟล์งาน</button>
      <button class="btn btn-blue" onclick="nav('queue')">💸 ออกใบสำคัญ</button>
     </div>
    </div>
@@ -1914,6 +1963,7 @@ body.sidebar-collapsed .main-content{
      <option value="mix">🎧 Mix</option>
      <option value="qc">✅ QC</option>
      <option value="subVideo">🎬 Sub & Video</option>
+     <option value="translation">🌐 นักแปล</option>
      <option value="manager">🗂️ Manager</option>
     </select>
     <label style="font-size:12px;color:var(--text2);font-weight:700;margin-left:6px">📊 สถานะ</label>
@@ -2571,6 +2621,7 @@ body.sidebar-collapsed .main-content{
      <div class="cat-toggle-btn" id="toggle-mix" onclick="toggleCat('mix')" style="border-color:rgba(0,223,160,.4);color:var(--green)">🎧 Mix</div>
      <div class="cat-toggle-btn" id="toggle-qc" onclick="toggleCat('qc')" style="border-color:rgba(155,111,255,.4);color:var(--purple)">✅ QC</div>
      <div class="cat-toggle-btn" id="toggle-sub" onclick="toggleCat('sub')" style="border-color:rgba(255,64,64,.4);color:var(--red)">🎬 Sub & Video</div>
+     <div class="cat-toggle-btn" id="toggle-trn" onclick="toggleCat('trn')" style="border-color:rgba(255,111,174,.4);color:#FF6FAE">🌐 นักแปล</div>
      <div class="cat-toggle-btn" id="toggle-mgr" onclick="toggleCat('mgr')" style="border-color:rgba(21,101,255,.4);color:var(--accent2)">🗂️ Manager</div>
     </div>
    </div>
@@ -2734,6 +2785,35 @@ body.sidebar-collapsed .main-content{
     <div id="sub-select-list" class="worker-dropdown-list"></div>
   </div>
   <select id="sub-select" style="display:none" onchange="addWorkerToSlot('sub','only')"></select>
+</div></div>
+   </div>
+
+   <!-- TRANSLATION (นักแปล) -->
+   <div class="cat-block cat-trn hidden" id="catblock-trn">
+    <div class="cat-block-head"><span>🌐 นักแปล</span>
+     <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:12px;font-weight:400">หัก % <input type="number" id="trn-tax" placeholder="0" style="width:56px;padding:3px 7px;background:rgba(0,0,0,.35);border:1px solid rgba(255,111,174,.3);border-radius:6px;color:#fff;font-family:Kanit;font-size:12px;margin-left:4px" oninput="calcProjSummary()"></span>
+      <span id="trn-subtotal" style="font-size:13px;font-weight:700;color:#FF6FAE">฿0</span>
+     </div>
+    </div>
+    <div class="cat-block-phase">
+     <span class="ph-lbl">📅 เริ่ม</span>
+     <input type="date" id="ph-trn-start" onchange="onPhaseDateChange('trn','start',this.value)">
+     <span class="ph-lbl">🏁 ส่ง</span>
+     <input type="date" id="ph-trn-deadline" onchange="onPhaseDateChange('trn','deadline',this.value)">
+     <span class="ph-lbl">🕒 เวลา</span>
+     <input type="text" id="ph-trn-time" placeholder="00:00" maxlength="5" oninput="this.value=this.value.replace(/[^0-9:.]/g,'')" onchange="validatePhaseTime(this,'trn')"><span id="ph-trn-time-lbl" style="font-size:10px;color:var(--text2);margin-left:6px;align-self:center"></span>
+     <input type="text" id="ph-trn-note" placeholder="📝 โน้ตแบ่งงาน เช่น ใช้ 2 คน · คนที่1 Ep.1-50" onchange="onPhaseDateChange('trn','note',this.value)" style="flex:1;min-width:150px">
+    </div>
+    <div class="cat-block-body"><div id="trn-list"></div><div class="worker-dropdown-wrap">
+  <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('trn-select')">
+    <span>➕ เพิ่มสมาชิก</span><span>▾</span>
+  </button>
+  <div id="trn-select-popup" class="worker-dropdown-popup">
+    <input class="worker-dropdown-search" type="text" placeholder="🔍 ค้นหาชื่อ..." oninput="filterWorkerDropdown('trn-select', this.value)" autocomplete="off">
+    <div id="trn-select-list" class="worker-dropdown-list"></div>
+  </div>
+  <select id="trn-select" style="display:none" onchange="addWorkerToSlot('trn','only')"></select>
 </div></div>
    </div>
 
@@ -2916,6 +2996,7 @@ body.sidebar-collapsed .main-content{
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:5px 10px;border-radius:8px;border:1px solid rgba(0,223,160,.3);background:rgba(0,223,160,.08);font-size:12px;font-weight:700;color:#00DFA0;transition:all .15s"><input type="checkbox" value="mix" style="accent-color:#00DFA0"> 🎧 Mix</label>
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:5px 10px;border-radius:8px;border:1px solid rgba(155,111,255,.3);background:rgba(155,111,255,.08);font-size:12px;font-weight:700;color:#9B6FFF;transition:all .15s"><input type="checkbox" value="qc" style="accent-color:#9B6FFF"> ✅ QC</label>
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:5px 10px;border-radius:8px;border:1px solid rgba(255,64,64,.3);background:rgba(255,64,64,.08);font-size:12px;font-weight:700;color:#FF4040;transition:all .15s"><input type="checkbox" value="subVideo" style="accent-color:#FF4040"> 🎬 Sub & Video</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:5px 10px;border-radius:8px;border:1px solid rgba(255,111,174,.3);background:rgba(255,111,174,.08);font-size:12px;font-weight:700;color:#FF6FAE;transition:all .15s"><input type="checkbox" value="translation" style="accent-color:#FF6FAE"> 🌐 นักแปล</label>
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:5px 10px;border-radius:8px;border:1px solid rgba(21,101,255,.3);background:rgba(21,101,255,.08);font-size:12px;font-weight:700;color:#1565FF;transition:all .15s"><input type="checkbox" value="manager" style="accent-color:#1565FF"> 🗂️ Manager</label>
      </div>
     </div>
@@ -3154,6 +3235,7 @@ const CATS = {
   mix:        {label:'🎧 Mix',         color:'var(--green)'},
   qc:         {label:'✅ QC',          color:'var(--purple)'},
   subVideo:   {label:'🎬 Sub & Video', color:'var(--red)'},
+  translation:{label:'🌐 นักแปล',      color:'#FF6FAE'},
   manager:    {label:'🗂️ Manager',    color:'var(--accent2)'},
 };
 const PHASES = [
@@ -3162,6 +3244,7 @@ const PHASES = [
   {key:'mix',        label:'🎧 Mix',          emoji:'🎧', color:'var(--green)'},
   {key:'qc',         label:'✅ QC',           emoji:'✅', color:'var(--purple)'},
   {key:'subVideo',   label:'🎬 Sub & Video', emoji:'🎬', color:'var(--red)'},
+  {key:'translation',label:'🌐 นักแปล',      emoji:'🌐', color:'#FF6FAE'},
   {key:'manager',    label:'🗂️ Manager',    emoji:'🗂️', color:'var(--accent2)'},
 ];
 
@@ -3773,7 +3856,7 @@ function cancelQtEdit(){
 // ══════════════════════════════════════════════
 function getStaffData(){
   const raw=ls('staff_v3');
-  if(!raw||!Object.keys(raw).length) return {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
+  if(!raw||!Object.keys(raw).length) return {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],translation:[],manager:[]};
   // Normalize: Firebase อาจ return {0:{...},1:{...}} แทน array
   const norm={};
   Object.entries(raw).forEach(([cat,val])=>{
@@ -3846,7 +3929,7 @@ function saveStaffData(d){
   if(_fbDatabase){
     // Save per-category to avoid overwriting other admins' changes
     const updates = {};
-    ['dubbing','adaptation','mix','qc','subVideo','manager'].forEach(cat=>{
+    ['dubbing','adaptation','mix','qc','subVideo','translation','manager'].forEach(cat=>{
       updates['staff/'+cat] = d[cat]||[];
     });
     // Mirror to public/staff_list — flat array for registration page (no auth needed to read)
@@ -4019,6 +4102,7 @@ const AV_CATS = {
   qc:{label:'ทีม QC', icon:'✅', mention:'@ทีม QC', channel:'ลงคิวบท-qc'},
   mix:{label:'ทีมมิกซ์', icon:'🎧', mention:'@ทีมมิกซ์', channel:'ลงคิวมิกซ์-ซับ'},
   subVideo:{label:'ทีมซับ/วิดีโอ', icon:'🎬', mention:'@ทีมซับ', channel:'ลงคิวมิกซ์-ซับ'},
+  translation:{label:'นักแปล', icon:'🌐', mention:'@นักแปล', channel:'-'},
   manager:{label:'เมเนเจอร์', icon:'🗂️', mention:'@เมเนเจอร์', channel:'-'},
 };
 const _TH_MONTH_FULL=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
@@ -4029,8 +4113,8 @@ function getRound(id){ return getRounds().find(r=>r.id===id)||null; }
 function getRoundReplies(roundId){ const v=ls('avail_r_'+roundId); return (v&&typeof v==='object')?v:{}; }
 // ── สถานะการตอบ: ตอบรับ / แจ้งไม่สะดวก / ยังไม่ตอบ ──
 //    ทีมอัปเดตคำตอบซ้ำได้ ระบบเก็บของเดิมไว้เป็นประวัติ แล้วยึดข้อความล่าสุดเป็นคำตอบปัจจุบัน
-const AV_CANCEL_RE = /ไม่สะดวก|ไม่ว่าง|ขอถอน|ถอนคิว|ยกเลิก|ขอผ่าน|ติดธุระ|ไม่ไหว|ขอบายรอบนี้|บายรอบนี้|ไม่รับ/;
-const AV_YES_RE    = /สะดวก|ว่าง|รับได้|รับ|สนใจ|สน|โอเค|ok/i;
+const AV_CANCEL_RE = /ไม่สะดวก|ไม่ว่าง|ไม่ว่ง|ขอถอน|ถอนคิว|ยกเลิก|ขอผ่าน|ติดธุระ|ไม่ไหว|ขอบายรอบนี้|บายรอบนี้|ไม่รับ/;
+const AV_YES_RE    = /สะดวก|ว่าง|ว่ง|รับได้|รับ|สนใจ|สน|โอเค|ok/i;
 function _avDetectStatus(text, prev){
   const t=String(text||'').trim();
   if(!t) return 'pending';
@@ -4050,7 +4134,33 @@ async function saveRoundReply(roundId, staffId, patch){
       if(next.history.length>10) next.history=next.history.slice(-10);
     }
     if(!Object.prototype.hasOwnProperty.call(patch,'status')){
-      next.status=_avDetectStatus(patch.freeText, cur.status);
+      // 🧮 ระบบหักลบวัน — อัปเดตใหม่ไม่ล้างของเก่าทั้งหมด
+      //   "ว่าง 15 16 17 18" แล้วพิมพ์ "16 17 ไม่ว่างแล้ว" → 15,18 ยังขึ้นว่างเหมือนเดิม
+      //   ข้อความ "ว่าง" ที่ระบุวันใหม่ = แทนที่ชุดวันเดิม (เช่น "เปลี่ยนเป็นว่าง 10-20")
+      const det=_avDetectStatus(patch.freeText, cur.status);
+      const r=getRound(roundId);
+      const rdays=r?_roundDays(r):[];
+      const pf=parseFreeDays(patch.freeText, rdays);
+      const newNums=pf.days.map(d=>d.getDate());
+      const curPf=parseFreeDays(cur.freeText||'', rdays);
+      const curEveryday=cur.everydayFlag===true || curPf.everyday;
+      let baseNums=(Array.isArray(cur.dayNums)&&cur.dayNums.length) ? [...cur.dayNums] : curPf.days.map(d=>d.getDate());
+      if(det==='unavailable' && newNums.length && (baseNums.length || curEveryday)){
+        // ไม่ว่างเฉพาะบางวัน → หักออกจากชุดเดิม ที่เหลือยังว่าง
+        if(!baseNums.length && curEveryday) baseNums=rdays.map(d=>d.getDate());
+        const remain=baseNums.filter(x=>!newNums.includes(x));
+        next.status=remain.length?'available':'unavailable';
+        next.dayNums=remain; next.everydayFlag=false;
+      } else if(det==='available'){
+        next.status='available';
+        if(pf.everyday){ next.everydayFlag=true; next.dayNums=[]; }
+        else if(newNums.length){ next.dayNums=newNums; next.everydayFlag=false; }
+        else { next.dayNums=baseNums; next.everydayFlag=curEveryday; } // "ว่าง" เฉย ๆ — คงชุดวันเดิม
+      } else if(det==='unavailable'){
+        next.status='unavailable'; next.dayNums=[]; next.everydayFlag=false;
+      } else {
+        next.status=det;
+      }
     }
   }
   if(!next.status) next.status=_avDetectStatus(next.freeText, 'pending');
@@ -4396,23 +4506,36 @@ async function pullFromDiscord(silent, allHistory){
   if(!chId){ if(!silent){ toast('ยังไม่ได้ตั้ง ID ห้องของทีมนี้','error'); openDiscordSetup(); } return; }
   if(!silent) showLoader(true);
   try{
-    // allHistory = ดึง 100 ข้อความล่าสุดทั้งห้อง (ไม่สนว่าโพสของบอทอยู่ตรงไหน)
-    const res=await callAppsScript({action:'discordFetch', channelId:chId, afterId:(allHistory?'':(r.postedMessageId||'')), limit:100});
+    // 🔎 สแกน 100 ข้อความล่าสุดของทั้งห้องเสมอ — ไม่อิงโพสของบอท
+    //    (เดิมดึงเฉพาะที่ใหม่กว่าโพสล่าสุด → พอกด "โพสใหม่" ทับ คำตอบเก่าหายเงียบตลอดกาล)
+    const res=await callAppsScript({action:'discordFetch', channelId:chId, afterId:'', limit:100});
     let msgs=res.messages||[];
     const fetched=msgs.length;
     let skipped=0;
-    // ไม่มีโพสของบอทให้อ้างอิง → กรองเอาเฉพาะข้อความหลังเปิดรอบ (เผื่อ 2 ชม. กันเคสโพสก่อนเปิดรอบในเว็บ)
-    if(!r.postedMessageId && !allHistory && r.createdAt){
+    // เอาเฉพาะข้อความหลังเปิดรอบ (เผื่อ 2 ชม.) — กันข้อความเก่าจากรอบก่อน ๆ · allHistory = เอาทั้งหมด
+    if(!allHistory && r.createdAt){
       const since=new Date(new Date(r.createdAt).getTime() - 2*3600*1000).toISOString();
       const inRange=msgs.filter(m=>String(m.at||'') >= since);
       skipped=msgs.length-inRange.length;
       msgs=inRange;
     }
     const unmatched=[];
-    let n=0;
+    let n=0, emptyCount=0;
     // ข้อความใหม่กว่าทับข้อความเก่าของคนเดียวกัน (เรียงเวลามาแล้วจาก Apps Script)
     for(const m of msgs){
-      if(!String(m.content||'').trim()) continue;
+      // เนื้อความว่าง = มักเกิดจากบอทไม่ได้เปิดสิทธิ์ Message Content Intent (Discord ส่งข้อความมาแบบไร้ตัวหนังสือ)
+      // → ห้ามข้ามเงียบ: ลองจับคู่จาก "ชื่อ" ก่อน จับได้ก็บันทึกเลย จับไม่ได้ก็ขึ้นกล่องส้มให้ผูกเอง
+      if(!String(m.content||'').trim()){
+        emptyCount++;
+        const lk=matchStaffByDiscord(m);
+        if(lk.staff){
+          await saveRoundReply(r.id, lk.staff.id, {freeText:'', discordName:m.displayName||m.username, source:'discord'});
+          n++;
+        } else {
+          unmatched.push({...m, content:'', options:lk.options||[], noContent:true});
+        }
+        continue;
+      }
       const match=matchStaffByDiscord(m);
       if(match.staff){
         await saveRoundReply(r.id, match.staff.id, {
@@ -4428,24 +4551,27 @@ async function pullFromDiscord(silent, allHistory){
     if(!silent){
       if(!msgs.length && skipped){
         // มีข้อความในห้องแต่เก่ากว่าเวลาที่เปิดรอบ — ถามว่าจะดึงย้อนหลังทั้งหมดไหม
-        if(confirm(`ไม่พบข้อความใหม่หลังเปิดรอบนี้\n(ในห้องมี ${skipped} ข้อความ แต่เก่ากว่าเวลาที่เปิดรอบ)\n\nดึงย้อนหลัง ${fetched} ข้อความล่าสุดทั้งหมดเลยไหม?`)){
+        if(confirm(`ไม่พบข้อความหลังเวลาเปิดรอบนี้\n(ในห้องมี ${skipped} ข้อความ แต่เก่ากว่าเวลาที่เปิดรอบ)\n\nดึงย้อนหลัง ${fetched} ข้อความล่าสุดทั้งหมดเลยไหม?`)){
           showLoader(false);
           return pullFromDiscord(false, true);
         }
         toast('ไม่พบคำตอบใหม่','info');
-      } else if(!msgs.length && r.postedMessageId && !allHistory){
-        // โพสผ่านบอทแล้วแต่ไม่เจอข้อความใหม่ — เคสทีมตอบไว้ก่อนโพส หรือเพิ่งกด "โพสใหม่" ทับ
-        if(confirm('ไม่พบข้อความใหม่หลังโพสล่าสุดของบอท\n(ถ้าทีมตอบไว้ก่อนโพส หรือเพิ่งกดโพสใหม่ทับ คำตอบจะอยู่ก่อนหน้าโพส)\n\nดึง 100 ข้อความล่าสุดของทั้งห้องมาตรวจแทนไหม?')){
-          showLoader(false);
-          return pullFromDiscord(false, true);
-        }
-        toast('ไม่พบคำตอบใหม่','info');
+      } else if(msgs.length && !n && emptyCount){
+        // ดึงมาได้แต่เนื้อความว่างหมด → บอทอ่านข้อความไม่ได้ ต้องเปิดสิทธิ์ก่อน
+        alert('⚠️ ดึงมา '+emptyCount+' ข้อความ แต่เนื้อความว่างเปล่าทั้งหมด\n\n'
+          +'สาเหตุ: บอทยังไม่ได้เปิดสิทธิ์อ่านข้อความ (MESSAGE CONTENT INTENT)\n\n'
+          +'วิธีแก้ (ทำครั้งเดียว ประมาณ 1 นาที):\n'
+          +'1. เข้าเว็บ discord.com/developers/applications\n'
+          +'2. กดเลือกบอทของเรา → เมนูซ้ายกด "Bot"\n'
+          +'3. เลื่อนลงหาหัวข้อ "Privileged Gateway Intents"\n'
+          +'4. เปิดสวิตช์ "MESSAGE CONTENT INTENT" ให้ติด (สีเขียว/ฟ้า)\n'
+          +'5. กด Save Changes แล้วกลับมากด "ดึงคำตอบจาก Discord" ใหม่');
       } else {
-        toast(`🔄 ดึงมา ${msgs.length} ข้อความ · จับคู่ได้ ${n} คน${unmatched.length?' · ผูกชื่อไม่ได้ '+unmatched.length+' (ดูกล่องส้ม)':''}${skipped?' · ข้ามข้อความเก่า '+skipped:''}`, unmatched.length?'warn':'success');
+        toast(`🔄 ดึงมา ${msgs.length} ข้อความ · จับคู่ได้ ${n} คน${unmatched.length?' · ผูกชื่อไม่ได้ '+unmatched.length+' (ดูกล่องส้ม)':''}${emptyCount?' · อ่านเนื้อความไม่ได้ '+emptyCount:''}${skipped?' · ข้ามข้อความเก่า '+skipped:''}`, unmatched.length?'warn':'success');
       }
     }
     renderAvailability();
-    return {fetched:msgs.length, matched:n, unmatched:unmatched.length};
+    return {fetched:msgs.length, matched:n, unmatched:unmatched.length, empty:emptyCount};
   }catch(e){ if(!silent) toast('ดึงไม่สำเร็จ: '+e.message,'error'); return {fetched:0, matched:0, unmatched:0, error:String(e&&e.message||e)}; }
   finally{ if(!silent) showLoader(false); }
 }
@@ -4463,7 +4589,7 @@ function _dcUnmatchedHTML(r){
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--border2)">
         <div style="flex:1;min-width:170px">
           <div style="font-size:12.5px;font-weight:700">${esc(m.displayName||m.username||'?')}</div>
-          <div style="font-size:11px;color:var(--text2)">${esc(String(m.content||'').slice(0,90))}</div>
+          <div style="font-size:11px;color:${m.noContent?'var(--orange)':'var(--text2)'}">${m.noContent?'⚠️ บอทอ่านเนื้อความไม่ได้ — เปิดสิทธิ์ MESSAGE CONTENT INTENT แล้วดึงใหม่':esc(String(m.content||'').slice(0,90))}</div>
         </div>
         <select id="dc-un-${i}" style="min-width:150px;padding:6px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px">
           <option value="">— เลือกคนในทีม —</option>
@@ -4846,13 +4972,16 @@ function renderAvailability(){
   if(!list.length){ tblEl.innerHTML='<div style="text-align:center;padding:40px;color:var(--text2)">ไม่มีสมาชิกในหมวดนี้</div>'; return; }
   const TH_DOW=['จ','อ','พ','พฤ','ศ','ส','อา'];
   const refDate=days[0]||new Date(r.dateFrom);
-  const ROLE_ICON={dubbing:'🎤',adaptation:'✍️',mix:'🎧',qc:'✅',subVideo:'🎬',manager:'🗂️'};
+  const ROLE_ICON={dubbing:'🎤',adaptation:'✍️',mix:'🎧',qc:'✅',subVideo:'🎬',translation:'🌐',manager:'🗂️'};
   const ROLE_NAME={dubbing:'พากย์',adaptation:'บท',mix:'มิกซ์',qc:'QC',subVideo:'ซับ',manager:'เมเนเจอร์'};
 
   // ── ข้อมูลประกอบของแต่ละคน ──
   function _person(s){
     const e=data[s.id]||{};
-    const parsed=parseFreeDays(e.freeText, days);
+    // ใช้ชุดวันจากระบบหักลบก่อน (แม่นกว่า parse ข้อความล่าสุดเฉย ๆ)
+    let parsed=parseFreeDays(e.freeText, days);
+    if(e.everydayFlag===true) parsed={days:days.slice(), everyday:true, unclear:false};
+    else if(Array.isArray(e.dayNums)&&e.dayNums.length) parsed={days:days.filter(d=>e.dayNums.includes(d.getDate())), everyday:false, unclear:false};
     const jobs=_avCurrentJobs(s.id, refDate);
     const roles=[].concat(s.categories||[s.category]).filter(Boolean);
     return {s,e,parsed,jobs,roles,st:_avStatusOf(e)};
@@ -5015,9 +5144,9 @@ function avCopyForChat(){
 //    ขวา: โปรเจกต์เรียงตามเดทไลน์ — ลากชื่อใส่ช่องตำแหน่ง → ✅ ยืนยันทีละโปรเจกต์ → ใส่ราคา
 //    การลากเป็น "ฉบับร่าง" เก็บใน misc/allocdraft → ทุกเครื่องเห็นพร้อมกันแบบเรียลไทม์
 // ══════════════════════════════════════════════
-const ALC_ROLE={adp:'✍️ เกลาบท',dub:'🎤 พากย์',mix:'🎧 มิกซ์',qc:'✅ QC',sub:'🎬 Sub',mgr:'🗂️ เมเนเจอร์'};
-const ALC_PRE=['adp','dub','mix','qc','sub','mgr'];
-const ALC_CAT2PRE={adaptation:'adp',dubbing:'dub',mix:'mix',qc:'qc',subVideo:'sub',manager:'mgr'};
+const ALC_ROLE={adp:'✍️ เกลาบท',dub:'🎤 พากย์',mix:'🎧 มิกซ์',qc:'✅ QC',sub:'🎬 Sub',trn:'🌐 แปล',mgr:'🗂️ เมเนเจอร์'};
+const ALC_PRE=['adp','dub','mix','qc','sub','trn','mgr'];
+const ALC_CAT2PRE={adaptation:'adp',dubbing:'dub',mix:'mix',qc:'qc',subVideo:'sub',translation:'trn',manager:'mgr'};
 const ALC_TH_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 let _alcFilter='all', _alcSearch='', _alcShowAll=false, _alcShowFull=false, _alcDragSid=null;
 // งานนี้ยังต้องการคนไหม — ใช้ตัดสินว่าจะโชว์บนกระดานหรือไม่
@@ -5076,10 +5205,12 @@ function _alcPeople(){
   rounds.forEach(r=>{
     const reps=getRoundReplies(r.id)||{};
     Object.entries(reps).forEach(([sid,e])=>{
-      if(!e || _avStatusOf(e)==='unavailable') return;
+      if(!e) return;
       const s=getStaffById(sid); if(!s || !isStaffAssignable(s)) return;
       if(!map[sid]) map[sid]={sid, staff:s, replies:[]};
-      map[sid].replies.push({cat:r.cat, freeText:e.freeText||'', at:e.updatedAt||'', round:r});
+      // เก็บสถานะ + ชุดวันหักลบ ติดมากับคำตอบด้วย (คนไม่ว่างก็เก็บ — ไปแสดงในกลุ่ม "แจ้งไม่ว่าง")
+      map[sid].replies.push({cat:r.cat, freeText:e.freeText||'', at:e.updatedAt||'', round:r,
+        dayNums:Array.isArray(e.dayNums)?e.dayNums:null, everyday:e.everydayFlag===true, status:_avStatusOf(e)});
     });
   });
   return Object.values(map);
@@ -5092,7 +5223,14 @@ function _alcDraftOf(sid){
 }
 function _alcAvailChip(rep){
   if(!rep) return '';
-  const pf=parseFreeDays(rep.freeText, _alcRoundDays(rep.round));
+  const rdays=_alcRoundDays(rep.round);
+  // ชุดวันจากระบบหักลบมาก่อนเสมอ
+  if(rep.everyday) return '<span class="alc-chip alc-c-all">ว่างทุกวัน</span>';
+  if(Array.isArray(rep.dayNums)&&rep.dayNums.length){
+    const ds=rdays.filter(d=>rep.dayNums.includes(d.getDate()));
+    if(ds.length) return '<span class="alc-chip alc-c-day">'+ds.map(x=>x.getDate()).join(', ')+' '+(ALC_TH_M[ds[0].getMonth()]||'')+'</span>';
+  }
+  const pf=parseFreeDays(rep.freeText, rdays);
   if(pf.everyday) return '<span class="alc-chip alc-c-all">ว่างทุกวัน</span>';
   if(pf.unclear || !pf.days.length) return '<span class="alc-chip alc-c-warn">ไม่ระบุวัน — อ่านข้อความ</span>';
   const m=ALC_TH_M[pf.days[0].getMonth()]||'';
@@ -5111,15 +5249,32 @@ function _alcDraftChips(sid){
     return '<span class="alc-chip alc-c-in">📁 '+esc(nm)+' '+((ALC_ROLE[x.pre]||'').split(' ')[0])+' ('+_alcDL(p&&p.deadline)+')</span>';
   }).join(' ');
 }
-function _alcPersonRow(o){
+function _alcPersonRow(o, busy){
   const s=o.staff;
   const drafted=_alcDraftOf(o.sid).length>0;
   const rep=[...o.replies].sort((a,b)=>String(b.at).localeCompare(String(a.at)))[0];
-  return '<div class="alc-person'+(drafted?' alc-taken':'')+'" draggable="true" data-sid="'+esc(o.sid)+'" title="'+esc(rep?rep.freeText:'')+'">'
+  const msg=String((rep&&rep.freeText)||'').trim();
+  return '<div class="alc-person'+(drafted?' alc-taken':'')+(busy?' alc-busy':'')+'"'+(busy?'':' draggable="true"')+' data-sid="'+esc(o.sid)+'">'
     +'<span class="alc-p-n">'+esc(s.nickname||s.name||'?')+'</span>'
+    +(_alcPres(s).includes('dub')&&(s.gender==='ชาย'||s.gender==='หญิง')
+      ?'<span class="alc-chip '+(s.gender==='หญิง'?'alc-c-in':'alc-c-day')+'" style="padding:1px 6px" title="เพศ (จากทะเบียนทีม)">'+(s.gender==='หญิง'?'♀ ญ':'♂ ช')+'</span>':'')
     +'<span class="alc-roles">'+_alcPres(s).map(p2=>'<span class="alc-rl">'+((ALC_ROLE[p2]||'').split(' ')[0])+'</span>').join('')+'</span>'
-    +_alcAvailChip(rep)+' '+_alcJobChip(o.sid)+(drafted?' '+_alcDraftChips(o.sid):'')
+    +(busy
+      ? '<span class="alc-chip alc-c-warn">🙅 แจ้งไม่ว่าง</span><span class="alc-tgl" onclick="alcSetAvail(\''+esc(o.sid)+'\',true)" title="ถ้าจริง ๆ แล้วเขาว่าง กดปุ่มนี้ — จะย้ายกลับมาให้ลากเข้างานได้">↩️ ว่างแล้ว</span>'
+      : _alcAvailChip(rep)+' '+_alcJobChip(o.sid)+(drafted?' '+_alcDraftChips(o.sid):'')
+        +'<span class="alc-tgl" onclick="alcSetAvail(\''+esc(o.sid)+'\',false)" title="ย้ายไปกลุ่มแจ้งไม่ว่าง (แก้ด้วยมือ)">🙅 ไม่ว่าง</span>')
+    +'<div class="alc-p-quote">'+(msg?('💬 “'+esc(msg.slice(0,140))+'”'):'<span style="color:var(--orange)">⚠️ อ่านข้อความไม่ได้ — เช็คสิทธิ์บอท</span>')+'</div>'
     +'</div>';
+}
+// สลับสถานะ ว่าง ⇄ ไม่ว่าง ด้วยมือ — มีผลกับทุกรอบที่เปิดอยู่ที่คนนี้ตอบไว้
+async function alcSetAvail(sid, val){
+  const rounds=getRounds().filter(r=>r.status==='open');
+  for(const r of rounds){
+    const reps=getRoundReplies(r.id);
+    if(reps[sid]) await saveRoundReply(r.id, sid, {status: val?'available':'unavailable'});
+  }
+  toast(val?'↩️ ย้ายกลับมากลุ่ม "ว่าง" แล้ว — ลากเข้างานได้เลย':'🙅 ย้ายไปกลุ่ม "แจ้งไม่ว่าง" แล้ว','success');
+  renderAlloc();
 }
 function _alcProjs(){
   const q=String(document.getElementById('alc-proj-search')?.value||'').trim().toLowerCase();
@@ -5166,17 +5321,30 @@ function renderAlloc(){
   }
   const openRounds=getRounds().filter(r=>r.status==='open');
   const people=_alcPeople();
+  // คนที่คำตอบล่าสุดทุกรอบ = ไม่ว่าง → แยกไปกลุ่ม "แจ้งไม่ว่าง" (กดย้ายกลับได้)
+  people.forEach(o=>{ o.unavail=o.replies.length>0 && o.replies.every(x=>x.status==='unavailable'); });
   const match=o=>{
-    if(_alcFilter!=='all' && !_alcPres(o.staff).includes(_alcFilter)) return false;
+    // 🎤 นักพากย์แยกเพศ: dubM = ชาย (รวมไม่ระบุ) · dubF = หญิง
+    if(_alcFilter==='dubM'){ if(!_alcPres(o.staff).includes('dub') || String(o.staff.gender||'')==='หญิง') return false; }
+    else if(_alcFilter==='dubF'){ if(!_alcPres(o.staff).includes('dub') || String(o.staff.gender||'')!=='หญิง') return false; }
+    else if(_alcFilter!=='all' && !_alcPres(o.staff).includes(_alcFilter)) return false;
     if(_alcSearch && !String((o.staff.nickname||'')+' '+(o.staff.name||'')).includes(_alcSearch)) return false;
     return true;
   };
-  const free=people.filter(o=>match(o) && !_alcDraftOf(o.sid).length);
-  const taken=people.filter(o=>match(o) && _alcDraftOf(o.sid).length);
+  const free=people.filter(o=>match(o) && !o.unavail && !_alcDraftOf(o.sid).length);
+  const taken=people.filter(o=>match(o) && !o.unavail && _alcDraftOf(o.sid).length);
+  const busyList=people.filter(o=>match(o) && o.unavail);
   const rail='<div class="alc-rail">'
     +'<div class="alc-railbtn'+(_alcFilter==='all'?' on':'')+'" onclick="_alcFilter=\'all\';renderAlloc()">👥<small>ทั้งหมด</small></div>'
     +ALC_PRE.map(pre=>{
-      const n=people.filter(o=>_alcPres(o.staff).includes(pre) && !_alcDraftOf(o.sid).length).length;
+      if(pre==='dub'){
+        // นักพากย์แยกปุ่ม ชาย/หญิง
+        const nm=people.filter(o=>!o.unavail && _alcPres(o.staff).includes('dub') && String(o.staff.gender||'')!=='หญิง' && !_alcDraftOf(o.sid).length).length;
+        const nf=people.filter(o=>!o.unavail && _alcPres(o.staff).includes('dub') && String(o.staff.gender||'')==='หญิง' && !_alcDraftOf(o.sid).length).length;
+        return '<div class="alc-railbtn'+(_alcFilter==='dubM'?' on':'')+'" onclick="_alcFilter=\'dubM\';renderAlloc()">🎤<small>พากย์ ช '+nm+'</small></div>'
+             + '<div class="alc-railbtn'+(_alcFilter==='dubF'?' on':'')+'" onclick="_alcFilter=\'dubF\';renderAlloc()">🎤<small>พากย์ ญ '+nf+'</small></div>';
+      }
+      const n=people.filter(o=>!o.unavail && _alcPres(o.staff).includes(pre) && !_alcDraftOf(o.sid).length).length;
       return '<div class="alc-railbtn'+(_alcFilter===pre?' on':'')+'" onclick="_alcFilter=\''+pre+'\';renderAlloc()">'+((ALC_ROLE[pre]||'').split(' ')[0])+'<small>'+(ALC_ROLE[pre]||'').split(' ').slice(1).join(' ')+' '+n+'</small></div>';
     }).join('')+'</div>';
   const roundChips=openRounds.map(r=>{const c=AV_CATS[r.cat]||{};return '<span class="alc-chip alc-c-day">'+(c.icon||'')+' '+esc(c.label||r.cat)+'</span>';}).join(' ');
@@ -5192,7 +5360,9 @@ function renderAlloc(){
         const pre=(m.options&&m.options[0]&&m.options[0].id)||'';
         return '<div style="margin-bottom:9px">'
           +'<div style="font-size:12px;font-weight:700">💬 '+esc(m.displayName||m.username||'?')+'</div>'
-          +'<div style="font-size:11px;color:var(--text2);margin:2px 0 5px">“'+esc(String(m.content||'').slice(0,100))+'”</div>'
+          +(m.noContent
+            ?'<div style="font-size:11px;color:var(--orange);margin:2px 0 5px">⚠️ บอทอ่านเนื้อความไม่ได้ — เปิดสิทธิ์ MESSAGE CONTENT INTENT แล้วดึงใหม่</div>'
+            :'<div style="font-size:11px;color:var(--text2);margin:2px 0 5px">“'+esc(String(m.content||'').slice(0,100))+'”</div>')
           +'<div style="display:flex;gap:6px">'
           +'<select id="alc-un-'+esc(u.r.id)+'-'+u.i+'" class="form-input form-select" style="flex:1;min-width:0;padding:5px 24px 5px 8px;font-size:12px">'
           +'<option value="">— เลือกว่าเป็นใครในทีม —</option>'
@@ -5209,8 +5379,9 @@ function renderAlloc(){
     ? unmHTML+'<div style="text-align:center;padding:26px 10px;color:var(--text2);font-size:12.5px;line-height:1.8">'+(unm.length?'ผูกชื่อด้านบนก่อน แล้วรายชื่อจะขึ้นที่นี่':'ยังไม่มีคนตอบรับ<br>กด "🔄 ดึงคำตอบล่าสุด" ด้านบน หรือรอทีมพิมพ์ตอบใน Discord')+'</div>'
     : unmHTML+'<div class="alc-bwrap">'+rail+'<div class="alc-blist">'
       +'<input class="form-input" id="alc-search" placeholder="🔍 ค้นหาชื่อ…" style="width:100%;margin-bottom:8px;padding:7px 11px;font-size:12.5px;box-sizing:border-box" value="'+esc(_alcSearch)+'" oninput="_alcSearch=this.value;renderAlloc();var i=document.getElementById(\'alc-search\');i.focus();i.setSelectionRange(i.value.length,i.value.length)">'
-      +(free.map(_alcPersonRow).join('')||'<div style="font-size:11.5px;color:var(--text2);padding:4px">— ไม่พบคนว่างในหมวดนี้ —</div>')
-      +(taken.length?'<div class="alc-divide">⬇️ ถูกลากเข้างานแล้ว '+taken.length+' คน (ลากเพิ่มได้)</div>'+taken.map(_alcPersonRow).join(''):'')
+      +(free.map(o=>_alcPersonRow(o)).join('')||'<div style="font-size:11.5px;color:var(--text2);padding:4px">— ไม่พบคนว่างในหมวดนี้ —</div>')
+      +(taken.length?'<div class="alc-divide">⬇️ ถูกลากเข้างานแล้ว '+taken.length+' คน (ลากเพิ่มได้)</div>'+taken.map(o=>_alcPersonRow(o)).join(''):'')
+      +(busyList.length?'<div class="alc-divide" style="color:var(--red)">🙅 แจ้งไม่ว่าง '+busyList.length+' คน — กด "↩️ ว่างแล้ว" เพื่อย้ายกลับ</div>'+busyList.map(o=>_alcPersonRow(o,true)).join(''):'')
       +'</div></div>';
   const projs=_alcProjs();
   const shown=_alcShowAll?projs:projs.slice(0,18);
@@ -5353,8 +5524,19 @@ async function alcSavePrice(){
       if(w){ w.ratePerUnit=v.rate; w.unit=v.unit; w.qty=v.qty; w.amount=calcWorkerAmt({amount:v.rate,unit:v.unit,qty:v.qty},dur); }
     });
   });
-  if(res.ok){ toast('💾 บันทึกราคาแล้ว','success'); document.getElementById('tag-overlay')?.remove(); window._alcPriceCtx=null; renderAlloc(); }
+  if(res.ok){ toast('💾 บันทึกราคาแล้ว','success'); document.getElementById('tag-overlay')?.remove(); const _pid=ctx.projId; window._alcPriceCtx=null; renderAlloc(); _alcNextSteps(_pid); }
   else toast('บันทึกไม่สำเร็จ: '+((res.error&&res.error.message)||''),'error');
+}
+// 🚶 สายพานลดคลิก: จัดคน+ราคาเสร็จ → ชวนไปขั้นถัดไปทันที ไม่ต้องหาเมนูเอง
+function _alcNextSteps(projId){
+  const p=getProjects().find(x=>x.id===projId); if(!p) return;
+  _tagOverlayShow('✅ จัดคนเข้า "'+esc(p.name||'')+'" เรียบร้อย — ไปต่อเลยไหม?', `
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-blue" onclick="document.getElementById('tag-overlay')?.remove();_prSel='${esc(projId)}';nav('projroom')">🐧 สร้างห้อง + โพสต์คู่มือใน Discord</button>
+      <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove();_drSel='${esc(projId)}';nav('drive')">📂 สร้างโฟลเดอร์งานในไดรฟ์</button>
+      <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">เสร็จแล้ว ปิดได้เลย</button>
+    </div>
+    <div style="font-size:10.5px;color:var(--text2);margin-top:9px">ทั้งสองหน้าจะเลือกโปรเจกต์นี้รอไว้ให้เลย</div>`, 430);
 }
 // 🔄 ดึงคำตอบจาก Discord ของทุกรอบที่เปิดอยู่ — รายงานผลรวมชัด ๆ ไม่เงียบ
 async function alcPullAll(){
@@ -5362,15 +5544,17 @@ async function alcPullAll(){
   if(!rounds.length){ toast('ยังไม่มีรอบลงคิวที่เปิดอยู่ — เปิดรอบที่หน้า 📌 ลงคิว','warn'); return; }
   const keep=_avRoundId;
   showLoader(true);
-  let fetched=0, matched=0, unm=0, errs=[];
+  let fetched=0, matched=0, unm=0, empty=0, errs=[];
   try{
     for(const r of rounds){
       _avRoundId=r.id;
       const st=await pullFromDiscord(true);
-      if(st){ fetched+=st.fetched||0; matched+=st.matched||0; unm+=st.unmatched||0; if(st.error) errs.push(st.error); }
+      if(st){ fetched+=st.fetched||0; matched+=st.matched||0; unm+=st.unmatched||0; empty+=st.empty||0; if(st.error) errs.push(st.error); }
     }
     if(errs.length) toast('ดึงไม่สำเร็จบางรอบ: '+errs[0],'error');
     else if(!fetched) toast('ไม่พบข้อความใหม่ใน Discord — ถ้าทีมตอบไว้ก่อนโพสล่าสุด ให้ไปหน้า 📌 ลงคิว กด "ดึงคำตอบจาก Discord" ระบบจะเสนอดึงย้อนหลังทั้งห้องให้','warn');
+    else if(!matched && empty)
+      alert('⚠️ ดึงมา '+empty+' ข้อความ แต่เนื้อความว่างเปล่าทั้งหมด\n\nสาเหตุ: บอทยังไม่ได้เปิดสิทธิ์อ่านข้อความ (MESSAGE CONTENT INTENT)\n\nวิธีแก้ (ทำครั้งเดียว):\n1. เข้า discord.com/developers/applications\n2. เลือกบอทของเรา → เมนู "Bot"\n3. เลื่อนหา "Privileged Gateway Intents"\n4. เปิดสวิตช์ "MESSAGE CONTENT INTENT"\n5. กด Save Changes แล้วกลับมากดดึงใหม่');
     else toast('🔄 ดึงมา '+fetched+' ข้อความ · จับคู่ได้ '+matched+' คน'+(unm?' · ผูกชื่อไม่ได้ '+unm+' คน — ดูกล่องส้มในช่องรายชื่อ':''), unm?'warn':'success');
   }catch(e){ toast('ดึงไม่สำเร็จ: '+e.message,'error'); }
   finally{ _avRoundId=keep; showLoader(false); renderAlloc(); }
@@ -5399,10 +5583,625 @@ async function updateRoundPost(roundId){
 }
 
 // ══════════════════════════════════════════════
+// 🐧 ห้อง Discord ประจำโปรเจกต์ — บอทสร้างหมวด+ห้องให้เอง · โพสต์ข้อมูล (แก้ได้โพสต์ตาม) · ดึงทีมเข้าห้อง
+// ══════════════════════════════════════════════
+function _pjDiscordMentions(p){
+  const by={};
+  (p.workers||[]).forEach(w=>{
+    if(!w||!w.id) return;
+    const pre=(w.slot||'').split('-')[0];
+    const s=getStaffById(w.id); if(!s) return;
+    const tag=s.discordId?('<@'+s.discordId+'>'):(s.nickname||s.name||'');
+    if(tag && !(by[pre]=by[pre]||[]).includes(tag)) by[pre].push(tag);
+  });
+  return by;
+}
+// ข้อความโพสต์ = เทมเพลตข้อมูลโปรเจกต์ + บรีฟตามรหัสงาน + แท็กทีม (คนที่ผูก Discord แล้วจะโดนแท็กจริง)
+function buildProjPostText(p){
+  const code=((p.clientCode||'')+(p.seq||''));
+  const briefs=(typeof getBriefTemplates==='function'?getBriefTemplates():{})||{};
+  const brief=briefs[(p.clientCode||'').toUpperCase()];
+  const briefTxt=brief?(typeof brief==='string'?brief:(brief.text||brief.body||'')):'';
+  const by=_pjDiscordMentions(p);
+  const lines=[];
+  lines.push('📁 **'+(p.name||'')+'**'+(code?' ('+code+')':''));
+  if(p.deadline) lines.push('🏁 เดทไลน์: '+fmtDate(p.deadline));
+  if(p.episodes) lines.push('🎬 จำนวนตอน: '+p.episodes+(p.duration?' · ยาว '+p.duration+' นาที':''));
+  if(p.downloadLink) lines.push('🔗 ไฟล์งาน: '+p.downloadLink);
+  const hasTeam=Object.keys(by).length;
+  if(hasTeam){
+    lines.push(''); lines.push('👥 ทีม:');
+    [['trn','🌐 แปล'],['adp','✍️ บท'],['dub','🎤 พากย์'],['mix','🎧 มิกซ์'],['qc','✅ QC'],['sub','🎬 ซับ'],['mgr','🗂️ เมเนเจอร์']]
+      .forEach(([pre,label])=>{ if(by[pre]&&by[pre].length) lines.push(label+': '+by[pre].join(' ')); });
+  }
+  if((p.note||'').trim()){ lines.push(''); lines.push('📌 '+p.note.trim()); }
+  if(briefTxt){ lines.push(''); lines.push(String(briefTxt).slice(0,600)); }
+  return lines.join('\n').slice(0,1900);
+}
+function openProjDiscord(projId){
+  const p=getProjects().find(x=>x.id===projId); if(!p) return;
+  const has=!!p.discordChannelId;
+  const ta='width:100%;box-sizing:border-box;padding:9px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px;line-height:1.6;resize:vertical';
+  _tagOverlayShow('🐧 ห้อง Discord — '+esc(p.name||''), `
+    ${has
+      ? '<div style="font-size:12.5px;margin-bottom:10px">ห้องของโปรเจกต์นี้: <strong style="color:var(--accent2)">#'+esc(p.discordChannelName||p.discordChannelId)+'</strong>'+(p.discordMsgId?' · 📣 เคยโพสต์ข้อมูลแล้ว (กดอัปเดตจะแก้โพสต์เดิม)':'')+'</div>'
+      : `<div style="font-size:11.5px;color:var(--text2);margin-bottom:8px">บอทจะสร้างหมวดหมู่ (ถ้ายังไม่มี) + ห้องข้อความของโปรเจกต์นี้ให้อัตโนมัติ แล้วโพสต์ข้อมูลด้านล่างลงห้องเลย</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:3px">ชื่อหมวดหมู่</div>
+        <input id="pjdc-cat" class="form-input" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:7px 10px;font-size:12.5px" value="${esc((getDiscordCfg().projCategory)||'📁 โปรเจกต์')}">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:3px">ชื่อห้อง</div>
+        <input id="pjdc-name" class="form-input" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:7px 10px;font-size:12.5px" value="${esc((((p.clientCode||'')+(p.seq||''))?(((p.clientCode||'')+(p.seq||''))+'-'):'')+(p.name||''))}">`}
+    <div style="font-size:11px;color:var(--text2);margin:6px 0 3px">📣 ข้อความที่จะโพสต์ (แก้ในกล่องได้เลย):</div>
+    <textarea id="pjdc-preview" rows="9" style="${ta}">${esc(buildProjPostText(p))}</textarea>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      ${has
+        ? `<button class="btn btn-green" style="flex:1" onclick="postProjToDiscord('${esc(p.id)}')">📣 ${p.discordMsgId?'อัปเดตโพสต์ (แก้โพสต์เดิม)':'โพสต์ข้อมูลลงห้อง'}</button>
+           <button class="btn btn-blue" onclick="pullTeamIntoRoom('${esc(p.id)}')" title="เปิดสิทธิ์ให้ทีมในโปรเจกต์ที่ผูกบัญชี Discord แล้ว มองเห็นห้องนี้">👥 ดึงทีมเข้าห้อง</button>
+           <button class="btn btn-outline btn-sm" onclick="unlinkProjRoom('${esc(p.id)}')" title="เลิกผูก (ห้องใน Discord ไม่ถูกลบ)">🔓 เลิกผูก</button>`
+        : `<button class="btn btn-blue" style="flex:1" onclick="createProjRoom('${esc(p.id)}')">🏗️ สร้างห้อง + โพสต์ข้อมูล</button>`}
+      <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
+    </div>
+    <div style="font-size:10.5px;color:var(--text2);margin-top:8px;line-height:1.6">แก้ชื่อคนทำงาน/รายละเอียดในโปรเจกต์เมื่อไหร่ กลับมากด "📣 อัปเดตโพสต์" — ระบบจะแก้โพสต์เดิมใน Discord ให้ตรงกันเสมอ</div>`, 640);
+}
+async function createProjRoom(projId){
+  const p=getProjects().find(x=>x.id===projId); if(!p) return;
+  const catName=(document.getElementById('pjdc-cat')?.value||'').trim();
+  const chName=(document.getElementById('pjdc-name')?.value||p.name||'').trim();
+  if(!chName){ toast('ตั้งชื่อห้องก่อน','error'); return; }
+  showLoader(true);
+  try{
+    const res=await callAppsScript({action:'discordCreateChannel', categoryName:catName, channelName:chName});
+    const cfg=getDiscordCfg(); if(catName && cfg.projCategory!==catName){ cfg.projCategory=catName; await saveDiscordCfg(cfg); }
+    await saveProjectMerge(projId, f=>{ f.discordChannelId=res.channelId; f.discordChannelName=res.channelName||chName; });
+    try{ logAudit('project.discord', p.name, 'สร้างห้อง Discord #'+(res.channelName||chName)); }catch(e){}
+    toast('🏗️ สร้างห้อง #'+(res.channelName||chName)+' แล้ว','success');
+    await postProjToDiscord(projId);
+  }catch(e){
+    toast(String(e.message||'').includes('ไม่รู้จักคำสั่ง')
+      ? 'ตัวกลาง Worker ยังเป็นเวอร์ชันเก่า — เอาโค้ด worker.js ไปวางทับใน Cloudflare แล้ว Deploy ก่อน'
+      : 'สร้างห้องไม่สำเร็จ: '+e.message, 'error');
+  }finally{ showLoader(false); }
+}
+async function postProjToDiscord(projId){
+  const p=getProjects().find(x=>x.id===projId);
+  if(!p||!p.discordChannelId){ toast('ยังไม่มีห้องของโปรเจกต์นี้ — กดสร้างห้องก่อน','warn'); return; }
+  const txt=String(document.getElementById('pjdc-preview')?.value||buildProjPostText(p)).trim();
+  if(!txt){ toast('ข้อความว่าง','error'); return; }
+  showLoader(true);
+  try{
+    if(p.discordMsgId){
+      await callAppsScript({action:'discordEdit', channelId:p.discordChannelId, messageId:p.discordMsgId, content:txt});
+      toast('📣 แก้โพสต์เดิมในห้องให้ตรงข้อมูลล่าสุดแล้ว','success');
+    } else {
+      const r=await callAppsScript({action:'discordPost', channelId:p.discordChannelId, content:txt});
+      await saveProjectMerge(projId, f=>{ f.discordMsgId=r.messageId; });
+      toast('📣 โพสต์ข้อมูลโปรเจกต์ลงห้องแล้ว','success');
+    }
+    try{ logAudit('project.discord', p.name, 'โพสต์/อัปเดตข้อมูลโปรเจกต์ใน Discord'); }catch(e){}
+    document.getElementById('tag-overlay')?.remove();
+  }catch(e){ toast('โพสต์ไม่สำเร็จ: '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+async function pullTeamIntoRoom(projId){
+  const p=getProjects().find(x=>x.id===projId); if(!p||!p.discordChannelId) return;
+  const team=[...new Set((p.workers||[]).map(w=>w&&w.id).filter(Boolean))]
+    .map(id=>getStaffById(id)).filter(s=>s&&s.discordId);
+  if(!team.length){ toast('ทีมในโปรเจกต์ยังไม่มีใครผูกบัญชี Discord (ผูกได้จากหน้าลงคิว/จัดสรรคน)','warn'); return; }
+  showLoader(true);
+  let ok=0, fail=0;
+  try{
+    for(const s of team){
+      try{ await callAppsScript({action:'discordAllowMember', channelId:p.discordChannelId, userId:s.discordId}); ok++; }
+      catch(e){ fail++; }
+    }
+    toast('👥 ดึงทีมเข้าห้องแล้ว '+ok+' คน'+(fail?' · ไม่สำเร็จ '+fail+' คน':''), fail?'warn':'success');
+  }finally{ showLoader(false); }
+}
+async function unlinkProjRoom(projId){
+  if(!confirm('เลิกผูกห้อง Discord กับโปรเจกต์นี้?\n(ห้องใน Discord ยังอยู่ ไม่ถูกลบ — แค่ระบบเลิกจำ)')) return;
+  await saveProjectMerge(projId, f=>{ delete f.discordChannelId; delete f.discordChannelName; delete f.discordMsgId; });
+  toast('เลิกผูกแล้ว','info');
+  document.getElementById('tag-overlay')?.remove();
+}
+
+// ══════════════════════════════════════════════
+// 🐧 หน้า "ห้องโปรเจกต์" — บอทตัวที่ 2 สร้างหมวดหมู่+ห้อง แล้วโพสต์คู่มืองานจากเทมเพลต
+// ══════════════════════════════════════════════
+let _prSel='';
+// บอทโปรเจกต์ = Worker อีกตัว (โค้ดไฟล์เดียวกัน ใส่โทเค็นบอทคนละตัว) — ถ้าไม่ตั้ง จะใช้บอทลงคิวแทน
+async function callProjBot(payload){
+  const cfg=getDiscordCfg();
+  const url=(cfg.projWorkerUrl||cfg.workerUrl||'').trim(), secret=(cfg.projWorkerSecret||cfg.workerSecret||'').trim();
+  if(!url||!secret) throw new Error('ยังไม่ได้ตั้งค่าบอท — กดปุ่ม 🤖 ตั้งค่าบอทโปรเจกต์');
+  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json;charset=utf-8'},body:JSON.stringify({secret,...payload})});
+  let d; try{ d=await res.json(); }catch(e){ throw new Error('บอทตอบผิดรูปแบบ (HTTP '+res.status+') — เช็ค URL/Deploy'); }
+  if(!d.ok) throw new Error(d.error||'ไม่ทราบสาเหตุ');
+  return d;
+}
+function openProjBotSetup(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const cfg=getDiscordCfg();
+  _tagOverlayShow('🤖 ตั้งค่าบอทโปรเจกต์ (บอทตัวที่ 2)', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.7;margin-bottom:10px">
+      สร้างบอทใหม่ใน Discord Developer Portal + Cloudflare Worker อีกตัว (ใช้โค้ดไฟล์ worker.js เดิมเป๊ะ ๆ แค่ใส่โทเค็นของบอทตัวใหม่)
+      แล้วเอา URL กับรหัสลับมากรอกที่นี่ · <strong>เว้นว่าง = ใช้บอทลงคิวตัวเดิมทำหน้าที่แทน</strong>
+    </div>
+    <div class="pr-lbl">URL Worker ของบอทโปรเจกต์</div>
+    <input id="prb-url" class="pr-in" value="${esc(cfg.projWorkerUrl||'')}" placeholder="https://project-bot.xxx.workers.dev" style="font-family:monospace">
+    <div class="pr-lbl">รหัสลับ (WEB_SECRET ของ Worker ตัวนั้น)</div>
+    <input id="prb-secret" type="password" class="pr-in" value="${esc(cfg.projWorkerSecret||'')}" style="font-family:monospace">
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-green" style="flex:1" onclick="saveProjBotSetup()">💾 บันทึก</button>
+      <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
+    </div>`, 520);
+}
+async function saveProjBotSetup(){
+  const cfg=getDiscordCfg();
+  cfg.projWorkerUrl=(document.getElementById('prb-url')?.value||'').trim();
+  cfg.projWorkerSecret=(document.getElementById('prb-secret')?.value||'').trim();
+  await saveDiscordCfg(cfg);
+  toast('บันทึกแล้ว ✅','success');
+  document.getElementById('tag-overlay')?.remove();
+}
+// เทมเพลตโพสต์คู่มืองาน — เขียนครั้งเดียวใช้ทุกโปรเจกต์ (ช่อง {…} ระบบเติมให้เอง)
+const _PR_TPL_DEFAULT=[
+'📄 คู่มือการทำงาน','','🎙 Project — {รหัส}','📁 File Project — {ไดรฟ์}','🎞 จำนวนตอน — {ตอน} ตอน','⏱ เวลารวม — {นาที} นาที','——————————',
+'📝 ทีมเกลา {ทีมบท}','🗓 เดทไลน์ — {เดทไลน์บท}','——————————',
+'🎙 พากย์ — {จำนวนพากย์} คน','🗓 เดทไลน์ — {เดทไลน์พากย์}','🎙 : {นักพากย์}','——————————',
+'🎧 มิกซ์ + QC | {ทีมมิกซ์} {ทีมQC}','🗓 เดทไลน์ QC — {เดทไลน์QC}','🗓 เดทไลน์ Final — {เดทไลน์}','——————————',
+'📌 โน้ต:','{หมายเหตุ}','——————————',
+'🔴 มีเรื่องสอบถาม/งานเลท แท็กแจ้ง {เมเนเจอร์}','🔴 แจ้ง "รับทราบ" ในห้อง 🎙พูดคุย เพื่อคอนเฟิร์มรับงาน'].join('\n');
+function getProjPostTpl(){ return String(ls('projposttpl')||_PR_TPL_DEFAULT); }
+function _prPhaseDL(p,k){
+  const v=p?.phases?.[k]?.deadline||'';
+  if(!v) return '—';
+  const d=new Date(v); if(isNaN(d)) return String(v);
+  const hasT=String(v).includes('T') && !String(v).includes('T23:59');
+  const tail=p?.phases?.[k]?.deadline2 ? ' · รอบ2 '+fmtDate(p.phases[k].deadline2) : '';
+  return fmtDate(v)+(hasT?' | ⏰ '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'):'')+tail;
+}
+function _prFillTpl(p){
+  const by=_pjDiscordMentions(p);
+  const j=k=>(by[k]&&by[k].length)?by[k].join(' / '):'—';
+  const map={
+    '{รหัส}':((p.clientCode||'')+(p.seq||''))||p.name||'', '{ชื่อ}':p.name||'',
+    '{ไดรฟ์}':p.downloadLink||p.driveFolderLink||'—',
+    '{ตอน}':p.episodes||'—', '{นาที}':p.duration||'—',
+    '{เดทไลน์}':p.deadline?fmtDate(p.deadline):'—',
+    '{ทีมบท}':j('adp'), '{นักพากย์}':j('dub'), '{ทีมมิกซ์}':j('mix'), '{ทีมQC}':j('qc'), '{ทีมซับ}':j('sub'), '{ทีมแปล}':j('trn'), '{เมเนเจอร์}':j('mgr'),
+    '{จำนวนพากย์}':(by.dub||[]).length||'—', '{จำนวนบท}':(by.adp||[]).length||'—',
+    '{เดทไลน์บท}':_prPhaseDL(p,'adaptation'), '{เดทไลน์พากย์}':_prPhaseDL(p,'dubbing'),
+    '{เดทไลน์QC}':_prPhaseDL(p,'qc'), '{เดทไลน์มิกซ์}':_prPhaseDL(p,'mix'),
+    '{เดทไลน์ซับ}':_prPhaseDL(p,'subVideo'), '{เดทไลน์แปล}':_prPhaseDL(p,'translation'),
+    '{หมายเหตุ}':(p.note||'').trim()||'—',
+  };
+  let t=getProjPostTpl();
+  Object.entries(map).forEach(([k,v])=>{ t=t.split(k).join(String(v)); });
+  return t.slice(0,1900);
+}
+function openProjPostTplEditor(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมินแก้เทมเพลตได้','error'); return; }
+  _tagOverlayShow('⚙️ เทมเพลตโพสต์คู่มืองาน — ใช้ซ้ำทุกโปรเจกต์', `
+    <div style="font-size:11px;color:var(--text2);line-height:1.7;margin-bottom:8px">
+      ช่องที่ระบบเติมให้เอง: <code>{รหัส} {ชื่อ} {ไดรฟ์} {ตอน} {นาที} {เดทไลน์} {ทีมบท} {นักพากย์} {ทีมมิกซ์} {ทีมQC} {ทีมซับ} {ทีมแปล} {เมเนเจอร์} {จำนวนพากย์} {เดทไลน์บท} {เดทไลน์พากย์} {เดทไลน์QC} {เดทไลน์มิกซ์} {เดทไลน์ซับ} {หมายเหตุ}</code>
+      — คนที่ผูก Discord แล้วจะถูกแท็กจริง
+    </div>
+    <textarea id="prtpl-text" rows="14" class="pr-in" style="line-height:1.6;resize:vertical">${esc(getProjPostTpl())}</textarea>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-green" style="flex:1" onclick="saveProjPostTpl()">💾 บันทึกเทมเพลต</button>
+      <button class="btn btn-outline" onclick="if(confirm('คืนค่าเทมเพลตเริ่มต้น?')){ls('projposttpl',null);fbSaveKeyed('projposttpl',null);openProjPostTplEditor();}">↩️ ค่าเริ่มต้น</button>
+      <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
+    </div>`, 660);
+}
+async function saveProjPostTpl(){
+  const t=String(document.getElementById('prtpl-text')?.value||'').trim();
+  if(!t){ toast('เทมเพลตว่าง','error'); return; }
+  ls('projposttpl', t); try{ await fbSaveKeyed('projposttpl', t); }catch(e){}
+  toast('💾 บันทึกเทมเพลตแล้ว','success');
+  document.getElementById('tag-overlay')?.remove();
+  renderProjRoom();
+}
+function _prComposeCat(){
+  const emoji=document.getElementById('pr-emoji')?.value||'';
+  const kind=document.querySelector('input[name=pr-kind]:checked')?.value||'none';
+  const carer=(document.getElementById('pr-carer')?.value||'').trim();
+  const p=getProjects().find(x=>x.id===_prSel); if(!p) return;
+  const code=((p.clientCode||'')+(p.seq||''))||p.name||'';
+  const kindTxt=kind==='human'?' หนังคน':kind==='ai'?' หนังAI':'';
+  const el=document.getElementById('pr-catname');
+  if(el) el.value=emoji+code+kindTxt+(carer?' | '+carer+' ดูแล':'');
+  try{ ls('projroom_emoji', emoji); }catch(e){}
+}
+function renderProjRoom(){
+  const el=document.getElementById('pr-body'); if(!el) return;
+  const role=currentUser?.role;
+  if(role!=='admin'&&role!=='manager'){ el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin และ Manager เท่านั้น</div>'; return; }
+  let list=getProjects().filter(p=>p&&p.projStatus!=='cancelled'&&p.projStatus!=='done');
+  if(role==='manager') list=list.filter(p=>p.managerId===currentUser.uid);
+  list.sort((a,b)=>String(a.deadline||'9999').localeCompare(String(b.deadline||'9999')));
+  if(_prSel && !list.some(p=>p.id===_prSel)) _prSel='';
+  const p=list.find(x=>x.id===_prSel);
+  const mgrs={}; try{ getAllManagerUsers().forEach(m=>{ mgrs[m.uid]=m.nickname||m.email||''; }); }catch(e){}
+  const sel=`<div class="pr-step"><div class="pr-step-t">1️⃣ เลือกโปรเจกต์</div>
+    <select class="pr-in" onchange="_prSel=this.value;renderProjRoom()">
+      <option value="">— เลือกโปรเจกต์ —</option>
+      ${list.map(x=>`<option value="${esc(x.id)}"${x.id===_prSel?' selected':''}>${esc(((x.clientCode||'')+(x.seq||''))?((x.clientCode||'')+(x.seq||''))+' · ':'')}${esc(x.name||'')}${x.discordChannelId?' 🐧':''}</option>`).join('')}
+    </select></div>`;
+  if(!p){ el.innerHTML=sel+'<div style="color:var(--text2);font-size:12.5px;padding:6px 2px">เลือกโปรเจกต์ก่อน แล้วขั้นตอนสร้างห้อง+โพสต์จะโผล่ที่นี่ · โปรเจกต์ที่มี 🐧 = สร้างห้องแล้ว</div>'; return; }
+  const has=!!p.discordChannelId;
+  const emoji=ls('projroom_emoji')||'❤️';
+  const carer=(p.managerId&&mgrs[p.managerId])||currentUser?.nickname||'';
+  const step2 = has
+    ? `<div class="pr-step"><div class="pr-step-t">2️⃣ ห้องของโปรเจกต์นี้ <span class="alc-chip alc-c-all">✅ สร้างแล้ว</span></div>
+        <div style="font-size:12.5px;line-height:1.8">หมวดหมู่: <strong>${esc(p.discordCategoryName||'-')}</strong><br>ห้อง: <strong style="color:var(--accent2)">#${esc(p.discordChannelName||'📁│project')}</strong>${p.discordTalkId?' + <strong style="color:var(--accent2)">#🎙│พูดคุย</strong>':''}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">
+          <button class="btn btn-blue btn-sm" onclick="prPullTeam('${esc(p.id)}')" title="เปิดสิทธิ์ให้ทีมที่ผูก Discord แล้วเห็นห้อง">👥 ดึงทีมเข้าห้อง</button>
+          <button class="btn btn-outline btn-sm" onclick="prUnlink('${esc(p.id)}')">🔓 เลิกผูกห้อง</button>
+        </div></div>`
+    : `<div class="pr-step"><div class="pr-step-t">2️⃣ สร้างหมวดหมู่ + ห้อง</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <div style="width:70px"><div class="pr-lbl">อิโมจิ</div><input id="pr-emoji" class="pr-in" value="${esc(emoji)}" oninput="_prComposeCat()"></div>
+          <div><div class="pr-lbl">ประเภท</div>
+            <div style="display:flex;gap:10px;font-size:12.5px;padding:8px 0">
+              <label style="cursor:pointer"><input type="radio" name="pr-kind" value="human" onchange="_prComposeCat()"> หนังคน</label>
+              <label style="cursor:pointer"><input type="radio" name="pr-kind" value="ai" onchange="_prComposeCat()"> หนังAI</label>
+              <label style="cursor:pointer"><input type="radio" name="pr-kind" value="none" checked onchange="_prComposeCat()"> ไม่ระบุ</label>
+            </div></div>
+          <div style="flex:1;min-width:130px"><div class="pr-lbl">ใครดูแล</div><input id="pr-carer" class="pr-in" value="${esc(carer)}" oninput="_prComposeCat()"></div>
+        </div>
+        <div class="pr-lbl">ชื่อหมวดหมู่ (แก้เองได้)</div>
+        <input id="pr-catname" class="pr-in" value="">
+        <div style="font-size:10.5px;color:var(--text2);margin-top:5px">บอทจะสร้าง: หมวดหมู่ชื่อนี้ + ห้อง <strong>#📁│project</strong> และ <strong>#🎙│พูดคุย</strong> แล้วโพสต์คู่มือด้านล่างลง #project ให้เลย</div>
+        <button class="btn btn-blue" style="width:100%;margin-top:9px" onclick="createProjRoomCat('${esc(p.id)}')">🏗️ สร้างหมวด+ห้อง แล้วโพสต์คู่มือ</button>
+      </div>`;
+  const step3=`<div class="pr-step"><div class="pr-step-t">3️⃣ โพสต์คู่มืองาน ${p.discordMsgId?'<span class="alc-chip alc-c-all">เคยโพสต์แล้ว — กดอัปเดตจะแก้โพสต์เดิม</span>':''}</div>
+    <textarea id="pr-post" rows="13" class="pr-in" style="line-height:1.6;resize:vertical">${esc(_prFillTpl(p))}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      ${has?`<button class="btn btn-green" style="flex:1" onclick="postProjRoomMsg('${esc(p.id)}')">📣 ${p.discordMsgId?'อัปเดตโพสต์ (แก้โพสต์เดิม)':'โพสต์ลง #project'}</button>`:'<span style="font-size:11.5px;color:var(--text2);align-self:center">สร้างห้องก่อน (ขั้นที่ 2) แล้วปุ่มโพสต์จะใช้ได้ — หรือแก้ข้อความในกล่องได้เลย จะถูกใช้ตอนสร้างห้อง</span>'}
+      <button class="btn btn-outline btn-sm" onclick="renderProjRoom()" title="ดึงข้อมูลล่าสุดของโปรเจกต์มาเติมเทมเพลตใหม่ (ทับที่แก้ไว้ในกล่อง)">↻ รีเฟรชจากเทมเพลต</button>
+    </div></div>`;
+  el.innerHTML=sel+step2+step3;
+  if(!has) _prComposeCat();
+}
+async function createProjRoomCat(projId){
+  const cat=(document.getElementById('pr-catname')?.value||'').trim();
+  if(!cat){ toast('ตั้งชื่อหมวดหมู่ก่อน','error'); return; }
+  const postTxt=String(document.getElementById('pr-post')?.value||'').trim();
+  showLoader(true);
+  try{
+    const c1=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'📁│project'});
+    let c2=null; try{ c2=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'🎙│พูดคุย'}); }catch(e){}
+    let msgId='';
+    if(postTxt){ try{ const r=await callProjBot({action:'discordPost', channelId:c1.channelId, content:postTxt}); msgId=r.messageId||''; }catch(e){} }
+    await saveProjectMerge(projId, f=>{
+      f.discordCategoryName=cat; f.discordChannelId=c1.channelId; f.discordChannelName=c1.channelName||'📁│project';
+      if(c2) f.discordTalkId=c2.channelId;
+      if(msgId) f.discordMsgId=msgId;
+    });
+    try{ logAudit('project.discord', cat, 'สร้างหมวด+ห้องโปรเจกต์ใน Discord'+(msgId?' + โพสต์คู่มือ':'')); }catch(e){}
+    toast('🏗️ สร้างหมวด "'+cat+'" + ห้องแล้ว'+(msgId?' · 📣 โพสต์คู่มือแล้ว':''),'success');
+    renderProjRoom();
+  }catch(e){
+    toast(String(e.message||'').includes('ไม่รู้จักคำสั่ง')
+      ? 'Worker ของบอทยังเป็นเวอร์ชันเก่า — วางโค้ด worker.js ล่าสุดแล้ว Deploy ก่อน'
+      : 'สร้างไม่สำเร็จ: '+e.message,'error');
+  }finally{ showLoader(false); }
+}
+async function postProjRoomMsg(projId){
+  const p=getProjects().find(x=>x.id===projId);
+  if(!p||!p.discordChannelId){ toast('ยังไม่มีห้อง — สร้างห้องก่อน','warn'); return; }
+  const txt=String(document.getElementById('pr-post')?.value||'').trim();
+  if(!txt){ toast('ข้อความว่าง','error'); return; }
+  showLoader(true);
+  try{
+    if(p.discordMsgId){
+      await callProjBot({action:'discordEdit', channelId:p.discordChannelId, messageId:p.discordMsgId, content:txt});
+      toast('📣 แก้โพสต์เดิมให้ตรงข้อมูลล่าสุดแล้ว','success');
+    }else{
+      const r=await callProjBot({action:'discordPost', channelId:p.discordChannelId, content:txt});
+      await saveProjectMerge(projId, f=>{ f.discordMsgId=r.messageId; });
+      toast('📣 โพสต์คู่มือลง #project แล้ว','success');
+    }
+    try{ logAudit('project.discord', p.name, 'โพสต์/อัปเดตคู่มืองานใน Discord'); }catch(e){}
+    renderProjRoom();
+  }catch(e){ toast('โพสต์ไม่สำเร็จ: '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+async function prPullTeam(projId){
+  const p=getProjects().find(x=>x.id===projId); if(!p) return;
+  const team=[...new Set((p.workers||[]).map(w=>w&&w.id).filter(Boolean))].map(id=>getStaffById(id)).filter(s=>s&&s.discordId);
+  if(!team.length){ toast('ทีมยังไม่มีใครผูกบัญชี Discord (ผูกได้ที่หน้าลงคิว/จัดสรรคน)','warn'); return; }
+  showLoader(true);
+  let ok=0, fail=0;
+  try{
+    for(const s of team){
+      for(const ch of [p.discordChannelId, p.discordTalkId].filter(Boolean)){
+        try{ await callProjBot({action:'discordAllowMember', channelId:ch, userId:s.discordId}); ok++; }catch(e){ fail++; }
+      }
+    }
+    toast('👥 เปิดสิทธิ์แล้ว '+ok+' รายการ'+(fail?' · ไม่สำเร็จ '+fail:''), fail?'warn':'success');
+  }finally{ showLoader(false); }
+}
+async function prUnlink(projId){
+  if(!confirm('เลิกผูกห้องกับโปรเจกต์นี้? (ห้องใน Discord ไม่ถูกลบ)')) return;
+  await saveProjectMerge(projId, f=>{ delete f.discordCategoryName; delete f.discordChannelId; delete f.discordChannelName; delete f.discordTalkId; delete f.discordMsgId; });
+  toast('เลิกผูกแล้ว','info');
+  renderProjRoom();
+}
+
+// ══════════════════════════════════════════════
+// 📂 หน้า "จัดไฟล์งาน" — สร้าง/จัดโฟลเดอร์ Google Drive ผ่าน Apps Script (ไฟล์ AppsScript-จัดไฟล์ไดรฟ์.gs)
+// ══════════════════════════════════════════════
+let _drSel='', _drParent='', _drSub='', _drSubs=[], _drProjFolders=[];
+const _DR_TPL_DEFAULT=['1.DUBING (ส่งเสียงพากย์)','2.Videos Original (คลิปแยกตอน)','3.SUB Original','4.QC (ไฟล์อัพคลิปให้คิวซี)','5.{รหัส}_FINAL (ส่งไฟล์ไฟนอลลูกค้า)','-1.{รหัส}_FULL MIX.wav','-2.{รหัส}_DUB + TIMING - DRY.wav','-3.{รหัส}_SUB FINAL.Srt/Ass','-4.{รหัส}_Video Full + Sub.MP4'].join('\n');
+function getDriveCfg(){ const v=ls('drivecfg'); return (v&&typeof v==='object')?v:{}; }
+async function saveDriveCfg(c){ ls('drivecfg', c); try{ await fbSaveKeyed('drivecfg', c); }catch(e){} }
+async function callDrive(payload){
+  const cfg=getDriveCfg();
+  if(!(cfg.gasUrl||'').trim()) throw new Error('ยังไม่ได้ตั้งค่า — กดปุ่ม 🔧 ตั้งค่า Drive');
+  const res=await fetch(cfg.gasUrl.trim(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({secret:(cfg.secret||'').trim(),...payload})});
+  let d; try{ d=await res.json(); }catch(e){ throw new Error('Apps Script ตอบผิดรูปแบบ — เช็คว่า Deploy เป็น Web App แล้ว (ทุกคนเข้าถึงได้)'); }
+  if(!d.ok) throw new Error(d.error||'ไม่ทราบสาเหตุ');
+  return d;
+}
+function _drIdFromLink(s){ const m=String(s||'').match(/[-\w]{25,}/); return m?m[0]:String(s||'').trim(); }
+function openDriveSetup(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const cfg=getDriveCfg();
+  _tagOverlayShow('🔧 ตั้งค่าจัดไฟล์งาน (Google Drive)', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.7;margin-bottom:10px">
+      ต้องติดตั้ง Apps Script ครั้งเดียว: เปิดไฟล์ <strong>AppsScript-จัดไฟล์ไดรฟ์.gs</strong> ในโฟลเดอร์เว็บ ทำตามคู่มือหัวไฟล์ แล้วเอา URL + รหัสลับมากรอกที่นี่
+    </div>
+    <div class="pr-lbl">URL Web App ของ Apps Script</div>
+    <input id="drs-url" class="pr-in" value="${esc(cfg.gasUrl||'')}" placeholder="https://script.google.com/macros/s/…/exec" style="font-family:monospace">
+    <div class="pr-lbl">รหัสลับ (SECRET ที่ตั้งใน Apps Script)</div>
+    <input id="drs-secret" type="password" class="pr-in" value="${esc(cfg.secret||'')}" style="font-family:monospace">
+    <div class="pr-lbl">ลิงก์ไฟล์เทมเพลตบท (สเปรดชีต Script/CV ต้นฉบับ — ใช้ก๊อปปี้เป็นไฟล์บทของแต่ละงาน)</div>
+    <input id="drs-scripttpl" class="pr-in" value="${esc(cfg.scriptTplId||'')}" placeholder="วางลิงก์ไฟล์ Script/CV_ ต้นฉบับ">
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-green" style="flex:1" onclick="saveDriveSetup()">💾 บันทึก</button>
+      <button class="btn btn-outline btn-sm" onclick="drTestConn()">🧪 ทดสอบการเชื่อมต่อ</button>
+      <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
+    </div>`, 560);
+}
+async function saveDriveSetup(){
+  const cfg=getDriveCfg();
+  cfg.gasUrl=(document.getElementById('drs-url')?.value||'').trim();
+  cfg.secret=(document.getElementById('drs-secret')?.value||'').trim();
+  cfg.scriptTplId=_drIdFromLink(document.getElementById('drs-scripttpl')?.value||'');
+  await saveDriveCfg(cfg);
+  toast('บันทึกแล้ว ✅','success');
+  document.getElementById('tag-overlay')?.remove();
+  renderDrivePage();
+}
+async function drTestConn(){
+  const url=(document.getElementById('drs-url')?.value||'').trim();
+  const secret=(document.getElementById('drs-secret')?.value||'').trim();
+  if(!url){ toast('กรอก URL ก่อน','error'); return; }
+  showLoader(true);
+  try{
+    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({secret,action:'ping'})});
+    const d=await res.json();
+    toast(d.ok?'✅ เชื่อมต่อได้ — ไดรฟ์ของ '+(d.email||''):'❌ '+(d.error||'ไม่สำเร็จ'), d.ok?'success':'error');
+  }catch(e){ toast('เชื่อมต่อไม่ได้: '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+async function drAddParent(){
+  const link=prompt('วางลิงก์โฟลเดอร์ใน Google Drive (เปิดโฟลเดอร์นั้นแล้วคัดลอก URL มาวาง):');
+  if(!link) return;
+  const name=prompt('ตั้งชื่อเรียกโฟลเดอร์นี้ (เช่น 01. Project_Work หรือ ส่งงานลูกค้า):');
+  if(!name) return;
+  const cfg=getDriveCfg(); cfg.parents=cfg.parents||[];
+  cfg.parents.push({id:_drIdFromLink(link), name:name.trim()});
+  await saveDriveCfg(cfg);
+  _drParent=_drIdFromLink(link);
+  renderDrivePage();
+  toast('➕ เพิ่มโฟลเดอร์หลัก "'+name+'" แล้ว','success');
+}
+async function drLoadSubs(){
+  if(!_drParent){ toast('เลือกโฟลเดอร์หลักก่อน','warn'); return; }
+  showLoader(true);
+  try{
+    const d=await callDrive({action:'list', parentId:_drParent});
+    _drSubs=d.folders||[];
+    toast('🔄 พบ '+_drSubs.length+' โฟลเดอร์','success');
+    renderDrivePage();
+  }catch(e){ toast('โหลดไม่ได้: '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+async function drNewSub(){
+  if(!_drParent){ toast('เลือกโฟลเดอร์หลักก่อน','warn'); return; }
+  const name=prompt('ชื่อโฟลเดอร์หมวดใหม่ (เช่น G, H, M):');
+  if(!name) return;
+  showLoader(true);
+  try{
+    const d=await callDrive({action:'create', parentId:_drParent, name:name.trim()});
+    _drSubs.push({id:d.id, name:d.name||name.trim()});
+    _drSub=d.id;
+    renderDrivePage();
+    toast('📁 สร้างหมวด "'+(d.name||name)+'" แล้ว','success');
+  }catch(e){ toast('สร้างไม่ได้: '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+function _drParseTpl(txt, code){
+  const out=[];
+  String(txt||'').split('\n').map(l=>l.trim()).filter(Boolean).forEach(l=>{
+    const name=l.replace(/^-\s*/,'').split('{รหัส}').join(code);
+    if(l.startsWith('-') && out.length) out[out.length-1].children.push(name);
+    else out.push({name, children:[]});
+  });
+  return out;
+}
+async function drCreateFolders(){
+  const p=getProjects().find(x=>x.id===_drSel);
+  if(!p){ toast('เลือกโปรเจกต์ก่อน','warn'); return; }
+  const parentId=_drSub||_drParent;
+  if(!parentId){ toast('เลือกที่เก็บก่อน (โฟลเดอร์หลัก/หมวด)','warn'); return; }
+  const projName=(document.getElementById('dr-projname')?.value||'').trim();
+  if(!projName){ toast('ตั้งชื่อโฟลเดอร์งานก่อน','error'); return; }
+  const code=((p.clientCode||'')+(p.seq||''))||'';
+  const tplTxt=document.getElementById('dr-tpl')?.value||_DR_TPL_DEFAULT;
+  const checked=[...document.querySelectorAll('#dr-tplchecks input:checked')].map(x=>+x.value);
+  const all=_drParseTpl(tplTxt, code);
+  const items=checked.length?all.filter((_,i)=>checked.includes(i)):all;
+  showLoader(true);
+  try{
+    const root=await callDrive({action:'create', parentId, name:projName});
+    const tr=await callDrive({action:'tree', parentId:root.id, items});
+    const cfg=getDriveCfg(); cfg.tpl=tplTxt; await saveDriveCfg(cfg);
+    await saveProjectMerge(p.id, f=>{ f.driveFolderId=root.id; f.driveFolderLink=root.link||''; if(!f.downloadLink) f.downloadLink=root.link||''; });
+    _drProjFolders=(tr.created||[]).filter(x=>x&&x.id);
+    try{ logAudit('project.drive', p.name, 'สร้างโฟลเดอร์งานในไดรฟ์ ('+items.length+' โฟลเดอร์หลัก)'); }catch(e){}
+    toast('📂 สร้างโฟลเดอร์ "'+projName+'" + เทมเพลตข้างในเรียบร้อย','success');
+    renderDrivePage();
+  }catch(e){ toast('สร้างไม่สำเร็จ: '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+async function drMakeScript(){
+  const p=getProjects().find(x=>x.id===_drSel); if(!p) return;
+  const cfg=getDriveCfg();
+  if(!cfg.scriptTplId){ toast('ยังไม่ได้ใส่ลิงก์ไฟล์เทมเพลตบท — ตั้งได้ที่ 🔧 ตั้งค่า Drive','warn'); return; }
+  if(!p.driveFolderId){ toast('สร้างโฟลเดอร์งานก่อน (ขั้นที่ 3)','warn'); return; }
+  const code=((p.clientCode||'')+(p.seq||''))||p.name;
+  showLoader(true);
+  try{
+    const d=await callDrive({action:'copy', fileId:cfg.scriptTplId, destId:p.driveFolderId, name:'Script/CV_'+code});
+    toast('📄 สร้างไฟล์บท Script/CV_'+code+' แล้ว','success');
+    if(d.link) window.open(d.link,'_blank');
+  }catch(e){ toast('สร้างไฟล์บทไม่ได้: '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+async function drRefreshProjFolders(){
+  const p=getProjects().find(x=>x.id===_drSel);
+  if(!p||!p.driveFolderId){ toast('ยังไม่มีโฟลเดอร์งานของโปรเจกต์นี้','warn'); return; }
+  showLoader(true);
+  try{
+    const d=await callDrive({action:'list', parentId:p.driveFolderId});
+    _drProjFolders=[{id:p.driveFolderId,name:'(โฟลเดอร์หลักของงาน)'},...(d.folders||[])];
+    renderDrivePage();
+  }catch(e){ toast('โหลดไม่ได้: '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+async function drUpload(){
+  const folderId=document.getElementById('dr-upfolder')?.value;
+  const files=document.getElementById('dr-files')?.files;
+  if(!folderId){ toast('เลือกโฟลเดอร์ปลายทางก่อน (กด 🔄 โหลดรายชื่อโฟลเดอร์ถ้ายังว่าง)','warn'); return; }
+  if(!files||!files.length){ toast('เลือกไฟล์ก่อน','warn'); return; }
+  showLoader(true);
+  let ok=0, skip=0;
+  try{
+    for(const f of files){
+      if(f.size>25*1024*1024){ skip++; continue; } // ไฟล์ใหญ่เกิน 25MB ส่งผ่าน Apps Script ไม่ไหว
+      const b64=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||''); r.onerror=rej; r.readAsDataURL(f); });
+      await callDrive({action:'upload', folderId, name:f.name, mimeType:f.type||'application/octet-stream', b64});
+      ok++;
+    }
+    toast('⬆️ อัปโหลดแล้ว '+ok+' ไฟล์'+(skip?' · ข้ามไฟล์ใหญ่เกิน 25MB '+skip+' ไฟล์ (ไฟล์ใหญ่ลากเข้าไดรฟ์ตรง ๆ เร็วกว่า)':''), skip?'warn':'success');
+  }catch(e){ toast('อัปโหลดสะดุด (สำเร็จ '+ok+'): '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+async function drMakeDelivery(){
+  const p=getProjects().find(x=>x.id===_drSel); if(!p){ toast('เลือกโปรเจกต์ก่อน','warn'); return; }
+  const parentId=document.getElementById('dr-delivparent')?.value;
+  if(!parentId){ toast('เลือกโฟลเดอร์หลักสำหรับส่งงานก่อน','warn'); return; }
+  const code=((p.clientCode||'')+(p.seq||''))||'';
+  const name=prompt('ชื่อโฟลเดอร์ส่งงานลูกค้า:', (code?code+' ':'')+(p.name||'')+' - ส่งลูกค้า');
+  if(!name) return;
+  showLoader(true);
+  try{
+    const d=await callDrive({action:'create', parentId, name:name.trim()});
+    toast('📦 สร้างโฟลเดอร์ส่งงาน "'+name+'" แล้ว','success');
+    if(d.link) window.open(d.link,'_blank');
+  }catch(e){ toast('สร้างไม่ได้: '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+function renderDrivePage(){
+  const el=document.getElementById('dr-body'); if(!el) return;
+  const role=currentUser?.role;
+  if(role!=='admin'&&role!=='manager'){ el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin และ Manager เท่านั้น</div>'; return; }
+  const cfg=getDriveCfg();
+  if(!(cfg.gasUrl||'').trim()){
+    el.innerHTML=`<div class="pr-step" style="border-left:3px solid var(--orange)">
+      <div class="pr-step-t">🔧 ตั้งค่าครั้งแรก (ครั้งเดียวจบ)</div>
+      <div style="font-size:12.5px;line-height:1.9;color:var(--text2)">
+        หน้านี้ให้เว็บสร้าง/จัดโฟลเดอร์ใน Google Drive ได้เอง ต้องติดตั้งตัวเชื่อมก่อน:<br>
+        1. เปิดไฟล์ <strong style="color:var(--text)">AppsScript-จัดไฟล์ไดรฟ์.gs</strong> ในโฟลเดอร์เว็บ — มีคู่มือทีละขั้นอยู่หัวไฟล์<br>
+        2. ทำตามคู่มือ (วางโค้ดใน script.google.com → Deploy เป็น Web App)<br>
+        3. กดปุ่มด้านล่าง เอา URL + รหัสลับมากรอก</div>
+      <button class="btn btn-blue" style="margin-top:10px" onclick="openDriveSetup()">🔧 ตั้งค่า Drive</button>
+    </div>`;
+    return;
+  }
+  let list=getProjects().filter(p=>p&&p.projStatus!=='cancelled'&&p.projStatus!=='done');
+  if(role==='manager') list=list.filter(p=>p.managerId===currentUser.uid);
+  list.sort((a,b)=>String(a.deadline||'9999').localeCompare(String(b.deadline||'9999')));
+  if(_drSel && !list.some(p=>p.id===_drSel)) _drSel='';
+  const p=list.find(x=>x.id===_drSel);
+  const parents=cfg.parents||[];
+  if(!_drParent && parents.length) _drParent=parents[0].id;
+  const code=p?(((p.clientCode||'')+(p.seq||''))||''):'';
+  const tplItems=_drParseTpl(cfg.tpl||_DR_TPL_DEFAULT, code||'{รหัส}');
+  el.innerHTML=`
+    <div class="pr-step"><div class="pr-step-t">1️⃣ เลือกโปรเจกต์</div>
+      <select class="pr-in" onchange="_drSel=this.value;_drProjFolders=[];renderDrivePage()">
+        <option value="">— เลือกโปรเจกต์ —</option>
+        ${list.map(x=>`<option value="${esc(x.id)}"${x.id===_drSel?' selected':''}>${esc(((x.clientCode||'')+(x.seq||''))?((x.clientCode||'')+(x.seq||''))+' · ':'')}${esc(x.name||'')}${x.driveFolderId?' 📂':''}</option>`).join('')}
+      </select>
+      ${p&&p.driveFolderLink?`<div style="font-size:11.5px;margin-top:7px">📂 โฟลเดอร์งานนี้: <a href="${esc(p.driveFolderLink)}" target="_blank" rel="noopener" style="color:var(--accent2)">เปิดในไดรฟ์</a></div>`:''}
+    </div>
+    <div class="pr-step"><div class="pr-step-t">2️⃣ ที่เก็บในไดรฟ์</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:1;min-width:160px"><div class="pr-lbl">โฟลเดอร์หลัก</div>
+          <select class="pr-in" onchange="_drParent=this.value;_drSub='';_drSubs=[];renderDrivePage()">
+            ${parents.length?parents.map(x=>`<option value="${esc(x.id)}"${x.id===_drParent?' selected':''}>${esc(x.name)}</option>`).join(''):'<option value="">— ยังไม่มี กด ➕ เพิ่ม —</option>'}
+          </select></div>
+        <button class="btn btn-outline btn-sm" onclick="drAddParent()">➕ เพิ่มโฟลเดอร์หลัก</button>
+        <div style="flex:1;min-width:150px"><div class="pr-lbl">โฟลเดอร์หมวด (เช่น G, H, M)</div>
+          <select id="dr-sub" class="pr-in" onchange="_drSub=this.value">
+            <option value="">(วางตรงโฟลเดอร์หลักเลย)</option>
+            ${_drSubs.map(x=>`<option value="${esc(x.id)}"${x.id===_drSub?' selected':''}>${esc(x.name)}</option>`).join('')}
+          </select></div>
+        <button class="btn btn-outline btn-sm" onclick="drLoadSubs()">🔄 โหลดรายชื่อ</button>
+        <button class="btn btn-outline btn-sm" onclick="drNewSub()">➕ หมวดใหม่</button>
+      </div>
+    </div>
+    <div class="pr-step"><div class="pr-step-t">3️⃣ สร้างโฟลเดอร์งานตามเทมเพลต</div>
+      <div class="pr-lbl">ชื่อโฟลเดอร์งาน</div>
+      <input id="dr-projname" class="pr-in" value="${esc(p?((code?code+' ':'')+(p.name||'')):'')}" placeholder="เลือกโปรเจกต์ก่อน">
+      <div class="pr-lbl">โฟลเดอร์ที่จะสร้างข้างใน (ติ๊กเลือกได้ · แก้เทมเพลตในกล่องล่างได้อิสระ — บรรทัดขึ้นต้น "-" = โฟลเดอร์ย่อยของบรรทัดบน · {รหัส} = รหัสงาน)</div>
+      <div id="dr-tplchecks" style="display:flex;flex-direction:column;gap:3px;font-size:12px;margin:4px 0 8px">
+        ${tplItems.map((it,i)=>`<label style="cursor:pointer"><input type="checkbox" value="${i}" checked> 📁 ${esc(it.name)}${it.children.length?' <span style="color:var(--text2)">(+'+it.children.length+' โฟลเดอร์ย่อย)</span>':''}</label>`).join('')}
+      </div>
+      <textarea id="dr-tpl" rows="6" class="pr-in" style="font-size:11.5px;line-height:1.6;resize:vertical" onchange="const c=getDriveCfg();c.tpl=this.value;saveDriveCfg(c);renderDrivePage()">${esc(cfg.tpl||_DR_TPL_DEFAULT)}</textarea>
+      <button class="btn btn-blue" style="width:100%;margin-top:8px" onclick="drCreateFolders()">📂 สร้างโฟลเดอร์งาน + เทมเพลตข้างใน</button>
+    </div>
+    <div class="pr-step"><div class="pr-step-t">4️⃣ ไฟล์บท + อัปโหลดไฟล์</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn btn-outline btn-sm" onclick="drMakeScript()">📄 สร้างไฟล์บท (Script/CV_${esc(code||'…')})</button>
+        <button class="btn btn-outline btn-sm" onclick="drRefreshProjFolders()">🔄 โหลดโฟลเดอร์ของงานนี้</button>
+      </div>
+      <div class="pr-lbl">โยนไฟล์เข้าโฟลเดอร์ (ไฟล์ละไม่เกิน 25MB — ไฟล์วิดีโอใหญ่ลากเข้าไดรฟ์ตรง ๆ เร็วกว่า)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="dr-upfolder" class="pr-in" style="flex:1;min-width:170px">
+          ${_drProjFolders.length?_drProjFolders.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join(''):'<option value="">— กด 🔄 โหลดโฟลเดอร์ของงานนี้ก่อน —</option>'}
+        </select>
+        <input id="dr-files" type="file" multiple style="font-size:12px;color:var(--text2)">
+        <button class="btn btn-green btn-sm" onclick="drUpload()">⬆️ อัปโหลด</button>
+      </div>
+    </div>
+    <div class="pr-step"><div class="pr-step-t">5️⃣ โฟลเดอร์ส่งงานลูกค้า (แยกออกมาให้คนส่งงาน)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:1;min-width:170px"><div class="pr-lbl">สร้างไว้ในโฟลเดอร์หลัก</div>
+          <select id="dr-delivparent" class="pr-in">${parents.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></div>
+        <button class="btn btn-blue btn-sm" onclick="drMakeDelivery()">📦 สร้างโฟลเดอร์ส่งงาน</button>
+      </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════
 // 📆 รอบจ่ายรายเดือน — รวมงานทั้งเดือนของแต่ละคน · จ่าย + ออกใบ + ส่ง จบในที่เดียว
 //    แก้ปัญหา: เมเนเจอร์ต้องจ่ายรายคนทุกเดือน แต่งานกระจายอยู่หลายสิบโปรเจกต์
 // ══════════════════════════════════════════════
-const PR_SLOT_LABEL = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', mgr:'🗂️ Manager'};
+const PR_SLOT_LABEL = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', trn:'🌐 นักแปล', mgr:'🗂️ Manager'};
 
 // ══════════════════════════════════════════════
 // 💼 เฟส 3 — ประเภทการจ่าย + โบนัส/หัก รายเดือน + สลิป
@@ -6788,7 +7587,7 @@ async function preloadRegStaff(){
           // public list คือ flat array ของ staff (เฉพาะข้อมูลที่จำเป็นสำหรับ register)
           const publicList = snap.val() || [];
           // แปลงกลับเป็น structured object เหมือน staff_v3 (แยกตาม category)
-          const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
+          const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],translation:[],manager:[]};
           (Array.isArray(publicList)?publicList:Object.values(publicList)).forEach(s => {
             if(!s || !s.id) return;
             const cat = s.category || 'dubbing';
@@ -7844,7 +8643,7 @@ auth.onAuthStateChanged(async(fbUser)=>{
           const emailLc = (fbUser.email||'').toLowerCase().trim();
           // staff record ใน public list อาจไม่มี email (เพื่อความเป็นส่วนตัว)
           // → cache ไว้ก่อน แล้วให้ renderMyDash fallback ไปหาจาก staff_v3 (ที่มี email จาก admin)
-          const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
+          const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],translation:[],manager:[]};
           list.forEach(s => {
             if(!s || !s.id) return;
             const cat = s.category || 'dubbing';
@@ -7982,7 +8781,8 @@ async function enterApp(){
   try { await loadMgrRequests(); await loadManagerUsers(); await loadMgrSuspended(); await loadTeamLeft(); } catch(e) {}
   try { await fbLoadKeyed('tags_master'); await fbLoadKeyed('brief_templates'); await fbLoadKeyed('company_expenses');
         await fbLoadKeyed('payroll_profiles'); await fbLoadKeyed('payroll_runs');
-        await fbLoadKeyed('recruit_rounds'); await fbLoadKeyed('discord_cfg'); await fbLoadKeyed('allocdraft'); await fbLoadKeyed('announcetpl'); } catch(e) {}
+        await fbLoadKeyed('recruit_rounds'); await fbLoadKeyed('discord_cfg'); await fbLoadKeyed('allocdraft'); await fbLoadKeyed('announcetpl'); await fbLoadKeyed('wipecode');
+        await fbLoadKeyed('projposttpl'); await fbLoadKeyed('drivecfg'); } catch(e) {}
   try { logLogin(); startIdleWatch(); } catch(e) {}
   // 🕐 สำรองอัตโนมัติรายวัน — รอ 8 วิ ให้ข้อมูลโหลดครบก่อน
   try { setTimeout(()=>{ try{ autoDailyBackup(); }catch(e){} }, 8000); } catch(e) {}
@@ -8044,7 +8844,7 @@ async function enterApp(){
           const snapPub = await _fbDatabase.ref('public/staff_list').get();
           if(snapPub.exists()){
             const publicList = snapPub.val() || [];
-            const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
+            const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],translation:[],manager:[]};
             (Array.isArray(publicList)?publicList:Object.values(publicList)).forEach(s => {
               if(!s || !s.id) return;
               const cat = s.category || 'dubbing';
@@ -8246,7 +9046,7 @@ function nav(page){
   const pg=document.getElementById('page-'+page);if(pg)pg.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes(`'${page}'`))n.classList.add('active')});
   const renders={
-    dashboard:renderDash,track:renderTrack,assign:renderAssign,projects:renderProjects,profit:renderProfit,staff:renderStaff,'staff-detail':renderStaffDetail,queue:renderQueue,payroll:renderPayrollMonth,availability:renderAvailability,alloc:renderAlloc,'payment-history':renderPaymentHistory,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
+    dashboard:renderDash,track:renderTrack,assign:renderAssign,projects:renderProjects,profit:renderProfit,staff:renderStaff,'staff-detail':renderStaffDetail,queue:renderQueue,payroll:renderPayrollMonth,availability:renderAvailability,alloc:renderAlloc,projroom:renderProjRoom,drive:renderDrivePage,'payment-history':renderPaymentHistory,docs:renderDocs,calc:renderCalcList,payment:renderPaymentAccounts,settings:renderSettings,
     'my-dashboard':renderMyDash,'my-history':renderMyHistory,'my-calendar':renderMyCalendar,'confirm-amount':renderConfirmAmountPage,
     'mgr-home':renderMgrHome,'mgr-projects':renderMgrProjects,'mgr-track':renderMgrTrack,'mgr-team':renderMgrTeam,
     'mgr-calc':()=>renderCalcList('mgr-calc-list',true)
@@ -8350,7 +9150,7 @@ function exportPaymentCSV(){
   let projs=getProjects();
   if(currentUser?.role==='manager') projs=projs.filter(p=>p.managerId===currentUser.uid); // scope เฉพาะที่ดูแล
   const rows=[['ชื่อ','นามสกุล','ตำแหน่ง','โปรเจกต์','ลูกค้า','ยอด','สถานะ','Deadline']];
-  projs.forEach(p=>(p.workers||[]).forEach(w=>{const s=getStaffById(w.id);if(!s)return;const[first,...rest]=s.name.split(' ');rows.push([first,rest.join(' ')||'-',(()=>{const _p=(w.slot||'').split('-')[0];const _s=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';const _l={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return (_l[_p]||CATS[s.category]?.label||'')+_s;})()||'',p.name,p.client||'-',w.amount||0,w.status,p.deadline||''])}));
+  projs.forEach(p=>(p.workers||[]).forEach(w=>{const s=getStaffById(w.id);if(!s)return;const[first,...rest]=s.name.split(' ');rows.push([first,rest.join(' ')||'-',(()=>{const _p=(w.slot||'').split('-')[0];const _s=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';const _l={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'};return (_l[_p]||CATS[s.category]?.label||'')+_s;})()||'',p.name,p.client||'-',w.amount||0,w.status,p.deadline||''])}));
   const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;
@@ -10851,7 +11651,7 @@ function inspectWorkers(){
         const s = allStaff[w.id];
         const found = !!s;
         const slot = (w.slot||'').split('-')[0];
-        const slotLabel = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'}[slot] || slot;
+        const slotLabel = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'}[slot] || slot;
         const bg = found ? 'rgba(0,223,160,.04)' : 'rgba(255,64,64,.06)';
         const border = found ? 'rgba(0,223,160,.25)' : 'rgba(255,64,64,.3)';
 
@@ -11328,7 +12128,7 @@ function updateCardProj(cardId,projId){
 }
 function getActivePhasesForProj(p){
   if(!p||!p.workers||!p.workers.length)return PHASES.map(ph=>ph.key);
-  const SMAP={dub:'dubbing',adp:'adaptation',mix:'mix',qc:'qc',sub:'subVideo',mgr:'manager'};
+  const SMAP={dub:'dubbing',adp:'adaptation',mix:'mix',qc:'qc',sub:'subVideo',trn:'translation',mgr:'manager'};
   const keys=new Set();(p.workers||[]).forEach(w=>{const pre=(w.slot||'').split('-')[0];if(SMAP[pre])keys.add(SMAP[pre])});
   return PHASES.map(ph=>ph.key).filter(k=>keys.has(k));
 }
@@ -11604,7 +12404,7 @@ function adminProjDetailHTML(p){
     </div>`;
   }).join('') || '<div style="font-size:12px;color:var(--text2)">ยังไม่มีผู้ทำงาน</div>';
   // phase deadlines
-  const phMap={adaptation:'✍️ บท',dubbing:'🎤 พากย์',mix:'🎧 มิกซ์',qc:'✅ QC',subVideo:'🎬 ซับ/วิดีโอ',manager:'🗂️ จัดการ'};
+  const phMap={adaptation:'✍️ บท',dubbing:'🎤 พากย์',mix:'🎧 มิกซ์',qc:'✅ QC',subVideo:'🎬 ซับ/วิดีโอ',translation:'🌐 แปล',manager:'🗂️ จัดการ'};
   const phHTML=Object.entries(p.phases||{}).filter(([k,ph])=>ph&&(ph.deadline||ph.startDate)).map(([k,ph])=>
     `<span style="font-size:11px;color:var(--text2);background:rgba(0,0,0,.2);padding:3px 9px;border-radius:8px">${phMap[k]||k}: ${ph.deadline?fmtDate(ph.deadline):'—'}</span>`).join(' ');
   const finBlock=hideFin?'' :`<div style="display:flex;gap:18px;flex-wrap:wrap">
@@ -11628,7 +12428,7 @@ function adminProjDetailHTML(p){
 // ══════════════════════════════════════════════
 // PROJECT FORM
 // ══════════════════════════════════════════════
-function initFormSlots(){formSlots={dub:{main:[],sub:[]},adp:{only:[]},mix:{only:[]},qc:{only:[]},sub:{only:[]},mgr:{only:[]}};activeCats=new Set()}
+function initFormSlots(){formSlots={dub:{main:[],sub:[]},adp:{only:[]},mix:{only:[]},qc:{only:[]},sub:{only:[]},trn:{only:[]},mgr:{only:[]}};activeCats=new Set()}
 
 // ══ 💰 ค่าเหมา Manager ตรงจุดมอบหมาย — กรอกครั้งเดียว ระบบใส่ลงหมวด Manager ให้เอง ══
 function _mgrStaffIdOf(uid){
@@ -11692,8 +12492,8 @@ function prefillManagerFee(p){
 //   Short cat keys: adp, dub, mix, qc, sub, mgr
 //   Full phase keys (ใน data): adaptation, dubbing, mix, qc, subVideo, manager
 // ══════════════════════════════════════════════════════════
-const PHASE_KEY_FROM_SHORT = { adp:'adaptation', dub:'dubbing', mix:'mix', qc:'qc', sub:'subVideo', mgr:'manager' };
-const SHORT_FROM_PHASE_KEY = { adaptation:'adp', dubbing:'dub', mix:'mix', qc:'qc', subVideo:'sub', manager:'mgr' };
+const PHASE_KEY_FROM_SHORT = { adp:'adaptation', dub:'dubbing', mix:'mix', qc:'qc', sub:'subVideo', trn:'translation', mgr:'manager' };
+const SHORT_FROM_PHASE_KEY = { adaptation:'adp', dubbing:'dub', mix:'mix', qc:'qc', subVideo:'sub', translation:'trn', manager:'mgr' };
 
 function initFormPhases(){
   formPhases = {};
@@ -11915,8 +12715,8 @@ async function openNewProject(){
   const pd=document.getElementById('pj-deadline');if(pd)pd.value=isoToThai(today);
   const pdpk=document.getElementById('pj-deadline-pk');if(pdpk)pdpk.value=today;
   document.querySelectorAll('.cat-toggle-btn').forEach(b=>b.classList.remove('on'));
-  ['dub','adp','mix','qc','sub','mgr'].forEach(k=>{const el=document.getElementById('catblock-'+k);if(el)el.classList.add('hidden');});
-  ['dub','adp','mix','qc','sub','mgr'].forEach(k=>{const el=document.getElementById(k+'-tax');if(el)el.value='';});
+  ['dub','adp','mix','qc','sub','trn','mgr'].forEach(k=>{const el=document.getElementById('catblock-'+k);if(el)el.classList.add('hidden');});
+  ['dub','adp','mix','qc','sub','trn','mgr'].forEach(k=>{const el=document.getElementById(k+'-tax');if(el)el.value='';});
   // Default phase dates = project today
   applyProjectDatesToEmptyPhases();
   populateFormPhasesUI();
@@ -12050,14 +12850,25 @@ function assignAddRow(){
 }
 function assignCancelRow(){ _assignAdding=false; _assignEditId=null; renderAssign(); }
 function assignEditRow(id){ _assignAdding=false; _assignEditId=id; renderAssign(); }
-const _ASSIGN_PHASES=[['adaptation','บท'],['dubbing','พากย์'],['qc','QC'],['mix','มิกซ์'],['subVideo','ซับ']];
+const _ASSIGN_PHASES=[['translation','แปล'],['adaptation','บท'],['dubbing','พากย์'],['qc','QC'],['mix','มิกซ์'],['subVideo','ซับ']];
 const _TH_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 function _thaiMonthLabel(ym){ const p=ym.split('-'); return _TH_M[parseInt(p[1])-1]+' '+(parseInt(p[0])+543); }
 function _assignDL(p,key){
   const ph=p?.phases?.[key]||{};
-  const base=ph.deadline?fmtDate(ph.deadline):'<span style="opacity:.35">—</span>';
+  // แสดงเวลาด้วยถ้าตั้งไว้ (23:59 = ไม่ได้เจาะจงเวลา ไม่ต้องโชว์)
+  const f=v=>{
+    if(!v) return '';
+    const hasT=String(v).includes('T');
+    const d=new Date(v);
+    if(isNaN(d)) return esc(String(v));
+    const tm=hasT&&!String(v).includes('T23:59') ? ' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+' น.' : '';
+    return fmtDate(v)+tm;
+  };
+  const base=ph.deadline?f(ph.deadline):'<span style="opacity:.35">—</span>';
+  const extra=ph.deadline2?`<div style="font-size:10px;color:var(--orange);margin-top:1px">รอบ 2: ${f(ph.deadline2)}</div>`:'';
   const note=(ph.note||'').trim();
-  return note?`<span title="${esc(note)}" style="cursor:help;border-bottom:1px dotted var(--text2)">${base} 📝</span>`:base;
+  const main=note?`<span title="${esc(note)}" style="cursor:help;border-bottom:1px dotted var(--text2)">${base} 📝</span>`:base;
+  return main+extra;
 }
 function toggleSecretKey(btnId,spanId,key){
   const sp=document.getElementById(spanId); const b=document.getElementById(btnId);
@@ -12094,31 +12905,35 @@ function _assignEditRowHTML(p){
       ${ms.map(m=>`<option value="${esc(m.uid)}"${p.managerId===m.uid?' selected':''}>${esc(m.nickname||m.email)}</option>`).join('')}
     </select>`;
   }
+  // เดทไลน์ราย Role: ใส่เวลาได้ + กด "＋ รอบ 2" เพิ่มเดทไลน์รอบสองของหน้าที่นั้นได้
+  const _dtVal=v=>v?(String(v).includes('T')?v:v+'T23:59'):'';
   const phCells=_ASSIGN_PHASES.map(([k,l])=>{
     const ph=(p.phases||{})[k]||{};
-    return `<td style="padding:6px;vertical-align:top;min-width:112px">${inp('ar-ph-'+k,'date',ph.deadline||'')}<div style="margin-top:3px">${inp('ar-phn-'+k,'text',ph.note||'','📝 โน้ต')}</div></td>`;
+    const has2=!!ph.deadline2;
+    return `<td style="padding:6px;vertical-align:top;min-width:158px">${inp('ar-ph-'+k,'datetime-local',_dtVal(ph.deadline))}
+      <div id="ar-ph2wrap-${k}" style="margin-top:3px;${has2?'':'display:none'}">${inp('ar-ph2-'+k,'datetime-local',_dtVal(ph.deadline2))}</div>
+      <div style="margin-top:3px">${inp('ar-phn-'+k,'text',ph.note||'','📝 โน้ต')}</div>
+      <div style="margin-top:2px"><span onclick="var w=document.getElementById('ar-ph2wrap-${k}');w.style.display=w.style.display==='none'?'block':'none'" style="font-size:10px;color:var(--accent2);cursor:pointer;user-select:none">＋ เดทไลน์รอบ 2</span></div>
+    </td>`;
   }).join('');
   const budgetLocked=!isNew && p.budgetType && p.budgetType!=='flat';
   const budgetCell=budgetLocked
     ? `<td style="padding:6px;font-size:11px;color:var(--text2);vertical-align:top" title="งบเป็นแบบคิดตามหน่วย — แก้ได้ในฟอร์มเต็ม (ปุ่ม 👥)">${fmtB(p.budget||0)}<br>🔒</td>`
     : `<td style="padding:6px;min-width:84px;vertical-align:top">${inp('ar-budget','number',p.budget||'','งบ')}</td>`;
-  // ลูกค้า: เลือกจากที่เคยกรอกได้หรือพิมพ์ใหม่ · ประเภทงาน: ชุดเดียวกับฟอร์มโปรเจกต์
-  const clients=[...new Set((getProjects()||[]).map(x=>(x.client||'').trim()).filter(Boolean))].sort();
-  const clientCell=`<input id="ar-client" list="ar-client-list" value="${esc(p.client||'')}" placeholder="ลูกค้า" style="width:100%;min-width:0;padding:5px 7px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px"><datalist id="ar-client-list">${clients.map(c=>`<option value="${esc(c)}"></option>`).join('')}</datalist>`;
+  // ประเภทงาน: ชุดเดียวกับฟอร์มโปรเจกต์ (ช่องลูกค้าเอาออกตามที่เจ้าของสั่ง)
   const types=['หนัง','ซีรีย์','อนิเมะ','อนิเมชัน','หนังแนวตั้ง','เกม','โฆษณา','บรรยาย','หนังสือเสียง','เพลง','มิกซ์'];
   if(p.type && !types.includes(p.type)) types.push(p.type);
   const typeSel=`<select id="ar-type" style="width:100%;padding:5px 4px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px"><option value="">— ประเภท —</option>${types.map(t=>`<option${p.type===t?' selected':''}>${esc(t)}</option>`).join('')}</select>`;
   return `<tr id="${isNew?'assign-newrow':'assign-editrow'}" style="background:rgba(0,180,255,.06)">
+    <td style="padding:6px;min-width:150px;vertical-align:top">${inp('ar-name','text',p.name||'','ชื่อโปรเจกต์ *')}</td>
     <td style="padding:6px;min-width:126px;vertical-align:top">${inp('ar-deadline','date',p.deadline||'')}</td>
     <td style="padding:6px;min-width:88px;vertical-align:top">${codeSel}</td>
     <td style="padding:6px;min-width:58px;vertical-align:top">${inp('ar-seq','number',p.seq||'','ลำดับ')}</td>
+    <td style="padding:6px;min-width:96px;vertical-align:top">${typeSel}</td>
     ${budgetCell}
     <td style="padding:6px;min-width:58px;vertical-align:top">${inp('ar-episodes','number',p.episodes||'','Ep.')}</td>
     <td style="padding:6px;min-width:112px;vertical-align:top">${mgrSel}</td>
     ${phCells}
-    <td style="padding:6px;min-width:150px;vertical-align:top">${inp('ar-name','text',p.name||'','ชื่อโปรเจกต์ *')}</td>
-    <td style="padding:6px;min-width:110px;vertical-align:top">${clientCell}</td>
-    <td style="padding:6px;min-width:96px;vertical-align:top">${typeSel}</td>
     <td style="padding:6px;min-width:150px;vertical-align:top">${inp('ar-link','text',p.downloadLink||'','https://ลิงก์โหลดงาน')}<div style="margin-top:3px">${inp('ar-secret','text',p.secretKey||'','🔑 Secret key')}</div></td>
     <td style="padding:6px;min-width:120px;vertical-align:top">${inp('ar-note','text',p.note||'','หมายเหตุ')}</td>
     <td style="padding:6px;white-space:nowrap;vertical-align:top">
@@ -12144,13 +12959,12 @@ async function assignSaveRow(projId){
     downloadLink:(g('ar-link')?.value||'').trim(),
     secretKey:(g('ar-secret')?.value||'').trim(),
     note:(g('ar-note')?.value||'').trim(),
-    client:(g('ar-client')?.value||'').trim(),
     type:g('ar-type')?.value||'',
   };
   const budgetEl=g('ar-budget');
   const budget=budgetEl?(parseFloat(budgetEl.value)||0):null;
   const phVals={};
-  _ASSIGN_PHASES.forEach(([k])=>{ phVals[k]={deadline:g('ar-ph-'+k)?.value||'', note:(g('ar-phn-'+k)?.value||'').trim()}; });
+  _ASSIGN_PHASES.forEach(([k])=>{ phVals[k]={deadline:g('ar-ph-'+k)?.value||'', deadline2:g('ar-ph2-'+k)?.value||'', note:(g('ar-phn-'+k)?.value||'').trim()}; });
   if(projId){
     let mgrChanged=false;
     const res=await saveProjectMerge(projId, p=>{
@@ -12160,9 +12974,9 @@ async function assignSaveRow(projId){
       p.phases=p.phases||{};
       _ASSIGN_PHASES.forEach(([k])=>{
         const v=phVals[k];
-        if(v.deadline||v.note){
-          p.phases[k]=Object.assign({startDate:'',submitTime:'',status:'none'}, p.phases[k]||{}, {deadline:v.deadline, note:v.note});
-        } else if(p.phases[k]){ p.phases[k].deadline=''; p.phases[k].note=''; }
+        if(v.deadline||v.deadline2||v.note){
+          p.phases[k]=Object.assign({startDate:'',submitTime:'',status:'none'}, p.phases[k]||{}, {deadline:v.deadline, deadline2:v.deadline2, note:v.note});
+        } else if(p.phases[k]){ p.phases[k].deadline=''; p.phases[k].deadline2=''; p.phases[k].note=''; }
       });
     });
     if(res&&res.ok===false){ toast('บันทึกไม่สำเร็จ','error'); return; }
@@ -12171,7 +12985,7 @@ async function assignSaveRow(projId){
   } else {
     const today=new Date().toISOString().split('T')[0];
     const phases={};
-    _ASSIGN_PHASES.forEach(([k])=>{ const v=phVals[k]; if(v.deadline||v.note) phases[k]={startDate:'',deadline:v.deadline,submitTime:'',status:'none',note:v.note}; });
+    _ASSIGN_PHASES.forEach(([k])=>{ const v=phVals[k]; if(v.deadline||v.deadline2||v.note) phases[k]={startDate:'',deadline:v.deadline,deadline2:v.deadline2,submitTime:'',status:'none',note:v.note}; });
     const proj={
       id:'P'+Date.now(), name, date:today, client:vals.client||'', type:vals.type||'',
       budget:budget||0, budgetRate:budget||0, budgetType:'flat', budgetQty:0, duration:0,
@@ -12183,7 +12997,11 @@ async function assignSaveRow(projId){
     };
     await saveProjectDB(proj);
     if(vals.managerId && vals.managerId!==currentUser?.uid){ try{ addNotification({type:'project',title:`📁 คุณได้รับมอบหมายโปรเจกต์ "${vals.name}"`,recipientUid:vals.managerId,projId:proj.id}); }catch(e){} }
-    toast('เพิ่มงานใหม่แล้ว ✅ — กด 👥 ที่แถวเพื่อจัดทีม/ราคา','success');
+    // 🎯 ลดคลิก: สร้างเสร็จพาไปหน้าจัดสรรคนต่อเลย เพื่อลากคนเข้าโปรเจกต์นี้
+    toast('เพิ่มงาน "'+esc(vals.name)+'" แล้ว ✅ — พามาหน้าจัดสรรคน ลากคนเข้าโปรเจกต์ได้เลย','success');
+    _assignAdding=false; _assignEditId=null;
+    nav('alloc');
+    return;
   }
   _assignAdding=false; _assignEditId=null;
   renderAssign();
@@ -12233,16 +13051,15 @@ function renderAssign(){
         + (p.secretKey?`<div style="margin-top:3px;font-size:11px;color:var(--text2)">🔑 <span id="${secId}" data-shown="0" style="font-family:monospace">••••••••</span> <button id="${secId}-b" class="btn btn-sm btn-outline" style="padding:0 6px;font-size:10px" onclick="toggleSecretKey('${secId}-b','${secId}','${escJs(p.secretKey)}')">👁</button></div>`:'')
       : '<span style="opacity:.35">—</span>';
     return `<tr style="background:${overdue?'rgba(255,64,64,.05)':''}">
+      ${td(`<span style="font-weight:700;cursor:pointer;color:var(--accent2)" onclick="openProjDetail('${p.id}')" title="เปิดรายละเอียด">${esc(p.name||'')}</span>`)}
       ${td(`<span style="font-weight:700;color:${overdue?'var(--red)':'var(--text)'}">${p.deadline?fmtDate(p.deadline):'—'}</span>`)}
       ${td(code?`<span style="padding:2px 10px;border-radius:8px;background:${cc}22;color:${cc};font-weight:800;font-size:12px;cursor:pointer" onclick="openBriefLibrary('${escJs(code)}')" title="เปิดบรีฟงานรหัส ${esc(code)}">${esc(code)}</span>`:'<span style="opacity:.35">—</span>')}
       ${td(p.seq||'<span style="opacity:.35">—</span>','text-align:center')}
+      ${td(p.type?esc(p.type):'<span style="opacity:.35">—</span>','font-size:12px;white-space:nowrap')}
       ${td(p.budget?fmtB(p.budget):'<span style="opacity:.35">—</span>')}
       ${td(p.episodes||'<span style="opacity:.35">—</span>','text-align:center')}
       ${td(p.managerId&&mgrs[p.managerId]?`🗂️ ${esc(mgrs[p.managerId])}`:'👑 แอดมิน')}
       ${_ASSIGN_PHASES.map(([k])=>td(_assignDL(p,k),'white-space:nowrap')).join('')}
-      ${td(`<span style="font-weight:700;cursor:pointer;color:var(--accent2)" onclick="openProjDetail('${p.id}')" title="เปิดรายละเอียด">${esc(p.name||'')}</span>`)}
-      ${td(p.client?esc(p.client):'<span style="opacity:.35">—</span>','max-width:110px;font-size:12px')}
-      ${td(p.type?esc(p.type):'<span style="opacity:.35">—</span>','font-size:12px;white-space:nowrap')}
       ${td(link,'max-width:180px')}
       ${td(p.note?esc(p.note):'<span style="opacity:.35">—</span>','max-width:160px;font-size:11.5px;color:var(--text2)')}
       ${td(`<button class="btn btn-sm btn-outline" style="padding:3px 9px;font-size:11px" onclick="assignEditRow('${p.id}')" title="แก้ในตาราง">✏️</button>
@@ -12251,9 +13068,9 @@ function renderAssign(){
   }).join('');
   const newRow=_assignAdding?_assignEditRowHTML(null):'';
   const emptyHint=(!list.length&&!_assignAdding)
-    ? `<tr><td colspan="18" style="padding:36px;text-align:center;color:var(--text2)">ไม่มีงานในมุมมองนี้ — กด "➕ มอบหมายงานใหม่" เพื่อเพิ่มแถวกรอกแบบชีท</td></tr>`:'';
+    ? `<tr><td colspan="17" style="padding:36px;text-align:center;color:var(--text2)">ไม่มีงานในมุมมองนี้ — กด "➕ มอบหมายงานใหม่" เพื่อเพิ่มแถวกรอกแบบชีท</td></tr>`:'';
   el.innerHTML=toolbar+`<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:1250px">
-    <thead><tr>${th('เดทไลน์')}${th('รหัส')}${th('ลำดับ')}${th('งบ')}${th('Ep.')}${th('ผู้รับผิดชอบ')}${_ASSIGN_PHASES.map(([,l])=>th('DL '+l)).join('')}${th('ชื่อโปรเจกต์')}${th('ลูกค้า')}${th('ประเภท')}${th('Link โหลดงาน')}${th('หมายเหตุ')}${th('')}</tr></thead>
+    <thead><tr>${th('ชื่อโปรเจกต์')}${th('เดทไลน์')}${th('รหัส')}${th('ลำดับ')}${th('ประเภท')}${th('งบ')}${th('Ep.')}${th('ผู้รับผิดชอบ')}${_ASSIGN_PHASES.map(([,l])=>th('DL '+l)).join('')}${th('Link โหลดงาน')}${th('หมายเหตุ')}${th('')}</tr></thead>
     <tbody>${rows}${emptyHint}${newRow}</tbody></table></div>`;
 }
 
@@ -12281,7 +13098,7 @@ function populateWorkerSelects(){
   _workerListCache = buildWorkerList();
   const opts = '<option value="">+ เพิ่มสมาชิก</option>' +
     _workerListCache.map(s => '<option value="'+s.id+'">'+esc((s.nickname||'')+' '+s.name)+'</option>').join('');
-  ['dub-main-select','dub-sub-select','adp-select','mix-select','qc-select','sub-select','mgr-select'].forEach(id => {
+  ['dub-main-select','dub-sub-select','adp-select','mix-select','qc-select','sub-select','trn-select','mgr-select'].forEach(id => {
     const el = document.getElementById(id); if(el) el.innerHTML = opts;
   });
 }
@@ -12302,11 +13119,11 @@ function addWorkerToSlot(cat,slot){
   renderWorkerList(cat,slot);calcProjSummary();
 }
 function renderAllWorkerLists(){
-  const cats=[['dub','main'],['dub','sub'],['adp','only'],['mix','only'],['qc','only'],['sub','only'],['mgr','only']];
+  const cats=[['dub','main'],['dub','sub'],['adp','only'],['mix','only'],['qc','only'],['sub','only'],['trn','only'],['mgr','only']];
   cats.forEach(([cat,slot])=>renderWorkerList(cat,slot));
 }
 function clearAllWorkerLists(){
-  const cats=[['dub','main'],['dub','sub'],['adp','only'],['mix','only'],['qc','only'],['sub','only'],['mgr','only']];
+  const cats=[['dub','main'],['dub','sub'],['adp','only'],['mix','only'],['qc','only'],['sub','only'],['trn','only'],['mgr','only']];
     cats.forEach(([cat,slot])=>{const id=cat==='dub'?`dub-${slot}-list`:`${cat}-list`;const el=document.getElementById(id);if(el)el.innerHTML=''});
 }
 // ══ หน่วยราคา ══
@@ -12325,7 +13142,7 @@ function renderWorkerList(cat,slot){
   const el=document.getElementById(listId);if(!el)return;
   const items=(formSlots[cat]||{})[slot]||[];
   const dur=parseFloat(document.getElementById('pj-duration')?.value)||0;
-  const catColors={dub:'var(--orange)',adp:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',sub:'var(--red)',mgr:'var(--accent2)'};
+  const catColors={dub:'var(--orange)',adp:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',sub:'var(--red)',trn:'#FF6FAE',mgr:'var(--accent2)'};
   el.innerHTML=items.map((w,i)=>{
     const s=getStaffById(w.staffId);
     const hasPerson=!!s;
@@ -12491,7 +13308,7 @@ function toggleBudgetQty(){
 function calcProjSummary(){
   const dur=parseFloat(document.getElementById('pj-duration')?.value)||0;
   let totalExp=0;
-  const catKeys=['dub','adp','mix','qc','sub','mgr'];
+  const catKeys=['dub','adp','mix','qc','sub','trn','mgr'];
   catKeys.forEach(key=>{
     let catTotal=0;const slots=formSlots[key]||{};
     Object.values(slots).forEach(arr=>arr.forEach(w=>{catTotal+=calcWorkerAmt(w,dur)}));
@@ -12531,7 +13348,7 @@ function calcProjSummary(){
   const _sumGrid=document.getElementById('proj-calc-summary');if(_sumGrid)_sumGrid.style.gridTemplateColumns='repeat(4,1fr)';
   ['sum-expense','sum-deduction','sum-profit'].forEach(id=>{const c=document.getElementById(id);if(c&&c.parentElement)c.parentElement.style.display='';});
   // Update per-worker labels without re-rendering (avoids focus loss)
-  const catKeys2=['dub','adp','mix','qc','sub','mgr'];
+  const catKeys2=['dub','adp','mix','qc','sub','trn','mgr'];
   catKeys2.forEach(cat=>{
     const slots=formSlots[cat]||{};
     Object.keys(slots).forEach(slot=>{
@@ -12554,7 +13371,7 @@ async function saveProject(){
       });
     });
   });
-  const tax={};['dub','adp','mix','qc','sub','mgr'].forEach(k=>{tax[k]=parseFloat((document.getElementById(k+'-tax')||{}).value||0)});
+  const tax={};['dub','adp','mix','qc','sub','trn','mgr'].forEach(k=>{tax[k]=parseFloat((document.getElementById(k+'-tax')||{}).value||0)});
   const existingProj=editingProjId?getProjects().find(p=>p.id===editingProjId):null;
   const today=new Date().toISOString().split('T')[0];
   const proj={
@@ -12747,7 +13564,7 @@ async function openViewProject(id){
   const body = document.getElementById('view-project-body');
   if(!body) return;
   // ช่วยแปลง worker slot key → ชื่อหมวด
-  const catLbl = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+  const catLbl = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'};
   // Group workers by cat
   const byCatWorkers = {};
   (p.workers||[]).forEach(w=>{
@@ -12797,7 +13614,7 @@ async function openViewProject(id){
   // Workers block
   const workersHtml = Object.keys(byCatWorkers).length
     ? Object.entries(byCatWorkers).map(([cat, arr])=>{
-        const col = {dub:'var(--orange)',adp:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',sub:'var(--red)',mgr:'var(--accent2)'}[cat] || 'var(--text)';
+        const col = {dub:'var(--orange)',adp:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',sub:'var(--red)',trn:'#FF6FAE',mgr:'var(--accent2)'}[cat] || 'var(--text)';
         return `<div style="margin-bottom:12px">
           <div style="font-size:12px;font-weight:700;color:${col};margin-bottom:6px">${catLbl[cat]||cat}</div>
           ${arr.map(w=>{
@@ -13062,9 +13879,9 @@ async function openEditProject(id){
   document.getElementById('pj-deadline').value=isoToThai(p.deadline||'');document.getElementById('pj-deadline-pk').value=p.deadline||'';
   const typeEl=document.getElementById('pj-type');[...typeEl.options].forEach((o,i)=>{if(o.value===p.type)typeEl.selectedIndex=i});
   // cycle removed - ignored
-  const tax=p.tax||{};['dub','adp','mix','qc','sub','mgr'].forEach(k=>{const el=document.getElementById(k+'-tax');if(el)el.value=tax[k]||''});
+  const tax=p.tax||{};['dub','adp','mix','qc','sub','trn','mgr'].forEach(k=>{const el=document.getElementById(k+'-tax');if(el)el.value=tax[k]||''});
   document.querySelectorAll('.cat-toggle-btn').forEach(b=>b.classList.remove('on'));
-  ['dub','adp','mix','qc','sub','mgr'].forEach(k=>{const c=document.getElementById('catblock-'+k);if(c)c.classList.add('hidden')});
+  ['dub','adp','mix','qc','sub','trn','mgr'].forEach(k=>{const c=document.getElementById('catblock-'+k);if(c)c.classList.add('hidden')});
   activeCats=new Set();
   (p.workers||[]).forEach(w=>{
     const parts=w.slot.split('-');const cat=parts[0];const slot=parts.slice(1).join('-')||'only';
@@ -13152,12 +13969,12 @@ function renderProjDetail(){
   }
   const el=document.getElementById('det-workers');el.innerHTML='';
   const grouped={};(p.workers||[]).forEach(w=>{const parts=w.slot.split('-');const cat=parts[0];if(!grouped[cat])grouped[cat]=[];grouped[cat].push(w)});
-  const catKeyMap={dub:'dubbing',adp:'adaptation',mix:'mix',qc:'qc',sub:'subVideo',mgr:'manager'};
+  const catKeyMap={dub:'dubbing',adp:'adaptation',mix:'mix',qc:'qc',sub:'subVideo',trn:'translation',mgr:'manager'};
   Object.entries(grouped).forEach(([key,wArr])=>{
     const cat=CATS[catKeyMap[key]||key];const div=document.createElement('div');div.className='section-card';
     div.innerHTML=`<div class="section-title" style="color:${cat?.color||'var(--text)'}">${cat?.label||key}</div>`+
       wArr.map(w=>{const s=getStaffById(w.id);if(!s)return'';
-        const slotPre2=(w.slot||'').split('-')[0];const slotLabelMap={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};const slotLabel=(slotLabelMap[slotPre2]||CATS[s.category]?.label||'')+( w.slot.includes('main')?' · หลัก':w.slot.includes('-sub')?' · รอง':'');
+        const slotPre2=(w.slot||'').split('-')[0];const slotLabelMap={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'};const slotLabel=(slotLabelMap[slotPre2]||CATS[s.category]?.label||'')+( w.slot.includes('main')?' · หลัก':w.slot.includes('-sub')?' · รอง':'');
         return`<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border2)">
           <div style="width:36px;height:36px;border-radius:50%;background:${cat?.color||'var(--accent)'}22;color:${cat?.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">${esc(s.nickname[0])}</div>
           <div style="flex:1">
@@ -13207,7 +14024,7 @@ function openPayAmt(projId,workerId,slot){
   if(!s){ toast('ไม่พบข้อมูลทีมงาน','error'); return; }
   // 🔧 Fix: ใช้ slot ที่ส่งเข้ามาเป็น parameter (เดิมอ้าง allSlots[0] ที่ไม่มีอยู่ → ทำให้ฟังก์ชันล้ม)
   const slotKey = (slot||'').split('-')[0];
-  const slotLbl = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+  const slotLbl = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'};
   const roleLabel = slotLbl[slotKey] || CATS[s.category]?.label || '';
   document.getElementById('payamt-info').innerHTML=`<div style="padding:12px;background:var(--bg2);border-radius:10px"><div style="font-weight:700">${esc(s.name)} (${esc(s.nickname)})</div><div style="font-size:12px;color:var(--text2)">${roleLabel} | ${esc(s.bank||'')} ${esc(s.account||'')}</div></div>`;
   document.getElementById('payamt-val').value=w?.amount||0;
@@ -14033,7 +14850,7 @@ function renderQueue() {
           <div style="width:34px;height:34px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">${esc(s.nickname[0])}</div>
           <div>
             <div style="font-weight:700;font-size:13px">${esc(s.name)}</div>
-            <div style="font-size:10px;color:${color};margin-top:1px">${(()=>{const pre=(w.slot||'').split('-')[0];const suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return (lbl[pre]||CATS[s.category]?.label||'')+suf;})()} · ${esc(s.nickname)}</div>
+            <div style="font-size:10px;color:${color};margin-top:1px">${(()=>{const pre=(w.slot||'').split('-')[0];const suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'};return (lbl[pre]||CATS[s.category]?.label||'')+suf;})()} · ${esc(s.nickname)}</div>
           </div>
         </div>
         <!-- Amount -->
@@ -15117,7 +15934,7 @@ function renderConfirmCart(){
       const p = getProjects().find(x=>x.id===item.projId);
       const projName = p?.name || `(โปรเจกต์ไม่พบ: ${item.projId})`;
       const slotKey = (item.slot||'').split('-')[0];
-      const slotLbl = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', mgr:'🗂️ Manager'}[slotKey] || slotKey;
+      const slotLbl = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', trn:'🌐 นักแปล', mgr:'🗂️ Manager'}[slotKey] || slotKey;
       const slotSuf = (item.slot||'').includes('main') ? ' · หลัก' : (item.slot||'').includes('-sub') ? ' · รอง' : '';
       return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.04);border-radius:8px;margin-top:6px;flex-wrap:wrap">
         <input type="checkbox" data-cart-item="${key}" data-cart-staff-of="${staffId}" checked onchange="_updateCartTotals()" style="cursor:pointer;width:16px;height:16px;accent-color:#9B6FFF;flex-shrink:0">
@@ -15459,7 +16276,7 @@ function _renderStaffConfirmList(items){
     const sentAt = w.confirmSentAt ? new Date(w.confirmSentAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
     const respAt = w.confirmRespondedAt ? new Date(w.confirmRespondedAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
     const slot = (w.slot||'').split('-')[0];
-    const slotLabel = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', mgr:'🗂️ Manager'}[slot] || slot;
+    const slotLabel = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', trn:'🌐 นักแปล', mgr:'🗂️ Manager'}[slot] || slot;
 
     let bg, borderColor, statusLabel, actions = '';
     if(cs === 'sent'){
@@ -15560,7 +16377,7 @@ function _confirmItemCardHTML(p, w){
   const sentAt=w.confirmSentAt?new Date(w.confirmSentAt).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'';
   const respAt=w.confirmRespondedAt?new Date(w.confirmRespondedAt).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'';
   const pre=(w.slot||'').split('-')[0];
-  const slotLabel={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'}[pre]||pre;
+  const slotLabel={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'}[pre]||pre;
   const amt=w.confirmAmount||w.amount||0;
   const isPaid=w.status==='paid';
   let bg,bd,statusLabel,actions='';
@@ -15974,7 +16791,7 @@ function renderTeamEarnings(){
 
   // Category colors
   const catColors = {dubbing:'var(--orange)', adaptation:'var(--cyan)', mix:'var(--green)', qc:'var(--purple)', subVideo:'var(--red)', manager:'var(--accent2)'};
-  const catLabels = {dubbing:'🎤 Dubbing', adaptation:'✍️ Adapt', mix:'🎧 Mix', qc:'✅ QC', subVideo:'🎬 Sub', manager:'🗂️ Mgr'};
+  const catLabels = {dubbing:'🎤 Dubbing', adaptation:'✍️ Adapt', mix:'🎧 Mix', qc:'✅ QC', subVideo:'🎬 Sub', translation:'🌐 แปล', manager:'🗂️ Mgr'};
 
   // Sort header helper
   const sortBtn = (key, label) => {
@@ -16612,7 +17429,7 @@ function renderStaff(){
   try{
     try{ syncManagerCategoryFromRoles(); separateAdminsFromManagerCategory(); }catch(e){}
     const data=getStaffData();
-    const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
+    const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',translation:'#FF6FAE',manager:'var(--accent2)'};
     // 🚪 คนที่ออกจากทีม — ไม่นับในจำนวนทีม + ไม่ขึ้นในหมวดปกติ (ยังเก็บข้อมูลไว้)
     const _left=getTeamLeft();
     const _active=s=>s && !_left[s.id];
@@ -16712,7 +17529,7 @@ function renderStaffGrid(){
   if(!el){return;}
   const q=(document.getElementById('staff-search')||{}).value?.toLowerCase()||'';
   const tagF=document.getElementById('staff-tag-filter')?.value||'';
-  const cc={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
+  const cc={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',translation:'#FF6FAE',manager:'var(--accent2)'};
   let html='';
   const _left=getTeamLeft();
   const _resolvePerson=_buildPersonResolver(Object.values(data).flat());
@@ -16744,7 +17561,7 @@ function renderStaffGrid(){
         html+='<div style="font-size:11px;color:var(--text2);margin-bottom:4px">'+(s.nickname?'('+s.nickname+') · ':'')+s.gender+'</div>';
         // แสดงทุกตำแหน่งที่มี
         if(s.categories&&s.categories.length>1){
-          const catColors2={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
+          const catColors2={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',translation:'#FF6FAE',manager:'var(--accent2)'};
           html+='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">';
           s.categories.forEach(cat=>{
             const cl=catColors2[cat]||'var(--text2)';
@@ -17246,7 +18063,7 @@ async function _loadStaffFromPublic(){
     const snap = await _fbDatabase.ref('public/staff_list').get();
     if(!snap.exists()) return false;
     const publicList = snap.val() || [];
-    const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
+    const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],translation:[],manager:[]};
     (Array.isArray(publicList)?publicList:Object.values(publicList)).forEach(s => {
       if(!s || !s.id) return;
       const cat = s.category || 'dubbing';
@@ -17516,9 +18333,9 @@ function renderMyDash(){
       const realAmt = w.amount || 0;
       const _pre = (w.slot||'').split('-')[0];
       const _suf = (w.slot||'').includes('main') ? ' · หลัก' : (w.slot||'').includes('-sub') ? ' · รอง' : '';
-      const _lbl = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+      const _lbl = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'};
       // หา deadline ของ phase ที่สต๊าฟรับผิดชอบ
-      const _phKey = {dub:'dubbing',adp:'adaptation',mix:'mix',qc:'qc',sub:'subVideo',mgr:'manager'}[_pre];
+      const _phKey = {dub:'dubbing',adp:'adaptation',mix:'mix',qc:'qc',sub:'subVideo',trn:'translation',mgr:'manager'}[_pre];
       const _ph = (p.phases && _phKey) ? (p.phases[_phKey]||{}) : {};
       allItems.push({
         projId: p.id,
@@ -17788,9 +18605,9 @@ function openMyProjDetail(projId, slot){
   if(!myWorkers.length){ toast('ไม่พบงานของคุณในโปรเจกต์นี้','error'); return; }
   const myW = myWorkers[0];
   const preSlot = (myW.slot||'').split('-')[0];
-  const phaseKeyMap = {dub:'dubbing',adp:'adaptation',mix:'mix',qc:'qc',sub:'subVideo',mgr:'manager'};
+  const phaseKeyMap = {dub:'dubbing',adp:'adaptation',mix:'mix',qc:'qc',sub:'subVideo',trn:'translation',mgr:'manager'};
   const phKey = phaseKeyMap[preSlot];
-  const lblMap = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+  const lblMap = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'};
   const ph = (p.phases && phKey) ? (p.phases[phKey]||{}) : {};
   const suf = (myW.slot||'').includes('main') ? ' · หลัก' : (myW.slot||'').includes('-sub') ? ' · รอง' : '';
   const roleLbl = (lblMap[preSlot]||'') + suf;
@@ -18905,7 +19722,7 @@ function _vcRenderRetroSection(){
       const latestVNo = _vcLatestVoucherNo(staffId);
       const projLines = items.map(it=>{
         const slotKey=(it.w.slot||'').split('-')[0];
-        const slotLbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'}[slotKey]||slotKey;
+        const slotLbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'}[slotKey]||slotKey;
         const tag = it.hasDoc ? '<span style="color:var(--green)">✓ มีใบ</span>' : '<span style="color:var(--orange)">• ยังไม่มีใบ</span>';
         return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--text2);padding:2px 0"><span>${it.p.name} · ${slotLbl} ${tag}</span><span>${fmtB(it.w.amount||0)}</span></div>`;
       }).join('');
@@ -19065,7 +19882,7 @@ function renderVcByPerson(){
       const key = `${it.p.id}|${it.w.slot}`;
       const checked = sel.has(key);
       const slotKey = (it.w.slot||'').split('-')[0];
-      const slotLbl = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', mgr:'🗂️ Manager'}[slotKey] || slotKey;
+      const slotLbl = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', trn:'🌐 นักแปล', mgr:'🗂️ Manager'}[slotKey] || slotKey;
       const slotSuf = (it.w.slot||'').includes('main') ? ' · หลัก' : (it.w.slot||'').includes('-sub') ? ' · รอง' : '';
       return `<div onclick="event.stopPropagation();toggleVcPersonWork('${staffId}','${key}')" style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(0,0,0,.22);border:1px solid ${checked?'rgba(0,180,255,.45)':'rgba(255,255,255,.04)'};border-radius:7px;margin-top:5px;cursor:pointer;transition:all .12s">
         <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${checked?'var(--accent2)':'var(--border)'};background:${checked?'var(--accent2)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -19167,7 +19984,7 @@ function buildMultiVoucherHTML(opts){
     const parsed = _parseDate(d);
     return parsed ? parsed.toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}) : '—';
   };
-  const SLOT_LBL = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', mgr:'🗂️ Manager'};
+  const SLOT_LBL = {dub:'🎤 Dubbing', adp:'✍️ Adaptation', mix:'🎧 Mix', qc:'✅ QC', sub:'🎬 Sub & Video', trn:'🌐 นักแปล', mgr:'🗂️ Manager'};
   const adminSig = ls('admin_signature');
   const rows = opts.items.map((it, i) => {
     const slotKey = (it.slot||'').split('-')[0];
@@ -19703,7 +20520,7 @@ function renderVcWorkerList() {
     listEl.innerHTML = '<div style="color:var(--text2);font-size:13px;padding:16px;text-align:center;background:var(--bg2);border-radius:8px">← เลือกโปรเจกต์ก่อน</div>';
     updateVcSummary(); return;
   }
-  const catColors = {dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
+  const catColors = {dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',translation:'#FF6FAE',manager:'var(--accent2)'};
   listEl.innerHTML = projs.map(p => {
     const workersHtml = (p.workers||[]).map(w => {
       const s = getStaffById(w.id); if (!s) return '';
@@ -19725,7 +20542,7 @@ function renderVcWorkerList() {
         <div style="width:32px;height:32px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">${esc(s.nickname[0])}</div>
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:13px">${esc(s.name)} <span style="color:var(--text2);font-size:11px">(${esc(s.nickname)})</span></div>
-          <div style="font-size:11px;color:${color}">${(()=>{const pre=(w.slot||'').split('-')[0];const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};return lbl[pre]||CATS[s.category]?.label||'';})()}</div>
+          <div style="font-size:11px;color:${color}">${(()=>{const pre=(w.slot||'').split('-')[0];const lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'};return lbl[pre]||CATS[s.category]?.label||'';})()}</div>
         </div>
         ${s.qrUrl?`<div style="flex-shrink:0" title="QR โอนเงิน">${_qrImgHtml(s.qrUrl,'thumb',{staffName:s.nickname||s.name,clickToView:true})}</div>`:''}
         <div style="text-align:right">
@@ -19813,7 +20630,7 @@ function buildVoucherHTML(projId, workerId, slot, vNo, issueDate, note) {
   const thaiDate = d => d ? new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}) : '—';
   const slotPre = (slot||'').split('-')[0];
   const slotSuf = slot.includes('main')?'หลัก':slot.includes('-sub')?'รอง':'';
-  const SLOT_LABELS = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+  const SLOT_LABELS = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'};
   const catLabel = SLOT_LABELS[slotPre]||CATS[s.category]?.label||'';
   const slotLabel = slotSuf;
   return `<div style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:620px;margin:0 auto 32px;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb;page-break-after:always">
@@ -20421,7 +21238,7 @@ function renderBillingStaffCards() {
     return;
   }
 
-  const catColors = {dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
+  const catColors = {dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',translation:'#FF6FAE',manager:'var(--accent2)'};
   const grandTotal = entries.reduce((a,e)=>a+e.total,0);
 
   el.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding:12px 16px;background:var(--bg2);border-radius:10px;border:1px solid var(--border2)">
@@ -20494,7 +21311,7 @@ function buildBillingVoucherHTML(staffId) {
   const vNo = nextVoucherNo();
   const issueDate = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
   // ดึง catLabel จาก slot ของ worker ใน project (ไม่ใช่ category ใน staff db)
-  const SLOT_LABELS = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+  const SLOT_LABELS = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'};
   const firstSlot = (items[0]?.worker?.slot||'').split('-')[0];
   const firstSuf  = (items[0]?.worker?.slot||'').includes('main')?'หลัก':(items[0]?.worker?.slot||'').includes('-sub')?'รอง':'';
   const catLabel  = (SLOT_LABELS[firstSlot]||CATS[s.category]?.label||'')+(firstSuf?' · '+firstSuf:'');
@@ -21614,7 +22431,7 @@ function startFirebaseSync() {
         try {
           if(!snapPub.exists()) return;
           const publicList = snapPub.val() || [];
-          const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],manager:[]};
+          const structured = {dubbing:[],adaptation:[],mix:[],qc:[],subVideo:[],translation:[],manager:[]};
           (Array.isArray(publicList)?publicList:Object.values(publicList)).forEach(st => {
             if(!st || !st.id) return;
             const cat = st.category || 'dubbing';
@@ -22199,12 +23016,12 @@ function _applyDraft(snap){
   set('pj-note', snap.note);
   set('pj-manager', snap.managerId);
   const t = snap.tax||{};
-  ['dub','adp','mix','qc','sub','mgr'].forEach(k=>set(k+'-tax', t[k]));
+  ['dub','adp','mix','qc','sub','trn','mgr'].forEach(k=>set(k+'-tax', t[k]));
   if(snap.formSlots) formSlots = snap.formSlots;
   if(snap.activeCats){
     activeCats = new Set(snap.activeCats);
     document.querySelectorAll('.cat-toggle-btn').forEach(b=>b.classList.remove('on'));
-    ['dub','adp','mix','qc','sub','mgr'].forEach(k=>{
+    ['dub','adp','mix','qc','sub','trn','mgr'].forEach(k=>{
       const block = document.getElementById('catblock-'+k);
       if(block) block.classList.add('hidden');
     });
@@ -22556,9 +23373,9 @@ function renderMyCalendar(){
 
   // หา slot ทั้งหมดของ staff คนนี้ในทุกโปรเจกต์
   // slot prefix → PHASES key
-  const SLOT_PHASE = {dub:'dubbing', adp:'adaptation', mix:'mix', qc:'qc', sub:'subVideo', mgr:'manager'};
+  const SLOT_PHASE = {dub:'dubbing', adp:'adaptation', mix:'mix', qc:'qc', sub:'subVideo', trn:'translation', mgr:'manager'};
   const PHASE_COLORS = {adaptation:'var(--cyan)',dubbing:'var(--orange)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
-  const PHASE_LABELS = {adaptation:'✍️ Adaptation',dubbing:'🎤 Dubbing',mix:'🎧 Mix',qc:'✅ QC',subVideo:'🎬 Sub & Video',manager:'🗂️ Manager'};
+  const PHASE_LABELS = {adaptation:'✍️ Adaptation',dubbing:'🎤 Dubbing',mix:'🎧 Mix',qc:'✅ QC',subVideo:'🎬 Sub & Video',translation:'🌐 นักแปล',manager:'🗂️ Manager'};
 
   // สร้าง events จาก projects ทั้งหมด (รวม done/cancelled ด้วย เพื่อให้เห็นประวัติ)
   //   Prefer project.phases (v4) · fallback ไป trkCard phases ถ้า project ไม่มี
@@ -22765,6 +23582,7 @@ const CALC_CATS = [
   {key:'mix', label:'🎧 Mix',          color:'var(--green)'},
   {key:'qc',  label:'✅ QC',           color:'var(--purple)'},
   {key:'sub', label:'🎬 Sub & Video', color:'var(--red)'},
+  {key:'trn', label:'🌐 นักแปล',      color:'#FF6FAE'},
   {key:'mgr', label:'🗂️ Manager',    color:'var(--accent2)'},
 ];
 function getCalcDrafts(){ return ls('calc_drafts_v1') || []; }
@@ -24426,6 +25244,59 @@ function renderBackupHistory(){
     </div>`;
 }
 
+// ── 🚨 ล้างข้อมูลฉุกเฉิน — ปุ่มด่านสุดท้ายกันข้อมูลรั่วไหล (ต้องใส่รหัสที่เจ้าของตั้งเอง) ──
+async function _wipeHash(str){
+  try{
+    const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode('guin-wipe:'+str));
+    return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }catch(e){ let h=0; const s='guin-wipe:'+str; for(let i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; } return 'x'+h; }
+}
+async function setWipeCode(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const cur=ls('wipecode');
+  if(cur){
+    const old=prompt('มีรหัสฉุกเฉินตั้งไว้แล้ว — ใส่รหัสเดิมก่อนเพื่อเปลี่ยน:');
+    if(old===null) return;
+    if(await _wipeHash(old)!==cur){ toast('รหัสเดิมไม่ถูกต้อง','error'); return; }
+  }
+  const c1=prompt('ตั้งรหัสฉุกเฉินใหม่ (อย่างน้อย 6 ตัว — จำให้ดี ระบบเก็บแบบเข้ารหัส กู้คืนไม่ได้):');
+  if(!c1) return;
+  if(c1.length<6){ toast('รหัสสั้นเกินไป — อย่างน้อย 6 ตัว','error'); return; }
+  const c2=prompt('พิมพ์รหัสซ้ำอีกครั้งเพื่อยืนยัน:');
+  if(c1!==c2){ toast('รหัสสองครั้งไม่ตรงกัน','error'); return; }
+  const h=await _wipeHash(c1);
+  ls('wipecode', h);
+  try{ await fbSaveKeyed('wipecode', h); }catch(e){}
+  try{ logAudit('security','wipecode','ตั้ง/เปลี่ยนรหัสฉุกเฉิน'); }catch(e){}
+  toast('🔑 ตั้งรหัสฉุกเฉินแล้ว — เก็บรหัสไว้กับตัวเองเท่านั้น','success');
+}
+async function openEmergencyWipe(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const saved=ls('wipecode');
+  if(!saved){ toast('ยังไม่ได้ตั้งรหัสฉุกเฉิน — กด "🔑 ตั้ง/เปลี่ยนรหัส" ก่อน','warn'); return; }
+  if(!confirm('🚨 ล้างข้อมูลฉุกเฉิน\n\nจะลบข้อมูลทั้งหมดทั้งในเครื่องนี้และบน Firebase:\nโปรเจกต์ · ทีมงาน · เอกสาร · การเงิน · สำรองอัตโนมัติ ฯลฯ\n(บัญชีผู้ใช้และบันทึกการตรวจสอบจะยังอยู่)\n\nกู้คืนได้ทางเดียวคือไฟล์สำรองที่ดาวน์โหลดไว้เท่านั้น — ไปต่อไหม?')) return;
+  const code=prompt('ใส่รหัสฉุกเฉิน:');
+  if(code===null) return;
+  if(await _wipeHash(code)!==saved){
+    try{ logAudit('security','wipe','⚠️ ใส่รหัสฉุกเฉินผิด'); }catch(e){}
+    toast('รหัสไม่ถูกต้อง','error'); return;
+  }
+  const word=prompt('ด่านสุดท้าย — พิมพ์คำว่า "ล้างทั้งหมด" เพื่อยืนยัน:');
+  if(word!=='ล้างทั้งหมด'){ toast('ยกเลิก — คำยืนยันไม่ตรง','info'); return; }
+  try{ logAudit('security','wipe','🚨 สั่งล้างข้อมูลฉุกเฉินทั้งระบบ'); }catch(e){}
+  showLoader(true);
+  try{
+    if(_fbDatabase){
+      const paths=['projects','staff','staff_v3','docs','misc','trkCards','paymentAccounts','warnings','appreciations','calcDrafts','backups','notifications','mgrRequests','mgrSuspended','mgrColors','teamLeft','staff_excluded','admin_notifications','presence','meta','public'];
+      for(const p of paths){ try{ await _fbDatabase.ref(p).set(null); }catch(e){ console.warn('wipe fail:', p, e.message); } }
+    }
+    try{ localStorage.clear(); }catch(e){}
+    try{ sessionStorage.clear(); }catch(e){}
+    alert('🚨 ล้างข้อมูลเรียบร้อย — ระบบจะรีโหลดใหม่');
+    location.reload();
+  }finally{ showLoader(false); }
+}
+
 // ── 🕐 สำรองอัตโนมัติรายวัน → Firebase ──
 //    เก็บที่ backups/auto/d0-d6 (ตามวันในสัปดาห์ หมุนทับเอง = มีสำเนา 7 วันล่าสุดเสมอ)
 //    ทำงานเองวันละครั้งตอนแอดมินเปิดเว็บ — ไม่ต้องกดอะไร ไม่มีไฟล์เด้งดาวน์โหลด
@@ -24695,7 +25566,7 @@ function showNewStaffToast(data){
   if(!wrap) return;
   const CAT_LABELS = {
     dubbing:'🎤 Dubbing', adaptation:'✍️ Adaptation', mix:'🎧 Mix',
-    qc:'✅ QC', subVideo:'🎬 Sub & Video', manager:'🗂️ Manager'
+    qc:'✅ QC', subVideo:'🎬 Sub & Video', translation:'🌐 นักแปล', manager:'🗂️ Manager'
   };
   const CAT_COLORS = {
     dubbing:'#FF9E00', adaptation:'#00B4FF', mix:'#00DFA0',
@@ -25321,7 +26192,7 @@ function getStaffEarnings(staffId){
 let _detailStaffId='';
 let _sdTab=1;
 let _sdEditing=false;
-const _SD_CAT_ORDER=['dubbing','adaptation','mix','qc','subVideo','manager'];
+const _SD_CAT_ORDER=['dubbing','adaptation','mix','qc','subVideo','translation','manager'];
 function openStaffDetail(id){
   if(currentUser?.role!=='admin') return;
   _detailStaffId=id; _sdTab=1; _sdEditing=false;
@@ -25353,7 +26224,7 @@ function renderStaffDetail(){
         : `<button class="btn btn-blue" onclick="toggleStaffDetailEdit()">✏️ แก้ไขข้อมูล</button>`;
     } else actEl.innerHTML='';
   }
-  const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
+  const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',translation:'#FF6FAE',manager:'var(--accent2)'};
   // ── Tab 1: ข้อมูล (อ่าน / แก้ไขในหน้า) ──
   if(b1){
    if(_sdEditing){
@@ -25601,7 +26472,7 @@ function renderMgrProjects() {
       const s=getStaffById(w.id);if(!s)return'';
       const _pre=(w.slot||'').split('-')[0];
       const _suf=(w.slot||'').includes('main')?' · หลัก':(w.slot||'').includes('-sub')?' · รอง':'';
-      const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',mgr:'🗂️ Manager'};
+      const _lbl={dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'};
       // ─ Admin เห็นทุกคน · Manager: ตัวเองโชว์ยอด, คนอื่นซ่อน
       const isMe = myStaffId && w.id === myStaffId;
       const canSeeAmt = isAdminViewer || isMe;
@@ -25691,7 +26562,7 @@ function renderMgrTrack() {
     const pctColor = pct>=80?'#00DFA0':pct>=50?'#00B4FF':'#FF9E00';
     const circFill = (pct/100)*CIRC;
     const phaseRows = phases.map(([phKey,ph])=>{
-      const PHASE_LABELS={adaptation:'✍️ Adaptation',dubbing:'🎤 Dubbing',mix:'🎧 Mix',qc:'✅ QC',subVideo:'🎬 Sub & Video',manager:'🗂️ Manager'};
+      const PHASE_LABELS={adaptation:'✍️ Adaptation',dubbing:'🎤 Dubbing',mix:'🎧 Mix',qc:'✅ QC',subVideo:'🎬 Sub & Video',translation:'🌐 นักแปล',manager:'🗂️ Manager'};
       const PHASE_COLORS={adaptation:'var(--cyan)',dubbing:'var(--orange)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
       const stKey=ph.status||'none';
       const stBg=stKey==='done'?'rgba(0,223,160,.1)':stKey==='doing'?'rgba(255,158,0,.1)':stKey==='briefed'?'rgba(0,180,255,.1)':'rgba(120,120,140,.12)';
@@ -25808,7 +26679,7 @@ function renderMgrTrackCal(projs) {
     const card = getTrkCards().find(c=>c.projId===p.id);
     if(!card) return;
     Object.entries(card.phases||{}).forEach(([phKey,ph])=>{
-      const PHASE_EMOJI={adaptation:'✍️',dubbing:'🎤',mix:'🎧',qc:'✅',subVideo:'🎬',manager:'🗂️'};
+      const PHASE_EMOJI={adaptation:'✍️',dubbing:'🎤',mix:'🎧',qc:'✅',subVideo:'🎬',translation:'🌐',manager:'🗂️'};
       if(ph.deadline){
         const d=new Date(ph.deadline).getDate();
         if(new Date(ph.deadline).getMonth()===m){
@@ -25883,9 +26754,9 @@ function setMgrTeamCat(cat){ _mgrTeamCat=cat; renderMgrTeam(); }
 function renderMgrTeam() {
   const el=document.getElementById('mgr-team-grid');if(!el)return;
   const q=(document.getElementById('mgr-team-search')?.value||'').toLowerCase();
-  const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',manager:'var(--accent2)'};
-  const catLabels={dubbing:'🎤 Dubbing',adaptation:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',subVideo:'🎬 Sub & Video',manager:'🗂️ Manager'};
-  const catOrder=['dubbing','adaptation','mix','qc','subVideo','manager'];
+  const catColors={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',translation:'#FF6FAE',manager:'var(--accent2)'};
+  const catLabels={dubbing:'🎤 Dubbing',adaptation:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',subVideo:'🎬 Sub & Video',translation:'🌐 นักแปล',manager:'🗂️ Manager'};
+  const catOrder=['dubbing','adaptation','mix','qc','subVideo','translation','manager'];
   const suspended=getMgrSuspended();
   const data=(typeof getStaffData==='function')?getStaffData():{};
   // ── สรุปจำนวน + แถบฟิลเตอร์หมวดหมู่ (เหมือนแอดมิน) ──
@@ -26191,19 +27062,19 @@ if(typeof openModal==='function'){
 function isMgr(){ return currentUser?.role==='manager'; }
 
 // ── Role badge helpers (slot prefix → ป้ายโรลที่ทำในโปรเจกต์) ──
-const _SLOT_ROLE  = {dub:'🎤 พากย์', adp:'✍️ บท', mix:'🎧 มิกซ์', qc:'✅ QC', sub:'🎬 ซับ/วิดีโอ', mgr:'🗂️ จัดการ'};
-const _SLOT_COLOR = {dub:'var(--orange)', adp:'var(--cyan)', mix:'var(--green)', qc:'var(--purple)', sub:'var(--red)', mgr:'var(--accent2)'};
+const _SLOT_ROLE  = {dub:'🎤 พากย์', adp:'✍️ บท', mix:'🎧 มิกซ์', qc:'✅ QC', sub:'🎬 ซับ/วิดีโอ', trn:'🌐 แปล', mgr:'🗂️ จัดการ'};
+const _SLOT_COLOR = {dub:'var(--orange)', adp:'var(--cyan)', mix:'var(--green)', qc:'var(--purple)', sub:'var(--red)', trn:'#FF6FAE', mgr:'var(--accent2)'};
 function _roleBadgeHTML(k){ return `<span style="padding:1px 7px;border-radius:7px;font-size:9.5px;font-weight:700;background:${_SLOT_COLOR[k]}1e;color:${_SLOT_COLOR[k]};border:1px solid ${_SLOT_COLOR[k]}55;white-space:nowrap">${_SLOT_ROLE[k]}</span>`; }
 // ป้ายรวมของโปรเจกต์ (มีโรลอะไรบ้างในงานนี้)
 function projRoleBadges(p){
   const set=new Set();(p.workers||[]).forEach(w=>{const pre=(w.slot||'').split('-')[0];if(_SLOT_ROLE[pre])set.add(pre);});
-  const order=['dub','adp','mix','qc','sub','mgr'];
+  const order=['dub','adp','mix','qc','sub','trn','mgr'];
   return order.filter(k=>set.has(k)).map(_roleBadgeHTML).join(' ');
 }
 // ป้ายเฉพาะที่ staff คนหนึ่งทำในโปรเจกต์ (ใช้กับรายได้ของฉัน)
 function staffRoleBadges(p, staffId){
   const set=new Set();(p.workers||[]).filter(w=>w.id===staffId).forEach(w=>{const pre=(w.slot||'').split('-')[0];if(_SLOT_ROLE[pre])set.add(pre);});
-  const order=['dub','adp','mix','qc','sub','mgr'];
+  const order=['dub','adp','mix','qc','sub','trn','mgr'];
   return order.filter(k=>set.has(k)).map(_roleBadgeHTML).join(' ');
 }
 // dropdown สถานะงาน (ใช้ร่วมการ์ด manager) — กดแล้วไม่ขยายการ์ด
