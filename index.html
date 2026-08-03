@@ -5997,16 +5997,50 @@ async function drAddParent(){
   renderDrivePage();
   toast('➕ เพิ่มโฟลเดอร์หลัก "'+name+'" แล้ว','success');
 }
-async function drLoadSubs(){
-  if(!_drParent){ toast('เลือกโฟลเดอร์หลักก่อน','warn'); return; }
-  showLoader(true);
+async function drLoadSubs(silent){
+  if(!_drParent){ if(!silent) toast('เลือกโฟลเดอร์หลักก่อน','warn'); return; }
+  if(!silent) showLoader(true);
   try{
     const d=await callDrive({action:'list', parentId:_drParent});
     _drSubs=d.folders||[];
-    toast('🔄 พบ '+_drSubs.length+' โฟลเดอร์','success');
+    if(!silent) toast('🔄 พบ '+_drSubs.length+' โฟลเดอร์','success');
     renderDrivePage();
-  }catch(e){ toast('โหลดไม่ได้: '+e.message,'error'); }
-  finally{ showLoader(false); }
+  }catch(e){ if(!silent) toast('โหลดไม่ได้: '+e.message,'error'); }
+  finally{ if(!silent) showLoader(false); }
+}
+// 📂 เปิดดูโฟลเดอร์ในไดรฟ์จริง แล้วคลิกเลือกเป็นโฟลเดอร์หลักได้เลย (ไม่ต้องวางลิงก์)
+let _drBrowse={id:'root',name:'ไดรฟ์ของฉัน',stack:[]};
+async function drBrowseParent(start){
+  if(start) _drBrowse={id:'root',name:'ไดรฟ์ของฉัน',stack:[]};
+  showLoader(true);
+  try{
+    const d=await callDrive({action:'list', parentId:_drBrowse.id});
+    const rows=(d.folders||[]).map(f=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);font-size:13px">
+        <span style="flex:1;min-width:0;cursor:pointer" title="กดเพื่อเข้าไปดูข้างใน" onclick="_drBrowse.stack.push({id:_drBrowse.id,name:_drBrowse.name});_drBrowse.id='${esc(f.id)}';_drBrowse.name='${escJs(f.name)}';drBrowseParent()">📁 ${esc(f.name)}</span>
+        <button class="btn btn-sm btn-outline" onclick="drPickParent('${esc(f.id)}','${escJs(f.name)}')">✅ ใช้อันนี้</button>
+      </div>`).join('');
+    _tagOverlayShow('📂 เลือกโฟลเดอร์หลักจากไดรฟ์', `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;margin-bottom:8px">
+        <span style="color:var(--text2)">ตอนนี้อยู่ใน:</span> <strong>${esc(_drBrowse.name)}</strong>
+        ${_drBrowse.stack.length?`<button class="btn btn-sm btn-outline" onclick="const b=_drBrowse.stack.pop();_drBrowse.id=b.id;_drBrowse.name=b.name;drBrowseParent()">⬅️ ย้อนกลับ</button>`:''}
+        ${_drBrowse.id!=='root'?`<button class="btn btn-sm btn-green" onclick="drPickParent('${esc(_drBrowse.id)}','${escJs(_drBrowse.name)}')">✅ ใช้โฟลเดอร์นี้เป็นหลัก</button>`:''}
+      </div>
+      <div style="max-height:330px;overflow-y:auto">${rows||'<div style="color:var(--text2);padding:14px;text-align:center">ไม่มีโฟลเดอร์ย่อยในนี้</div>'}</div>
+      <div style="font-size:10.5px;color:var(--text2);margin-top:9px">กดชื่อโฟลเดอร์ = เข้าไปดูข้างใน · กด ✅ = ใช้เป็นโฟลเดอร์หลักของหน้าจัดไฟล์งาน</div>`, 560);
+  }catch(e){
+    toast('เปิดดูไดรฟ์ไม่ได้: '+e.message+' — ถ้าเพิ่งแก้สคริปต์ ต้อง Deploy เวอร์ชันใหม่ก่อน หรือใช้ปุ่ม ➕ วางลิงก์แทน','error');
+  }finally{ showLoader(false); }
+}
+async function drPickParent(id, name){
+  const cfg=getDriveCfg(); cfg.parents=cfg.parents||[];
+  if(!cfg.parents.some(x=>x.id===id)) cfg.parents.push({id, name});
+  await saveDriveCfg(cfg);
+  _drParent=id; _drSub=''; _drSubs=[];
+  document.getElementById('tag-overlay')?.remove();
+  renderDrivePage();
+  drLoadSubs(true);
+  toast('✅ ใช้ "'+name+'" เป็นโฟลเดอร์หลักแล้ว','success');
 }
 async function drNewSub(){
   if(!_drParent){ toast('เลือกโฟลเดอร์หลักก่อน','warn'); return; }
@@ -6070,35 +6104,18 @@ async function drMakeScript(){
   }catch(e){ toast('สร้างไฟล์บทไม่ได้: '+e.message,'error'); }
   finally{ showLoader(false); }
 }
-async function drRefreshProjFolders(){
+async function drRefreshProjFolders(silent){
   const p=getProjects().find(x=>x.id===_drSel);
-  if(!p||!p.driveFolderId){ toast('ยังไม่มีโฟลเดอร์งานของโปรเจกต์นี้','warn'); return; }
-  showLoader(true);
+  if(!p||!p.driveFolderId){ if(!silent) toast('ยังไม่มีโฟลเดอร์งานของโปรเจกต์นี้ — สร้างที่ขั้น 3 ก่อน','warn'); return; }
+  if(!silent) showLoader(true);
   try{
     const d=await callDrive({action:'list', parentId:p.driveFolderId});
-    _drProjFolders=[{id:p.driveFolderId,name:'(โฟลเดอร์หลักของงาน)'},...(d.folders||[])];
+    _drProjFolders=[{id:p.driveFolderId,name:'(โฟลเดอร์หลักของงาน)',link:p.driveFolderLink||''},...(d.folders||[])];
     renderDrivePage();
-  }catch(e){ toast('โหลดไม่ได้: '+e.message,'error'); }
-  finally{ showLoader(false); }
+  }catch(e){ if(!silent) toast('โหลดไม่ได้: '+e.message,'error'); }
+  finally{ if(!silent) showLoader(false); }
 }
-async function drUpload(){
-  const folderId=document.getElementById('dr-upfolder')?.value;
-  const files=document.getElementById('dr-files')?.files;
-  if(!folderId){ toast('เลือกโฟลเดอร์ปลายทางก่อน (กด 🔄 โหลดรายชื่อโฟลเดอร์ถ้ายังว่าง)','warn'); return; }
-  if(!files||!files.length){ toast('เลือกไฟล์ก่อน','warn'); return; }
-  showLoader(true);
-  let ok=0, skip=0;
-  try{
-    for(const f of files){
-      if(f.size>25*1024*1024){ skip++; continue; } // ไฟล์ใหญ่เกิน 25MB ส่งผ่าน Apps Script ไม่ไหว
-      const b64=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||''); r.onerror=rej; r.readAsDataURL(f); });
-      await callDrive({action:'upload', folderId, name:f.name, mimeType:f.type||'application/octet-stream', b64});
-      ok++;
-    }
-    toast('⬆️ อัปโหลดแล้ว '+ok+' ไฟล์'+(skip?' · ข้ามไฟล์ใหญ่เกิน 25MB '+skip+' ไฟล์ (ไฟล์ใหญ่ลากเข้าไดรฟ์ตรง ๆ เร็วกว่า)':''), skip?'warn':'success');
-  }catch(e){ toast('อัปโหลดสะดุด (สำเร็จ '+ok+'): '+e.message,'error'); }
-  finally{ showLoader(false); }
-}
+async function drRefreshProjFoldersSilent(){ try{ await drRefreshProjFolders(true); }catch(e){} }
 async function drMakeDelivery(){
   const p=getProjects().find(x=>x.id===_drSel); if(!p){ toast('เลือกโปรเจกต์ก่อน','warn'); return; }
   const parentId=document.getElementById('dr-delivparent')?.value;
@@ -6151,16 +6168,16 @@ function renderDrivePage(){
     <div class="pr-step"><div class="pr-step-t">2️⃣ ที่เก็บในไดรฟ์</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
         <div style="flex:1;min-width:160px"><div class="pr-lbl">โฟลเดอร์หลัก</div>
-          <select class="pr-in" onchange="_drParent=this.value;_drSub='';_drSubs=[];renderDrivePage()">
-            ${parents.length?parents.map(x=>`<option value="${esc(x.id)}"${x.id===_drParent?' selected':''}>${esc(x.name)}</option>`).join(''):'<option value="">— ยังไม่มี กด ➕ เพิ่ม —</option>'}
+          <select class="pr-in" onchange="_drParent=this.value;_drSub='';_drSubs=[];renderDrivePage();drLoadSubs(true)">
+            ${parents.length?parents.map(x=>`<option value="${esc(x.id)}"${x.id===_drParent?' selected':''}>${esc(x.name)}</option>`).join(''):'<option value="">— ยังไม่มี กด 📂 เลือกจากไดรฟ์ —</option>'}
           </select></div>
-        <button class="btn btn-outline btn-sm" onclick="drAddParent()">➕ เพิ่มโฟลเดอร์หลัก</button>
-        <div style="flex:1;min-width:150px"><div class="pr-lbl">โฟลเดอร์หมวด (เช่น G, H, M)</div>
+        <button class="btn btn-blue btn-sm" onclick="drBrowseParent(true)" title="เปิดดูโฟลเดอร์ในไดรฟ์จริง แล้วคลิกเลือกได้เลย">📂 เลือกจากไดรฟ์</button>
+        <button class="btn btn-outline btn-sm" onclick="drAddParent()" title="อีกทาง: วางลิงก์โฟลเดอร์เอง">➕ วางลิงก์</button>
+        <div style="flex:1;min-width:150px"><div class="pr-lbl">โฟลเดอร์หมวด (เช่น G, H, M — โหลดให้อัตโนมัติ)</div>
           <select id="dr-sub" class="pr-in" onchange="_drSub=this.value">
             <option value="">(วางตรงโฟลเดอร์หลักเลย)</option>
             ${_drSubs.map(x=>`<option value="${esc(x.id)}"${x.id===_drSub?' selected':''}>${esc(x.name)}</option>`).join('')}
           </select></div>
-        <button class="btn btn-outline btn-sm" onclick="drLoadSubs()">🔄 โหลดรายชื่อ</button>
         <button class="btn btn-outline btn-sm" onclick="drNewSub()">➕ หมวดใหม่</button>
       </div>
     </div>
@@ -6174,19 +6191,19 @@ function renderDrivePage(){
       <textarea id="dr-tpl" rows="6" class="pr-in" style="font-size:11.5px;line-height:1.6;resize:vertical" onchange="const c=getDriveCfg();c.tpl=this.value;saveDriveCfg(c);renderDrivePage()">${esc(cfg.tpl||_DR_TPL_DEFAULT)}</textarea>
       <button class="btn btn-blue" style="width:100%;margin-top:8px" onclick="drCreateFolders()">📂 สร้างโฟลเดอร์งาน + เทมเพลตข้างใน</button>
     </div>
-    <div class="pr-step"><div class="pr-step-t">4️⃣ ไฟล์บท + อัปโหลดไฟล์</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <div class="pr-step"><div class="pr-step-t">4️⃣ ไฟล์บท + เปิดโฟลเดอร์โยนไฟล์</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
         <button class="btn btn-outline btn-sm" onclick="drMakeScript()">📄 สร้างไฟล์บท (Script/CV_${esc(code||'…')})</button>
-        <button class="btn btn-outline btn-sm" onclick="drRefreshProjFolders()">🔄 โหลดโฟลเดอร์ของงานนี้</button>
+        ${p&&p.driveFolderLink?`<button class="btn btn-blue btn-sm" onclick="window.open('${esc(p.driveFolderLink)}','_blank')">🔗 เปิดโฟลเดอร์งานในไดรฟ์</button>`:''}
+        <button class="btn btn-outline btn-sm" onclick="drRefreshProjFolders()">🔄 โหลดรายชื่อโฟลเดอร์</button>
       </div>
-      <div class="pr-lbl">โยนไฟล์เข้าโฟลเดอร์ (ไฟล์ละไม่เกิน 25MB — ไฟล์วิดีโอใหญ่ลากเข้าไดรฟ์ตรง ๆ เร็วกว่า)</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select id="dr-upfolder" class="pr-in" style="flex:1;min-width:170px">
-          ${_drProjFolders.length?_drProjFolders.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join(''):'<option value="">— กด 🔄 โหลดโฟลเดอร์ของงานนี้ก่อน —</option>'}
-        </select>
-        <input id="dr-files" type="file" multiple style="font-size:12px;color:var(--text2)">
-        <button class="btn btn-green btn-sm" onclick="drUpload()">⬆️ อัปโหลด</button>
-      </div>
+      <div class="pr-lbl">กดเปิดโฟลเดอร์ที่ต้องการ → เด้งไปไดรฟ์ตรงจุด แล้วลากไฟล์ลงได้เลย (เร็วสุดสำหรับไฟล์ใหญ่)</div>
+      ${_drProjFolders.length
+        ? _drProjFolders.map(x=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border2);font-size:12.5px">
+            <span style="flex:1;min-width:0">📁 ${esc(x.name)}</span>
+            <button class="btn btn-sm btn-outline" onclick="window.open('${esc(x.link||('https://drive.google.com/drive/folders/'+x.id))}','_blank')">🔗 เปิด</button>
+          </div>`).join('')
+        : '<div style="font-size:12px;color:var(--text2);padding:6px 0">— สร้างโฟลเดอร์งาน (ขั้นที่ 3) หรือกด 🔄 โหลดรายชื่อโฟลเดอร์ —</div>'}
     </div>
     <div class="pr-step"><div class="pr-step-t">5️⃣ โฟลเดอร์ส่งงานลูกค้า (แยกออกมาให้คนส่งงาน)</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
@@ -6195,6 +6212,9 @@ function renderDrivePage(){
         <button class="btn btn-blue btn-sm" onclick="drMakeDelivery()">📦 สร้างโฟลเดอร์ส่งงาน</button>
       </div>
     </div>`;
+  // 🔄 โหลดให้เองไม่ต้องกด: รายชื่อหมวดของโฟลเดอร์หลัก + โฟลเดอร์ของงานที่เลือก (ครั้งแรกเท่านั้น)
+  if(_drParent && !_drSubs.length && window._drAutoSub!==_drParent){ window._drAutoSub=_drParent; drLoadSubs(true); }
+  if(p && p.driveFolderId && !_drProjFolders.length && window._drAutoProj!==p.id){ window._drAutoProj=p.id; drRefreshProjFolders(true); }
 }
 
 // ══════════════════════════════════════════════
