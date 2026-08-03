@@ -1132,10 +1132,10 @@ body.sidebar-collapsed .main-content{
    <div class="nav-item active" onclick="nav('dashboard')"><span class="nav-icon">🏠</span><span>หน้าหลัก</span></div>
    <div class="nav-section">งาน</div>
    <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">📌</span><span>ลงคิว</span></div>
-   <div class="nav-item" onclick="nav('projroom')"><span class="nav-icon">🐧</span><span>ห้องโปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('assign')"><span class="nav-icon">📋</span><span>มอบหมายงาน</span></div>
    <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
    <div class="nav-item" onclick="nav('drive')"><span class="nav-icon">📂</span><span>จัดไฟล์งาน</span></div>
+   <div class="nav-item" onclick="nav('projroom')"><span class="nav-icon">🐧</span><span>ห้องโปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span><span class="nav-badge hidden" id="deadline-badge">0</span></div>
    <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span><span class="nav-badge hidden" id="track-badge">0</span></div>
@@ -1161,10 +1161,10 @@ body.sidebar-collapsed .main-content{
    <div class="nav-section">ของฉัน</div>
    <div class="nav-item active" onclick="nav('mgr-home')"><span class="nav-icon">🏠</span><span>ภาพรวม</span></div>
    <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">📌</span><span>ลงคิว</span></div>
-   <div class="nav-item" onclick="nav('projroom')"><span class="nav-icon">🐧</span><span>ห้องโปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('assign')"><span class="nav-icon">📋</span><span>มอบหมายงาน</span></div>
    <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
    <div class="nav-item" onclick="nav('drive')"><span class="nav-icon">📂</span><span>จัดไฟล์งาน</span></div>
+   <div class="nav-item" onclick="nav('projroom')"><span class="nav-icon">🐧</span><span>ห้องโปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('mgr-calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
@@ -4030,13 +4030,23 @@ function staffStatusBadgeHTML(s){
 // 🎭 อิโมจิบอกว่าคนนี้ทำโรลอะไรบ้าง (คนเดียวมีได้หลาย record หลายหมวด — รวมให้เป็นชุดเดียว)
 const ROLE_EMOJI={dubbing:'🎤',adaptation:'✍️',mix:'🎧',qc:'✅',subVideo:'🎬',translation:'🌐',manager:'🗂️'};
 const ROLE_EMOJI_TH={dubbing:'พากย์',adaptation:'บท',mix:'มิกซ์',qc:'QC',subVideo:'ซับ/วิดีโอ',translation:'แปล',manager:'เมเนเจอร์'};
+let _roleCatCache=null, _roleCatCacheAt=0;
 function staffRoleEmojiHTML(staffId){
-  const cats=new Set();
-  try{
-    getAllStaff().forEach(r=>{
-      if(r&&r.id===staffId){ if(r.category) cats.add(r.category); (r.categories||[]).forEach(c=>cats.add(c)); }
-    });
-  }catch(e){}
+  // ⚡ memo 1.5 วิ — เรนเดอร์การ์ดทีเดียว 170 ใบไม่ต้อง parse ทะเบียนซ้ำทุกใบ (ls อ่าน localStorage + JSON.parse ทุกครั้ง)
+  const now=Date.now();
+  if(!_roleCatCache || now-_roleCatCacheAt>1500){
+    _roleCatCache={};
+    try{
+      getAllStaff().forEach(r=>{
+        if(!r||!r.id) return;
+        const set=_roleCatCache[r.id]||(_roleCatCache[r.id]=new Set());
+        if(r.category) set.add(r.category);
+        (r.categories||[]).forEach(c=>set.add(c));
+      });
+    }catch(e){}
+    _roleCatCacheAt=now;
+  }
+  const cats=_roleCatCache[staffId]||new Set();
   const keys=Object.keys(ROLE_EMOJI).filter(k=>cats.has(k));
   if(!keys.length) return '';
   return `<span style="font-size:11.5px;letter-spacing:.5px;margin-left:4px;cursor:default" title="ทำหน้าที่: ${esc(keys.map(k=>ROLE_EMOJI_TH[k]).join(' · '))}">${keys.map(k=>ROLE_EMOJI[k]).join('')}</span>`;
@@ -4611,13 +4621,24 @@ function blkLinkOne(i){
 }
 function blkLinkAllGuessed(){
   const rows=window._blkRows||[]; let n=0;
+  // ⚡ รวมทุกคนแล้วเซฟทะเบียนครั้งเดียว — เดิมเซฟทั้งก้อนซ้ำต่อคน (50 คน = เขียน Firebase 50 รอบ ช้ามาก)
+  const want={};   // staffId → {id,name}
   rows.forEach(r=>{
     if(!r.match.staff || r.match.how==='linked') return;
-    const cur=getStaffById(r.match.staff.id);
-    if(!cur || cur.discordId) return;   // มีคนอื่นถูกผูกกับ id นี้ไปก่อนแล้วในลูปนี้
-    _updateStaffRecords(cur.id, s=>{ s.discordId=r.m.id; s.discordName=r.disp; });
-    n++;
+    if(want[r.match.staff.id]) return;
+    want[r.match.staff.id]={ id:r.m.id, name:r.disp };
   });
+  const d=getStaffData();
+  Object.keys(d||{}).forEach(cat=>{
+    const arr=Array.isArray(d[cat])?d[cat]:Object.values(d[cat]||{});
+    arr.filter(Boolean).forEach(s=>{
+      const w=want[s.id];
+      if(w && !s.discordId){ s.discordId=w.id; s.discordName=w.name; if(!w._counted){ w._counted=true; n++; } }
+    });
+    d[cat]=arr;
+  });
+  if(n) saveStaffData(d);
+  _roleCatCache=null;
   try{ logAudit('staff.edit','ทั้งทีม','ผูกบัญชี Discord รวดเดียว '+n+' คน'); }catch(e){}
   toast('✅ ผูกแล้ว '+n+' คน','success');
   _renderBulkDiscordLink();
@@ -6134,6 +6155,7 @@ function renderProjRoom(){
           <button class="btn btn-blue btn-sm" onclick="prPullTeam('${esc(p.id)}')" title="เปิดสิทธิ์ให้ทีมที่ผูก Discord แล้วเห็นห้อง">👥 ดึงทีมเข้าห้อง</button>
           ${p.discordTalkId?'':`<button class="btn btn-outline btn-sm" onclick="prCreateTalk('${esc(p.id)}')" title="ห้องพูดคุยยังไม่ถูกสร้าง — กดสร้างเพิ่มในหมวดเดิมได้เลย">➕ สร้างห้องพูดคุย</button>`}
           <button class="btn btn-outline btn-sm" onclick="openBulkDiscordLink()" title="ดึงรายชื่อสมาชิกทั้งเซิร์ฟเวอร์มาจับคู่กับทะเบียนทีม — ผูกครั้งเดียว ดึงทีมเข้าห้องได้ครบ">🔗 ผูกทั้งทีมกับ Discord</button>
+          <button class="btn btn-outline btn-sm" onclick="prRecreateRooms('${esc(p.id)}')" title="ห้องเดิมใน Discord ถูกลบไปแล้ว? กดนี่เพื่อเลิกจำห้องเก่า แล้วสร้างหมวด+ห้องชุดใหม่ได้ทันที (สร้างซ้ำกี่รอบก็ได้)">🔄 สร้างห้องชุดใหม่</button>
           <button class="btn btn-outline btn-sm" onclick="prUnlink('${esc(p.id)}')">🔓 เลิกผูกห้อง</button>
         </div></div>`
     : `<div class="pr-step"><div class="pr-step-t">2️⃣ สร้างหมวดหมู่ + ห้อง</div>
@@ -6263,8 +6285,17 @@ async function postProjRoomMsg(projId){
     for(let i=0;i<n;i++){
       const content=chunks[i]||'—';   // ก้อนเก่าที่เกินจำนวนใหม่ → เคลียร์เหลือขีดเดียว
       if(oldIds[i]){
-        await callProjBot({action:'discordEdit', channelId:p.discordChannelId, messageId:oldIds[i], content});
-        if(chunks[i]!==undefined) newIds.push(oldIds[i]);
+        try{
+          await callProjBot({action:'discordEdit', channelId:p.discordChannelId, messageId:oldIds[i], content});
+          if(chunks[i]!==undefined) newIds.push(oldIds[i]);
+        }catch(e){
+          // โพสต์เดิมถูกลบไปแล้ว → โพสต์ใหม่แทน ไม่ล้มทั้งชุด (ห้องหาย = โยน error ต่อให้ตัวจับด้านนอก)
+          if(String(e.message||'').includes('ไม่พบห้อง')) throw e;
+          if(chunks[i]!==undefined){
+            const r=await callProjBot({action:'discordPost', channelId:p.discordChannelId, content});
+            newIds.push(r.messageId);
+          }
+        }
       } else if(chunks[i]!==undefined){
         const r=await callProjBot({action:'discordPost', channelId:p.discordChannelId, content});
         newIds.push(r.messageId);
@@ -6274,7 +6305,11 @@ async function postProjRoomMsg(projId){
     toast('📣 '+(oldIds.length?'อัปเดตโพสต์แล้ว':'โพสต์คู่มือแล้ว')+(chunks.length>1?' ('+chunks.length+' ก้อนต่อกัน)':''),'success');
     try{ logAudit('project.discord', p.name, 'โพสต์/อัปเดตคู่มืองานใน Discord ('+chunks.length+' ก้อน)'); }catch(e){}
     renderProjRoom();
-  }catch(e){ toast('โพสต์ไม่สำเร็จ: '+e.message,'error'); }
+  }catch(e){
+    toast(String(e.message||'').includes('ไม่พบห้อง')
+      ? 'ห้องนี้ถูกลบไปแล้วใน Discord — กดปุ่ม "🔄 สร้างห้องชุดใหม่" แล้วสร้างใหม่ได้เลย'
+      : 'โพสต์ไม่สำเร็จ: '+e.message,'error');
+  }
   finally{ showLoader(false); }
 }
 async function prPullTeam(projId){
@@ -6294,8 +6329,15 @@ async function prPullTeam(projId){
 }
 async function prUnlink(projId){
   if(!confirm('เลิกผูกห้องกับโปรเจกต์นี้? (ห้องใน Discord ไม่ถูกลบ)')) return;
-  await saveProjectMerge(projId, f=>{ delete f.discordCategoryName; delete f.discordChannelId; delete f.discordChannelName; delete f.discordTalkId; delete f.discordMsgId; });
+  await saveProjectMerge(projId, f=>{ delete f.discordCategoryName; delete f.discordChannelId; delete f.discordChannelName; delete f.discordTalkId; delete f.discordMsgId; delete f.discordMsgIds; delete f.discordPrivate; });
   toast('เลิกผูกแล้ว','info');
+  renderProjRoom();
+}
+// 🔄 ห้องเดิมถูกลบใน Discord → เลิกจำของเก่าแล้วเปิดฟอร์มสร้างใหม่ — สร้างซ้ำกี่รอบก็ได้
+async function prRecreateRooms(projId){
+  if(!confirm('สร้างห้องชุดใหม่?\n\nระบบจะเลิกจำหมวด/ห้อง/โพสต์ชุดเดิม แล้วเปิดฟอร์มสร้างหมวด+ห้องให้ใหม่ทันที\n(ถ้าหมวด/ห้องเดิมยังอยู่ใน Discord จะไม่ถูกลบ — ลบเองได้ตามสะดวก)')) return;
+  await saveProjectMerge(projId, f=>{ delete f.discordCategoryName; delete f.discordChannelId; delete f.discordChannelName; delete f.discordTalkId; delete f.discordMsgId; delete f.discordMsgIds; delete f.discordPrivate; });
+  toast('🔄 พร้อมสร้างห้องชุดใหม่ — ตั้งชื่อหมวดแล้วกด 🏗️ สร้างได้เลย','info');
   renderProjRoom();
 }
 
@@ -6428,15 +6470,17 @@ async function drNewSub(){
   }catch(e){ toast('สร้างไม่ได้: '+e.message,'error'); }
   finally{ showLoader(false); }
 }
-function _drParseTpl(txt, code){
+function _drParseTpl(txt, code, projName){
   const out=[];
   String(txt||'').split('\n').map(l=>l.trim()).filter(Boolean).forEach(l=>{
-    const name=l.replace(/^-\s*/,'').split('{รหัส}').join(code);
+    const name=l.replace(/^-\s*/,'').split('{รหัส}').join(code).split('{ชื่อ}').join(projName||'');
     if(l.startsWith('-') && out.length) out[out.length-1].children.push(name);
     else out.push({name, children:[]});
   });
   return out;
 }
+// {รหัส} ของหน้าจัดไฟล์: รหัสจริงแบบ G01 ก่อน · โปรเจกต์ที่ไม่ได้ตั้งรหัส/ลำดับ → ใช้ชื่องานแทน (ไม่ปล่อยว่างจนโฟลเดอร์ชื่อแหว่ง)
+function _drCodeOf(p){ return p ? (projCode(p)||String(p.name||'').trim()) : ''; }
 async function drCreateFolders(){
   const p=getProjects().find(x=>x.id===_drSel);
   if(!p){ toast('เลือกโปรเจกต์ก่อน','warn'); return; }
@@ -6444,10 +6488,10 @@ async function drCreateFolders(){
   if(!parentId){ toast('เลือกที่เก็บก่อน (โฟลเดอร์หลัก/หมวด)','warn'); return; }
   const projName=(document.getElementById('dr-projname')?.value||'').trim();
   if(!projName){ toast('ตั้งชื่อโฟลเดอร์งานก่อน','error'); return; }
-  const code=projCode(p);
+  const code=_drCodeOf(p);
   const tplTxt=getDriveCfg().tpl||_DR_TPL_DEFAULT;
   const checked=[...document.querySelectorAll('#dr-tplchecks input:checked')].map(x=>+x.value);
-  const all=_drParseTpl(tplTxt, code);
+  const all=_drParseTpl(tplTxt, code, p.name||'');
   const items=checked.length?all.filter((_,i)=>checked.includes(i)):all;
   showLoader(true);
   try{
@@ -6466,7 +6510,7 @@ async function drMakeScript(){
   const cfg=getDriveCfg();
   if(!cfg.scriptTplId){ toast('ยังไม่ได้ใส่ลิงก์ไฟล์เทมเพลตบท — ตั้งได้ที่ 🔧 ตั้งค่า Drive','warn'); return; }
   if(!p.driveFolderId){ toast('สร้างโฟลเดอร์งานก่อน (ขั้นที่ 3)','warn'); return; }
-  const code=projCode(p)||p.name;
+  const code=_drCodeOf(p);
   showLoader(true);
   try{
     const d=await callDrive({action:'copy', fileId:cfg.scriptTplId, destId:p.driveFolderId, name:'Script/CV_'+code});
@@ -6547,13 +6591,13 @@ function renderDrivePage(){
   const parents=cfg.parents||[];
   // เปิดหน้ามาเลือกโฟลเดอร์หลักที่จำไว้ให้เลย (จำตัวล่าสุดที่เคยเลือกใน cfg.defaultParentId)
   if(!_drParent && parents.length) _drParent=parents.some(x=>x.id===cfg.defaultParentId)?cfg.defaultParentId:parents[0].id;
-  const code=p?projCode(p):'';
+  const code=p?_drCodeOf(p):'';
   // เทมเพลตแบบรายการ — แถวละโฟลเดอร์ มีปุ่มแก้/ลบ/เพิ่ม (index อิงบรรทัดจริงใน cfg.tpl)
   const tplLines=_drTplLines();
   let _tplMainIdx=-1;
   const tplRows=tplLines.map((l,i)=>{
     const isSub=/^-/.test(l.trim());
-    const disp=esc(l.trim().replace(/^-\s*/,'').split('{รหัส}').join(code||'{รหัส}'));
+    const disp=esc(l.trim().replace(/^-\s*/,'').split('{รหัส}').join(code||'{รหัส}').split('{ชื่อ}').join((p&&p.name)||'{ชื่อ}'));
     if(!isSub){
       _tplMainIdx++;
       return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-top:1px solid var(--border2)">
@@ -6599,7 +6643,7 @@ function renderDrivePage(){
     <div class="pr-step"><div class="pr-step-t">3️⃣ สร้างโฟลเดอร์งานตามเทมเพลต</div>
       <div class="pr-lbl">ชื่อโฟลเดอร์งาน</div>
       <input id="dr-projname" class="pr-in" value="${esc(p?((code?code+' ':'')+(p.name||'')):'')}" placeholder="เลือกโปรเจกต์ก่อน">
-      <div class="pr-lbl">โฟลเดอร์ที่จะสร้างข้างใน (ติ๊ก = สร้าง · แก้ชื่อ/ลบ/เพิ่มได้เลย เทมเพลตจำถาวรใช้ทุกงาน)</div>
+      <div class="pr-lbl">โฟลเดอร์ที่จะสร้างข้างใน (ติ๊ก = สร้าง · แก้ชื่อ/ลบ/เพิ่มได้เลย เทมเพลตจำถาวรใช้ทุกงาน · {รหัส} = รหัสงานแบบ G01 หรือชื่องานถ้าไม่ได้ตั้งรหัส · {ชื่อ} = ชื่องาน)</div>
       <div id="dr-tplchecks" style="display:flex;flex-direction:column;margin:4px 0 6px">
         ${tplRows||'<div style="color:var(--text2);font-size:12px;padding:6px 0">— เทมเพลตว่าง กด ➕ เพิ่มโฟลเดอร์หลัก —</div>'}
       </div>
@@ -13425,6 +13469,8 @@ function assignToggleAll(){
   renderAssign();
 }
 function assignAddRow(){
+  // 🔒 เมเนเจอร์แก้งานที่แอดมินสร้างได้ แต่สร้างงานใหม่เองไม่ได้ (เจ้าของกำหนด 2026-08-04)
+  if(currentUser?.role==='manager'){ toast('เมเนเจอร์แก้ไขงานที่ได้รับมอบหมายได้ แต่การสร้างงานใหม่เป็นของแอดมิน','warn'); return; }
   _assignAdding=true; _assignEditId=null; renderAssign();
   setTimeout(()=>{ document.getElementById('assign-newrow')?.scrollIntoView({block:'center'}); document.getElementById('ar-name')?.focus(); },60);
 }
@@ -13433,17 +13479,18 @@ function assignEditRow(id){ _assignAdding=false; _assignEditId=id; renderAssign(
 const _ASSIGN_PHASES=[['translation','แปล'],['adaptation','บท'],['dubbing','พากย์'],['qc','QC'],['mix','มิกซ์'],['subVideo','ซับ']];
 const _TH_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 function _thaiMonthLabel(ym){ const p=ym.split('-'); return _TH_M[parseInt(p[1])-1]+' '+(parseInt(p[0])+543); }
+// วันที่แบบสั้นไม่มีปี "7 ส.ค." + เวลาเมื่อตั้งไว้ — ปีไปแสดงรวมที่หัวหน้าแทน จะได้ไม่รกทุกชิป
+function _arFmtDM(v){
+  if(!v) return '';
+  const d=new Date(v);
+  if(isNaN(d)) return esc(String(v));
+  const hasT=String(v).includes('T') && !String(v).includes('T23:59');
+  const tm=hasT?' ⏰'+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'):'';
+  return d.getDate()+' '+_TH_M[d.getMonth()]+tm;
+}
 function _assignDL(p,key){
   const ph=p?.phases?.[key]||{};
-  // แสดงเวลาด้วยถ้าตั้งไว้ (23:59 = ไม่ได้เจาะจงเวลา ไม่ต้องโชว์)
-  const f=v=>{
-    if(!v) return '';
-    const hasT=String(v).includes('T');
-    const d=new Date(v);
-    if(isNaN(d)) return esc(String(v));
-    const tm=hasT&&!String(v).includes('T23:59') ? ' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+' น.' : '';
-    return fmtDate(v)+tm;
-  };
+  const f=v=>_arFmtDM(v);
   const base=ph.deadline?f(ph.deadline):'<span style="opacity:.35">—</span>';
   const extra=ph.deadline2?`<div style="font-size:10px;color:var(--orange);margin-top:1px">รอบ 2: ${f(ph.deadline2)}</div>`:'';
   const note=(ph.note||'').trim();
@@ -13513,11 +13560,12 @@ function _assignEditRowHTML(p){
     const ph=(p.phases||{})[k]||{};
     const has2=!!ph.deadline2;
     return `<div style="padding:9px 10px;background:var(--bg2);border-radius:9px">
-      <div style="font-size:11.5px;font-weight:700;margin-bottom:4px">DL ${l}</div>
+      <div style="display:flex;align-items:center;margin-bottom:4px"><span style="font-size:11.5px;font-weight:700;flex:1">DL ${l}</span>
+        <span onclick="var i=document.getElementById('ar-ph-${k}');if(i)i.value='';" style="font-size:10px;color:var(--text2);cursor:pointer;padding:1px 6px;border:1px solid var(--border2);border-radius:6px" title="ล้างเดทไลน์ของ ${l} (เซฟแล้วถือว่าไม่ตั้ง)">✕ ล้าง</span></div>
       ${inp('ar-ph-'+k,'datetime-local',_dtVal(ph.deadline),'','background:var(--bg)')}
       <div id="ar-ph2wrap-${k}" style="margin-top:4px;${has2?'':'display:none'}">${inp('ar-ph2-'+k,'datetime-local',_dtVal(ph.deadline2),'','background:var(--bg)')}</div>
       <div style="margin-top:4px">${inp('ar-phn-'+k,'text',ph.note||'','📝 โน้ต','background:var(--bg)')}</div>
-      <div style="margin-top:3px"><span onclick="var w=document.getElementById('ar-ph2wrap-${k}');var i=document.getElementById('ar-ph2-${k}');if(w.style.display==='none'){w.style.display='block'}else{w.style.display='none';if(i)i.value='';}" style="font-size:10px;color:var(--accent2);cursor:pointer;user-select:none" title="กดเปิดเพื่อเพิ่ม · กดซ้ำเพื่อลบรอบ 2 ออก">＋/✕ เดทไลน์รอบ 2</span></div>
+      <div style="margin-top:3px"><span onclick="var w=document.getElementById('ar-ph2wrap-${k}');var i=document.getElementById('ar-ph2-${k}');if(w.style.display==='none'){w.style.display='block'}else{w.style.display='none';if(i)i.value='';}" style="font-size:10px;color:var(--accent2);cursor:pointer;user-select:none" title="กดเปิดเพื่อเพิ่ม · กดซ้ำเพื่อลบรอบ 2 ออก">＋ เพิ่ม / ✕ ลบ เดทไลน์รอบ 2</span></div>
     </div>`;
   }).join('');
   return `<div id="${isNew?'assign-newrow':'assign-editrow'}" style="margin-bottom:12px;padding:14px 16px;background:var(--card);border:1.5px solid var(--accent2);border-radius:12px;box-shadow:0 3px 14px rgba(0,0,0,.3)">
@@ -13671,6 +13719,10 @@ function renderAssign(){
       <option value="newest"${_assignSort==='newest'?' selected':''}>🆕 เพิ่มล่าสุดก่อน</option>
     </select>
     <span style="font-size:12px;color:var(--text2)">${list.length} งาน</span>
+    ${(()=>{ // 📅 ปีแสดงรวมที่หัวครั้งเดียว — ชิปวันที่ในการ์ดจะได้ไม่ต้องพ่วงปีทุกอัน
+      const ys=[...new Set(list.map(p=>(p.deadline||'').slice(0,4)).filter(y=>/^\d{4}$/.test(y)))].sort();
+      return ys.length?`<span style="font-size:12px;font-weight:700;padding:3px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px">📅 ปี ${ys.map(y=>+y+543).join(' / ')}</span>`:'';
+    })()}
   </div>`;
   const mgrs={}; try{ getAllManagerUsers().forEach(m=>{ mgrs[m.uid]=m.nickname||m.email||''; }); }catch(e){}
   const codeColors={}; const palette=['#FF6FAE','#9B6FFF','#00B4FF','#00DFA0','#FF9E00','#FF6060','#5AD1E6'];
@@ -13698,10 +13750,10 @@ function renderAssign(){
     return `<div style="margin-bottom:10px;padding:12px 15px;background:${overdue?'rgba(255,64,64,.07)':'var(--card)'};border:1px solid ${overdue?'rgba(255,64,64,.3)':'rgba(128,150,180,.22)'};border-left:4px solid ${overdue?'var(--red)':cc};border-radius:11px;box-shadow:0 2px 10px rgba(0,0,0,.25)">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         ${code?`<span style="padding:2px 11px;border-radius:8px;background:${cc}22;color:${cc};font-weight:800;font-size:12.5px;cursor:pointer;flex:none" onclick="openBriefLibrary('${escJs(code)}')" title="เปิดบรีฟงานรหัส ${esc(code)}">${esc(projCode(p)||code)}</span>`:''}
-        <span style="font-weight:800;font-size:14px;cursor:pointer;color:var(--accent2);min-width:120px" onclick="openProjDetail('${p.id}')" title="เปิดรายละเอียด">${esc(p.name||'')}</span>
+        <span style="font-weight:800;font-size:14px;cursor:pointer;color:var(--accent2);min-width:120px" onclick="openProjDetail('${p.id}')" title="เปิดรายละเอียด">${esc(p.name||'(ยังไม่ตั้งชื่องาน)')}</span>
         ${p.type?`<span style="font-size:11px;color:var(--text2);background:var(--bg2);padding:2px 9px;border-radius:8px;flex:none">${esc(p.type)}</span>`:''}
         <span style="flex:1"></span>
-        <span style="font-size:12px;flex:none">🏁 <strong style="color:${overdue?'var(--red)':'var(--text)'}">${p.deadline?fmtDate(p.deadline):'—'}</strong>${overdue?' <span style="color:var(--red);font-size:10.5px;font-weight:700">เลยกำหนด!</span>':''}</span>
+        <span style="font-size:12px;flex:none">🏁 <strong style="color:${overdue?'var(--red)':'var(--text)'}">${p.deadline?_arFmtDM(p.deadline):'—'}</strong>${overdue?' <span style="color:var(--red);font-size:10.5px;font-weight:700">เลยกำหนด!</span>':''}</span>
         <span style="font-size:12px;color:var(--text2);flex:none">${p.managerId&&mgrs[p.managerId]?'🗂️ '+esc(mgrs[p.managerId]):'👑 แอดมิน'}</span>
         <span style="white-space:nowrap;flex:none">
           <button class="btn btn-sm btn-outline" style="padding:3px 10px;font-size:11.5px" onclick="assignEditRow('${p.id}')" title="แก้ไขในฟอร์ม">✏️ แก้ไข</button>
@@ -13721,6 +13773,9 @@ function renderAssign(){
   const emptyHint=(!list.length&&!_assignAdding)
     ? `<div style="padding:36px;text-align:center;color:var(--text2);background:var(--card);border:1px dashed rgba(128,150,180,.3);border-radius:11px">ไม่มีงานในมุมมองนี้ — กด "➕ มอบหมายงานใหม่" ด้านบนเพื่อเปิดฟอร์มกรอก</div>`:'';
   el.innerHTML=toolbar+newRow+cards+emptyHint;
+  // 🔒 เมเนเจอร์ไม่มีปุ่มสร้างงานใหม่ (แก้งานเดิมได้อย่างเดียว)
+  const _addBtn=document.querySelector('#page-assign button[onclick="assignAddRow()"]');
+  if(_addBtn) _addBtn.style.display=(currentUser?.role==='manager')?'none':'';
   if(_assignAdding||_assignEditId){
     try{ _arBudgetUI(); }catch(e){}
     ['ar-budget','ar-bqty','ar-dur'].forEach(id=>{ const e=document.getElementById(id); if(e) e.oninput=_arBudgetUI; });
@@ -26838,7 +26893,7 @@ function teamMemberCardHTML(s, col, viewer){
     <div style="display:flex;align-items:center;gap:10px">
       <span style="width:32px;height:32px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${esc((s.nickname||s.name||'?')[0])}</span>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:700;color:var(--text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.nickname||s.name)}${staffRoleEmojiHTML(s.id)} <span style="font-size:11px;color:var(--text2);font-weight:400">${esc(s.name||'')}</span>
+        <div style="font-weight:700;color:var(--text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.nickname||s.name)}${staffRoleEmojiHTML(s.id)}${s.discordId?` <span style="font-size:10px;cursor:default" title="ผูกบัญชี Discord แล้ว: ${esc(s.discordName||s.discordId)}">🔗</span>`:''} <span style="font-size:11px;color:var(--text2);font-weight:400">${esc(s.name||'')}</span>
           ${staffStatusBadgeHTML(s)}
           ${wc?`<span title="ใบเตือน" style="padding:1px 7px;border-radius:8px;background:rgba(255,64,64,.15);color:#FF6060;font-size:10px;font-weight:700;margin-left:4px">⚠️${wc}</span>`:''}
           ${ac?`<span title="ใบชื่นชม" style="padding:1px 7px;border-radius:8px;background:rgba(255,199,0,.15);color:#FFC700;font-size:10px;font-weight:700;margin-left:4px">⭐${ac}</span>`:''}
