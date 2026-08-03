@@ -4690,9 +4690,22 @@ async function pullFromDiscord(silent, allHistory){
         unmatched.push({...m, options: match.options||[]});
       }
     }
+    // 🔗 คนเดียวกันตอบหลายข้อความ → รวมเหลือแถวเดียว (ผูกครั้งเดียวพอ ไม่ต้องผูกซ้ำทุกข้อความ)
+    //    ใช้ข้อความล่าสุดเป็นหลัก แต่ถ้าข้อความล่าสุดอ่านเนื้อความไม่ได้ ให้คงเนื้อความเก่าที่อ่านได้ไว้โชว์
+    const unBy={}; const unDedup=[];
+    unmatched.forEach(m=>{
+      const k=m.authorId||('name:'+(m.displayName||m.username||''));
+      const ex=unBy[k];
+      if(ex){
+        ex.at=m.at||ex.at;
+        ex.displayName=m.displayName||ex.displayName;
+        if(String(m.content||'').trim()){ ex.content=m.content; ex.noContent=false; }
+        if(m.options&&m.options.length) ex.options=m.options;
+      } else { const c={...m}; unBy[k]=c; unDedup.push(c); }
+    });
     // เก็บคนที่จับคู่ไม่ได้ไว้ให้แอดมินกดผูก
     const list=getRounds(); const rr=list.find(x=>x.id===r.id);
-    if(rr){ rr.unmatched=unmatched.slice(-30); rr.pulledAt=new Date().toISOString(); await saveRounds(list); }
+    if(rr){ rr.unmatched=unDedup.slice(-30); rr.pulledAt=new Date().toISOString(); await saveRounds(list); }
     if(!silent){
       if(!msgs.length && skipped){
         // มีข้อความในห้องแต่เก่ากว่าเวลาที่เปิดรอบ — ถามว่าจะดึงย้อนหลังทั้งหมดไหม
@@ -4712,17 +4725,23 @@ async function pullFromDiscord(silent, allHistory){
           +'4. เปิดสวิตช์ "MESSAGE CONTENT INTENT" ให้ติด (สีเขียว/ฟ้า)\n'
           +'5. กด Save Changes แล้วกลับมากด "ดึงคำตอบจาก Discord" ใหม่');
       } else {
-        toast(`🔄 ดึงมา ${msgs.length} ข้อความ · จับคู่ได้ ${n} คน${unmatched.length?' · ผูกชื่อไม่ได้ '+unmatched.length+' (ดูกล่องส้ม)':''}${emptyCount?' · อ่านเนื้อความไม่ได้ '+emptyCount:''}${skipped?' · ข้ามข้อความเก่า '+skipped:''}`, unmatched.length?'warn':'success');
+        toast(`🔄 ดึงมา ${msgs.length} ข้อความ · จับคู่ได้ ${n} คน${unDedup.length?' · ผูกชื่อไม่ได้ '+unDedup.length+' คน (ดูกล่องส้ม)':''}${emptyCount?' · อ่านเนื้อความไม่ได้ '+emptyCount:''}${skipped?' · ข้ามข้อความเก่า '+skipped:''}`, unDedup.length?'warn':'success');
       }
     }
     renderAvailability();
-    return {fetched:msgs.length, matched:n, unmatched:unmatched.length, empty:emptyCount};
+    return {fetched:msgs.length, matched:n, unmatched:unDedup.length, empty:emptyCount};
   }catch(e){ if(!silent) toast('ดึงไม่สำเร็จ: '+e.message,'error'); return {fetched:0, matched:0, unmatched:0, error:String(e&&e.message||e)}; }
   finally{ if(!silent) showLoader(false); }
 }
 // กล่องรายชื่อที่ผูกไม่ได้
 function _dcUnmatchedHTML(r){
-  const un=(r.unmatched||[]);
+  // กันข้อมูลรอบเก่าที่เคยเก็บซ้ำต่อข้อความ — โชว์คนละแถวเดียวเสมอ
+  const _seenAuthor=new Set();
+  const un=(r.unmatched||[]).filter(m=>{
+    const k=m.authorId||m.displayName||m.username||'';
+    if(_seenAuthor.has(k)) return false;
+    _seenAuthor.add(k); return true;
+  });
   if(!un.length) return '';
   const all=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s&&s.id&&isStaffAssignable(s));
   const seen=new Set(); const opts=all.filter(s=>{ if(seen.has(s.id))return false; seen.add(s.id); return true; })
@@ -13501,7 +13520,7 @@ function _assignEditRowHTML(p){
       <div style="margin-top:3px"><span onclick="var w=document.getElementById('ar-ph2wrap-${k}');var i=document.getElementById('ar-ph2-${k}');if(w.style.display==='none'){w.style.display='block'}else{w.style.display='none';if(i)i.value='';}" style="font-size:10px;color:var(--accent2);cursor:pointer;user-select:none" title="กดเปิดเพื่อเพิ่ม · กดซ้ำเพื่อลบรอบ 2 ออก">＋/✕ เดทไลน์รอบ 2</span></div>
     </div>`;
   }).join('');
-  return `<div class="card" id="${isNew?'assign-newrow':'assign-editrow'}" style="margin-bottom:12px;padding:14px 16px;border:1.5px solid var(--accent2);border-radius:12px">
+  return `<div id="${isNew?'assign-newrow':'assign-editrow'}" style="margin-bottom:12px;padding:14px 16px;background:var(--card);border:1.5px solid var(--accent2);border-radius:12px;box-shadow:0 3px 14px rgba(0,0,0,.3)">
     <div style="font-size:14.5px;font-weight:800;margin-bottom:11px">${isNew?'➕ มอบหมายงานใหม่':'✏️ แก้ไขงาน — '+esc(p.name||'')}</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px">
       <div style="grid-column:1/-1">${lbl('ชื่อโปรเจกต์ *')}${inp('ar-name','text',p.name||'','ชื่องาน')}</div>
@@ -13676,7 +13695,7 @@ function renderAssign(){
       p.secretKey?`<span style="font-size:11px;color:var(--text2)">🔑 <span id="${secId}" data-shown="0" style="font-family:monospace">••••••••</span> <button id="${secId}-b" class="btn btn-sm btn-outline" style="padding:0 6px;font-size:10px" onclick="toggleSecretKey('${secId}-b','${secId}','${escJs(p.secretKey)}')">👁</button></span>`:'',
       (p.note||'').trim()?`<span style="font-size:11.5px;color:var(--text2)">📝 ${esc(p.note)}</span>`:''
     ].filter(Boolean).join(' <span style="opacity:.3">·</span> ');
-    return `<div class="card" style="margin-bottom:10px;padding:12px 15px;border-left:3px solid ${overdue?'var(--red)':cc};border-radius:11px;${overdue?'background:rgba(255,64,64,.04)':''}">
+    return `<div style="margin-bottom:10px;padding:12px 15px;background:${overdue?'rgba(255,64,64,.07)':'var(--card)'};border:1px solid ${overdue?'rgba(255,64,64,.3)':'rgba(128,150,180,.22)'};border-left:4px solid ${overdue?'var(--red)':cc};border-radius:11px;box-shadow:0 2px 10px rgba(0,0,0,.25)">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         ${code?`<span style="padding:2px 11px;border-radius:8px;background:${cc}22;color:${cc};font-weight:800;font-size:12.5px;cursor:pointer;flex:none" onclick="openBriefLibrary('${escJs(code)}')" title="เปิดบรีฟงานรหัส ${esc(code)}">${esc(projCode(p)||code)}</span>`:''}
         <span style="font-weight:800;font-size:14px;cursor:pointer;color:var(--accent2);min-width:120px" onclick="openProjDetail('${p.id}')" title="เปิดรายละเอียด">${esc(p.name||'')}</span>
@@ -13700,7 +13719,7 @@ function renderAssign(){
   }).join('');
   const newRow=_assignAdding?_assignEditRowHTML(null):'';
   const emptyHint=(!list.length&&!_assignAdding)
-    ? `<div class="card" style="padding:36px;text-align:center;color:var(--text2)">ไม่มีงานในมุมมองนี้ — กด "➕ มอบหมายงานใหม่" ด้านบนเพื่อเปิดฟอร์มกรอก</div>`:'';
+    ? `<div style="padding:36px;text-align:center;color:var(--text2);background:var(--card);border:1px dashed rgba(128,150,180,.3);border-radius:11px">ไม่มีงานในมุมมองนี้ — กด "➕ มอบหมายงานใหม่" ด้านบนเพื่อเปิดฟอร์มกรอก</div>`:'';
   el.innerHTML=toolbar+newRow+cards+emptyHint;
   if(_assignAdding||_assignEditId){
     try{ _arBudgetUI(); }catch(e){}
