@@ -2335,6 +2335,7 @@ body.sidebar-collapsed .main-content{
       <div class="tab" onclick="setDocsHistFilter('receipt',this)">🧾 ใบเสร็จรับเงิน</div>
       <div class="tab" onclick="setDocsHistFilter('voucher',this)">💸 ใบสำคัญจ่าย</div>
      </div>
+     <button class="btn btn-sm btn-outline" onclick="openFinanceSummaryDoc()" title="ออกเอกสารสรุปรายรับ-รายจ่าย-กำไร รายเดือน/ไตรมาส/ปี เป็น PDF">🧾 ใบสรุปยอดเงิน</button>
     </div>
     <div id="docs-history-list"></div>
    </div>
@@ -3969,14 +3970,16 @@ function getStaffById(id){return getAllStaff().find(s=>s.id===id)}
 //    status ใหม่เก็บใน staff record (field `status`) — ของเก่า (mgrSuspended/teamLeft)
 //    ยังอ่านต่อเป็น fallback เพื่อไม่กระทบข้อมูลเดิม
 // ══════════════════════════════════════════════
+// สถานะเหลือ 3 อย่างตามที่เจ้าของสรุป (2026-08-04): Active · พักงาน (พักเอง/โดนสั่งพัก) · ลาออก (= ออกทีม ย้ายไปแท็บออกทีม)
+// "ปิดใช้งาน" เอาออกแล้ว — ข้อมูลเก่าที่ค้างเป็น inactive จะถูกตีความเป็น "พักงาน" (ยังไม่ถูกจัดงาน ไม่เผลอกลับมา Active เอง)
 const STAFF_STATUSES = {
   active:    {label:'🟢 Active',     color:'var(--green)',  badge:''},
   suspended: {label:'⏸️ พักงาน',    color:'#FF9E00',       badge:'⏸️ พักงาน'},
-  inactive:  {label:'🚫 ปิดใช้งาน', color:'#9AA0B4',       badge:'🚫 ปิดใช้งาน'},
   resigned:  {label:'🚪 ลาออก',     color:'var(--red)',    badge:'🚪 ลาออก'},
 };
 function getStaffStatus(s){
   if(!s) return 'active';
+  if(s.status==='inactive') return 'suspended';   // legacy "ปิดใช้งาน"
   if(s.status && STAFF_STATUSES[s.status]) return s.status;
   try{ if(typeof isStaffLeft==='function' && isStaffLeft(s.id)) return 'resigned'; }catch(e){}
   try{ if(typeof getMgrSuspended==='function' && getMgrSuspended()[s.id]) return 'suspended'; }catch(e){}
@@ -3994,19 +3997,59 @@ function _updateStaffRecords(staffId, mut){
   if(n) saveStaffData(d);
   return n;
 }
-function setStaffStatus(staffId, status){
+async function setStaffStatus(staffId, status){
   if(!STAFF_STATUSES[status]) return;
+  // ลาออก = การกระทำที่ควรยืนยันก่อน (ย้ายออกจากทีมเลย)
+  if(status==='resigned'){
+    const s0=getStaffById(staffId);
+    if(!confirm(`ให้ "${s0?(s0.nickname||s0.name):''}" ลาออกจากทีม?\n\nชื่อจะย้ายไปแท็บ "🚪 ออกทีม" และไม่ถูกนับในจำนวนทีม\nข้อมูลยังอยู่ครบ — กู้คืนกลับเข้าทีมได้ภายหลัง`)) { try{ renderStaff(); }catch(e){} return; }
+  }
   const n=_updateStaffRecords(staffId, s=>{ s.status=status; s.statusAt=new Date().toISOString(); s.statusBy=currentUser?.email||''; });
-  if(n){
-    toast(`เปลี่ยนสถานะเป็น ${STAFF_STATUSES[status].label} แล้ว`,'success');
-    try{ if(typeof renderStaff==='function') renderStaff(); }catch(e){}
-  } else toast('ไม่พบสมาชิก','error');
+  if(!n){ toast('ไม่พบสมาชิก','error'); return; }
+  // 🔗 ลาออก = ออกทีม (ระบบเดียวกัน ไม่แยกสองที่อีกแล้ว): ซิงก์ team_left ให้ตรงกับสถานะเสมอ
+  try{
+    const map=getTeamLeft();
+    if(status==='resigned' && !map[staffId]){
+      const s=getStaffById(staffId);
+      map[staffId]={ by:currentUser?.nickname||currentUser?.email||'Admin', at:new Date().toISOString(), name:s?(s.nickname||s.name):staffId };
+      await saveTeamLeft(map);
+    } else if(status!=='resigned' && map[staffId]){
+      delete map[staffId];
+      await saveTeamLeft(map);
+    }
+  }catch(e){}
+  toast(status==='resigned'?'🚪 ย้ายไปแท็บออกทีมแล้ว (กู้คืนได้)':`เปลี่ยนสถานะเป็น ${STAFF_STATUSES[status].label} แล้ว`, status==='resigned'?'info':'success');
+  try{ if(typeof renderStaff==='function') renderStaff(); }catch(e){}
 }
 function staffStatusBadgeHTML(s){
   const k=getStaffStatus(s);
   if(k==='active') return '';
   const v=STAFF_STATUSES[k];
   return `<span style="padding:1px 7px;border-radius:8px;background:${k==='suspended'?'rgba(255,158,0,.18)':k==='resigned'?'rgba(255,64,64,.15)':'rgba(150,154,180,.18)'};color:${v.color};font-size:10px;font-weight:700;margin-left:4px">${v.badge}</span>`;
+}
+// 🎭 อิโมจิบอกว่าคนนี้ทำโรลอะไรบ้าง (คนเดียวมีได้หลาย record หลายหมวด — รวมให้เป็นชุดเดียว)
+const ROLE_EMOJI={dubbing:'🎤',adaptation:'✍️',mix:'🎧',qc:'✅',subVideo:'🎬',translation:'🌐',manager:'🗂️'};
+const ROLE_EMOJI_TH={dubbing:'พากย์',adaptation:'บท',mix:'มิกซ์',qc:'QC',subVideo:'ซับ/วิดีโอ',translation:'แปล',manager:'เมเนเจอร์'};
+function staffRoleEmojiHTML(staffId){
+  const cats=new Set();
+  try{
+    getAllStaff().forEach(r=>{
+      if(r&&r.id===staffId){ if(r.category) cats.add(r.category); (r.categories||[]).forEach(c=>cats.add(c)); }
+    });
+  }catch(e){}
+  const keys=Object.keys(ROLE_EMOJI).filter(k=>cats.has(k));
+  if(!keys.length) return '';
+  return `<span style="font-size:11.5px;letter-spacing:.5px;margin-left:4px;cursor:default" title="ทำหน้าที่: ${esc(keys.map(k=>ROLE_EMOJI_TH[k]).join(' · '))}">${keys.map(k=>ROLE_EMOJI[k]).join('')}</span>`;
+}
+// ⚙️ dropdown รวมทุกคำสั่งบนการ์ดสมาชิก (แทนปุ่มแยก 4-5 ปุ่มที่รกการ์ด)
+function teamCardAction(staffId, sel){
+  const v=sel.value; sel.value='';
+  if(!v) return;
+  if(v==='warn') return teamWarn(staffId);
+  if(v==='appr') return teamAppr(staffId);
+  if(v==='tag') return openStaffTagEditor(staffId);
+  if(v==='delete') return deleteStaff(staffId);
+  if(v.indexOf('st-')===0) setStaffStatus(staffId, v.slice(3));
 }
 // ── Tag master — admin สร้างหัวข้อเอง เก็บที่ misc/tags_master ──
 function getTagsMaster(){ return ls('tags_master')||{}; }
@@ -4472,12 +4515,112 @@ function matchStaffByDiscord(msg){
   // ยังแยกไม่ได้ → ไม่เดา ให้แอดมินเลือกเอง (ผูกครั้งเดียวจำตลอด)
   return {staff:null, how:'ambiguous', options:(narrowed.length?narrowed:top).map(c=>c.s)};
 }
+// จับคู่จาก "ชื่อ" สำเร็จ → ผูก discordId ถาวรให้เงียบ ๆ ทันที
+// (เดิมจับคู่ได้แต่ไม่บันทึก — รอบหน้าต้องเดาชื่อใหม่ทุกครั้ง และ "ดึงทีมเข้าห้อง" ใช้ไม่ได้เพราะไม่มี id)
+function _dcAutoLink(match, m){
+  try{
+    if(!match||!match.staff||!m||!m.authorId) return;
+    if(match.how!=='name' && match.how!=='name+ชื่อย่อ') return;
+    if(match.staff.discordId) return;
+    _updateStaffRecords(match.staff.id, s=>{ s.discordId=m.authorId; s.discordName=m.displayName||m.username||''; });
+    logAudit('staff.edit', match.staff.nickname||match.staff.name||'', 'ผูกบัญชี Discord อัตโนมัติจากการจับคู่ชื่อ: '+(m.displayName||m.username||m.authorId));
+  }catch(e){}
+}
 async function linkDiscordUser(staffId, discordId, discordName){
   _updateStaffRecords(staffId, s=>{ s.discordId=discordId; s.discordName=discordName||''; });
   const s=getStaffById(staffId);
   logAudit('staff.edit', s?(s.nickname||s.name):staffId, 'ผูกบัญชี Discord: '+(discordName||discordId));
   toast('ผูกบัญชีแล้ว ✅ ครั้งหน้าระบบจะจำเอง','success');
   await pullFromDiscord(true);
+}
+// ══ 🔗 ผูกบัญชี Discord ทั้งทีมรวดเดียว ══
+//    ดึงสมาชิกทั้งเซิร์ฟเวอร์ (worker action: discordMembers — ต้องเปิด SERVER MEMBERS INTENT)
+//    → จับคู่กับทะเบียนด้วยตรรกะเดียวกับตอนดึงคำตอบ → เดาให้ กดยืนยันรายคนหรือทั้งหมด
+async function openBulkDiscordLink(){
+  showLoader(true);
+  try{
+    const d=await callAppsScript({action:'discordMembers'});
+    window._blkMembers=d.members||[];
+    if(!window._blkMembers.length){ toast('ไม่พบสมาชิกในเซิร์ฟเวอร์ — เช็คว่าเปิด SERVER MEMBERS INTENT ให้บอทแล้ว','warn'); return; }
+    _renderBulkDiscordLink();
+  }catch(e){
+    toast(String(e.message||'').includes('ไม่รู้จักคำสั่ง')
+      ? 'Worker ยังเป็นเวอร์ชันเก่า — วางโค้ด worker.js ล่าสุดใน Cloudflare แล้ว Deploy ก่อน จึงจะดึงรายชื่อสมาชิกได้'
+      : 'ดึงรายชื่อสมาชิกไม่ได้: '+e.message,'error');
+  }finally{ showLoader(false); }
+}
+function _renderBulkDiscordLink(){
+  const members=window._blkMembers||[];
+  const all=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s&&s.id&&isStaffAssignable(s));
+  const seen=new Set();
+  const opts=all.filter(s=>{ if(seen.has(s.id))return false; seen.add(s.id); return true; })
+    .sort((a,b)=>String(a.nickname||a.name||'').localeCompare(String(b.nickname||b.name||''),'th'));
+  const rows=members.map(m=>{
+    const disp=m.nick||m.globalName||m.username||'';
+    const match=matchStaffByDiscord({authorId:m.id, displayName:disp, username:m.username});
+    return {m, disp, match};
+  });
+  // เรียง: เดาได้แต่ยังไม่ผูก → กำกวม → เดาไม่ได้ → ผูกแล้ว (ท้ายสุด ไม่ต้องยุ่ง)
+  const order={'name':0,'name+ชื่อย่อ':0,'ambiguous':1,'none':2,'linked':3};
+  rows.sort((a,b)=>((order[a.match.how]??2)-(order[b.match.how]??2)) || a.disp.localeCompare(b.disp,'th'));
+  window._blkRows=rows;
+  const guessable=rows.filter(r=>r.match.staff && r.match.how!=='linked').length;
+  const linked=rows.filter(r=>r.match.how==='linked').length;
+  const rowHTML=rows.map((r,i)=>{
+    if(r.match.how==='linked'){
+      const s=r.match.staff;
+      return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--border2);font-size:12.5px;opacity:.65">
+        <span style="flex:1;min-width:0">${esc(r.disp)} <span style="font-size:10.5px;color:var(--text2)">@${esc(r.m.username||'')}</span></span>
+        <span style="color:var(--green);font-size:11.5px">✅ ผูกแล้ว → ${esc(s.nickname||s.name)}</span>
+      </div>`;
+    }
+    const guessId=r.match.staff?r.match.staff.id:'';
+    const ambiIds=(r.match.options||[]).map(o=>o.id);
+    return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--border2)">
+      <div style="flex:1;min-width:150px">
+        <div style="font-size:12.5px;font-weight:700">${esc(r.disp)}</div>
+        <div style="font-size:10.5px;color:var(--text2)">@${esc(r.m.username||'')}${r.match.how==='ambiguous'?' · <span style="color:var(--orange)">ชื่อซ้ำหลายคน เลือกเอง</span>':r.match.staff?' · เดาว่าเป็นคนนี้':''}</div>
+      </div>
+      <select id="blk-sel-${i}" style="min-width:140px;padding:6px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px">
+        <option value="">— ไม่ผูก —</option>
+        ${opts.map(s=>`<option value="${esc(s.id)}"${s.id===guessId||(!guessId&&ambiIds[0]===s.id)?' selected':''}>${esc(s.nickname||s.name)}${s.name&&s.nickname?' · '+esc(s.name):''}</option>`).join('')}
+      </select>
+      <button class="btn btn-sm" onclick="blkLinkOne(${i})">🔗 ผูก</button>
+    </div>`;
+  }).join('');
+  _tagOverlayShow('🔗 ผูกบัญชี Discord ทั้งทีมรวดเดียว', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.7;margin-bottom:8px">
+      สมาชิกในเซิร์ฟเวอร์ ${members.length} คน · ผูกแล้ว ${linked} คน — ระบบเดาจากชื่อให้แล้ว กด 🔗 ยืนยันรายคน หรือกดปุ่มเขียวผูกทั้งหมดที่เดาได้ทีเดียว
+      <strong>ผูกครั้งเดียวจำตลอด</strong> ใช้ทั้งดึงคำตอบลงคิวและดึงทีมเข้าห้องโปรเจกต์
+    </div>
+    ${guessable?`<button class="btn btn-green" style="width:100%;margin-bottom:6px" onclick="blkLinkAllGuessed()">✅ ผูกทั้งหมดที่เดาได้ (${guessable} คน)</button>`:''}
+    <div style="max-height:380px;overflow-y:auto">${rowHTML||'<div style="color:var(--text2);text-align:center;padding:16px">ไม่มีสมาชิก</div>'}</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-outline" style="flex:1" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
+    </div>`, 620);
+}
+function blkLinkOne(i){
+  const r=(window._blkRows||[])[i]; if(!r) return;
+  const sid=document.getElementById('blk-sel-'+i)?.value;
+  if(!sid){ toast('เลือกคนในทะเบียนก่อน','warn'); return; }
+  _updateStaffRecords(sid, s=>{ s.discordId=r.m.id; s.discordName=r.disp; });
+  const s=getStaffById(sid);
+  try{ logAudit('staff.edit', s?(s.nickname||s.name):sid, 'ผูกบัญชี Discord (ผูกทั้งทีม): '+r.disp); }catch(e){}
+  toast('ผูก '+(s?(s.nickname||s.name):'')+' แล้ว ✅','success');
+  _renderBulkDiscordLink();
+}
+function blkLinkAllGuessed(){
+  const rows=window._blkRows||[]; let n=0;
+  rows.forEach(r=>{
+    if(!r.match.staff || r.match.how==='linked') return;
+    const cur=getStaffById(r.match.staff.id);
+    if(!cur || cur.discordId) return;   // มีคนอื่นถูกผูกกับ id นี้ไปก่อนแล้วในลูปนี้
+    _updateStaffRecords(cur.id, s=>{ s.discordId=r.m.id; s.discordName=r.disp; });
+    n++;
+  });
+  try{ logAudit('staff.edit','ทั้งทีม','ผูกบัญชี Discord รวดเดียว '+n+' คน'); }catch(e){}
+  toast('✅ ผูกแล้ว '+n+' คน','success');
+  _renderBulkDiscordLink();
 }
 // ── โพสประกาศลงห้อง ──
 async function postRoundToDiscord(){
@@ -4529,6 +4672,7 @@ async function pullFromDiscord(silent, allHistory){
         emptyCount++;
         const lk=matchStaffByDiscord(m);
         if(lk.staff){
+          _dcAutoLink(lk, m);
           await saveRoundReply(r.id, lk.staff.id, {freeText:'', discordName:m.displayName||m.username, source:'discord'});
           n++;
         } else {
@@ -4538,6 +4682,7 @@ async function pullFromDiscord(silent, allHistory){
       }
       const match=matchStaffByDiscord(m);
       if(match.staff){
+        _dcAutoLink(match, m);
         await saveRoundReply(r.id, match.staff.id, {
           freeText:m.content.trim(), discordName:m.displayName||m.username, source:'discord' });
         n++;
@@ -4961,6 +5106,7 @@ function renderAvailability(){
           : `<button class="btn btn-sm btn-outline" onclick="openDiscordSetup()" title="ตั้ง ID ห้องก่อนจึงจะโพส/ดึงได้">🐧 ตั้งค่าห้อง Discord</button>`}
         ${r.postedMessageId?`<button class="btn btn-sm btn-outline" onclick="resetRoundPost()" title="ยกเลิกการผูกกับโพสเดิม เพื่อโพสใหม่/เปลี่ยนห้อง">↩️ โพสใหม่</button>`:''}
         <button class="btn btn-sm btn-outline" onclick="openDiscordSetup()" title="แก้ ID ห้อง Discord">🐧 ห้อง Discord</button>
+        <button class="btn btn-sm btn-outline" onclick="openBulkDiscordLink()" title="ดึงรายชื่อสมาชิกทั้งเซิร์ฟเวอร์มาจับคู่กับทะเบียนทีม ผูกครั้งเดียวจำตลอด">🔗 ผูกทั้งทีม</button>
         <button class="btn btn-sm btn-outline" onclick="showRoundAnnounce('${escJs(r.id)}')">📢 ข้อความประกาศ</button>
         <button class="btn btn-sm btn-outline" onclick="avCopyForChat()">📋 คัดลอกสรุป</button>
         <button class="btn btn-sm btn-outline" onclick="closeRound('${escJs(r.id)}')">${r.status==='open'?'🔒 ปิดรอบ':'🔓 เปิดอีกครั้ง'}</button>
@@ -5466,6 +5612,8 @@ async function alcConfirm(projId){
     fresh.workers=fresh.workers||[];
     // กันซ้ำเผื่ออีกเครื่องกดยืนยันคนเดียวกันพร้อมกัน
     rows.forEach(r0=>{ if(!fresh.workers.some(w=>w&&w.id===r0.id&&(w.slot||'').split('-')[0]===(r0.slot||'').split('-')[0])) fresh.workers.push(r0); });
+    // 🎯 flow มอบหมาย→สร้างจริง: ยืนยันคนเข้าโปรเจกต์สำเร็จ = โปรเจกต์เริ่มเดินงานจริง
+    if(fresh.projStatus!=='done' && fresh.projStatus!=='cancelled') fresh.projStatus='inprogress';
   });
   if(!res.ok){ toast('บันทึกไม่สำเร็จ: '+((res.error&&res.error.message)||''),'error'); return; }
   delete d[projId]; await saveAllocDraft(d);
@@ -5597,8 +5745,16 @@ function _pjDiscordMentions(p){
   return by;
 }
 // ข้อความโพสต์ = เทมเพลตข้อมูลโปรเจกต์ + บรีฟตามรหัสงาน + แท็กทีม (คนที่ผูก Discord แล้วจะโดนแท็กจริง)
+// 🔖 รหัสงานมาตรฐาน เช่น G01 (เลขลำดับเติม 0 ให้ครบ 2 หลักเสมอ — ตรงกับชื่อโฟลเดอร์/ไฟล์จริงของสตูดิโอ)
+function projCode(p){
+  if(!p) return '';
+  const c=String(p.clientCode||'').trim();
+  const n=String(p.seq==null?'':p.seq).trim();
+  if(!c && !n) return '';
+  return c+(/^\d+$/.test(n)?n.padStart(2,'0'):n);
+}
 function buildProjPostText(p){
-  const code=((p.clientCode||'')+(p.seq||''));
+  const code=projCode(p);
   const briefs=(typeof getBriefTemplates==='function'?getBriefTemplates():{})||{};
   const brief=briefs[(p.clientCode||'').toUpperCase()];
   const briefTxt=brief?(typeof brief==='string'?brief:(brief.text||brief.body||'')):'';
@@ -5629,7 +5785,7 @@ function openProjDiscord(projId){
         <div style="font-size:11px;color:var(--text2);margin-bottom:3px">ชื่อหมวดหมู่</div>
         <input id="pjdc-cat" class="form-input" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:7px 10px;font-size:12.5px" value="${esc((getDiscordCfg().projCategory)||'📁 โปรเจกต์')}">
         <div style="font-size:11px;color:var(--text2);margin-bottom:3px">ชื่อห้อง</div>
-        <input id="pjdc-name" class="form-input" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:7px 10px;font-size:12.5px" value="${esc((((p.clientCode||'')+(p.seq||''))?(((p.clientCode||'')+(p.seq||''))+'-'):'')+(p.name||''))}">`}
+        <input id="pjdc-name" class="form-input" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:7px 10px;font-size:12.5px" value="${esc((projCode(p)?projCode(p)+'-':'')+(p.name||''))}">`}
     <div style="font-size:11px;color:var(--text2);margin:6px 0 3px">📣 ข้อความที่จะโพสต์ (แก้ในกล่องได้เลย):</div>
     <textarea id="pjdc-preview" rows="9" style="${ta}">${esc(buildProjPostText(p))}</textarea>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
@@ -5769,7 +5925,39 @@ const _PR_TPL_DEFAULT=[
 '🎧 มิกซ์ + QC | {ทีมมิกซ์} {ทีมQC}','🗓 เดทไลน์ QC — {เดทไลน์QC}','🗓 เดทไลน์ Final — {เดทไลน์}','——————————',
 '📌 โน้ต:','{หมายเหตุ}','——————————',
 '🔴 มีเรื่องสอบถาม/งานเลท แท็กแจ้ง {เมเนเจอร์}','🔴 แจ้ง "รับทราบ" ในห้อง 🎙พูดคุย เพื่อคอนเฟิร์มรับงาน'].join('\n');
-function getProjPostTpl(){ return String(ls('projposttpl')||_PR_TPL_DEFAULT); }
+// ── เทมเพลตโพสต์หลายชุด (คีย์ posttpls — ห้ามมี underscore เพื่อ live-sync) ──
+//    migrate อัตโนมัติจากเทมเพลตเดี่ยวเดิม (projposttpl) · แต่ละโปรเจกต์เลือกชุดของตัวเองได้ (p.postTplId)
+function getPostTpls(){
+  const v=ls('posttpls');
+  if(Array.isArray(v)&&v.length) return v;
+  return [{id:'tpl1', name:'ชุดมาตรฐาน', text:String(ls('projposttpl')||_PR_TPL_DEFAULT)}];
+}
+async function savePostTpls(v){ ls('posttpls', v); try{ await fbSaveKeyed('posttpls', v); }catch(e){} }
+function getProjPostTplFor(p){
+  const tpls=getPostTpls();
+  const t=tpls.find(x=>x.id===(p&&p.postTplId));
+  return String((t||tpls[0]).text||_PR_TPL_DEFAULT);
+}
+function getProjPostTpl(){ return String(getPostTpls()[0].text||_PR_TPL_DEFAULT); }
+// ── แท็กโรลจริง: "@ชื่อโรล" ในเทมเพลตเป็นตัวหนังสือเฉย ๆ ไม่ ping ต้องแปลงเป็น <@&roleId> ก่อนโพสต์ ──
+let _prRoleCache=null;
+async function _prRoleMap(){
+  if(_prRoleCache) return _prRoleCache;
+  try{
+    const d=await callProjBot({action:'discordRoles'});
+    const map={};
+    (d.roles||[]).forEach(r=>{ const n=String(r.name||'').trim(); if(n) map[n]=r.id; });
+    _prRoleCache=map;
+  }catch(e){ _prRoleCache={}; }
+  return _prRoleCache;
+}
+function _prApplyRoleMentions(txt, map){
+  // เทียบชื่อยาวก่อน — กันเคสโรล "นักพากย์" ไปกินครึ่งแรกของ "@นักพากย์ชาย"
+  const names=Object.keys(map||{}).sort((a,b)=>b.length-a.length);
+  let t=String(txt||'');
+  names.forEach(n=>{ t=t.split('@'+n).join('<@&'+map[n]+'>'); });
+  return t;
+}
 function _prPhaseDL(p,k){
   const v=p?.phases?.[k]?.deadline||'';
   if(!v) return '—';
@@ -5782,7 +5970,7 @@ function _prFillTpl(p){
   const by=_pjDiscordMentions(p);
   const j=k=>(by[k]&&by[k].length)?by[k].join(' / '):'—';
   const map={
-    '{รหัส}':((p.clientCode||'')+(p.seq||''))||p.name||'', '{ชื่อ}':p.name||'',
+    '{รหัส}':projCode(p)||p.name||'', '{ชื่อ}':p.name||'',
     '{ไดรฟ์}':p.downloadLink||p.driveFolderLink||'—',
     '{ตอน}':p.episodes||'—', '{นาที}':p.duration||'—',
     '{เดทไลน์}':p.deadline?fmtDate(p.deadline):'—',
@@ -5793,7 +5981,7 @@ function _prFillTpl(p){
     '{เดทไลน์ซับ}':_prPhaseDL(p,'subVideo'), '{เดทไลน์แปล}':_prPhaseDL(p,'translation'),
     '{หมายเหตุ}':(p.note||'').trim()||'—',
   };
-  let t=getProjPostTpl();
+  let t=getProjPostTplFor(p);
   Object.entries(map).forEach(([k,v])=>{ t=t.split(k).join(String(v)); });
   return t;
 }
@@ -5811,34 +5999,88 @@ function _prChunks(txt){
   if(cur.trim()) out.push(cur);
   return out.length?out:[''];
 }
-function openProjPostTplEditor(){
+let _prTplEditId='';
+function openProjPostTplEditor(selId){
   if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมินแก้เทมเพลตได้','error'); return; }
-  _tagOverlayShow('⚙️ เทมเพลตโพสต์คู่มืองาน — ใช้ซ้ำทุกโปรเจกต์', `
-    <div style="font-size:11px;color:var(--text2);line-height:1.7;margin-bottom:8px">
-      ช่องที่ระบบเติมให้เอง: <code>{รหัส} {ชื่อ} {ไดรฟ์} {ตอน} {นาที} {เดทไลน์} {ทีมบท} {นักพากย์} {ทีมมิกซ์} {ทีมQC} {ทีมซับ} {ทีมแปล} {เมเนเจอร์} {จำนวนพากย์} {เดทไลน์บท} {เดทไลน์พากย์} {เดทไลน์QC} {เดทไลน์มิกซ์} {เดทไลน์ซับ} {หมายเหตุ}</code>
-      — คนที่ผูก Discord แล้วจะถูกแท็กจริง
+  const tpls=getPostTpls();
+  if(selId) _prTplEditId=selId;
+  if(!tpls.some(t=>t.id===_prTplEditId)) _prTplEditId=tpls[0].id;
+  const cur=tpls.find(t=>t.id===_prTplEditId);
+  _tagOverlayShow('⚙️ เทมเพลตโพสต์คู่มืองาน — มีได้หลายชุด เลือกใช้ต่อโปรเจกต์', `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+      <select class="pr-in" style="flex:1;min-width:170px;margin:0" onchange="saveProjPostTpl(true).then(()=>openProjPostTplEditor(this.value))">
+        ${tpls.map(t=>`<option value="${esc(t.id)}"${t.id===_prTplEditId?' selected':''}>${esc(t.name||'ไม่มีชื่อ')}</option>`).join('')}
+      </select>
+      <button class="btn btn-outline btn-sm" onclick="prTplAdd()">➕ เพิ่มชุดใหม่</button>
+      <button class="btn btn-outline btn-sm" style="border-color:rgba(255,64,64,.3);color:var(--red)" onclick="prTplDel()">🗑️ ลบชุดนี้</button>
     </div>
-    <textarea id="prtpl-text" rows="14" class="pr-in" style="line-height:1.6;resize:vertical">${esc(getProjPostTpl())}</textarea>
-    <div style="display:flex;gap:8px;margin-top:10px">
+    <div class="pr-lbl">ชื่อชุดเทมเพลต</div>
+    <input id="prtpl-name" class="pr-in" value="${esc(cur.name||'')}" placeholder="เช่น หนังคน / หนังAI / งานด่วน">
+    <div style="font-size:11px;color:var(--text2);line-height:1.7;margin:8px 0">
+      ช่องที่ระบบเติมให้เอง: <code>{รหัส} {ชื่อ} {ไดรฟ์} {ตอน} {นาที} {เดทไลน์} {ทีมบท} {นักพากย์} {ทีมมิกซ์} {ทีมQC} {ทีมซับ} {ทีมแปล} {เมเนเจอร์} {จำนวนพากย์} {เดทไลน์บท} {เดทไลน์พากย์} {เดทไลน์QC} {เดทไลน์มิกซ์} {เดทไลน์ซับ} {หมายเหตุ}</code><br>
+      🏷️ พิมพ์ <code>@ชื่อโรล</code> ให้ตรงกับชื่อโรลในเซิร์ฟเวอร์ (เช่น @นักพากย์ชาย) — ตอนโพสต์ระบบจะแปลงเป็นแท็กโรลจริงที่ ping ได้<br>
+      🔗 ฝังลิงก์ในคำได้: <code>[คำที่ให้กด](https://ลิงก์)</code> — หรือกดปุ่ม "แทรกลิงก์" ด้านล่าง
+    </div>
+    <textarea id="prtpl-text" rows="13" class="pr-in" style="line-height:1.6;resize:vertical">${esc(cur.text||'')}</textarea>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
       <button class="btn btn-green" style="flex:1" onclick="saveProjPostTpl()">💾 บันทึกเทมเพลต</button>
-      <button class="btn btn-outline" onclick="if(confirm('คืนค่าเทมเพลตเริ่มต้น?')){ls('projposttpl',null);fbSaveKeyed('projposttpl',null);openProjPostTplEditor();}">↩️ ค่าเริ่มต้น</button>
+      <button class="btn btn-outline btn-sm" onclick="prTplInsertLink()" title="แทรก [คำ](ลิงก์) ตรงตำแหน่งเคอร์เซอร์">🔗 แทรกลิงก์</button>
+      <button class="btn btn-outline btn-sm" onclick="prTplResetCur()">↩️ ค่าเริ่มต้น</button>
       <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
     </div>`, 660);
 }
-async function saveProjPostTpl(){
-  const t=String(document.getElementById('prtpl-text')?.value||'').trim();
-  if(!t){ toast('เทมเพลตว่าง','error'); return; }
-  ls('projposttpl', t); try{ await fbSaveKeyed('projposttpl', t); }catch(e){}
-  toast('💾 บันทึกเทมเพลตแล้ว','success');
-  document.getElementById('tag-overlay')?.remove();
-  renderProjRoom();
+// เซฟชุดที่กำลังแก้ · silent=true ใช้ตอนสลับชุด (ไม่เด้ง toast/ไม่ปิดกล่อง)
+async function saveProjPostTpl(silent){
+  const tpls=getPostTpls();
+  const cur=tpls.find(t=>t.id===_prTplEditId); if(!cur) return;
+  const name=(document.getElementById('prtpl-name')?.value||'').trim();
+  const text=String(document.getElementById('prtpl-text')?.value||'').trim();
+  if(!text){ if(!silent) toast('เทมเพลตว่าง','error'); return; }
+  cur.name=name||cur.name||'ไม่มีชื่อ'; cur.text=text;
+  await savePostTpls(tpls);
+  if(!silent){
+    toast('💾 บันทึกเทมเพลตแล้ว','success');
+    document.getElementById('tag-overlay')?.remove();
+    renderProjRoom();
+  }
+}
+async function prTplAdd(){
+  await saveProjPostTpl(true);
+  const tpls=getPostTpls();
+  const id='tpl'+Date.now();
+  tpls.push({id, name:'ชุดใหม่', text:_PR_TPL_DEFAULT});
+  await savePostTpls(tpls);
+  openProjPostTplEditor(id);
+}
+async function prTplDel(){
+  const tpls=getPostTpls();
+  if(tpls.length<=1){ toast('ต้องเหลืออย่างน้อย 1 ชุด','warn'); return; }
+  const cur=tpls.find(t=>t.id===_prTplEditId);
+  if(!confirm('ลบชุด "'+(cur?.name||'')+'" ?\n(โปรเจกต์ที่เคยเลือกชุดนี้จะกลับไปใช้ชุดแรกแทน)')) return;
+  const rest=tpls.filter(t=>t.id!==_prTplEditId);
+  await savePostTpls(rest);
+  openProjPostTplEditor(rest[0].id);
+}
+async function prTplResetCur(){
+  if(!confirm('คืนข้อความของชุดนี้เป็นค่าเริ่มต้น?')) return;
+  const ta=document.getElementById('prtpl-text');
+  if(ta) ta.value=_PR_TPL_DEFAULT;
+}
+function prTplInsertLink(){
+  const ta=document.getElementById('prtpl-text'); if(!ta) return;
+  const word=prompt('คำที่จะให้กดได้ (เช่น เปิดไฟล์งาน):','เปิดไฟล์งาน'); if(word===null) return;
+  const url=prompt('วางลิงก์ (https://…):','https://'); if(url===null) return;
+  const ins='['+word+']('+url.trim()+')';
+  const s=ta.selectionStart||0, e=ta.selectionEnd||0;
+  ta.value=ta.value.slice(0,s)+ins+ta.value.slice(e);
+  ta.focus(); ta.selectionStart=ta.selectionEnd=s+ins.length;
 }
 function _prComposeCat(){
   const emoji=document.getElementById('pr-emoji')?.value||'';
   const kind=document.querySelector('input[name=pr-kind]:checked')?.value||'none';
   const carer=(document.getElementById('pr-carer')?.value||'').trim();
   const p=getProjects().find(x=>x.id===_prSel); if(!p) return;
-  const code=((p.clientCode||'')+(p.seq||''))||p.name||'';
+  const code=projCode(p)||p.name||'';
   const kindTxt=kind==='human'?' หนังคน':kind==='ai'?' หนังAI':'';
   const el=document.getElementById('pr-catname');
   if(el) el.value=emoji+code+kindTxt+(carer?' | '+carer+' ดูแล':'');
@@ -5858,7 +6100,7 @@ function renderProjRoom(){
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <select class="pr-in" style="flex:1;min-width:220px" onchange="_prSel=this.value;renderProjRoom()">
         <option value="">— เลือกโปรเจกต์ —</option>
-        ${list.map(x=>`<option value="${esc(x.id)}"${x.id===_prSel?' selected':''}>${esc(((x.clientCode||'')+(x.seq||''))?((x.clientCode||'')+(x.seq||''))+' · ':'')}${esc(x.name||'')}${x.discordChannelId?' 🐧':''}</option>`).join('')}
+        ${list.map(x=>`<option value="${esc(x.id)}"${x.id===_prSel?' selected':''}>${esc(projCode(x)?projCode(x)+' · ':'')}${esc(x.name||'')}${x.discordChannelId?' 🐧':''}</option>`).join('')}
       </select>
       <button class="btn btn-blue btn-sm" onclick="openNewProject()" title="กรอกชื่อ/เดทไลน์ก่อน สร้างเสร็จกลับมาเลือกที่นี่ได้เลย">＋ สร้างโปรเจกต์ใหม่</button>
     </div></div>`;
@@ -5867,10 +6109,12 @@ function renderProjRoom(){
   const emoji=ls('projroom_emoji')||'❤️';
   const carer=(p.managerId&&mgrs[p.managerId])||currentUser?.nickname||'';
   const step2 = has
-    ? `<div class="pr-step"><div class="pr-step-t">2️⃣ ห้องของโปรเจกต์นี้ <span class="alc-chip alc-c-all">✅ สร้างแล้ว</span></div>
+    ? `<div class="pr-step"><div class="pr-step-t">2️⃣ ห้องของโปรเจกต์นี้ <span class="alc-chip alc-c-all">✅ สร้างแล้ว</span>${p.discordPrivate?' <span class="alc-chip" style="background:rgba(150,154,180,.18)">🔒 ส่วนตัว</span>':''}</div>
         <div style="font-size:12.5px;line-height:1.8">หมวดหมู่: <strong>${esc(p.discordCategoryName||'-')}</strong><br>ห้อง: <strong style="color:var(--accent2)">#${esc(p.discordChannelName||'📁│project')}</strong>${p.discordTalkId?' + <strong style="color:var(--accent2)">#🎙│พูดคุย</strong>':''}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">
           <button class="btn btn-blue btn-sm" onclick="prPullTeam('${esc(p.id)}')" title="เปิดสิทธิ์ให้ทีมที่ผูก Discord แล้วเห็นห้อง">👥 ดึงทีมเข้าห้อง</button>
+          ${p.discordTalkId?'':`<button class="btn btn-outline btn-sm" onclick="prCreateTalk('${esc(p.id)}')" title="ห้องพูดคุยยังไม่ถูกสร้าง — กดสร้างเพิ่มในหมวดเดิมได้เลย">➕ สร้างห้องพูดคุย</button>`}
+          <button class="btn btn-outline btn-sm" onclick="openBulkDiscordLink()" title="ดึงรายชื่อสมาชิกทั้งเซิร์ฟเวอร์มาจับคู่กับทะเบียนทีม — ผูกครั้งเดียว ดึงทีมเข้าห้องได้ครบ">🔗 ผูกทั้งทีมกับ Discord</button>
           <button class="btn btn-outline btn-sm" onclick="prUnlink('${esc(p.id)}')">🔓 เลิกผูกห้อง</button>
         </div></div>`
     : `<div class="pr-step"><div class="pr-step-t">2️⃣ สร้างหมวดหมู่ + ห้อง</div>
@@ -5886,10 +6130,24 @@ function renderProjRoom(){
         </div>
         <div class="pr-lbl">ชื่อหมวดหมู่ (แก้เองได้)</div>
         <input id="pr-catname" class="pr-in" value="">
+        <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;margin-top:8px">
+          <input type="checkbox" id="pr-private" checked>
+          <span>🔒 ห้องส่วนตัว — คนนอกทีมมองไม่เห็น (สร้างเสร็จกด "👥 ดึงทีมเข้าห้อง" เพื่อเปิดสิทธิ์รายคน)</span>
+        </label>
         <div style="font-size:10.5px;color:var(--text2);margin-top:5px">บอทจะสร้าง: หมวดหมู่ชื่อนี้ + ห้อง <strong>#📁│project</strong> และ <strong>#🎙│พูดคุย</strong> แล้วโพสต์คู่มือด้านล่างลง #project ให้เลย</div>
         <button class="btn btn-blue" style="width:100%;margin-top:9px" onclick="createProjRoomCat('${esc(p.id)}')">🏗️ สร้างหมวด+ห้อง แล้วโพสต์คู่มือ</button>
+        <button class="btn btn-outline btn-sm" style="width:100%;margin-top:7px" onclick="prLinkExisting('${esc(p.id)}')" title="สร้างหมวด/ห้องไว้เองใน Discord แล้ว? ผูกห้องนั้นกับโปรเจกต์นี้แทนการสร้างใหม่">🔗 ผูกห้องที่มีอยู่แล้วใน Discord</button>
       </div>`;
+  const tpls=getPostTpls();
+  const curTplId=(p.postTplId&&tpls.some(t=>t.id===p.postTplId))?p.postTplId:tpls[0].id;
   const step3=`<div class="pr-step"><div class="pr-step-t">3️⃣ โพสต์คู่มืองาน ${p.discordMsgId?'<span class="alc-chip alc-c-all">เคยโพสต์แล้ว — กดอัปเดตจะแก้โพสต์เดิม</span>':''}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:7px">
+      <span style="font-size:11.5px;color:var(--text2)">ชุดเทมเพลต:</span>
+      <select class="pr-in" style="flex:1;min-width:150px;margin:0" onchange="prSetTpl('${esc(p.id)}',this.value)">
+        ${tpls.map(t=>`<option value="${esc(t.id)}"${t.id===curTplId?' selected':''}>${esc(t.name||'ไม่มีชื่อ')}</option>`).join('')}
+      </select>
+      ${currentUser?.role==='admin'?`<button class="btn btn-outline btn-sm" onclick="openProjPostTplEditor()" title="เพิ่ม/แก้/ลบชุดเทมเพลต">⚙️ จัดการเทมเพลต</button>`:''}
+    </div>
     <textarea id="pr-post" rows="13" class="pr-in" style="line-height:1.6;resize:vertical">${esc(_prFillTpl(p))}</textarea>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       ${has?`<button class="btn btn-green" style="flex:1" onclick="postProjRoomMsg('${esc(p.id)}')">📣 ${p.discordMsgId?'อัปเดตโพสต์ (แก้โพสต์เดิม)':'โพสต์ลง #project'}</button>`:'<span style="font-size:11.5px;color:var(--text2);align-self:center">สร้างห้องก่อน (ขั้นที่ 2) แล้วปุ่มโพสต์จะใช้ได้ — หรือแก้ข้อความในกล่องได้เลย จะถูกใช้ตอนสร้างห้อง</span>'}
@@ -5901,16 +6159,22 @@ function renderProjRoom(){
 async function createProjRoomCat(projId){
   const cat=(document.getElementById('pr-catname')?.value||'').trim();
   if(!cat){ toast('ตั้งชื่อหมวดหมู่ก่อน','error'); return; }
+  const isPrivate=!!document.getElementById('pr-private')?.checked;
   showLoader(true);
   try{
-    const c1=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'📁│project'});
-    let c2=null; try{ c2=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'🎙│พูดคุย'}); }catch(e){}
+    const c1=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'📁│project', ...(isPrivate?{private:true}:{})});
+    // ห้องพูดคุยพลาดต้องบอกให้รู้ ไม่เงียบ — ห้องหลักสร้างแล้วก็เดินหน้าต่อได้ แล้วค่อยกดสร้างห้องพูดคุยแยก
+    let c2=null, talkErr='';
+    try{ c2=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'🎙│พูดคุย', ...(isPrivate?{private:true}:{})}); }
+    catch(e){ talkErr=String(e.message||e); }
     await saveProjectMerge(projId, f=>{
       f.discordCategoryName=cat; f.discordChannelId=c1.channelId; f.discordChannelName=c1.channelName||'📁│project';
+      f.discordPrivate=isPrivate;
       if(c2) f.discordTalkId=c2.channelId;
     });
-    try{ logAudit('project.discord', cat, 'สร้างหมวด+ห้องโปรเจกต์ใน Discord'); }catch(e){}
-    toast('🏗️ สร้างหมวด "'+cat+'" + ห้องแล้ว','success');
+    try{ logAudit('project.discord', cat, 'สร้างหมวด+ห้องโปรเจกต์ใน Discord'+(isPrivate?' (ส่วนตัว)':'')); }catch(e){}
+    toast('🏗️ สร้างหมวด "'+cat+'" + ห้องแล้ว'+(isPrivate?' 🔒':''),'success');
+    if(talkErr) toast('⚠️ ห้อง 🎙พูดคุย สร้างไม่สำเร็จ: '+talkErr+' — กดปุ่ม "➕ สร้างห้องพูดคุย" เพื่อลองใหม่ได้','warn');
     await postProjRoomMsg(projId);   // โพสต์คู่มือต่อเลย (แบ่งก้อนอัตโนมัติถ้ายาว)
   }catch(e){
     toast(String(e.message||'').includes('ไม่รู้จักคำสั่ง')
@@ -5918,13 +6182,60 @@ async function createProjRoomCat(projId){
       : 'สร้างไม่สำเร็จ: '+e.message,'error');
   }finally{ showLoader(false); }
 }
+// ➕ สร้างห้องพูดคุยแยกทีหลัง — ใช้ตอนรอบแรกสร้างพลาด หรือห้องถูกลบไป
+async function prCreateTalk(projId){
+  const p=getProjects().find(x=>x.id===projId); if(!p) return;
+  const cat=(p.discordCategoryName||'').trim();
+  if(!cat){ toast('โปรเจกต์นี้ยังไม่มีหมวดหมู่ — สร้างหมวด+ห้องก่อน','warn'); return; }
+  showLoader(true);
+  try{
+    const c2=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'🎙│พูดคุย', ...(p.discordPrivate?{private:true}:{})});
+    await saveProjectMerge(projId, f=>{ f.discordTalkId=c2.channelId; });
+    try{ logAudit('project.discord', cat, 'สร้างห้องพูดคุยเพิ่ม'); }catch(e){}
+    toast('🎙 สร้างห้องพูดคุยแล้ว','success');
+    renderProjRoom();
+  }catch(e){ toast('สร้างห้องพูดคุยไม่สำเร็จ: '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+// เลือกชุดเทมเพลตของโปรเจกต์นี้ (จำถาวรใน p.postTplId)
+async function prSetTpl(projId, tplId){
+  await saveProjectMerge(projId, f=>{ f.postTplId=tplId; });
+  renderProjRoom();
+}
+// 🔗 ผูกห้องที่สร้างเองใน Discord กับโปรเจกต์ — สำหรับหมวดที่ทีมสร้างมือไว้ก่อนแล้ว
+async function prLinkExisting(projId){
+  showLoader(true);
+  try{
+    const d=await callProjBot({action:'discordChannels'});
+    const chs=d.channels||[];
+    if(!chs.length){ toast('บอทมองไม่เห็นห้องข้อความเลย — เช็คว่าเชิญบอทเข้าเซิร์ฟเวอร์และเปิดสิทธิ์ดูห้องแล้ว','warn'); return; }
+    _tagOverlayShow('🔗 ผูกห้องที่มีอยู่แล้วใน Discord', `
+      <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:8px">เลือกห้องที่จะใช้เป็นห้องโพสต์คู่มือของโปรเจกต์นี้ — ปุ่มโพสต์/อัปเดตคู่มือจะลงห้องนี้เสมอ</div>
+      <div style="max-height:330px;overflow-y:auto">
+        ${chs.map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border2);font-size:12.5px">
+          <span style="flex:1;min-width:0"># ${esc(c.name)}</span>
+          <button class="btn btn-sm btn-outline" onclick="prPickExisting('${escJs(projId)}','${escJs(c.id)}','${escJs(c.name)}')">✅ ใช้ห้องนี้</button>
+        </div>`).join('')}
+      </div>`, 520);
+  }catch(e){ toast('ดึงรายชื่อห้องไม่ได้: '+e.message,'error'); }
+  finally{ showLoader(false); }
+}
+async function prPickExisting(projId, chId, chName){
+  await saveProjectMerge(projId, f=>{ f.discordChannelId=chId; f.discordChannelName=chName; });
+  try{ logAudit('project.discord', chName, 'ผูกห้อง Discord ที่มีอยู่กับโปรเจกต์'); }catch(e){}
+  document.getElementById('tag-overlay')?.remove();
+  toast('🔗 ผูกห้อง #'+chName+' แล้ว','success');
+  renderProjRoom();
+}
 async function postProjRoomMsg(projId){
   const p=getProjects().find(x=>x.id===projId);
   if(!p||!p.discordChannelId){ toast('ยังไม่มีห้อง — สร้างห้องก่อน','warn'); return; }
-  const txt=String(document.getElementById('pr-post')?.value||_prFillTpl(p)).trim();
+  let txt=String(document.getElementById('pr-post')?.value||_prFillTpl(p)).trim();
   if(!txt){ toast('ข้อความว่าง','error'); return; }
   showLoader(true);
   try{
+    // 🏷️ @ชื่อโรล ที่ตรงกับโรลจริงในเซิร์ฟเวอร์ → <@&id> เพื่อให้ ping ได้จริง
+    try{ txt=_prApplyRoleMentions(txt, await _prRoleMap()); }catch(e){}
     // ยาวแค่ไหนก็โพสต์ได้ — แบ่งก้อนอัตโนมัติ แล้วตอนอัปเดตก็แก้ครบทุกก้อน
     const chunks=_prChunks(txt);
     const oldIds=(Array.isArray(p.discordMsgIds)&&p.discordMsgIds.length)?[...p.discordMsgIds]:(p.discordMsgId?[p.discordMsgId]:[]);
@@ -6076,6 +6387,7 @@ async function drBrowseParent(start){
 async function drPickParent(id, name){
   const cfg=getDriveCfg(); cfg.parents=cfg.parents||[];
   if(!cfg.parents.some(x=>x.id===id)) cfg.parents.push({id, name});
+  cfg.defaultParentId=id;   // จำเป็นค่าเริ่มต้น — เปิดหน้ามาครั้งหน้าเลือกให้เลย
   await saveDriveCfg(cfg);
   _drParent=id; _drSub=''; _drSubs=[];
   document.getElementById('tag-overlay')?.remove();
@@ -6113,8 +6425,8 @@ async function drCreateFolders(){
   if(!parentId){ toast('เลือกที่เก็บก่อน (โฟลเดอร์หลัก/หมวด)','warn'); return; }
   const projName=(document.getElementById('dr-projname')?.value||'').trim();
   if(!projName){ toast('ตั้งชื่อโฟลเดอร์งานก่อน','error'); return; }
-  const code=((p.clientCode||'')+(p.seq||''))||'';
-  const tplTxt=document.getElementById('dr-tpl')?.value||_DR_TPL_DEFAULT;
+  const code=projCode(p);
+  const tplTxt=getDriveCfg().tpl||_DR_TPL_DEFAULT;
   const checked=[...document.querySelectorAll('#dr-tplchecks input:checked')].map(x=>+x.value);
   const all=_drParseTpl(tplTxt, code);
   const items=checked.length?all.filter((_,i)=>checked.includes(i)):all;
@@ -6122,7 +6434,6 @@ async function drCreateFolders(){
   try{
     const root=await callDrive({action:'create', parentId, name:projName});
     const tr=await callDrive({action:'tree', parentId:root.id, items});
-    const cfg=getDriveCfg(); cfg.tpl=tplTxt; await saveDriveCfg(cfg);
     await saveProjectMerge(p.id, f=>{ f.driveFolderId=root.id; f.driveFolderLink=root.link||''; if(!f.downloadLink) f.downloadLink=root.link||''; });
     _drProjFolders=(tr.created||[]).filter(x=>x&&x.id);
     try{ logAudit('project.drive', p.name, 'สร้างโฟลเดอร์งานในไดรฟ์ ('+items.length+' โฟลเดอร์หลัก)'); }catch(e){}
@@ -6136,7 +6447,7 @@ async function drMakeScript(){
   const cfg=getDriveCfg();
   if(!cfg.scriptTplId){ toast('ยังไม่ได้ใส่ลิงก์ไฟล์เทมเพลตบท — ตั้งได้ที่ 🔧 ตั้งค่า Drive','warn'); return; }
   if(!p.driveFolderId){ toast('สร้างโฟลเดอร์งานก่อน (ขั้นที่ 3)','warn'); return; }
-  const code=((p.clientCode||'')+(p.seq||''))||p.name;
+  const code=projCode(p)||p.name;
   showLoader(true);
   try{
     const d=await callDrive({action:'copy', fileId:cfg.scriptTplId, destId:p.driveFolderId, name:'Script/CV_'+code});
@@ -6157,20 +6468,40 @@ async function drRefreshProjFolders(silent){
   finally{ if(!silent) showLoader(false); }
 }
 async function drRefreshProjFoldersSilent(){ try{ await drRefreshProjFolders(true); }catch(e){} }
-async function drMakeDelivery(){
-  const p=getProjects().find(x=>x.id===_drSel); if(!p){ toast('เลือกโปรเจกต์ก่อน','warn'); return; }
-  const parentId=document.getElementById('dr-delivparent')?.value;
-  if(!parentId){ toast('เลือกโฟลเดอร์หลักสำหรับส่งงานก่อน','warn'); return; }
-  const code=((p.clientCode||'')+(p.seq||''))||'';
-  const name=prompt('ชื่อโฟลเดอร์ส่งงานลูกค้า:', (code?code+' ':'')+(p.name||'')+' - ส่งลูกค้า');
-  if(!name) return;
-  showLoader(true);
-  try{
-    const d=await callDrive({action:'create', parentId, name:name.trim()});
-    toast('📦 สร้างโฟลเดอร์ส่งงาน "'+name+'" แล้ว','success');
-    if(d.link) window.open(d.link,'_blank');
-  }catch(e){ toast('สร้างไม่ได้: '+e.message,'error'); }
-  finally{ showLoader(false); }
+// ══ เทมเพลตโฟลเดอร์แบบรายการ — แก้/ลบ/เพิ่มเป็นรายบรรทัด เก็บโครงเดิมใน cfg.tpl (บรรทัดขึ้นต้น "-" = ย่อย) ══
+function _drTplLines(){ return String(getDriveCfg().tpl||_DR_TPL_DEFAULT).split('\n').filter(l=>l.trim()); }
+async function _drTplSave(lines){ const cfg=getDriveCfg(); cfg.tpl=lines.join('\n'); await saveDriveCfg(cfg); renderDrivePage(); }
+async function drTplEdit(i){
+  const lines=_drTplLines(); const cur=lines[i]; if(cur===undefined) return;
+  const isSub=/^-/.test(cur.trim());
+  const name=prompt('แก้ชื่อโฟลเดอร์ ({รหัส} = รหัสงาน เช่น G01):', cur.trim().replace(/^-\s*/,''));
+  if(!name||!name.trim()) return;
+  lines[i]=(isSub?'-':'')+name.trim();
+  await _drTplSave(lines);
+}
+async function drTplDel(i){
+  const lines=_drTplLines(); const cur=lines[i]; if(cur===undefined) return;
+  const isSub=/^-/.test(cur.trim());
+  let end=i+1;
+  if(!isSub){ while(end<lines.length && /^-/.test(lines[end].trim())) end++; }   // ลบหลัก = ลบย่อยของมันด้วย
+  const n=end-i;
+  if(!confirm('ลบ "'+cur.trim().replace(/^-\s*/,'')+'"'+(n>1?' พร้อมโฟลเดอร์ย่อย '+(n-1)+' รายการ':'')+' ออกจากเทมเพลต?')) return;
+  lines.splice(i,n);
+  await _drTplSave(lines);
+}
+async function drTplAddMain(){
+  const name=prompt('ชื่อโฟลเดอร์หลักใหม่ ({รหัส} = รหัสงาน เช่น G01):');
+  if(!name||!name.trim()) return;
+  const lines=_drTplLines(); lines.push(name.trim());
+  await _drTplSave(lines);
+}
+async function drTplAddSub(i){
+  const name=prompt('ชื่อโฟลเดอร์ย่อยใหม่ ({รหัส} = รหัสงาน เช่น G01):');
+  if(!name||!name.trim()) return;
+  const lines=_drTplLines();
+  let end=i+1; while(end<lines.length && /^-/.test(lines[end].trim())) end++;
+  lines.splice(end,0,'-'+name.trim());
+  await _drTplSave(lines);
 }
 function renderDrivePage(){
   const el=document.getElementById('dr-body'); if(!el) return;
@@ -6195,15 +6526,36 @@ function renderDrivePage(){
   if(_drSel && !list.some(p=>p.id===_drSel)) _drSel='';
   const p=list.find(x=>x.id===_drSel);
   const parents=cfg.parents||[];
-  if(!_drParent && parents.length) _drParent=parents[0].id;
-  const code=p?(((p.clientCode||'')+(p.seq||''))||''):'';
-  const tplItems=_drParseTpl(cfg.tpl||_DR_TPL_DEFAULT, code||'{รหัส}');
+  // เปิดหน้ามาเลือกโฟลเดอร์หลักที่จำไว้ให้เลย (จำตัวล่าสุดที่เคยเลือกใน cfg.defaultParentId)
+  if(!_drParent && parents.length) _drParent=parents.some(x=>x.id===cfg.defaultParentId)?cfg.defaultParentId:parents[0].id;
+  const code=p?projCode(p):'';
+  // เทมเพลตแบบรายการ — แถวละโฟลเดอร์ มีปุ่มแก้/ลบ/เพิ่ม (index อิงบรรทัดจริงใน cfg.tpl)
+  const tplLines=_drTplLines();
+  let _tplMainIdx=-1;
+  const tplRows=tplLines.map((l,i)=>{
+    const isSub=/^-/.test(l.trim());
+    const disp=esc(l.trim().replace(/^-\s*/,'').split('{รหัส}').join(code||'{รหัส}'));
+    if(!isSub){
+      _tplMainIdx++;
+      return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-top:1px solid var(--border2)">
+        <label style="cursor:pointer;flex:1;min-width:0;font-size:12px"><input type="checkbox" value="${_tplMainIdx}" checked> 📁 ${disp}</label>
+        <button class="btn btn-sm btn-outline" title="เพิ่มโฟลเดอร์ย่อยใต้อันนี้" onclick="drTplAddSub(${i})">➕ ย่อย</button>
+        <button class="btn btn-sm btn-outline" title="แก้ชื่อ" onclick="drTplEdit(${i})">✏️</button>
+        <button class="btn btn-sm btn-outline" style="border-color:rgba(255,64,64,.3);color:var(--red)" title="ลบ" onclick="drTplDel(${i})">🗑️</button>
+      </div>`;
+    }
+    return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0 2px 26px">
+      <span style="flex:1;min-width:0;font-size:11.5px;color:var(--text2)">└ 📁 ${disp}</span>
+      <button class="btn btn-sm btn-outline" title="แก้ชื่อ" onclick="drTplEdit(${i})">✏️</button>
+      <button class="btn btn-sm btn-outline" style="border-color:rgba(255,64,64,.3);color:var(--red)" title="ลบ" onclick="drTplDel(${i})">🗑️</button>
+    </div>`;
+  }).join('');
   el.innerHTML=`
     <div class="pr-step"><div class="pr-step-t">1️⃣ เลือกโปรเจกต์</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <select class="pr-in" style="flex:1;min-width:220px" onchange="_drSel=this.value;_drProjFolders=[];renderDrivePage()">
           <option value="">— เลือกโปรเจกต์ —</option>
-          ${list.map(x=>`<option value="${esc(x.id)}"${x.id===_drSel?' selected':''}>${esc(((x.clientCode||'')+(x.seq||''))?((x.clientCode||'')+(x.seq||''))+' · ':'')}${esc(x.name||'')}${x.driveFolderId?' 📂':''}</option>`).join('')}
+          ${list.map(x=>`<option value="${esc(x.id)}"${x.id===_drSel?' selected':''}>${esc(projCode(x)?projCode(x)+' · ':'')}${esc(x.name||'')}${x.driveFolderId?' 📂':''}</option>`).join('')}
         </select>
         <button class="btn btn-blue btn-sm" onclick="openNewProject()" title="สร้างเสร็จกลับมาเลือกที่นี่ได้เลย">＋ สร้างโปรเจกต์ใหม่</button>
       </div>
@@ -6211,8 +6563,8 @@ function renderDrivePage(){
     </div>
     <div class="pr-step"><div class="pr-step-t">2️⃣ ที่เก็บในไดรฟ์</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-        <div style="flex:1;min-width:160px"><div class="pr-lbl">โฟลเดอร์หลัก</div>
-          <select class="pr-in" onchange="_drParent=this.value;_drSub='';_drSubs=[];renderDrivePage();drLoadSubs(true)">
+        <div style="flex:1;min-width:160px"><div class="pr-lbl">โฟลเดอร์หลัก (ระบบจำตัวที่เลือกล่าสุดเป็นค่าเริ่มต้น)</div>
+          <select class="pr-in" onchange="_drParent=this.value;_drSub='';_drSubs=[];const c=getDriveCfg();c.defaultParentId=this.value;saveDriveCfg(c);renderDrivePage();drLoadSubs(true)">
             ${parents.length?parents.map(x=>`<option value="${esc(x.id)}"${x.id===_drParent?' selected':''}>${esc(x.name)}</option>`).join(''):'<option value="">— ยังไม่มี กด 📂 เลือกจากไดรฟ์ —</option>'}
           </select></div>
         <button class="btn btn-blue btn-sm" onclick="drBrowseParent(true)" title="เปิดดูโฟลเดอร์ในไดรฟ์จริง แล้วคลิกเลือกได้เลย">📂 เลือกจากไดรฟ์</button>
@@ -6228,11 +6580,11 @@ function renderDrivePage(){
     <div class="pr-step"><div class="pr-step-t">3️⃣ สร้างโฟลเดอร์งานตามเทมเพลต</div>
       <div class="pr-lbl">ชื่อโฟลเดอร์งาน</div>
       <input id="dr-projname" class="pr-in" value="${esc(p?((code?code+' ':'')+(p.name||'')):'')}" placeholder="เลือกโปรเจกต์ก่อน">
-      <div class="pr-lbl">โฟลเดอร์ที่จะสร้างข้างใน (ติ๊กเลือกได้ · แก้เทมเพลตในกล่องล่างได้อิสระ — บรรทัดขึ้นต้น "-" = โฟลเดอร์ย่อยของบรรทัดบน · {รหัส} = รหัสงาน)</div>
-      <div id="dr-tplchecks" style="display:flex;flex-direction:column;gap:3px;font-size:12px;margin:4px 0 8px">
-        ${tplItems.map((it,i)=>`<label style="cursor:pointer"><input type="checkbox" value="${i}" checked> 📁 ${esc(it.name)}${it.children.length?' <span style="color:var(--text2)">(+'+it.children.length+' โฟลเดอร์ย่อย)</span>':''}</label>`).join('')}
+      <div class="pr-lbl">โฟลเดอร์ที่จะสร้างข้างใน (ติ๊ก = สร้าง · แก้ชื่อ/ลบ/เพิ่มได้เลย เทมเพลตจำถาวรใช้ทุกงาน)</div>
+      <div id="dr-tplchecks" style="display:flex;flex-direction:column;margin:4px 0 6px">
+        ${tplRows||'<div style="color:var(--text2);font-size:12px;padding:6px 0">— เทมเพลตว่าง กด ➕ เพิ่มโฟลเดอร์หลัก —</div>'}
       </div>
-      <textarea id="dr-tpl" rows="6" class="pr-in" style="font-size:11.5px;line-height:1.6;resize:vertical" onchange="const c=getDriveCfg();c.tpl=this.value;saveDriveCfg(c);renderDrivePage()">${esc(cfg.tpl||_DR_TPL_DEFAULT)}</textarea>
+      <button class="btn btn-outline btn-sm" onclick="drTplAddMain()">➕ เพิ่มโฟลเดอร์หลัก</button>
       <button class="btn btn-blue" style="width:100%;margin-top:8px" onclick="drCreateFolders()">📂 สร้างโฟลเดอร์งาน + เทมเพลตข้างใน</button>
     </div>
     <div class="pr-step"><div class="pr-step-t">4️⃣ ไฟล์บท + เปิดโฟลเดอร์โยนไฟล์</div>
@@ -6248,13 +6600,6 @@ function renderDrivePage(){
             <button class="btn btn-sm btn-outline" onclick="window.open('${esc(x.link||('https://drive.google.com/drive/folders/'+x.id))}','_blank')">🔗 เปิด</button>
           </div>`).join('')
         : '<div style="font-size:12px;color:var(--text2);padding:6px 0">— สร้างโฟลเดอร์งาน (ขั้นที่ 3) หรือกด 🔄 โหลดรายชื่อโฟลเดอร์ —</div>'}
-    </div>
-    <div class="pr-step"><div class="pr-step-t">5️⃣ โฟลเดอร์ส่งงานลูกค้า (แยกออกมาให้คนส่งงาน)</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-        <div style="flex:1;min-width:170px"><div class="pr-lbl">สร้างไว้ในโฟลเดอร์หลัก</div>
-          <select id="dr-delivparent" class="pr-in">${parents.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></div>
-        <button class="btn btn-blue btn-sm" onclick="drMakeDelivery()">📦 สร้างโฟลเดอร์ส่งงาน</button>
-      </div>
     </div>`;
   // 🔄 โหลดให้เองไม่ต้องกด: รายชื่อหมวดของโฟลเดอร์หลัก + โฟลเดอร์ของงานที่เลือก (ครั้งแรกเท่านั้น)
   if(_drParent && !_drSubs.length && window._drAutoSub!==_drParent){ window._drAutoSub=_drParent; drLoadSubs(true); }
@@ -6935,6 +7280,7 @@ function openFinanceReport(){
       <span style="color:var(--text2);font-size:12px">ถึง</span>
       <input id="rp-to" type="date" value="${t}" onchange="document.getElementById('rp-preset').value='custom';renderFinanceReport()" style="padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
       <button class="btn btn-sm btn-outline" onclick="exportFinanceReportCSV()">⬇️ ดาวน์โหลด CSV</button>
+      <button class="btn btn-sm btn-outline" onclick="makeFinanceSummaryDocFromReport()" title="ออกเป็นเอกสาร PDF หัวบริษัท สวย ๆ ตามช่วงที่เลือกอยู่">🧾 ใบสรุปยอด (PDF)</button>
     </div>
     <div id="rp-body"></div>`, 700);
   renderFinanceReport();
@@ -7090,6 +7436,157 @@ function exportFinanceReportCSV(){
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   logAudit('report.export', (r.from||'ทั้งหมด')+' - '+(r.to||'ทั้งหมด'), 'ดาวน์โหลดรายงานการเงิน');
   toast('ดาวน์โหลดรายงานแล้ว ✅','success');
+}
+
+// ══ 🧾 ใบสรุปยอดเงิน — เอกสาร PDF หัวบริษัท (รายเดือน/ไตรมาส/ปี/กำหนดเอง) ══
+function openFinanceSummaryDoc(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const [f,t]=_reportRange('thismonth');
+  _tagOverlayShow('🧾 ใบสรุปยอดเงิน (PDF)', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.7;margin-bottom:10px">
+      เอกสารสรุป รายรับ · รายจ่าย · กำไร · ลูกหนี้ · เจ้าหนี้ · ภาษีหัก ณ ที่จ่าย ในช่วงที่เลือก — เปิดหน้าพิมพ์ให้กด "บันทึกเป็น PDF" ได้เลย
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <select id="fsd-preset" onchange="_fsdPreset(this.value)" class="pr-in" style="width:auto;margin:0">
+        <option value="thismonth">เดือนนี้</option>
+        <option value="lastmonth">เดือนที่แล้ว</option>
+        <option value="thisquarter">ไตรมาสนี้</option>
+        <option value="thisyear">ปีนี้</option>
+        <option value="lastyear">ปีที่แล้ว</option>
+        <option value="custom">กำหนดเอง</option>
+      </select>
+      <input id="fsd-from" type="date" value="${f}" onchange="document.getElementById('fsd-preset').value='custom'" class="pr-in" style="width:auto;margin:0">
+      <span style="color:var(--text2);font-size:12px">ถึง</span>
+      <input id="fsd-to" type="date" value="${t}" onchange="document.getElementById('fsd-preset').value='custom'" class="pr-in" style="width:auto;margin:0">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-green" style="flex:1" onclick="makeFinanceSummaryDoc()">🖨️ สร้างใบสรุป (เปิดหน้าพิมพ์)</button>
+      <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
+    </div>`, 520);
+}
+function _fsdPreset(v){
+  if(v==='custom') return;
+  const [f,t]=_reportRange(v);
+  _setVal('fsd-from',f); _setVal('fsd-to',t);
+}
+function _fsdPeriodLabel(from,to){
+  if(from&&to&&from.slice(0,7)===to.slice(0,7)) return _thaiMonthLabel(from.slice(0,7));
+  return (from?fmtDate(from):'ทั้งหมด')+' – '+(to?fmtDate(to):'ปัจจุบัน');
+}
+function makeFinanceSummaryDoc(){
+  const from=document.getElementById('fsd-from')?.value||'';
+  const to=document.getElementById('fsd-to')?.value||'';
+  const r=buildFinanceReport(from,to);
+  const label=_fsdPeriodLabel(from,to);
+  downloadDocHTML(buildFinanceSummaryDocHTML(r,label), 'สรุปยอดเงิน '+label);
+  try{ logAudit('report.export', label, 'ออกใบสรุปยอดเงิน (PDF)'); }catch(e){}
+  document.getElementById('tag-overlay')?.remove();
+}
+// ใช้จากหน้ารายงานการเงิน — เอาช่วงที่เลือกอยู่มาออกเอกสารเลย
+function makeFinanceSummaryDocFromReport(){
+  const from=document.getElementById('rp-from')?.value||'';
+  const to=document.getElementById('rp-to')?.value||'';
+  const r=buildFinanceReport(from,to);
+  const label=_fsdPeriodLabel(from,to);
+  downloadDocHTML(buildFinanceSummaryDocHTML(r,label), 'สรุปยอดเงิน '+label);
+  try{ logAudit('report.export', label, 'ออกใบสรุปยอดเงิน (PDF)'); }catch(e){}
+}
+function buildFinanceSummaryDocHTML(r, periodLabel){
+  const N=n=>'฿'+Number(n||0).toLocaleString('th-TH');
+  const thaiDate=d=>d?new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}):'—';
+  const CAP=60;   // กันเอกสารยาวเป็นสิบหน้า — เกินนี้ให้ไปดู CSV
+  const secTable=(title,heads,rows,total,emptyTxt)=>{
+    const shown=rows.slice(0,CAP);
+    return `<div style="padding:0 30px;margin-top:18px">
+      <div style="font-size:13px;font-weight:700;color:#0d1e3d;margin-bottom:6px">${title} <span style="color:#9ca3af;font-weight:400;font-size:11px">(${rows.length} รายการ)</span></div>
+      ${rows.length?`<table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <thead><tr style="background:#0d1e3d;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+          ${heads.map((h,i)=>`<th style="text-align:${i===heads.length-1?'right':'left'};padding:6px 10px;color:#a0c0ff;font-weight:600;font-size:10px;letter-spacing:.5px">${h}</th>`).join('')}
+        </tr></thead>
+        <tbody>
+          ${shown.map((cells,ri)=>`<tr style="border-bottom:1px solid #f3f4f6;background:${ri%2?'#fafafa':'#fff'}">
+            ${cells.map((c,i)=>`<td style="padding:5px 10px;color:#374151;text-align:${i===cells.length-1?'right':'left'}">${c}</td>`).join('')}
+          </tr>`).join('')}
+          ${rows.length>CAP?`<tr><td colspan="${heads.length}" style="padding:5px 10px;color:#9ca3af;font-size:10.5px">… แสดง ${CAP} จาก ${rows.length} รายการ (ดูครบทุกรายการได้จากไฟล์ CSV ในหน้ารายงานการเงิน)</td></tr>`:''}
+          ${total!=null?`<tr style="background:#f3f6fb;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important"><td colspan="${heads.length-1}" style="padding:6px 10px;font-weight:700;color:#0d1e3d">รวม</td><td style="padding:6px 10px;text-align:right;font-weight:700;color:#0d1e3d">${N(total)}</td></tr>`:''}
+        </tbody></table>`
+      :`<div style="font-size:11.5px;color:#9ca3af;padding:4px 0">${emptyTxt||'ไม่มีรายการ'}</div>`}
+    </div>`;
+  };
+  const sumRow=(l,v,color,bold)=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f3f4f6">
+    <span style="font-size:13px;color:${bold?'#111827':'#6b7280'};font-weight:${bold?'700':'400'}">${l}</span>
+    <span style="font-size:${bold?'16px':'13px'};font-weight:${bold?'700':'600'};color:${color||'#374151'}">${v}</span></div>`;
+  return `<div id="printable-finsummary" style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:680px;margin:0 auto;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb">
+    <div style="background:#0d1e3d;padding:26px 30px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:72px;object-fit:contain;display:block">
+          <div style="color:#a0c0ff;font-size:11px;margin-top:7px">penguinstudiovoice@gmail.com</div>
+        </div>
+        <div style="text-align:right">
+          <div style="color:#fff;font-size:20px;font-weight:700;letter-spacing:1px">ใบสรุปยอดเงิน</div>
+          <div style="color:#a0c0ff;font-size:10px;margin-top:2px;letter-spacing:0.5px">FINANCIAL SUMMARY</div>
+          <div style="margin-top:10px;background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 12px">
+            <div style="color:#a0c0ff;font-size:10px;letter-spacing:1px">ช่วงเวลา</div>
+            <div style="color:#fff;font-size:14px;font-weight:600">${esc(periodLabel||'')}</div>
+            <div style="color:#a0c0ff;font-size:10.5px;margin-top:3px">ออกวันที่ ${thaiDate(new Date().toISOString().split('T')[0])}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="height:5px;background:linear-gradient(90deg,#1565FF,#4080FF,#70A0FF);-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important"></div>
+    <div style="padding:22px 30px 0">
+      <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;font-weight:600">สรุปภาพรวม</div>
+      ${sumRow('💰 เงินเข้าในช่วงนี้ (ลูกค้าจ่ายจริง)', N(r.received), '#059669')}
+      ${sumRow('💸 จ่ายทีมในช่วงนี้', '−'+N(r.expensePaid), '#dc2626')}
+      ${sumRow('🏦 ค่าใช้จ่ายบริษัท ('+r.company.length+' รายการ)', '−'+N(r.companyTotal), '#ea580c')}
+      ${sumRow('เงินสดคงเหลือ (เงินเข้า − จ่ายทีม)', N(r.profit), r.profit>=0?'#059669':'#dc2626')}
+      ${sumRow('📊 กำไรสุทธิช่วงนี้ (หักค่าใช้จ่ายบริษัทแล้ว)', N(r.netProfit), r.netProfit>=0?'#059669':'#dc2626', true)}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px">
+        <div style="padding:10px 12px;background:#f3f6fb;border:1px solid #e5e7eb;border-radius:6px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+          <div style="font-size:10px;color:#6b7280">ลูกหนี้คงค้าง</div>
+          <div style="font-size:14px;font-weight:700;color:#0d1e3d">${N(r.receivableTotal)}</div>
+          ${r.overdueTotal?`<div style="font-size:10px;color:#dc2626">เลยกำหนด ${N(r.overdueTotal)}</div>`:''}
+        </div>
+        <div style="padding:10px 12px;background:#f3f6fb;border:1px solid #e5e7eb;border-radius:6px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+          <div style="font-size:10px;color:#6b7280">เจ้าหนี้คงค้าง (ค่าจ้างทีม)</div>
+          <div style="font-size:14px;font-weight:700;color:#0d1e3d">${N(r.payableTotal)}</div>
+        </div>
+        <div style="padding:10px 12px;background:#f3f6fb;border:1px solid #e5e7eb;border-radius:6px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+          <div style="font-size:10px;color:#6b7280">ภาษีหัก ณ ที่จ่ายในช่วงนี้</div>
+          <div style="font-size:14px;font-weight:700;color:#0d1e3d">${N(r.whtTotal)}</div>
+        </div>
+      </div>
+    </div>
+    ${secTable('💰 รายรับ', ['วันที่รับเงิน','โปรเจกต์','งวด','จำนวนเงิน'],
+      r.incomeRows.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(x=>[fmtDate(x.date),esc(x.proj),esc(x.label),N(x.amount)]), r.received, 'ไม่มีเงินเข้าในช่วงนี้')}
+    ${secTable('💸 รายจ่ายทีม', ['วันที่จ่าย','ผู้รับเงิน','โปรเจกต์','จำนวนเงิน'],
+      r.expenseRows.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(x=>[fmtDate(x.date),esc(x.who),esc(x.proj),N(x.amount)]), r.expensePaid, 'ไม่มีการจ่ายทีมในช่วงนี้')}
+    ${secTable('🏦 ค่าใช้จ่ายบริษัท', ['วันที่','รายการ','หมวด','จำนวนเงิน'],
+      r.company.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(x=>[fmtDate(x.date),esc(x.label),esc(x.cat||'—'),N(x.amount)]), r.companyTotal, 'ไม่มีรายการ')}
+    ${secTable('📋 ลูกหนี้ — ยังไม่ได้เก็บเงิน (ทุกช่วงเวลา)', ['ครบกำหนด','โปรเจกต์','งวด','จำนวนเงิน'],
+      r.receivable.slice().sort((a,b)=>String(a.dueDate).localeCompare(String(b.dueDate))).map(x=>[(x.overdue?'⚠️ ':'')+(x.dueDate?fmtDate(x.dueDate):'—'),esc(x.proj)+(x.client?' · '+esc(x.client):''),esc(x.label),N(x.amount)]), r.receivableTotal, 'เก็บเงินครบทุกงาน')}
+    ${secTable('💳 เจ้าหนี้ — ค่าจ้างทีมยังไม่จ่าย (ทุกช่วงเวลา)', ['เดทไลน์งาน','ผู้รับเงิน','โปรเจกต์','จำนวนเงิน'],
+      r.payable.slice().sort((a,b)=>String(a.deadline||'9999').localeCompare(String(b.deadline||'9999'))).map(x=>[x.deadline?fmtDate(x.deadline):'—',esc(x.who),esc(x.proj),N(x.amount)]), r.payableTotal, 'จ่ายทีมครบทุกงาน')}
+    ${secTable('🧾 ภาษีหัก ณ ที่จ่าย', ['วันที่จ่าย','ผู้ถูกหัก','โปรเจกต์ · % ที่หัก','ภาษีที่หักไว้'],
+      r.whtRows.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(x=>[fmtDate(x.date),esc(x.who),esc(x.proj)+' · '+x.pct+'% จาก '+N(x.gross),N(x.tax)]), r.whtTotal, 'ไม่มีการหักภาษีในช่วงนี้')}
+    <div style="padding:24px 30px 26px">
+      <div style="width:260px;margin-left:auto;text-align:center">
+        <div style="height:52px"></div>
+        <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
+        <div style="font-size:13px;font-weight:700;color:#111827">ผู้จัดทำ / Guin Home Studio</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(new Date().toISOString().split('T')[0])}</div>
+      </div>
+    </div>
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:9px 30px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:10px;color:#9ca3af">GUIN HOME STUDIO · Financial Summary · ${esc(periodLabel||'')}</div>
+      <div style="display:flex;gap:5px">
+        <div style="width:6px;height:6px;border-radius:50%;background:#1565FF"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#4080FF"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#70A0FF"></div>
+      </div>
+    </div>
+  </div>`;
 }
 
 // ══════════════════════════════════════════════
@@ -8846,7 +9343,7 @@ async function enterApp(){
   try { await fbLoadKeyed('tags_master'); await fbLoadKeyed('brief_templates'); await fbLoadKeyed('company_expenses');
         await fbLoadKeyed('payroll_profiles'); await fbLoadKeyed('payroll_runs');
         await fbLoadKeyed('recruit_rounds'); await fbLoadKeyed('discord_cfg'); await fbLoadKeyed('allocdraft'); await fbLoadKeyed('announcetpl'); await fbLoadKeyed('wipecode');
-        await fbLoadKeyed('projposttpl'); await fbLoadKeyed('drivecfg'); } catch(e) {}
+        await fbLoadKeyed('projposttpl'); await fbLoadKeyed('drivecfg'); await fbLoadKeyed('posttpls'); } catch(e) {}
   try { logLogin(); startIdleWatch(); } catch(e) {}
   // 🕐 สำรองอัตโนมัติรายวัน — รอ 8 วิ ให้ข้อมูลโหลดครบก่อน
   try { setTimeout(()=>{ try{ autoDailyBackup(); }catch(e){} }, 8000); } catch(e) {}
@@ -12910,7 +13407,7 @@ function assignToggleAll(){
 }
 function assignAddRow(){
   _assignAdding=true; _assignEditId=null; renderAssign();
-  setTimeout(()=>{ document.getElementById('assign-newrow')?.scrollIntoView({block:'center'}); document.getElementById('ar-deadline')?.focus(); },60);
+  setTimeout(()=>{ document.getElementById('assign-newrow')?.scrollIntoView({block:'center'}); document.getElementById('ar-name')?.focus(); },60);
 }
 function assignCancelRow(){ _assignAdding=false; _assignEditId=null; renderAssign(); }
 function assignEditRow(id){ _assignAdding=false; _assignEditId=id; renderAssign(); }
@@ -12946,65 +13443,116 @@ function _assignCodes(){
     ...Object.keys(typeof getBriefTemplates==='function'?getBriefTemplates():{})
   ])].sort();
 }
-// ── แถวกรอก (ใหม่/แก้ไข) — ช่องเรียงตามหัวคอลัมน์ชีทเดิม ──
+// ── ฟอร์มกรอก (ใหม่/แก้ไข) — การ์ดแนวตั้ง จัดกลุ่มช่องเป็นหมวด อ่านง่าย ไม่ต้องเลื่อนขวา ──
 function _assignEditRowHTML(p){
   p=p||{};
   const isNew=!p.id;
-  const inp=(id,type,val,ph)=>`<input id="${id}" type="${type}" value="${esc(val==null?'':val)}" placeholder="${ph||''}"${type==='number'?' onwheel="this.blur()" min="0"':''} style="width:100%;min-width:0;padding:5px 7px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px">`;
+  const inp=(id,type,val,ph,style)=>`<input id="${id}" type="${type}" value="${esc(val==null?'':val)}" placeholder="${ph||''}"${type==='number'?' onwheel="this.blur()" min="0" step="any"':''} style="width:100%;min-width:0;box-sizing:border-box;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;${style||''}">`;
+  const lbl=t=>`<div style="font-size:11px;color:var(--text2);margin:0 0 3px">${t}</div>`;
+  const selStyle='width:100%;box-sizing:border-box;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px';
   const codes=_assignCodes();
   const curCode=(p.clientCode||'').toUpperCase();
-  const codeSel=`<select id="ar-code" style="width:100%;padding:5px 4px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px" onchange="document.getElementById('ar-code-new').style.display=this.value==='__new'?'block':'none'">
+  const codeSel=`<select id="ar-code" style="${selStyle}" onchange="document.getElementById('ar-code-new').style.display=this.value==='__new'?'block':'none'">
       <option value="">—</option>
       ${codes.map(c=>`<option value="${esc(c)}"${curCode===c?' selected':''}>${esc(c)}</option>`).join('')}
       <option value="__new">+ ใหม่…</option>
     </select>
-    <input id="ar-code-new" placeholder="รหัสใหม่" maxlength="6" style="display:none;margin-top:3px;width:100%;padding:4px 6px;background:var(--bg2);border:1px solid var(--accent2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px;text-transform:uppercase">`;
+    <input id="ar-code-new" placeholder="รหัสใหม่" maxlength="6" style="display:none;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg2);border:1px solid var(--accent2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;text-transform:uppercase">`;
   let mgrSel;
   if(currentUser?.role==='manager'){
-    mgrSel=`<div style="font-size:12px;padding:5px 0">🗂️ ฉันเอง</div>`;
+    mgrSel=`<div style="font-size:13px;padding:8px 0">🗂️ ฉันเอง</div>`;
   } else {
     const ms=(typeof getAllManagerUsers==='function'?getAllManagerUsers():[]);
-    mgrSel=`<select id="ar-mgr" style="width:100%;padding:5px 4px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px">
+    mgrSel=`<select id="ar-mgr" style="${selStyle}">
       <option value="">👑 แอดมิน</option>
       ${ms.map(m=>`<option value="${esc(m.uid)}"${p.managerId===m.uid?' selected':''}>${esc(m.nickname||m.email)}</option>`).join('')}
     </select>`;
   }
-  // เดทไลน์ราย Role: ใส่เวลาได้ + กด "＋ รอบ 2" เพิ่มเดทไลน์รอบสองของหน้าที่นั้นได้
-  const _dtVal=v=>v?(String(v).includes('T')?v:v+'T23:59'):'';
-  const phCells=_ASSIGN_PHASES.map(([k,l])=>{
-    const ph=(p.phases||{})[k]||{};
-    const has2=!!ph.deadline2;
-    return `<td style="padding:6px;vertical-align:top;min-width:158px">${inp('ar-ph-'+k,'datetime-local',_dtVal(ph.deadline))}
-      <div id="ar-ph2wrap-${k}" style="margin-top:3px;${has2?'':'display:none'}">${inp('ar-ph2-'+k,'datetime-local',_dtVal(ph.deadline2))}</div>
-      <div style="margin-top:3px">${inp('ar-phn-'+k,'text',ph.note||'','📝 โน้ต')}</div>
-      <div style="margin-top:2px"><span onclick="var w=document.getElementById('ar-ph2wrap-${k}');var i=document.getElementById('ar-ph2-${k}');if(w.style.display==='none'){w.style.display='block'}else{w.style.display='none';if(i)i.value='';}" style="font-size:10px;color:var(--accent2);cursor:pointer;user-select:none" title="กดเปิดเพื่อเพิ่ม · กดซ้ำเพื่อลบรอบ 2 ออก">＋/✕ เดทไลน์รอบ 2</span></div>
-    </td>`;
-  }).join('');
-  const budgetLocked=!isNew && p.budgetType && p.budgetType!=='flat';
-  const budgetCell=budgetLocked
-    ? `<td style="padding:6px;font-size:11px;color:var(--text2);vertical-align:top" title="งบเป็นแบบคิดตามหน่วย — แก้ได้ในฟอร์มเต็ม (ปุ่ม 👥)">${fmtB(p.budget||0)}<br>🔒</td>`
-    : `<td style="padding:6px;min-width:84px;vertical-align:top">${inp('ar-budget','number',p.budget||'','งบ')}</td>`;
   // ประเภทงาน: ชุดเดียวกับฟอร์มโปรเจกต์ (ช่องลูกค้าเอาออกตามที่เจ้าของสั่ง)
   const types=['หนัง','ซีรีย์','อนิเมะ','อนิเมชัน','หนังแนวตั้ง','เกม','โฆษณา','บรรยาย','หนังสือเสียง','เพลง','มิกซ์'];
   if(p.type && !types.includes(p.type)) types.push(p.type);
-  const typeSel=`<select id="ar-type" style="width:100%;padding:5px 4px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px"><option value="">— ประเภท —</option>${types.map(t=>`<option${p.type===t?' selected':''}>${esc(t)}</option>`).join('')}</select>`;
-  return `<tr id="${isNew?'assign-newrow':'assign-editrow'}" style="background:rgba(0,180,255,.06)">
-    <td style="padding:6px;min-width:150px;vertical-align:top">${inp('ar-name','text',p.name||'','ชื่อโปรเจกต์ *')}</td>
-    <td style="padding:6px;min-width:126px;vertical-align:top">${inp('ar-deadline','date',p.deadline||'')}</td>
-    <td style="padding:6px;min-width:88px;vertical-align:top">${codeSel}</td>
-    <td style="padding:6px;min-width:58px;vertical-align:top">${inp('ar-seq','number',p.seq||'','ลำดับ')}</td>
-    <td style="padding:6px;min-width:96px;vertical-align:top">${typeSel}</td>
-    ${budgetCell}
-    <td style="padding:6px;min-width:58px;vertical-align:top">${inp('ar-episodes','number',p.episodes||'','Ep.')}</td>
-    <td style="padding:6px;min-width:112px;vertical-align:top">${mgrSel}</td>
-    ${phCells}
-    <td style="padding:6px;min-width:150px;vertical-align:top">${inp('ar-link','text',p.downloadLink||'','https://ลิงก์โหลดงาน')}<div style="margin-top:3px">${inp('ar-secret','text',p.secretKey||'','🔑 Secret key')}</div></td>
-    <td style="padding:6px;min-width:120px;vertical-align:top">${inp('ar-note','text',p.note||'','หมายเหตุ')}</td>
-    <td style="padding:6px;white-space:nowrap;vertical-align:top">
-      <button class="btn btn-sm" style="padding:4px 10px;font-size:12px" onclick="assignSaveRow('${p.id||''}')" title="บันทึก">✅</button>
-      <button class="btn btn-sm btn-outline" style="padding:4px 8px;font-size:12px" onclick="assignCancelRow()" title="ยกเลิก">✖</button>
-    </td>
-  </tr>`;
+  const typeSel=`<select id="ar-type" style="${selStyle}"><option value="">— ประเภท —</option>${types.map(t=>`<option${p.type===t?' selected':''}>${esc(t)}</option>`).join('')}</select>`;
+  // 💰 งบลูกค้า: เรท + หน่วย (เหมือนฟอร์มโปรเจกต์) — budgetRate × หน่วย = budget
+  const bt=p.budgetType||'flat';
+  const rate=(p.budgetRate!=null&&p.budgetRate!==0)?p.budgetRate:(p.budget||'');
+  const btOpts=[['flat','เหมา'],['per-minute','ต่อนาที'],['per-hour','ต่อชั่วโมง'],['per-page','ต่อหน้า'],['per-day','ต่อวัน'],['per-episode','ต่อตอน/บท'],['per-project','ต่อโปรเจกต์']];
+  const budgetBox=`<div style="margin-top:12px;padding:10px 12px;background:var(--bg2);border-radius:10px">
+    ${lbl('💰 งบลูกค้า — เลือกหน่วยได้')}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      ${inp('ar-budget','number',rate,'เรท/ยอด','width:120px;flex:none;background:var(--bg)')}
+      <select id="ar-btype" style="${selStyle};width:auto;flex:none;background:var(--bg)" onchange="_arBudgetUI()">
+        ${btOpts.map(([v,l])=>`<option value="${v}"${bt===v?' selected':''}>${l}</option>`).join('')}
+      </select>
+      <span id="ar-bqtywrap" style="flex:none">${inp('ar-bqty','number',p.budgetQty||'','จำนวน','width:95px;background:var(--bg)')}</span>
+      <span id="ar-durwrap" style="display:flex;align-items:center;gap:5px;flex:none;font-size:12px;color:var(--text2)">ยาว ${inp('ar-dur','number',p.duration||'','นาที','width:85px;background:var(--bg)')} นาที</span>
+    </div>
+    <div id="ar-bcalc" style="font-size:11.5px;margin-top:5px;color:var(--text2)"></div>
+  </div>`;
+  // เดทไลน์ราย Role: ใส่เวลาได้ + กด "＋ รอบ 2" เพิ่มเดทไลน์รอบสองของหน้าที่นั้นได้
+  const _dtVal=v=>v?(String(v).includes('T')?v:v+'T23:59'):'';
+  const phCards=_ASSIGN_PHASES.map(([k,l])=>{
+    const ph=(p.phases||{})[k]||{};
+    const has2=!!ph.deadline2;
+    return `<div style="padding:9px 10px;background:var(--bg2);border-radius:9px">
+      <div style="font-size:11.5px;font-weight:700;margin-bottom:4px">DL ${l}</div>
+      ${inp('ar-ph-'+k,'datetime-local',_dtVal(ph.deadline),'','background:var(--bg)')}
+      <div id="ar-ph2wrap-${k}" style="margin-top:4px;${has2?'':'display:none'}">${inp('ar-ph2-'+k,'datetime-local',_dtVal(ph.deadline2),'','background:var(--bg)')}</div>
+      <div style="margin-top:4px">${inp('ar-phn-'+k,'text',ph.note||'','📝 โน้ต','background:var(--bg)')}</div>
+      <div style="margin-top:3px"><span onclick="var w=document.getElementById('ar-ph2wrap-${k}');var i=document.getElementById('ar-ph2-${k}');if(w.style.display==='none'){w.style.display='block'}else{w.style.display='none';if(i)i.value='';}" style="font-size:10px;color:var(--accent2);cursor:pointer;user-select:none" title="กดเปิดเพื่อเพิ่ม · กดซ้ำเพื่อลบรอบ 2 ออก">＋/✕ เดทไลน์รอบ 2</span></div>
+    </div>`;
+  }).join('');
+  return `<div class="card" id="${isNew?'assign-newrow':'assign-editrow'}" style="margin-bottom:12px;padding:14px 16px;border:1.5px solid var(--accent2);border-radius:12px">
+    <div style="font-size:14.5px;font-weight:800;margin-bottom:11px">${isNew?'➕ มอบหมายงานใหม่':'✏️ แก้ไขงาน — '+esc(p.name||'')}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px">
+      <div style="grid-column:1/-1">${lbl('ชื่อโปรเจกต์ *')}${inp('ar-name','text',p.name||'','ชื่องาน')}</div>
+      <div>${lbl('🏁 เดทไลน์รวม (Final)')}${inp('ar-deadline','date',p.deadline||'')}</div>
+      <div>${lbl('รหัสลูกค้า')}${codeSel}</div>
+      <div>${lbl('ลำดับ (เช่น 1 = G01)')}${inp('ar-seq','number',p.seq||'','ลำดับ')}</div>
+      <div>${lbl('ประเภทงาน')}${typeSel}</div>
+      <div>${lbl('จำนวนตอน (Ep.)')}${inp('ar-episodes','number',p.episodes||'','Ep.')}</div>
+      <div>${lbl('ผู้รับผิดชอบ')}${mgrSel}</div>
+    </div>
+    ${budgetBox}
+    <div style="margin-top:12px">
+      ${lbl('⏰ เดทไลน์ราย Role (เว้นว่างได้ — เมเนเจอร์มาเติมทีหลัง)')}
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:8px">${phCards}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px">
+      <div>${lbl('🔗 Link โหลดงาน')}${inp('ar-link','text',p.downloadLink||'','https://ลิงก์โหลดงาน')}</div>
+      <div>${lbl('🔑 Secret key')}${inp('ar-secret','text',p.secretKey||'')}</div>
+      <div style="grid-column:1/-1">${lbl('📝 หมายเหตุ')}${inp('ar-note','text',p.note||'')}</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:13px">
+      <button class="btn btn-green" style="flex:1" onclick="assignSaveRow('${p.id||''}')">✅ บันทึก${isNew?' — ต่อไปจัดสรรคน':''}</button>
+      <button class="btn btn-outline" onclick="assignCancelRow()">✖ ยกเลิก</button>
+    </div>
+  </div>`;
+}
+// โชว์/ซ่อนช่องจำนวน+ความยาวตามหน่วยที่เลือก + คำนวนยอดรวมให้เห็นทันที
+function _arBudgetUI(){
+  const g=id=>document.getElementById(id);
+  const t=g('ar-btype')?.value||'flat';
+  const qw=g('ar-bqtywrap'), dw=g('ar-durwrap'), q=g('ar-bqty');
+  if(qw) qw.style.display=BUDGET_QTY_LABEL[t]?'':'none';
+  if(q) q.placeholder=BUDGET_QTY_LABEL[t]?'กี่'+BUDGET_QTY_LABEL[t]:'จำนวน';
+  if(dw) dw.style.display=t==='per-minute'?'flex':'none';
+  const rate=parseFloat(g('ar-budget')?.value)||0;
+  const qty=parseFloat(g('ar-bqty')?.value)||0;
+  const dur=parseFloat(g('ar-dur')?.value)||0;
+  const total=calcBudgetTotal(rate,t,dur,qty);
+  const el=g('ar-bcalc');
+  if(!el) return;
+  if(t==='per-minute'&&rate>0) el.innerHTML=dur>0?('= '+fmtB(rate)+' × '+dur+' นาที = <strong style="color:var(--accent2)">'+fmtB(total)+'</strong>'):'<span style="color:var(--orange)">⚠️ ใส่ความยาว (นาที) เพื่อคำนวนยอดรวม</span>';
+  else if(BUDGET_QTY_LABEL[t]&&rate>0) el.innerHTML=qty>0?('= '+fmtB(rate)+' × '+qty+' '+BUDGET_QTY_LABEL[t]+' = <strong style="color:var(--accent2)">'+fmtB(total)+'</strong>'):'<span style="color:var(--orange)">⚠️ กรอกจำนวน'+BUDGET_QTY_LABEL[t]+' เพื่อคำนวนยอดรวม</span>';
+  else el.innerHTML=rate>0?('ยอดรวม <strong style="color:var(--accent2)">'+fmtB(total)+'</strong>'):'';
+}
+// ป้ายหน่วยงบไว้โชว์ในการ์ดรายการ เช่น (฿500/นาที × 90 นาที)
+function _arUnitHint(p){
+  const t=p.budgetType;
+  if(t==='per-minute') return '('+fmtB(p.budgetRate||0)+'/นาที × '+(p.duration||'?')+' นาที)';
+  if(BUDGET_QTY_LABEL[t]) return '('+fmtB(p.budgetRate||0)+'/'+BUDGET_QTY_LABEL[t]+' × '+(p.budgetQty||'?')+' '+BUDGET_QTY_LABEL[t]+')';
+  if(t==='per-project') return '(ต่อโปรเจกต์)';
+  return '';
 }
 async function assignSaveRow(projId){
   const g=id=>document.getElementById(id);
@@ -13025,8 +13573,12 @@ async function assignSaveRow(projId){
     note:(g('ar-note')?.value||'').trim(),
     type:g('ar-type')?.value||'',
   };
+  // 💰 งบ: เรท + หน่วย + จำนวน/ความยาว → ยอดรวมคำนวนแบบเดียวกับฟอร์มโปรเจกต์
   const budgetEl=g('ar-budget');
-  const budget=budgetEl?(parseFloat(budgetEl.value)||0):null;
+  const bRate=budgetEl?(parseFloat(budgetEl.value)||0):null;
+  const bType=g('ar-btype')?.value||'flat';
+  const bQty=parseFloat(g('ar-bqty')?.value)||0;
+  const bDur=parseFloat(g('ar-dur')?.value)||0;
   const phVals={};
   _ASSIGN_PHASES.forEach(([k])=>{ phVals[k]={deadline:g('ar-ph-'+k)?.value||'', deadline2:g('ar-ph2-'+k)?.value||'', note:(g('ar-phn-'+k)?.value||'').trim()}; });
   if(projId){
@@ -13034,7 +13586,11 @@ async function assignSaveRow(projId){
     const res=await saveProjectMerge(projId, p=>{
       if(currentUser?.role==='admin' && vals.managerId!==(p.managerId||'')) mgrChanged=true;
       Object.assign(p, vals);
-      if(budgetEl && budget!=null){ p.budget=budget; p.budgetRate=budget; if(!p.budgetType||p.budgetType==='flat') p.budgetType='flat'; }
+      if(budgetEl && bRate!=null){
+        p.budgetRate=bRate; p.budgetType=bType; p.budgetQty=bQty;
+        if(bType==='per-minute' && bDur>0) p.duration=bDur;
+        p.budget=calcBudgetTotal(bRate, bType, bType==='per-minute'?(bDur||parseFloat(p.duration)||0):(parseFloat(p.duration)||0), bQty);
+      }
       p.phases=p.phases||{};
       _ASSIGN_PHASES.forEach(([k])=>{
         const v=phVals[k];
@@ -13052,7 +13608,7 @@ async function assignSaveRow(projId){
     _ASSIGN_PHASES.forEach(([k])=>{ const v=phVals[k]; if(v.deadline||v.deadline2||v.note) phases[k]={startDate:'',deadline:v.deadline,deadline2:v.deadline2,submitTime:'',status:'none',note:v.note}; });
     const proj={
       id:'P'+Date.now(), name, date:today, client:vals.client||'', type:vals.type||'',
-      budget:budget||0, budgetRate:budget||0, budgetType:'flat', budgetQty:0, duration:0,
+      budget:calcBudgetTotal(bRate||0, bType, bDur, bQty), budgetRate:bRate||0, budgetType:bType, budgetQty:bQty, duration:bDur||0,
       startDate:today, deadline:vals.deadline, cycle:'', note:vals.note,
       clientCode:vals.clientCode, seq:vals.seq, episodes:vals.episodes,
       downloadLink:vals.downloadLink, secretKey:vals.secretKey,
@@ -13100,42 +13656,56 @@ function renderAssign(){
   const mgrs={}; try{ getAllManagerUsers().forEach(m=>{ mgrs[m.uid]=m.nickname||m.email||''; }); }catch(e){}
   const codeColors={}; const palette=['#FF6FAE','#9B6FFF','#00B4FF','#00DFA0','#FF9E00','#FF6060','#5AD1E6'];
   let ci=0;
-  const th=t=>`<th style="padding:8px 10px;font-size:11.5px;color:var(--text2);font-weight:700;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border2)">${t}</th>`;
-  const td=(t,extra='')=>`<td style="padding:8px 10px;font-size:12.5px;vertical-align:top;border-bottom:1px solid rgba(255,255,255,.05);${extra}">${t}</td>`;
   const todayIso=new Date().toISOString().split('T')[0];
-  const rows=list.map((p,ri)=>{
+  // 🃏 รายการเป็นการ์ดคั่นชัด — อ่านแยกงานง่าย ไม่ต้องเลื่อนขวา (เดิมเป็นตารางกว้าง 1250px)
+  const cards=list.map((p,ri)=>{
     if(p.id===_assignEditId) return _assignEditRowHTML(p);
     const code=(p.clientCode||'').toUpperCase();
     if(code && !codeColors[code]){ codeColors[code]=palette[ci++%palette.length]; }
-    const cc=codeColors[code]||'var(--text2)';
+    const cc=codeColors[code]||'var(--border2)';
     const overdue=p.deadline && p.deadline<todayIso && p.projStatus!=='done';
     const secId='askey-'+ri;
-    const link=p.downloadLink
-      ? `<a href="${esc(p.downloadLink)}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:12px;word-break:break-all">🔗 เปิดลิงก์</a>`
-        + (p.secretKey?`<div style="margin-top:3px;font-size:11px;color:var(--text2)">🔑 <span id="${secId}" data-shown="0" style="font-family:monospace">••••••••</span> <button id="${secId}-b" class="btn btn-sm btn-outline" style="padding:0 6px;font-size:10px" onclick="toggleSecretKey('${secId}-b','${secId}','${escJs(p.secretKey)}')">👁</button></div>`:'')
-      : '<span style="opacity:.35">—</span>';
-    return `<tr style="background:${overdue?'rgba(255,64,64,.05)':''}">
-      ${td(`<span style="font-weight:700;cursor:pointer;color:var(--accent2)" onclick="openProjDetail('${p.id}')" title="เปิดรายละเอียด">${esc(p.name||'')}</span>`)}
-      ${td(`<span style="font-weight:700;color:${overdue?'var(--red)':'var(--text)'}">${p.deadline?fmtDate(p.deadline):'—'}</span>`)}
-      ${td(code?`<span style="padding:2px 10px;border-radius:8px;background:${cc}22;color:${cc};font-weight:800;font-size:12px;cursor:pointer" onclick="openBriefLibrary('${escJs(code)}')" title="เปิดบรีฟงานรหัส ${esc(code)}">${esc(code)}</span>`:'<span style="opacity:.35">—</span>')}
-      ${td(p.seq||'<span style="opacity:.35">—</span>','text-align:center')}
-      ${td(p.type?esc(p.type):'<span style="opacity:.35">—</span>','font-size:12px;white-space:nowrap')}
-      ${td(p.budget?fmtB(p.budget):'<span style="opacity:.35">—</span>')}
-      ${td(p.episodes||'<span style="opacity:.35">—</span>','text-align:center')}
-      ${td(p.managerId&&mgrs[p.managerId]?`🗂️ ${esc(mgrs[p.managerId])}`:'👑 แอดมิน')}
-      ${_ASSIGN_PHASES.map(([k])=>td(_assignDL(p,k),'white-space:nowrap')).join('')}
-      ${td(link,'max-width:180px')}
-      ${td(p.note?esc(p.note):'<span style="opacity:.35">—</span>','max-width:160px;font-size:11.5px;color:var(--text2)')}
-      ${td(`<button class="btn btn-sm btn-outline" style="padding:3px 9px;font-size:11px" onclick="assignEditRow('${p.id}')" title="แก้ในตาราง">✏️</button>
-            <button class="btn btn-sm btn-outline" style="padding:3px 9px;font-size:11px" onclick="openEditProject('${p.id}')" title="ฟอร์มเต็ม: จัดทีม/ราคา">👥</button>`,'white-space:nowrap')}
-    </tr>`;
+    const unitHint=_arUnitHint(p);
+    const dlChips=_ASSIGN_PHASES.map(([k,l])=>{
+      const ph=(p.phases||{})[k]||{};
+      if(!ph.deadline&&!ph.deadline2&&!(ph.note||'').trim()) return '';
+      return `<div style="padding:4px 10px;background:var(--bg2);border-radius:8px;font-size:11.5px;white-space:nowrap"><span style="color:var(--text2);font-weight:700">${l}</span> · ${_assignDL(p,k)}</div>`;
+    }).filter(Boolean).join('');
+    const linkRow=[
+      p.downloadLink?`<a href="${esc(p.downloadLink)}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:12px">🔗 เปิดลิงก์โหลดงาน</a>`:'',
+      p.secretKey?`<span style="font-size:11px;color:var(--text2)">🔑 <span id="${secId}" data-shown="0" style="font-family:monospace">••••••••</span> <button id="${secId}-b" class="btn btn-sm btn-outline" style="padding:0 6px;font-size:10px" onclick="toggleSecretKey('${secId}-b','${secId}','${escJs(p.secretKey)}')">👁</button></span>`:'',
+      (p.note||'').trim()?`<span style="font-size:11.5px;color:var(--text2)">📝 ${esc(p.note)}</span>`:''
+    ].filter(Boolean).join(' <span style="opacity:.3">·</span> ');
+    return `<div class="card" style="margin-bottom:10px;padding:12px 15px;border-left:3px solid ${overdue?'var(--red)':cc};border-radius:11px;${overdue?'background:rgba(255,64,64,.04)':''}">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        ${code?`<span style="padding:2px 11px;border-radius:8px;background:${cc}22;color:${cc};font-weight:800;font-size:12.5px;cursor:pointer;flex:none" onclick="openBriefLibrary('${escJs(code)}')" title="เปิดบรีฟงานรหัส ${esc(code)}">${esc(projCode(p)||code)}</span>`:''}
+        <span style="font-weight:800;font-size:14px;cursor:pointer;color:var(--accent2);min-width:120px" onclick="openProjDetail('${p.id}')" title="เปิดรายละเอียด">${esc(p.name||'')}</span>
+        ${p.type?`<span style="font-size:11px;color:var(--text2);background:var(--bg2);padding:2px 9px;border-radius:8px;flex:none">${esc(p.type)}</span>`:''}
+        <span style="flex:1"></span>
+        <span style="font-size:12px;flex:none">🏁 <strong style="color:${overdue?'var(--red)':'var(--text)'}">${p.deadline?fmtDate(p.deadline):'—'}</strong>${overdue?' <span style="color:var(--red);font-size:10.5px;font-weight:700">เลยกำหนด!</span>':''}</span>
+        <span style="font-size:12px;color:var(--text2);flex:none">${p.managerId&&mgrs[p.managerId]?'🗂️ '+esc(mgrs[p.managerId]):'👑 แอดมิน'}</span>
+        <span style="white-space:nowrap;flex:none">
+          <button class="btn btn-sm btn-outline" style="padding:3px 10px;font-size:11.5px" onclick="assignEditRow('${p.id}')" title="แก้ไขในฟอร์ม">✏️ แก้ไข</button>
+          <button class="btn btn-sm btn-outline" style="padding:3px 10px;font-size:11.5px" onclick="openEditProject('${p.id}')" title="ฟอร์มเต็ม: จัดทีม/ราคา">👥 ทีม/ราคา</button>
+        </span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
+        <span style="font-size:12px;flex:none">💰 <strong>${p.budget?fmtB(p.budget):'—'}</strong>${unitHint?` <span style="font-size:10.5px;color:var(--text2)">${unitHint}</span>`:''}</span>
+        ${p.episodes?`<span style="font-size:12px;color:var(--text2);flex:none">🎬 ${p.episodes} ตอน</span>`:''}
+        <span style="opacity:.3">|</span>
+        ${dlChips||'<span style="opacity:.45;font-size:11.5px">ยังไม่ตั้งเดทไลน์ราย Role — กด ✏️ แก้ไข เพื่อเติม</span>'}
+      </div>
+      ${linkRow?`<div style="margin-top:7px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${linkRow}</div>`:''}
+    </div>`;
   }).join('');
   const newRow=_assignAdding?_assignEditRowHTML(null):'';
   const emptyHint=(!list.length&&!_assignAdding)
-    ? `<tr><td colspan="17" style="padding:36px;text-align:center;color:var(--text2)">ไม่มีงานในมุมมองนี้ — กด "➕ มอบหมายงานใหม่" เพื่อเพิ่มแถวกรอกแบบชีท</td></tr>`:'';
-  el.innerHTML=toolbar+`<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:1250px">
-    <thead><tr>${th('ชื่อโปรเจกต์')}${th('เดทไลน์')}${th('รหัส')}${th('ลำดับ')}${th('ประเภท')}${th('งบ')}${th('Ep.')}${th('ผู้รับผิดชอบ')}${_ASSIGN_PHASES.map(([,l])=>th('DL '+l)).join('')}${th('Link โหลดงาน')}${th('หมายเหตุ')}${th('')}</tr></thead>
-    <tbody>${rows}${emptyHint}${newRow}</tbody></table></div>`;
+    ? `<div class="card" style="padding:36px;text-align:center;color:var(--text2)">ไม่มีงานในมุมมองนี้ — กด "➕ มอบหมายงานใหม่" ด้านบนเพื่อเปิดฟอร์มกรอก</div>`:'';
+  el.innerHTML=toolbar+newRow+cards+emptyHint;
+  if(_assignAdding||_assignEditId){
+    try{ _arBudgetUI(); }catch(e){}
+    ['ar-budget','ar-bqty','ar-dur'].forEach(id=>{ const e=document.getElementById(id); if(e) e.oninput=_arBudgetUI; });
+  }
 }
 
 // datalist รหัสงาน — รวบรวมจากโปรเจกต์ที่มีอยู่ (เช่น G, M) ให้เลือกซ้ำง่าย
@@ -21060,6 +21630,7 @@ function renderDocsHistory() {
       <td style="font-size:12px;color:var(--text2)">${fmtDate(d.date||d.createdAt)}</td>
       <td><div style="display:flex;gap:5px;flex-wrap:wrap">
         <button class="btn btn-xs btn-outline" onclick="repreviewDoc('${d.type}','${d.docNo}')">👁️ ดู</button>
+        <button class="btn btn-xs btn-outline" onclick="downloadDocByNo('${d.type}','${d.docNo}')" title="เปิดหน้าพิมพ์ → กดบันทึกเป็น PDF ได้เลย">⬇️ PDF</button>
         ${d.type==='invoice'?'<button class="btn btn-xs" style="background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.35);color:var(--accent2)" onclick="editInvoice(\''+d.docNo+'\')">✏️ แก้ไข</button>':''}
         ${d.type==='invoice'?'<button class="btn btn-xs" style="background:rgba(0,223,160,.12);border:1px solid rgba(0,223,160,.35);color:var(--green);font-weight:700" onclick="issueReceiptFromInvoice(\''+d.docNo+'\')" title="ลูกค้าจ่ายแล้ว → ออกใบเสร็จรับเงินจากใบแจ้งหนี้ใบนี้">🧾 ออกใบเสร็จ</button>':''}
         ${d.type==='quotation'?'<button class="btn btn-xs" style="background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.35);color:var(--accent2)" onclick="editQuotation(\''+d.docNo+'\')">✏️ แก้ไข</button>':''}
@@ -21176,6 +21747,26 @@ function repreviewDoc(type, docNo) {
     if(el) el.innerHTML = html || '<div style="color:red;padding:20px">ไม่สามารถสร้างใบเสร็จได้ (ข้อมูลไม่ครบ)</div>';
     openModal('modal-receipt');
   }
+}
+// สร้าง HTML ของเอกสารจากเลขที่ (ใช้ตรรกะเดียวกับ repreviewDoc) — สำหรับปุ่ม ⬇️ PDF ต่อแถว
+function _buildDocHTMLByNo(type, docNo){
+  try{
+    if(type==='quotation'){ const d=(getDocsStore('quotations')||[]).find(x=>x.docNo===docNo); return d?buildQuotationHTML(d):''; }
+    if(type==='invoice'){ const d=(getDocsStore('invoices')||[]).find(x=>x.docNo===docNo); return d?buildInvoiceHTML(d):''; }
+    if(type==='receipt'){ const d=(getDocsStore('receipts')||[]).find(x=>x.docNo===docNo); return d?buildReceiptDocHTML(d):''; }
+    const d=(getDocsStore('vouchers')||[]).find(x=>x.docNo===docNo);
+    if(!d) return '';
+    if(d.multiItem && Array.isArray(d.items) && d.items.length>0){
+      const s=d.staffId?(getStaffById(d.staffId)||{name:d.staffName,nickname:d.staffNickname,bank:d.bank,account:d.account,promptpay:''}):{name:d.staffName,nickname:d.staffNickname,bank:d.bank,account:d.account,promptpay:''};
+      return buildMultiVoucherHTML({vNo:docNo, staff:s, items:d.items, totalAmt:d.totalAmount||d.amount||0, date:d.date, note:d.note||''});
+    }
+    return buildVoucherHTML(d.projId,d.staffId,d.slot||'',docNo,d.date,'')||'';
+  }catch(e){ return ''; }
+}
+function downloadDocByNo(type, docNo){
+  const html=_buildDocHTMLByNo(type, docNo);
+  if(!html){ toast('ไม่พบข้อมูลเอกสาร '+docNo,'warn'); return; }
+  downloadDocHTML(html, docNo);
 }
 
 
@@ -26185,25 +26776,32 @@ function teamMemberCardHTML(s, col, viewer){
   const clickAttr = viewer==='admin' ? `onclick="openStaffDetail('${s.id}')" title="กดดูข้อมูล/รายได้"` : '';
   let actions='';
   if(canAct){
-    actions=`<div style="display:flex;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07)">
-      <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(255,64,64,.35);color:#FF6060" onclick="event.stopPropagation();teamWarn('${s.id}')">✉️ เตือน</button>
-      <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(255,199,0,.4);color:#FFC700" onclick="event.stopPropagation();teamAppr('${s.id}')">⭐ ชื่นชม</button>
-    </div>`;
-    // 🚪 ออกจากทีม + 🗑️ ลบถาวร — เฉพาะแอดมิน
     if(viewer==='admin'){
-      actions+=`<div style="display:flex;gap:6px;margin-top:6px">
-        <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(150,150,150,.4);color:var(--text2)" onclick="event.stopPropagation();adminLeaveTeam('${s.id}')" title="ย้ายไปโซนออกจากทีม (ข้อมูลยังอยู่ กู้คืนได้)">🚪 ออกจากทีม</button>
-        <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(255,64,64,.4);color:var(--red)" onclick="event.stopPropagation();deleteStaff('${s.id}')" title="ลบออกจากระบบถาวร + บล็อกไม่ให้ซิงค์กลับจากชีท (คืนได้ที่ ตั้งค่า → รายชื่อบล็อก Sync)">🗑️ ลบถาวร</button>
-      </div>`;
-    }
-    // 👥 สถานะ + 🏷️ Tag — เฉพาะแอดมิน
-    if(viewer==='admin'){
+      // ⚙️ รวมทุกคำสั่งไว้ dropdown เดียว — การ์ดสะอาด ไม่มีปุ่ม/สถานะซ้ำซ้อน (เจ้าของสั่ง 2026-08-04)
       const _st=getStaffStatus(s);
-      actions+=`<div style="display:flex;gap:6px;margin-top:6px;align-items:center" onclick="event.stopPropagation()">
-        <select onchange="setStaffStatus('${s.id}',this.value)" title="สถานะสมาชิก" style="flex:1;padding:5px 6px;border-radius:7px;background:var(--bg2);border:1px solid var(--border2);color:var(--text);font-family:Kanit;font-size:11px;cursor:pointer">
-          ${Object.entries(STAFF_STATUSES).map(([k,v])=>`<option value="${k}"${_st===k?' selected':''}>${v.label}</option>`).join('')}
+      const _stLabel=(STAFF_STATUSES[_st]||STAFF_STATUSES.active).label;
+      actions=`<div style="display:flex;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07);align-items:center" onclick="event.stopPropagation()">
+        <select onchange="teamCardAction('${s.id}',this)" title="คำสั่งทั้งหมดของสมาชิกคนนี้" style="flex:1;min-width:0;padding:6px 8px;border-radius:7px;background:var(--bg2);border:1px solid var(--border2);color:var(--text);font-family:Kanit;font-size:11.5px;cursor:pointer">
+          <option value="">⚙️ จัดการ · ${_stLabel}</option>
+          <optgroup label="สถานะ">
+            <option value="st-active">🟢 Active${_st==='active'?' ✓':''}</option>
+            <option value="st-suspended">⏸️ พักงาน (พักเอง/โดนสั่งพัก)${_st==='suspended'?' ✓':''}</option>
+            <option value="st-resigned">🚪 ลาออก — ย้ายไปแท็บออกทีม${_st==='resigned'?' ✓':''}</option>
+          </optgroup>
+          <optgroup label="ออกใบ">
+            <option value="warn">✉️ ส่งใบเตือน</option>
+            <option value="appr">⭐ ส่งใบชื่นชม</option>
+          </optgroup>
+          <optgroup label="อื่น ๆ">
+            <option value="tag">🏷️ ตั้ง Tag</option>
+            <option value="delete">🗑️ ลบถาวร (หายจากระบบเลย)</option>
+          </optgroup>
         </select>
-        <button class="btn btn-sm btn-outline" style="padding:5px 9px;font-size:11px" onclick="openStaffTagEditor('${s.id}')" title="ติด Tag หมายเหตุประจำตัว">🏷️</button>
+      </div>`;
+    } else {
+      actions=`<div style="display:flex;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07)">
+        <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(255,64,64,.35);color:#FF6060" onclick="event.stopPropagation();teamWarn('${s.id}')">✉️ เตือน</button>
+        <button class="btn btn-sm btn-outline" style="flex:1;padding:5px 4px;font-size:11px;border-color:rgba(255,199,0,.4);color:#FFC700" onclick="event.stopPropagation();teamAppr('${s.id}')">⭐ ชื่นชม</button>
       </div>`;
     }
     // 🎨 สีประจำเมเนเจอร์ — โชว์เฉพาะการ์ดคนที่เป็น manager (admin เลือกให้)
@@ -26221,7 +26819,7 @@ function teamMemberCardHTML(s, col, viewer){
     <div style="display:flex;align-items:center;gap:10px">
       <span style="width:32px;height:32px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${esc((s.nickname||s.name||'?')[0])}</span>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:700;color:var(--text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.nickname||s.name)} <span style="font-size:11px;color:var(--text2);font-weight:400">${esc(s.name||'')}</span>
+        <div style="font-weight:700;color:var(--text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.nickname||s.name)}${staffRoleEmojiHTML(s.id)} <span style="font-size:11px;color:var(--text2);font-weight:400">${esc(s.name||'')}</span>
           ${staffStatusBadgeHTML(s)}
           ${wc?`<span title="ใบเตือน" style="padding:1px 7px;border-radius:8px;background:rgba(255,64,64,.15);color:#FF6060;font-size:10px;font-weight:700;margin-left:4px">⚠️${wc}</span>`:''}
           ${ac?`<span title="ใบชื่นชม" style="padding:1px 7px;border-radius:8px;background:rgba(255,199,0,.15);color:#FFC700;font-size:10px;font-weight:700;margin-left:4px">⭐${ac}</span>`:''}
@@ -27240,14 +27838,8 @@ function startTeamLeftSync(){
 }
 async function adminLeaveTeam(staffId, staffName){
   if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
-  const s=getStaffById(staffId);
-  const nm=s?(s.nickname||s.name):(staffName||staffId);
-  if(!confirm(`ให้ "${nm}" ออกจากทีม?\n\nชื่อจะถูกย้ายไปโซน "ออกจากทีมแล้ว" และจะไม่ถูกนับในจำนวนทีม\nข้อมูลยังอยู่ครบ — กู้คืนกลับเข้าทีมได้ภายหลัง`)) return;
-  const map=getTeamLeft();
-  map[staffId]={ by:currentUser?.nickname||currentUser?.email||'Admin', at:new Date().toISOString(), name:nm };
-  await saveTeamLeft(map);
-  renderStaff();
-  toast(`🚪 ย้าย "${nm}" ออกจากทีมแล้ว`,'info');
+  // เส้นทางเดียวกับ dropdown "🚪 ลาออก" — ตั้งสถานะ + ย้ายไปแท็บออกทีมพร้อมกัน (มี confirm ในตัว)
+  await setStaffStatus(staffId, 'resigned');
 }
 async function adminRejoinTeam(staffId, staffName){
   if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
@@ -27255,8 +27847,10 @@ async function adminRejoinTeam(staffId, staffName){
   const nm=(map[staffId]&&map[staffId].name)||staffName||staffId;
   delete map[staffId];
   await saveTeamLeft(map);
+  // กู้คืน = กลับมาเป็น Active (เคลียร์สถานะลาออกที่ค้างอยู่ด้วย ไม่งั้นชื่อไม่โผล่ตอนจัดคนเข้างาน)
+  _updateStaffRecords(staffId, s=>{ s.status='active'; s.statusAt=new Date().toISOString(); s.statusBy=currentUser?.email||''; });
   renderStaff();
-  toast(`✅ กู้คืน "${nm}" กลับเข้าทีมแล้ว`,'success');
+  toast(`✅ กู้คืน "${nm}" กลับเข้าทีมแล้ว (สถานะ Active)`,'success');
 }
 
 // ══════════════════════════════════════════════
