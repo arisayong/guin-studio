@@ -5822,10 +5822,13 @@ function renderProjRoom(){
   const p=list.find(x=>x.id===_prSel);
   const mgrs={}; try{ getAllManagerUsers().forEach(m=>{ mgrs[m.uid]=m.nickname||m.email||''; }); }catch(e){}
   const sel=`<div class="pr-step"><div class="pr-step-t">1️⃣ เลือกโปรเจกต์</div>
-    <select class="pr-in" onchange="_prSel=this.value;renderProjRoom()">
-      <option value="">— เลือกโปรเจกต์ —</option>
-      ${list.map(x=>`<option value="${esc(x.id)}"${x.id===_prSel?' selected':''}>${esc(((x.clientCode||'')+(x.seq||''))?((x.clientCode||'')+(x.seq||''))+' · ':'')}${esc(x.name||'')}${x.discordChannelId?' 🐧':''}</option>`).join('')}
-    </select></div>`;
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select class="pr-in" style="flex:1;min-width:220px" onchange="_prSel=this.value;renderProjRoom()">
+        <option value="">— เลือกโปรเจกต์ —</option>
+        ${list.map(x=>`<option value="${esc(x.id)}"${x.id===_prSel?' selected':''}>${esc(((x.clientCode||'')+(x.seq||''))?((x.clientCode||'')+(x.seq||''))+' · ':'')}${esc(x.name||'')}${x.discordChannelId?' 🐧':''}</option>`).join('')}
+      </select>
+      <button class="btn btn-blue btn-sm" onclick="openNewProject()" title="กรอกชื่อ/เดทไลน์ก่อน สร้างเสร็จกลับมาเลือกที่นี่ได้เลย">＋ สร้างโปรเจกต์ใหม่</button>
+    </div></div>`;
   if(!p){ el.innerHTML=sel+'<div style="color:var(--text2);font-size:12.5px;padding:6px 2px">เลือกโปรเจกต์ก่อน แล้วขั้นตอนสร้างห้อง+โพสต์จะโผล่ที่นี่ · โปรเจกต์ที่มี 🐧 = สร้างห้องแล้ว</div>'; return; }
   const has=!!p.discordChannelId;
   const emoji=ls('projroom_emoji')||'❤️';
@@ -6159,10 +6162,13 @@ function renderDrivePage(){
   const tplItems=_drParseTpl(cfg.tpl||_DR_TPL_DEFAULT, code||'{รหัส}');
   el.innerHTML=`
     <div class="pr-step"><div class="pr-step-t">1️⃣ เลือกโปรเจกต์</div>
-      <select class="pr-in" onchange="_drSel=this.value;_drProjFolders=[];renderDrivePage()">
-        <option value="">— เลือกโปรเจกต์ —</option>
-        ${list.map(x=>`<option value="${esc(x.id)}"${x.id===_drSel?' selected':''}>${esc(((x.clientCode||'')+(x.seq||''))?((x.clientCode||'')+(x.seq||''))+' · ':'')}${esc(x.name||'')}${x.driveFolderId?' 📂':''}</option>`).join('')}
-      </select>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select class="pr-in" style="flex:1;min-width:220px" onchange="_drSel=this.value;_drProjFolders=[];renderDrivePage()">
+          <option value="">— เลือกโปรเจกต์ —</option>
+          ${list.map(x=>`<option value="${esc(x.id)}"${x.id===_drSel?' selected':''}>${esc(((x.clientCode||'')+(x.seq||''))?((x.clientCode||'')+(x.seq||''))+' · ':'')}${esc(x.name||'')}${x.driveFolderId?' 📂':''}</option>`).join('')}
+        </select>
+        <button class="btn btn-blue btn-sm" onclick="openNewProject()" title="สร้างเสร็จกลับมาเลือกที่นี่ได้เลย">＋ สร้างโปรเจกต์ใหม่</button>
+      </div>
       ${p&&p.driveFolderLink?`<div style="font-size:11.5px;margin-top:7px">📂 โฟลเดอร์งานนี้: <a href="${esc(p.driveFolderLink)}" target="_blank" rel="noopener" style="color:var(--accent2)">เปิดในไดรฟ์</a></div>`:''}
     </div>
     <div class="pr-step"><div class="pr-step-t">2️⃣ ที่เก็บในไดรฟ์</div>
@@ -22492,6 +22498,11 @@ function startFirebaseSync() {
       // 🎯 กระดานจัดสรรคน — โปรเจกต์เปลี่ยน (เช่น อีกคนกดยืนยัน) → วาดกระดานใหม่
       const pgAl = document.getElementById('page-alloc');
       if(pgAl&&!pgAl.classList.contains('hidden')) try{renderAlloc();}catch(e){}
+      // 🐧/📂 หน้าห้องโปรเจกต์ + จัดไฟล์งาน — มีโปรเจกต์ใหม่/แก้ไข → รีเฟรชตัวเลือก
+      const pgPr = document.getElementById('page-projroom');
+      if(pgPr&&!pgPr.classList.contains('hidden')) try{renderProjRoom();}catch(e){}
+      const pgDr = document.getElementById('page-drive');
+      if(pgDr&&!pgDr.classList.contains('hidden')) try{renderDrivePage();}catch(e){}
       // 🔑 Refresh queue page เมื่อมี project update → admin จะเห็น staff confirm/reject ทันที
       const pgQ = document.getElementById('page-queue');
       if(pgQ&&!pgQ.classList.contains('hidden')) try{renderQueue();}catch(e){}
