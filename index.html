@@ -2538,7 +2538,10 @@ body.sidebar-collapsed .main-content{
   </div>
   <div class="modal-body">
    <div id="edit-presence-banner" style="display:none;background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.4);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--orange);line-height:1.5"></div>
-   <div style="margin-bottom:12px">
+   <!-- 🔖 รหัสงาน+ลำดับขึ้นก่อน — ทีมจำงานด้วยรหัสแบบ G01 เป็นหลัก ชื่อเรื่องยาว ๆ เป็นรอง -->
+   <div style="display:grid;grid-template-columns:90px 90px 1fr;gap:12px;margin-bottom:12px">
+    <div class="form-group" style="margin:0"><label class="form-label">รหัสงาน</label><input class="form-input" id="pj-clientcode" list="pj-clientcode-list" placeholder="เช่น G" maxlength="6" style="text-transform:uppercase;font-weight:800"><datalist id="pj-clientcode-list"></datalist></div>
+    <div class="form-group" style="margin:0"><label class="form-label">ลำดับ</label><input class="form-input" id="pj-seq" type="number" placeholder="1" min="0" onwheel="this.blur()" style="font-weight:800"></div>
     <div class="form-group" style="margin:0"><label class="form-label">ชื่อโปรเจกต์ *</label><input class="form-input" id="pj-name" placeholder="เช่น One Piece Ep.1100" oninput="const t=document.getElementById('proj-modal-title');if(t)t.textContent=this.value.trim()||'โปรเจกต์ใหม่'"></div>
    </div>
    <div style="margin-bottom:12px">
@@ -2573,10 +2576,7 @@ body.sidebar-collapsed .main-content{
    <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">ชื่อ / URL ลูกค้า</label><input class="form-input" id="pj-client" placeholder="ชื่อลูกค้า หรือ link"></div>
    </div>
-   <!-- 📋 ข้อมูลจากชีทคิวเมเนเจอร์ (เฟส 1 — บรีฟข้อ 9) -->
-   <div style="display:grid;grid-template-columns:90px 90px 1fr;gap:12px;margin-bottom:12px">
-    <div class="form-group" style="margin:0"><label class="form-label">รหัสงาน</label><input class="form-input" id="pj-clientcode" list="pj-clientcode-list" placeholder="เช่น G" maxlength="6" style="text-transform:uppercase"><datalist id="pj-clientcode-list"></datalist></div>
-    <div class="form-group" style="margin:0"><label class="form-label">ลำดับ</label><input class="form-input" id="pj-seq" type="number" placeholder="1" min="0" onwheel="this.blur()"></div>
+   <div style="margin-bottom:12px;max-width:200px">
     <div class="form-group" style="margin:0"><label class="form-label">จำนวนตอน (Ep.)</label><input class="form-input" id="pj-episodes" type="number" placeholder="เช่น 100" min="0" onwheel="this.blur()"></div>
    </div>
    <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:12px;margin-bottom:12px">
@@ -4989,11 +4989,20 @@ async function createRound(){
 }
 function showRoundAnnounce(roundId){
   const r=getRound(roundId); if(!r) return;
-  const c=AV_CATS[r.cat]||AV_CATS.dubbing;
   const g=getAnnounceGender();
   const txt=r.announceText||roundAnnounceText(r, g);
-  _tagOverlayShow('📢 ข้อความประกาศ — คัดลอกไปโพสใน Discord', `
-    <div style="font-size:11.5px;color:var(--text2);margin-bottom:8px">แนะนำให้โพสในห้อง <strong style="color:var(--accent2)"># ${esc(c.channel)}</strong> · ระบบเติมช่วงวันที่ <strong style="color:var(--accent2)">${esc(_annRangeLabel(r))}</strong> และแท็กของทีมให้จากเทมเพลตอัตโนมัติ</div>
+  // ☑️ เลือกห้องที่จะโพสต์ได้หลายห้องพร้อมกัน — ห้องของทีมที่เปิดรอบติ๊กมาให้ก่อน
+  const cfgCh=getDiscordCfg().channels||{};
+  const postsArr=Array.isArray(r.posts)?r.posts:(r.postedMessageId?[{channelId:r.channelId, messageId:r.postedMessageId}]:[]);
+  const chBoxes=Object.entries(AV_CATS).filter(([k])=>cfgCh[k]).map(([k,v])=>{
+    const chId=cfgCh[k];
+    const done=postsArr.some(p=>p.channelId===chId);
+    return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;padding:4px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px">
+      <input type="checkbox" class="ra-ch" value="${esc(chId)}"${(k===r.cat||done)?' checked':''}> ${v.icon} ${esc(v.label)}${done?' <span style="color:var(--green);font-size:10px">เคยโพสต์—จะแก้โพสต์เดิม</span>':''}
+    </label>`;
+  }).join('');
+  _tagOverlayShow('📢 ประกาศขอคิว — รีเช็คข้อความแล้วให้บอทโพสต์เลย', `
+    <div style="font-size:11.5px;color:var(--text2);margin-bottom:8px">ระบบเติมช่วงวันที่ <strong style="color:var(--accent2)">${esc(_annRangeLabel(r))}</strong> และแท็กทีมจากเทมเพลตให้แล้ว — แก้ในกล่องได้เลยก่อนโพสต์</div>
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap;font-size:12.5px">
       <span style="font-weight:700">สำนวน:</span>
       <label style="cursor:pointer"><input type="radio" name="ra-g" value="female" ${g==='female'?'checked':''} onchange="_raSetGender('female','${r.id}')"> 👩 หญิง (ค่ะ/ค่า)</label>
@@ -5001,14 +5010,49 @@ function showRoundAnnounce(roundId){
       <button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="openAnnounceTplEditor('${r.id}')">⚙️ แก้เทมเพลต & แท็ก</button>
     </div>
     <textarea id="ra-text" rows="10" style="width:100%;padding:11px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:Kanit;font-size:13px;line-height:1.65;resize:vertical;box-sizing:border-box">${esc(txt)}</textarea>
+    <div style="margin-top:9px">
+      <div style="font-size:11.5px;font-weight:700;margin-bottom:5px">📍 โพสต์ลงห้องไหนบ้าง (ติ๊กได้หลายห้อง — โพสต์พร้อมกันทีเดียว)</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${chBoxes||'<span style="font-size:11.5px;color:var(--orange)">ยังไม่ได้ตั้ง ID ห้องของทีมไหนเลย — กด 🐧 ตั้งค่าห้อง Discord ก่อน</span>'}</div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:10px">
-      <button class="btn" style="flex:1" onclick="_raCopy()">📋 คัดลอกข้อความ</button>
-      ${r.postedMessageId?`<button class="btn btn-green" style="flex:1" onclick="updateRoundPost('${r.id}')" title="แก้ข้อความในโพสเดิมบน Discord — ไม่โพสใหม่ให้รก">🔄 อัปเดตโพสเดิมใน Discord</button>`:''}
+      <button class="btn btn-green" style="flex:1" onclick="postRoundAnnounceMulti('${r.id}')" title="โพสต์ลงทุกห้องที่ติ๊ก — ห้องที่เคยโพสต์แล้วจะแก้โพสต์เดิม ไม่โพสต์ซ้ำให้รก">📤 ให้บอทโพสต์/อัปเดตประกาศ</button>
+      <button class="btn btn-outline" onclick="_raCopy()" title="สำหรับกรณีอยากเอาไปวางเองใน Discord">📋 คัดลอก</button>
       <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
     </div>
     <div style="font-size:11px;color:var(--text2);margin-top:10px;line-height:1.6">
-      เทมเพลตเดียวใช้ซ้ำทุกรอบ — รอบหน้าแค่เลือกช่วงวันตอนเปิดรอบ ระบบเติมให้เอง · อยากแก้ข้อความเฉพาะรอบนี้ พิมพ์ในกล่องได้เลยก่อนคัดลอก/อัปเดตโพส
+      โพสต์ผิด/วันผิด? แก้ข้อความในกล่องแล้วกดปุ่มเดิมซ้ำ — ระบบจะแก้โพสต์เดิมในทุกห้องให้ตรงกัน · การดึงคำตอบยังอ่านจากห้องของทีมที่เปิดรอบเป็นหลัก
     </div>`, 620);
+}
+// 📤 โพสต์/อัปเดตประกาศหลายห้องพร้อมกัน — ห้องที่เคยโพสต์ = แก้โพสต์เดิม, ห้องใหม่ = โพสต์ใหม่
+async function postRoundAnnounceMulti(roundId){
+  const list=getRounds(); const r=list.find(x=>x.id===roundId); if(!r) return;
+  const txt=String(document.getElementById('ra-text')?.value||'').trim();
+  if(!txt){ toast('ข้อความว่าง','error'); return; }
+  const chosen=[...document.querySelectorAll('.ra-ch:checked')].map(x=>x.value);
+  if(!chosen.length){ toast('ติ๊กเลือกอย่างน้อย 1 ห้องก่อน','warn'); return; }
+  if(!confirm('รีเช็คข้อความเรียบร้อยแล้วใช่ไหม?\n\nบอทจะโพสต์/อัปเดตประกาศลง '+chosen.length+' ห้องพร้อมกัน')) return;
+  showLoader(true);
+  let posted=0, edited=0, fail=0, failMsg='';
+  try{
+    r.posts=Array.isArray(r.posts)?r.posts:(r.postedMessageId?[{channelId:r.channelId, messageId:r.postedMessageId}]:[]);
+    for(const chId of chosen){
+      const ex=r.posts.find(p=>p&&p.channelId===chId);
+      try{
+        if(ex){ await callAppsScript({action:'discordEdit', channelId:chId, messageId:ex.messageId, content:txt}); edited++; }
+        else{ const res=await callAppsScript({action:'discordPost', channelId:chId, content:txt}); r.posts.push({channelId:chId, messageId:res.messageId}); posted++; }
+      }catch(e){ fail++; failMsg=String(e.message||''); }
+    }
+    r.announceText=txt;
+    // ห้องหลักของรอบ (ใช้ดึงคำตอบ) = ห้องของทีมที่เปิดรอบถ้าถูกเลือกไว้ ไม่งั้นห้องแรกที่โพสต์
+    const own=_dcChannelOf(r.cat);
+    const primary=r.posts.find(p=>p.channelId===own)||r.posts[0];
+    if(primary){ r.channelId=primary.channelId; r.postedMessageId=primary.messageId; if(!r.postedAt) r.postedAt=new Date().toISOString(); }
+    await saveRounds(list);
+    try{ logAudit('recruit.round',(AV_CATS[r.cat]||{}).label||r.cat,'โพสต์/อัปเดตประกาศ '+chosen.length+' ห้อง'); }catch(e){}
+    toast(`📤 โพสต์ใหม่ ${posted} ห้อง · แก้โพสต์เดิม ${edited} ห้อง${fail?' · ไม่สำเร็จ '+fail+' ('+failMsg+')':''}`, fail?'warn':'success');
+    if(!fail) document.getElementById('tag-overlay')?.remove();
+    renderAvailability();
+  }finally{ showLoader(false); }
 }
 function _raCopy(){
   const el=document.getElementById('ra-text'); if(!el) return;
@@ -5088,12 +5132,18 @@ function renderAvailability(){
     return;
   }
   const rounds=getRounds();
+  // 🕘 รอบที่เลยช่วงวันแล้ว (เช่น ขอ 4-8 วันนี้ 9) ซ่อนจากดร็อปดาวน์ ไม่ให้รก — กดดูย้อนหลังได้
+  const _todayIso=new Date().toISOString().split('T')[0];
+  const expiredRounds=rounds.filter(r=>r.dateTo && r.dateTo<_todayIso);
+  const visRounds=window._avShowOld ? rounds : rounds.filter(r=>!(r.dateTo && r.dateTo<_todayIso));
   const selEl=document.getElementById('av-round');
-  if(!_avRoundId || !rounds.some(r=>r.id===_avRoundId)) _avRoundId = rounds[0]?.id || null;
+  if(!_avRoundId || !visRounds.some(r=>r.id===_avRoundId)) _avRoundId = visRounds[0]?.id || null;
   if(selEl){
-    selEl.innerHTML = rounds.length
-      ? rounds.map(r=>`<option value="${esc(r.id)}"${r.id===_avRoundId?' selected':''}>${(AV_CATS[r.cat]||{}).icon||''} ${_roundRangeLabel(r)} · ${(AV_CATS[r.cat]||{}).label||r.cat}${r.status==='closed'?' (ปิดแล้ว)':''}</option>`).join('')
-      : '<option value="">— ยังไม่มีรอบขอคิว —</option>';
+    selEl.innerHTML = (visRounds.length
+      ? visRounds.map(r=>`<option value="${esc(r.id)}"${r.id===_avRoundId?' selected':''}>${(AV_CATS[r.cat]||{}).icon||''} ${_roundRangeLabel(r)} · ${(AV_CATS[r.cat]||{}).label||r.cat}${r.status==='closed'?' (ปิดแล้ว)':''}${(r.dateTo&&r.dateTo<_todayIso)?' 🕘':''}</option>`).join('')
+      : '<option value="">— ยังไม่มีรอบขอคิว —</option>')
+      + (expiredRounds.length && !window._avShowOld ? `<option value="__old">🕘 แสดงรอบที่ผ่านไปแล้ว (${expiredRounds.length})</option>`:'')
+      + (window._avShowOld && expiredRounds.length ? `<option value="__hideold">🙈 กลับไปซ่อนรอบที่ผ่านแล้ว</option>`:'');
   }
   const headEl=document.getElementById('av-head');
   const tblEl=document.getElementById('av-table');
@@ -5159,6 +5209,7 @@ function renderAvailability(){
         <button class="btn btn-sm btn-outline" onclick="openDiscordSetup()" title="แก้ ID ห้อง Discord">🐧 ห้อง Discord</button>
         <button class="btn btn-sm btn-outline" onclick="openBulkDiscordLink()" title="ดึงรายชื่อสมาชิกทั้งเซิร์ฟเวอร์มาจับคู่กับทะเบียนทีม ผูกครั้งเดียวจำตลอด">🔗 ผูกทั้งทีม</button>
         <button class="btn btn-sm btn-outline" onclick="showRoundAnnounce('${escJs(r.id)}')">📢 ข้อความประกาศ</button>
+        <button class="btn btn-sm btn-outline" onclick="openEditRoundDates('${escJs(r.id)}')" title="เปิดรอบแล้วใส่วันผิด? แก้ช่วงวันได้ที่นี่ — คำตอบเดิมไม่หาย">✏️ แก้วัน</button>
         <button class="btn btn-sm btn-outline" onclick="avCopyForChat()">📋 คัดลอกสรุป</button>
         <button class="btn btn-sm btn-outline" onclick="closeRound('${escJs(r.id)}')">${r.status==='open'?'🔒 ปิดรอบ':'🔓 เปิดอีกครั้ง'}</button>
         <button class="btn btn-sm btn-outline" style="border-color:rgba(255,64,64,.3);color:var(--red)" onclick="deleteRound('${escJs(r.id)}')">🗑️</button>
@@ -5301,7 +5352,42 @@ function renderAvailability(){
     + pendingHtml;
 }
 
-function avSelectRound(id){ _avRoundId=id; renderAvailability(); }
+function avSelectRound(id){
+  if(id==='__old'){ window._avShowOld=true; renderAvailability(); return; }
+  if(id==='__hideold'){ window._avShowOld=false; renderAvailability(); return; }
+  _avRoundId=id; renderAvailability();
+}
+// ✏️ แก้ช่วงวันของรอบ — ใช้ตอนเปิดรอบแล้วใส่วันผิด
+function openEditRoundDates(roundId){
+  const r=getRound(roundId); if(!r) return;
+  _tagOverlayShow('✏️ แก้ช่วงวันของรอบ', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:10px">คำตอบที่ดึงมาแล้วไม่หาย — ระบบจะตีความวันที่ทีมตอบตามช่วงใหม่นี้</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="erd-from" type="date" value="${esc(r.dateFrom||'')}" class="pr-in" style="width:auto;margin:0">
+      <span style="color:var(--text2);font-size:12px">ถึง</span>
+      <input id="erd-to" type="date" value="${esc(r.dateTo||'')}" class="pr-in" style="width:auto;margin:0">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-green" style="flex:1" onclick="saveRoundDates('${esc(r.id)}')">💾 บันทึกช่วงวันใหม่</button>
+      <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ยกเลิก</button>
+    </div>`, 440);
+}
+async function saveRoundDates(roundId){
+  const f=document.getElementById('erd-from')?.value, t=document.getElementById('erd-to')?.value;
+  if(!f||!t){ toast('เลือกวันให้ครบก่อน','error'); return; }
+  if(t<f){ toast('วันสิ้นสุดต้องไม่น้อยกว่าวันเริ่ม','error'); return; }
+  const list=getRounds(); const r=list.find(x=>x.id===roundId); if(!r) return;
+  r.dateFrom=f; r.dateTo=t;
+  // ข้อความประกาศมีวันเก่าฝังอยู่ — สร้างใหม่จากเทมเพลตให้ตรงช่วงใหม่ (ถ้าเคยแก้เองจะถามก่อน)
+  if(!r.announceText || confirm('อัปเดตข้อความประกาศให้เป็นช่วงวันใหม่ด้วยไหม?\n\nตกลง = สร้างข้อความใหม่จากเทมเพลต (ที่เคยพิมพ์แก้เองจะถูกแทนที่)\nยกเลิก = เก็บข้อความเดิมไว้ แก้เองในกล่องประกาศ')) delete r.announceText;
+  await saveRounds(list);
+  document.getElementById('tag-overlay')?.remove();
+  try{ logAudit('recruit.round',(AV_CATS[r.cat]||{}).label||r.cat,'แก้ช่วงวันเป็น '+_roundRangeLabel(r)); }catch(e){}
+  toast('💾 แก้ช่วงวันแล้ว','success');
+  renderAvailability();
+  // เคยโพสต์ไปแล้ว → เปิดกล่องประกาศให้กดอัปเดตโพสต์ต่อเลย จะได้ไม่ลืม
+  if((Array.isArray(r.posts)&&r.posts.length)||r.postedMessageId) showRoundAnnounce(roundId);
+}
 async function avSet(staffId, field, value){
   if(!_avRoundId) return;
   await saveRoundReply(_avRoundId, staffId, {[field]:value});
@@ -5509,10 +5595,19 @@ function _alcProjCard(p){
   }).join('');
   const mgr=p.managerId ? getStaffById(p.managerId) : null;
   const needs=_alcNeedsPeople(p);
+  // 🔖 โชว์รหัสงาน (G01) เป็นชื่อหลัก — ชื่อเรื่องยาว ๆ เป็นบรรทัดเล็กด้านล่าง
+  const _code=projCode(p);
+  // ⏰ เดทไลน์รายหน้าที่ — เห็นตรงนี้เลยว่างานไหนเร่งส่วนไหน จัดคนเข้าถูก
+  const dlChips=_ASSIGN_PHASES.map(([k,l])=>{
+    const d=p.phases?.[k]?.deadline;
+    return d?'<span style="font-size:9.5px;padding:1px 7px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;white-space:nowrap"><strong>'+l+'</strong> '+_arFmtDM(d)+'</span>':'';
+  }).filter(Boolean).join(' ');
   return '<div class="alc-proj">'
-    +'<div class="alc-proj-n" onclick="openProjDetail(\''+esc(p.id)+'\')" title="'+esc(p.name||'')+' — กดเพื่อเปิดรายละเอียด">📁 '+esc(p.name||'(ไม่มีชื่อ)')+'</div>'
-    +'<div class="alc-proj-m">เดทไลน์ '+_alcDL(p.deadline)+(p.episodes?' · '+esc(p.episodes)+' ตอน':'')+(mgr?' · 🗂️ '+esc(mgr.nickname):'')
+    +'<div class="alc-proj-n" onclick="openProjDetail(\''+esc(p.id)+'\')" title="'+esc(p.name||'')+' — กดเพื่อเปิดรายละเอียด">📁 '+(_code?'<span style="font-weight:800">'+esc(_code)+'</span>':esc(p.name||'(ไม่มีชื่อ)'))+'</div>'
+    +(_code&&p.name?'<div style="font-size:10px;color:var(--accent2);margin:-2px 0 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(p.name)+'">'+esc(p.name)+'</div>':'')
+    +'<div class="alc-proj-m">🏁 '+_alcDL(p.deadline)+(p.episodes?' · '+esc(p.episodes)+' ตอน':'')+(mgr?' · 🗂️ '+esc(mgr.nickname):'')
     +(!needs?' · <span class="alc-chip alc-c-all">✅ ลงคนครบแล้ว</span>':'')+'</div>'
+    +(dlChips?'<div style="display:flex;gap:3px;flex-wrap:wrap;margin:2px 0 4px">'+dlChips+'</div>':'')
     +rows
     +(drafts.length ? '<button class="btn btn-green btn-sm" style="width:100%;margin-top:5px" onclick="alcConfirm(\''+esc(p.id)+'\')">✅ ยืนยัน '+drafts.length+' คน เข้าโปรเจกต์</button>' : '')
     +(p.allocDone
@@ -6055,23 +6150,36 @@ function _prPhaseDL(p,k){
   const tail=p?.phases?.[k]?.deadline2 ? ' · รอบ2 '+fmtDate(p.phases[k].deadline2) : '';
   return fmtDate(v)+(hasT?' | ⏰ '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'):'')+tail;
 }
-function _prFillTpl(p){
+function _prFillTpl(p, tplText){
   const by=_pjDiscordMentions(p);
   const j=k=>(by[k]&&by[k].length)?by[k].join(' / '):'—';
-  const map={
-    '{รหัส}':projCode(p)||p.name||'', '{ชื่อ}':p.name||'',
-    '{ไดรฟ์}':p.downloadLink||p.driveFolderLink||'—',
-    '{ตอน}':p.episodes||'—', '{นาที}':p.duration||'—',
-    '{เดทไลน์}':p.deadline?fmtDate(p.deadline):'—',
-    '{ทีมบท}':j('adp'), '{นักพากย์}':j('dub'), '{ทีมมิกซ์}':j('mix'), '{ทีมQC}':j('qc'), '{ทีมซับ}':j('sub'), '{ทีมแปล}':j('trn'), '{เมเนเจอร์}':j('mgr'),
-    '{จำนวนพากย์}':(by.dub||[]).length||'—', '{จำนวนบท}':(by.adp||[]).length||'—',
-    '{เดทไลน์บท}':_prPhaseDL(p,'adaptation'), '{เดทไลน์พากย์}':_prPhaseDL(p,'dubbing'),
-    '{เดทไลน์QC}':_prPhaseDL(p,'qc'), '{เดทไลน์มิกซ์}':_prPhaseDL(p,'mix'),
-    '{เดทไลน์ซับ}':_prPhaseDL(p,'subVideo'), '{เดทไลน์แปล}':_prPhaseDL(p,'translation'),
-    '{หมายเหตุ}':(p.note||'').trim()||'—',
+  // แท็กทีมทั้งหมดของโปรเจกต์ (ไม่ซ้ำคน) — สำหรับช่อง (แท็ก)
+  const allTags=[...new Set(Object.values(by).flat())].join(' ')||'—';
+  const drive=p.driveFolderLink||p.downloadLink||'—';
+  // 🔑 ชื่อช่อง → ค่า · ใช้ได้ทั้ง {ชื่อช่อง} และ (ชื่อช่อง) — เทมเพลตที่เจ้าของเขียนเองใส่วงเล็บได้เลย
+  //    ส่วนไหนของเทมเพลตที่ไม่มีวงเล็บ ระบบไม่แตะต้อง
+  const vals={
+    'รหัส':projCode(p)||p.name||'',
+    'ชื่อ':(projCode(p)?projCode(p)+(p.name?' '+p.name:''):(p.name||'')),
+    'ชื่อเรื่อง':p.name||'',
+    'ไดรฟ์':drive, 'ไฟล์':drive, 'ลิงก์':drive,
+    'ตอน':p.episodes||'—', 'ep':p.episodes||'—', 'Ep':p.episodes||'—', 'EP':p.episodes||'—',
+    'นาที':p.duration||'—', 'เวลา':p.duration||'—', 'time':p.duration||'—',
+    'งบ':fmtB(p.budget||0), 'เงิน':fmtB(p.budget||0), 'ราคา':fmtB(p.budget||0),
+    'เดทไลน์':p.deadline?fmtDate(p.deadline):'—',
+    'ทีมบท':j('adp'), 'นักพากย์':j('dub'), 'ทีมมิกซ์':j('mix'), 'ทีมQC':j('qc'), 'ทีมซับ':j('sub'), 'ทีมแปล':j('trn'), 'เมเนเจอร์':j('mgr'),
+    'แท็ก':allTags, 'แท็กทีม':allTags,
+    'จำนวนพากย์':(by.dub||[]).length||'—', 'จำนวนบท':(by.adp||[]).length||'—',
+    'เดทไลน์บท':_prPhaseDL(p,'adaptation'), 'เดทไลน์พากย์':_prPhaseDL(p,'dubbing'),
+    'เดทไลน์QC':_prPhaseDL(p,'qc'), 'เดทไลน์มิกซ์':_prPhaseDL(p,'mix'),
+    'เดทไลน์ซับ':_prPhaseDL(p,'subVideo'), 'เดทไลน์แปล':_prPhaseDL(p,'translation'),
+    'หมายเหตุ':(p.note||'').trim()||'—',
   };
-  let t=getProjPostTplFor(p);
-  Object.entries(map).forEach(([k,v])=>{ t=t.split(k).join(String(v)); });
+  let t=(tplText!=null)?String(tplText):getProjPostTplFor(p);
+  Object.entries(vals).forEach(([k,v])=>{
+    t=t.split('{'+k+'}').join(String(v));
+    t=t.split('('+k+')').join(String(v));
+  });
   return t;
 }
 // ✂️ แบ่งข้อความยาวเป็นก้อน ๆ ละไม่เกิน 1,900 ตัวอักษร (ลิมิต Discord = 2,000) — ตัดตามบรรทัด ไม่ตัดกลางคำ
@@ -6106,8 +6214,8 @@ function openProjPostTplEditor(selId){
     <div class="pr-lbl">ชื่อชุดเทมเพลต</div>
     <input id="prtpl-name" class="pr-in" value="${esc(cur.name||'')}" placeholder="เช่น หนังคน / หนังAI / งานด่วน">
     <div style="font-size:11px;color:var(--text2);line-height:1.7;margin:8px 0">
-      ช่องที่ระบบเติมให้เอง: <code>{รหัส} {ชื่อ} {ไดรฟ์} {ตอน} {นาที} {เดทไลน์} {ทีมบท} {นักพากย์} {ทีมมิกซ์} {ทีมQC} {ทีมซับ} {ทีมแปล} {เมเนเจอร์} {จำนวนพากย์} {เดทไลน์บท} {เดทไลน์พากย์} {เดทไลน์QC} {เดทไลน์มิกซ์} {เดทไลน์ซับ} {หมายเหตุ}</code><br>
-      🏷️ พิมพ์ <code>@ชื่อโรล</code> ให้ตรงกับชื่อโรลในเซิร์ฟเวอร์ (เช่น @นักพากย์ชาย) — ตอนโพสต์ระบบจะแปลงเป็นแท็กโรลจริงที่ ping ได้<br>
+      ช่องที่ระบบเติมให้เอง — ใช้ <strong>วงเล็บ ( )</strong> หรือปีกกา { } ก็ได้: <code>(รหัส) (ชื่อ) (ชื่อเรื่อง) (ไฟล์)/(ไดรฟ์)/(ลิงก์) (ตอน)/(ep) (นาที)/(time) (งบ)/(เงิน) (เดทไลน์) (ทีมแปล) (ทีมบท) (นักพากย์) (ทีมมิกซ์) (ทีมQC) (ทีมซับ) (เมเนเจอร์) (แท็ก)=แท็กทีมทั้งงาน (จำนวนพากย์) (เดทไลน์บท) (เดทไลน์พากย์) (เดทไลน์QC) (เดทไลน์มิกซ์) (เดทไลน์ซับ) (เดทไลน์แปล) (หมายเหตุ)</code> — ข้อความส่วนที่ไม่มีวงเล็บ ระบบไม่แตะ<br>
+      🏷️ พิมพ์ <code>@ชื่อโรล</code> ให้ตรงกับชื่อโรลในเซิร์ฟเวอร์ (เช่น @นักพากย์ชาย) — ตอนโพสต์ระบบแปลงเป็นแท็กโรลจริงที่ ping ทั้งโรลโดยไม่ต้องแท็กรายคน<br>
       🔗 ฝังลิงก์ในคำได้: <code>[คำที่ให้กด](https://ลิงก์)</code> — หรือกดปุ่ม "แทรกลิงก์" ด้านล่าง
     </div>
     <textarea id="prtpl-text" rows="13" class="pr-in" style="line-height:1.6;resize:vertical">${esc(cur.text||'')}</textarea>
@@ -6195,7 +6303,7 @@ function renderProjRoom(){
     </div></div>`;
   if(!p){ el.innerHTML=sel+'<div style="color:var(--text2);font-size:12.5px;padding:6px 2px">เลือกโปรเจกต์ก่อน แล้วขั้นตอนสร้างห้อง+โพสต์จะโผล่ที่นี่ · โปรเจกต์ที่มี 🐧 = สร้างห้องแล้ว</div>'; return; }
   const has=!!p.discordChannelId;
-  const emoji=ls('projroom_emoji')||'❤️';
+  const emoji=ls('projroom_emoji')||'🟡';
   const carer=(p.managerId&&mgrs[p.managerId])||currentUser?.nickname||'';
   const step2 = has
     ? `<div class="pr-step"><div class="pr-step-t">2️⃣ ห้องของโปรเจกต์นี้ <span class="alc-chip alc-c-all">✅ สร้างแล้ว</span>${p.discordPrivate?' <span class="alc-chip" style="background:rgba(150,154,180,.18)">🔒 ส่วนตัว</span>':''}</div>
@@ -6216,7 +6324,10 @@ function renderProjRoom(){
               <label style="cursor:pointer"><input type="radio" name="pr-kind" value="ai" onchange="_prComposeCat()"> หนังAI</label>
               <label style="cursor:pointer"><input type="radio" name="pr-kind" value="none" checked onchange="_prComposeCat()"> ไม่ระบุ</label>
             </div></div>
-          <div style="flex:1;min-width:130px"><div class="pr-lbl">ใครดูแล</div><input id="pr-carer" class="pr-in" value="${esc(carer)}" oninput="_prComposeCat()"></div>
+          <div style="flex:1;min-width:130px"><div class="pr-lbl">ใครดูแล</div>
+            <select id="pr-carer" class="pr-in" onchange="_prComposeCat()">
+              ${[...new Set(['แอดมิน', ...Object.values(mgrs).filter(Boolean), ...(carer?[carer]:[])])].map(n=>`<option${n===carer?' selected':''}>${esc(n)}</option>`).join('')}
+            </select></div>
         </div>
         <div class="pr-lbl">ชื่อหมวดหมู่ (แก้เองได้)</div>
         <input id="pr-catname" class="pr-in" value="">
@@ -6230,19 +6341,26 @@ function renderProjRoom(){
       </div>`;
   const tpls=getPostTpls();
   const curTplId=(p.postTplId&&tpls.some(t=>t.id===p.postTplId))?p.postTplId:tpls[0].id;
-  const step3=`<div class="pr-step"><div class="pr-step-t">3️⃣ โพสต์คู่มืองาน ${p.discordMsgId?'<span class="alc-chip alc-c-all">เคยโพสต์แล้ว — กดอัปเดตจะแก้โพสต์เดิม</span>':''}</div>
+  const hasDraft=!!(p.postDraft&&String(p.postDraft).trim());
+  const draftProjs=list.filter(x=>x.postDraft&&String(x.postDraft).trim());
+  const step3=`<div class="pr-step"><div class="pr-step-t">3️⃣ โพสต์คู่มืองาน ${p.discordMsgId?'<span class="alc-chip alc-c-all">เคยโพสต์แล้ว — กดอัปเดตจะแก้โพสต์เดิม</span>':''}${hasDraft?' <span class="alc-chip" style="background:rgba(255,158,0,.16);color:var(--orange)">📝 มีข้อความที่แก้เก็บไว้</span>':''}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:7px">
       <span style="font-size:11.5px;color:var(--text2)">ชุดเทมเพลต:</span>
-      <select class="pr-in" style="flex:1;min-width:150px;margin:0" onchange="prSetTpl('${esc(p.id)}',this.value)">
+      <select class="pr-in" style="flex:1;min-width:140px;margin:0" onchange="prSetTpl('${esc(p.id)}',this.value)" title="เลือกชุดเทมเพลตตั้งต้นของโปรเจกต์นี้">
         ${tpls.map(t=>`<option value="${esc(t.id)}"${t.id===curTplId?' selected':''}>${esc(t.name||'ไม่มีชื่อ')}</option>`).join('')}
       </select>
-      ${currentUser?.role==='admin'?`<button class="btn btn-outline btn-sm" onclick="openProjPostTplEditor()" title="เพิ่ม/แก้/ลบชุดเทมเพลต">⚙️ จัดการเทมเพลต</button>`:''}
+      <select class="pr-in" style="flex:1;min-width:150px;margin:0" onchange="prLoadSavedDraft(this)" title="ข้อความที่เคยแก้/โพสต์ของแต่ละงาน — เลือกเพื่อดึงมาดู/แก้ต่อ">
+        <option value="">📝 ข้อความที่เคยแก้ไว้ (${draftProjs.length})</option>
+        ${draftProjs.map(x=>`<option value="${esc(x.id)}">${esc(projCode(x)||x.name||'')}${x.id===p.id?' (งานนี้)':''}</option>`).join('')}
+      </select>
+      ${currentUser?.role==='admin'?`<button class="btn btn-outline btn-sm" onclick="openProjPostTplEditor()" title="เพิ่ม/แก้/ลบชุดเทมเพลต">⚙️</button>`:''}
     </div>
-    <textarea id="pr-post" rows="13" class="pr-in" style="line-height:1.6;resize:vertical">${esc(_prFillTpl(p))}</textarea>
+    <textarea id="pr-post" rows="13" class="pr-in" style="line-height:1.6;resize:vertical">${esc(hasDraft?p.postDraft:_prFillTpl(p))}</textarea>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       ${has?`<button class="btn btn-green" style="flex:1" onclick="postProjRoomMsg('${esc(p.id)}')">📣 ${p.discordMsgId?'อัปเดตโพสต์ (แก้โพสต์เดิม)':'โพสต์ลง #project'}</button>`:'<span style="font-size:11.5px;color:var(--text2);align-self:center">สร้างห้องก่อน (ขั้นที่ 2) แล้วปุ่มโพสต์จะใช้ได้ — หรือแก้ข้อความในกล่องได้เลย จะถูกใช้ตอนสร้างห้อง</span>'}
-      <button class="btn btn-outline btn-sm" onclick="prInsertMention()" title="เลือกคนจากทะเบียนทีม แทรกแท็กลงข้อความตรงตำแหน่งเคอร์เซอร์ — คนที่ผูก Discord แล้วจะถูก ping จริง">👤 แท็กคน</button>
-      <button class="btn btn-outline btn-sm" onclick="renderProjRoom()" title="ดึงข้อมูลล่าสุดของโปรเจกต์มาเติมเทมเพลตใหม่ (ทับที่แก้ไว้ในกล่อง)">↻ รีเฟรชจากเทมเพลต</button>
+      <button class="btn btn-blue btn-sm" onclick="prInsertMention()" title="เลือกคนแทรกแท็กลงข้อความ — ขึ้นเฉพาะทีมของงานนี้ก่อน คนที่ผูก Discord แล้ว ping จริง">👤 แท็กคน</button>
+      <button class="btn btn-outline btn-sm" onclick="prSaveDraft('${esc(p.id)}')" title="เก็บข้อความในกล่องไว้กับงานนี้ — กลับมาแก้ต่อทีหลังได้ ไม่หาย (ตอนกดโพสต์ระบบก็เก็บให้อัตโนมัติ)">💾 เก็บข้อความ</button>
+      <button class="btn btn-outline btn-sm" onclick="prResetDraft('${esc(p.id)}')" title="ทิ้งข้อความที่แก้ไว้ แล้วเติมใหม่จากเทมเพลต+ข้อมูลล่าสุดของงาน">↻ รีเฟรชจากเทมเพลต</button>
     </div></div>`;
   el.innerHTML=sel+step2+step3;
   if(!has) _prComposeCat();
@@ -6291,6 +6409,52 @@ async function prCreateTalk(projId){
 // เลือกชุดเทมเพลตของโปรเจกต์นี้ (จำถาวรใน p.postTplId)
 async function prSetTpl(projId, tplId){
   await saveProjectMerge(projId, f=>{ f.postTplId=tplId; });
+  const p=getProjects().find(x=>x.id===projId);
+  if(p&&p.postDraft&&String(p.postDraft).trim()) toast('งานนี้มีข้อความที่แก้เก็บไว้ — กด "↻ รีเฟรชจากเทมเพลต" ถ้าอยากเริ่มใหม่จากชุดที่เพิ่งเลือก','info');
+  renderProjRoom();
+}
+// ══ 📝 ข้อความที่แก้ไว้ต่อโปรเจกต์ (p.postDraft) — แก้แล้วไม่หาย กลับมาแก้ต่อได้ ══
+async function prSaveDraft(projId){
+  const txt=String(document.getElementById('pr-post')?.value||'').trim();
+  if(!txt){ toast('กล่องข้อความว่าง','warn'); return; }
+  await saveProjectMerge(projId, f=>{ f.postDraft=txt; });
+  toast('💾 เก็บข้อความไว้กับงานนี้แล้ว — กลับมาแก้ต่อได้ตลอด','success');
+  renderProjRoom();
+}
+async function prResetDraft(projId){
+  const p=getProjects().find(x=>x.id===projId);
+  if(p&&p.postDraft&&String(p.postDraft).trim()){
+    if(!confirm('ทิ้งข้อความที่แก้ไว้ แล้วเติมใหม่จากเทมเพลต+ข้อมูลล่าสุดของงาน?')) return;
+    await saveProjectMerge(projId, f=>{ delete f.postDraft; });
+  }
+  renderProjRoom();
+}
+// เลือกจากดร็อปดาวน์ "ข้อความที่เคยแก้ไว้" → เปิดดู แล้วเลือกได้ว่าจะใส่กล่อง หรือลบทิ้งจากลิสต์
+function prLoadSavedDraft(sel){
+  const pid=sel.value; sel.selectedIndex=0;
+  if(!pid) return;
+  const p=getProjects().find(x=>x.id===pid);
+  if(!p||!p.postDraft) return;
+  _tagOverlayShow('📝 ข้อความของ '+esc(projCode(p)||p.name||''), `
+    <textarea rows="12" readonly class="pr-in" style="line-height:1.6;resize:vertical;opacity:.9">${esc(p.postDraft)}</textarea>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-blue" style="flex:1" onclick="prUseSavedDraft('${esc(p.id)}')">⬇️ ใส่ในกล่องข้อความ (เอามาแก้ต่อ)</button>
+      <button class="btn btn-outline btn-sm" style="border-color:rgba(255,64,64,.35);color:var(--red)" onclick="prDeleteSavedDraft('${esc(p.id)}')" title="ลบออกจากลิสต์เท่านั้น — โพสต์ใน Discord ไม่ถูกแตะ">🗑️ ลบออกจากลิสต์</button>
+      <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
+    </div>`, 560);
+}
+function prUseSavedDraft(pid){
+  const p=getProjects().find(x=>x.id===pid);
+  const ta=document.getElementById('pr-post');
+  document.getElementById('tag-overlay')?.remove();
+  if(p&&ta&&p.postDraft){ ta.value=p.postDraft; toast('⬇️ ใส่ในกล่องแล้ว — แก้ต่อได้เลย','success'); }
+}
+async function prDeleteSavedDraft(pid){
+  const p=getProjects().find(x=>x.id===pid);
+  if(!confirm('ลบข้อความที่เก็บไว้ของ "'+(p?(projCode(p)||p.name||''):'')+'" ออกจากลิสต์?\n\nโพสต์จริงใน Discord ไม่ถูกแตะ — แค่ไม่เก็บข้อความนี้ในเว็บแล้ว')) return;
+  await saveProjectMerge(pid, f=>{ delete f.postDraft; });
+  document.getElementById('tag-overlay')?.remove();
+  toast('🗑️ ลบออกจากลิสต์แล้ว','info');
   renderProjRoom();
 }
 // 🔗 ผูกห้องที่สร้างเองใน Discord กับโปรเจกต์ — สำหรับหมวดที่ทีมสร้างมือไว้ก่อนแล้ว
@@ -6321,7 +6485,8 @@ async function prPickExisting(projId, chId, chName){
 async function postProjRoomMsg(projId){
   const p=getProjects().find(x=>x.id===projId);
   if(!p||!p.discordChannelId){ toast('ยังไม่มีห้อง — สร้างห้องก่อน','warn'); return; }
-  let txt=String(document.getElementById('pr-post')?.value||_prFillTpl(p)).trim();
+  const rawTxt=String(document.getElementById('pr-post')?.value||_prFillTpl(p)).trim();
+  let txt=rawTxt;
   if(!txt){ toast('ข้อความว่าง','error'); return; }
   showLoader(true);
   try{
@@ -6351,29 +6516,69 @@ async function postProjRoomMsg(projId){
         newIds.push(r.messageId);
       }
     }
-    await saveProjectMerge(projId, f=>{ f.discordMsgId=newIds[0]||''; f.discordMsgIds=newIds; });
+    // 📝 เก็บข้อความที่โพสต์ไว้กับงานนี้ด้วย (ฉบับก่อนแปลงแท็กโรล) — กลับมาแก้ต่อได้ ไม่ต้องเขียนใหม่
+    await saveProjectMerge(projId, f=>{ f.discordMsgId=newIds[0]||''; f.discordMsgIds=newIds; f.postDraft=rawTxt; });
     toast('📣 '+(oldIds.length?'อัปเดตโพสต์แล้ว':'โพสต์คู่มือแล้ว')+(chunks.length>1?' ('+chunks.length+' ก้อนต่อกัน)':''),'success');
     try{ logAudit('project.discord', p.name, 'โพสต์/อัปเดตคู่มืองานใน Discord ('+chunks.length+' ก้อน)'); }catch(e){}
     renderProjRoom();
   }catch(e){
-    toast(String(e.message||'').includes('ไม่พบห้อง')
-      ? 'ห้องนี้ถูกลบไปแล้วใน Discord — กดปุ่ม "🔄 สร้างห้องชุดใหม่" แล้วสร้างใหม่ได้เลย'
-      : 'โพสต์ไม่สำเร็จ: '+e.message,'error');
+    if(String(e.message||'').includes('ไม่พบห้อง')){
+      showLoader(false);
+      if(confirm('⚠️ ห้องนี้ถูกลบไปแล้วใน Discord\n\nให้บอทสร้างหมวด+ห้องชุดใหม่ แล้วโพสต์ข้อความนี้ให้เลยไหม?')){
+        await prAutoRecreate(projId, rawTxt);
+        return;
+      }
+      toast('ห้องถูกลบไปแล้ว — กด "🔄 สร้างห้องชุดใหม่" เมื่อพร้อม','warn');
+    } else {
+      toast('โพสต์ไม่สำเร็จ: '+e.message,'error');
+    }
   }
+  finally{ showLoader(false); }
+}
+// 🔄 ห้องถูกลบ → สร้างหมวด+ห้องชุดใหม่ด้วยชื่อเดิม แล้วโพสต์ข้อความเดิมให้อัตโนมัติ
+async function prAutoRecreate(projId, rawTxt){
+  const p=getProjects().find(x=>x.id===projId); if(!p) return;
+  const cat=(p.discordCategoryName||((ls('projroom_emoji')||'🟡')+(projCode(p)||p.name||''))).trim();
+  const priv=(p.discordPrivate!==false);   // ไม่เคยตั้ง = ส่วนตัว (ค่าเริ่มต้นของระบบ)
+  showLoader(true);
+  try{
+    const c1=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'📁│project', ...(priv?{private:true}:{})});
+    let c2=null; try{ c2=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'🎙│พูดคุย', ...(priv?{private:true}:{})}); }catch(e){}
+    await saveProjectMerge(projId, f=>{
+      f.discordCategoryName=cat; f.discordChannelId=c1.channelId; f.discordChannelName=c1.channelName||'📁│project';
+      f.discordPrivate=priv; f.discordTalkId=c2?c2.channelId:''; f.discordMsgId=''; f.discordMsgIds=[];
+      if(rawTxt) f.postDraft=rawTxt;
+    });
+    try{ logAudit('project.discord', cat, 'ห้องเดิมถูกลบ — สร้างหมวด+ห้องชุดใหม่อัตโนมัติ'); }catch(e){}
+    toast('🔄 สร้างห้องชุดใหม่แล้ว — กำลังโพสต์ข้อความเดิม...','info');
+    renderProjRoom();
+    const ta=document.getElementById('pr-post'); if(ta&&rawTxt) ta.value=rawTxt;
+    await postProjRoomMsg(projId);
+  }catch(e){ toast('สร้างห้องใหม่ไม่สำเร็จ: '+e.message,'error'); }
   finally{ showLoader(false); }
 }
 // 👤 ปุ่มแท็กคน — เลือกจากทะเบียนแล้วแทรกแท็กลงกล่องข้อความตรงตำแหน่งเคอร์เซอร์
 //    ผูก Discord แล้ว → แทรก <@id> (ping จริงตอนโพสต์) · ยังไม่ผูก → แทรกเป็น @ชื่อ ธรรมดา
-function prInsertMention(){
+function prInsertMention(showAll){
   const ta=document.getElementById('pr-post');
   if(!ta){ toast('เลือกโปรเจกต์ก่อน','warn'); return; }
   window._prMentionPos={s:ta.selectionStart??ta.value.length, e:ta.selectionEnd??ta.value.length};
   const all=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s&&s.id&&isStaffAssignable(s));
   const seen=new Set();
-  const opts=all.filter(s=>{ if(seen.has(s.id))return false; seen.add(s.id); return true; })
+  let opts=all.filter(s=>{ if(seen.has(s.id))return false; seen.add(s.id); return true; })
     .sort((a,b)=>((b.discordId?1:0)-(a.discordId?1:0)) || String(a.nickname||a.name||'').localeCompare(String(b.nickname||b.name||''),'th'));
-  _tagOverlayShow('👤 แท็กคนลงข้อความ', `
-    <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:8px">กดชื่อ = แทรกแท็กตรงจุดที่พิมพ์ค้างไว้ · 🔗 = ผูก Discord แล้ว จะ ping จริง · คนที่ยังไม่ผูกจะแทรกเป็นชื่อเฉย ๆ (ไม่ ping — ผูกได้ที่ปุ่ม "🔗 ผูกทั้งทีมกับ Discord")</div>
+  // 🎯 ค่าเริ่มต้น: ขึ้นเฉพาะทีมที่ถูกจัดเข้างานนี้แล้ว (จากหน้าจัดสรรคน) — กดสลับดูทั้งทะเบียนได้
+  const proj=getProjects().find(x=>x.id===_prSel);
+  const teamIds=new Set(((proj&&proj.workers)||[]).map(w=>w&&w.id).filter(Boolean));
+  const teamOnly=!showAll && teamIds.size>0;
+  if(teamOnly) opts=opts.filter(s=>teamIds.has(s.id));
+  _tagOverlayShow('👤 แท็กคนลงข้อความ'+(teamOnly?' — ทีมของงานนี้':''), `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:8px">กดชื่อ = แทรกแท็กตรงจุดที่พิมพ์ค้างไว้ · 🔗 = ผูก Discord แล้ว จะ ping จริง · คนที่ยังไม่ผูกจะแทรกเป็นชื่อเฉย ๆ (ไม่ ping)</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      ${teamOnly
+        ? `<button class="btn btn-outline btn-sm" onclick="prInsertMention(true)">👥 แสดงทุกคนในทะเบียน</button>`
+        : (teamIds.size?`<button class="btn btn-outline btn-sm" onclick="prInsertMention()">🎯 เฉพาะทีมของงานนี้ (${teamIds.size})</button>`:'<span style="font-size:11px;color:var(--orange)">งานนี้ยังไม่มีทีม — จัดคนได้ที่หน้า 🎯 จัดสรรคน</span>')}
+    </div>
     <input placeholder="🔍 ค้นหาชื่อ..." class="pr-in" style="margin-bottom:8px" oninput="var q=this.value.toLowerCase();[...document.querySelectorAll('.prm-row')].forEach(function(r){r.style.display=r.dataset.nm.indexOf(q)>=0?'flex':'none'})">
     <div style="max-height:340px;overflow-y:auto">
       ${opts.map(s=>`<div class="prm-row" data-nm="${esc(((s.nickname||'')+' '+(s.name||'')).toLowerCase())}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border2)">
@@ -6439,10 +6644,17 @@ async function callDrive(payload){
   const acct=_drActive(cfg);
   if(!(acct.url||'').trim()) throw new Error('ยังไม่ได้ตั้งค่า — กดปุ่ม 🔧 ตั้งค่า Drive');
   const res=await fetch(acct.url.trim(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({secret:(acct.secret||'').trim(),...payload})});
-  let d; try{ d=await res.json(); }catch(e){ throw new Error('Apps Script ตอบผิดรูปแบบ — เช็คว่า Deploy เป็น Web App แล้ว (ทุกคนเข้าถึงได้)'); }
+  let d; try{ d=await res.json(); }catch(e){ throw new Error('Apps Script ตอบผิดรูปแบบ — ถ้าเป็นเฉพาะบางคน: ตอน Deploy ต้องตั้ง "ผู้มีสิทธิ์เข้าถึง = ทุกคน (Anyone)" ไม่ใช่เฉพาะฉัน แล้ว Deploy เวอร์ชันใหม่'); }
   if(!d.ok) throw new Error(d.error||'ไม่ทราบสาเหตุ');
   return d;
 }
+// 🔄 ตั้งค่าไดรฟ์เปลี่ยนจากเครื่องอื่น (เช่น แอดมินเพิ่มโฟลเดอร์หลัก) → หน้านี้รีเฟรชเองทันที ทุกคนเห็นชุดเดียวกัน
+window.addEventListener('guindatachange', e=>{
+  if(e.detail && e.detail.key==='drivecfg'){
+    const pg=document.getElementById('page-drive');
+    if(pg && !pg.classList.contains('hidden')) try{ renderDrivePage(); }catch(_){}
+  }
+});
 function _drIdFromLink(s){ const m=String(s||'').match(/[-\w]{25,}/); return m?m[0]:String(s||'').trim(); }
 function openDriveSetup(){
   if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
@@ -6514,12 +6726,18 @@ async function drAddParent(){
 async function drLoadSubs(silent){
   if(!_drParent){ if(!silent) toast('เลือกโฟลเดอร์หลักก่อน','warn'); return; }
   if(!silent) showLoader(true);
+  window._drSubsErr='';
   try{
     const d=await callDrive({action:'list', parentId:_drParent});
     _drSubs=d.folders||[];
     if(!silent) toast('🔄 พบ '+_drSubs.length+' โฟลเดอร์','success');
     renderDrivePage();
-  }catch(e){ if(!silent) toast('โหลดไม่ได้: '+e.message,'error'); }
+  }catch(e){
+    // ห้ามเงียบ — บางคนเจอ "หมวดไม่ขึ้น" เพราะโหลดพลาดแบบไม่มีใครบอก
+    window._drSubsErr=String(e.message||e);
+    renderDrivePage();
+    if(!silent) toast('โหลดไม่ได้: '+e.message,'error');
+  }
   finally{ if(!silent) showLoader(false); }
 }
 // 📂 เปิดดูโฟลเดอร์ในไดรฟ์จริง แล้วคลิกเลือกเป็นโฟลเดอร์หลักได้เลย (ไม่ต้องวางลิงก์)
@@ -6590,7 +6808,7 @@ async function drCreateFolders(){
   const projName=(document.getElementById('dr-projname')?.value||'').trim();
   if(!projName){ toast('ตั้งชื่อโฟลเดอร์งานก่อน','error'); return; }
   const code=_drCodeOf(p);
-  const tplTxt=getDriveCfg().tpl||_DR_TPL_DEFAULT;
+  const tplTxt=_drTplText();   // เทมเพลตเฉพาะรหัสของงานนี้ (ถ้ามี) ไม่งั้นเทมเพลตกลาง
   const checked=[...document.querySelectorAll('#dr-tplchecks input:checked')].map(x=>+x.value);
   const all=_drParseTpl(tplTxt, code, p.name||'');
   const items=checked.length?all.filter((_,i)=>checked.includes(i)):all;
@@ -6632,9 +6850,76 @@ async function drRefreshProjFolders(silent){
   finally{ if(!silent) showLoader(false); }
 }
 async function drRefreshProjFoldersSilent(){ try{ await drRefreshProjFolders(true); }catch(e){} }
-// ══ เทมเพลตโฟลเดอร์แบบรายการ — แก้/ลบ/เพิ่มเป็นรายบรรทัด เก็บโครงเดิมใน cfg.tpl (บรรทัดขึ้นต้น "-" = ย่อย) ══
-function _drTplLines(){ return String(getDriveCfg().tpl||_DR_TPL_DEFAULT).split('\n').filter(l=>l.trim()); }
-async function _drTplSave(lines){ const cfg=getDriveCfg(); cfg.tpl=lines.join('\n'); await saveDriveCfg(cfg); renderDrivePage(); }
+// ══ เทมเพลตโฟลเดอร์แบบรายการ — แก้/ลบ/เพิ่มเป็นรายบรรทัด (บรรทัดขึ้นต้น "-" = ย่อย) ══
+//    มีได้ 2 ระดับ: เทมเพลตกลาง (cfg.tpl) + เทมเพลตเฉพาะรหัส (cfg.tplByCode = {G:'...'}) — งานรหัส G ใช้ของ G อัตโนมัติ
+function _drCurCode(){
+  const p=getProjects().find(x=>x.id===_drSel);
+  return (p&&p.clientCode||'').trim().toUpperCase();
+}
+function _drTplScopeCode(){
+  const c=_drCurCode();
+  const cfg=getDriveCfg();
+  return (c && cfg.tplByCode && cfg.tplByCode[c]!=null) ? c : '';
+}
+function _drTplText(){
+  const cfg=getDriveCfg(); const sc=_drTplScopeCode();
+  return String((sc?cfg.tplByCode[sc]:cfg.tpl)||_DR_TPL_DEFAULT);
+}
+function _drTplLines(){ return _drTplText().split('\n').filter(l=>l.trim()); }
+async function _drTplSave(lines){
+  const cfg=getDriveCfg(); const sc=_drTplScopeCode();
+  if(sc){ cfg.tplByCode=cfg.tplByCode||{}; cfg.tplByCode[sc]=lines.join('\n'); }
+  else cfg.tpl=lines.join('\n');
+  await saveDriveCfg(cfg); renderDrivePage();
+}
+// แยกเทมเพลตเฉพาะรหัสของงานที่เลือกอยู่ (เริ่มจากก๊อปเทมเพลตกลาง แล้วแก้ได้อิสระ ไม่กระทบรหัสอื่น)
+async function drTplMakeCode(){
+  const c=_drCurCode();
+  if(!c){ toast('งานนี้ยังไม่มีรหัสลูกค้า — ตั้งรหัสในหน้ามอบหมายงานก่อน','warn'); return; }
+  const cfg=getDriveCfg(); cfg.tplByCode=cfg.tplByCode||{};
+  if(cfg.tplByCode[c]!=null){ toast('รหัส '+c+' มีเทมเพลตเฉพาะอยู่แล้ว','info'); return; }
+  cfg.tplByCode[c]=String(cfg.tpl||_DR_TPL_DEFAULT);
+  await saveDriveCfg(cfg);
+  toast('➕ สร้างเทมเพลตเฉพาะรหัส '+c+' แล้ว — แก้รายการด้านล่างได้เลย ไม่กระทบรหัสอื่น','success');
+  renderDrivePage();
+}
+async function drTplDelCode(){
+  const sc=_drTplScopeCode(); if(!sc) return;
+  if(!confirm('ลบเทมเพลตเฉพาะรหัส '+sc+' ?\n(งานรหัสนี้จะกลับไปใช้เทมเพลตกลาง)')) return;
+  const cfg=getDriveCfg(); delete cfg.tplByCode[sc];
+  await saveDriveCfg(cfg);
+  toast('🗑️ ลบแล้ว — กลับไปใช้เทมเพลตกลาง','info');
+  renderDrivePage();
+}
+// ⚙️ จัดการรายการโฟลเดอร์หลักในดร็อปดาวน์ — เปลี่ยนชื่อเรียก/เอาออกจากลิสต์ (ตัวโฟลเดอร์ในไดรฟ์ไม่ถูกลบ)
+function drManageParents(){
+  const cfg=getDriveCfg(); const arr=cfg[_drParentsKey()]||[];
+  const rows=arr.map((x,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border2)">
+    <span style="flex:1;min-width:0;font-size:13px">📂 ${esc(x.name||x.id)}</span>
+    <button class="btn btn-sm btn-outline" onclick="drParentRename(${i})">✏️ เปลี่ยนชื่อ</button>
+    <button class="btn btn-sm btn-outline" style="border-color:rgba(255,64,64,.35);color:var(--red)" onclick="drParentRemove(${i})">🗑️ เอาออก</button>
+  </div>`).join('');
+  _tagOverlayShow('⚙️ จัดการโฟลเดอร์หลัก', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:8px">แก้ชื่อเรียกในดร็อปดาวน์ หรือเอาออกจากลิสต์ — <strong>ตัวโฟลเดอร์จริงในไดรฟ์ไม่ถูกลบ</strong> · ลิสต์นี้ทุกคนเห็นชุดเดียวกัน (ซิงก์อัตโนมัติ)</div>
+    ${rows||'<div style="color:var(--text2);text-align:center;padding:14px">ยังไม่มีโฟลเดอร์หลัก — กด 📂 เลือกจากไดรฟ์</div>'}
+    <div style="display:flex;margin-top:10px"><button class="btn btn-outline" style="flex:1" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button></div>`, 460);
+}
+async function drParentRename(i){
+  const cfg=getDriveCfg(); const arr=cfg[_drParentsKey()]||[]; const x=arr[i]; if(!x) return;
+  const nw=prompt('ชื่อเรียกใหม่:', x.name||''); if(!nw||!nw.trim()) return;
+  x.name=nw.trim();
+  await saveDriveCfg(cfg);
+  drManageParents(); renderDrivePage();
+}
+async function drParentRemove(i){
+  const cfg=getDriveCfg(); const pk=_drParentsKey(); const arr=cfg[pk]||[]; const x=arr[i]; if(!x) return;
+  if(!confirm('เอา "'+(x.name||x.id)+'" ออกจากลิสต์?\n(โฟลเดอร์ในไดรฟ์ไม่ถูกลบ — เพิ่มกลับได้ทีหลัง)')) return;
+  arr.splice(i,1);
+  if(cfg[_drDefKey()]===x.id) delete cfg[_drDefKey()];
+  if(_drParent===x.id){ _drParent=''; _drSub=''; _drSubs=[]; }
+  await saveDriveCfg(cfg);
+  drManageParents(); renderDrivePage();
+}
 async function drTplEdit(i){
   const lines=_drTplLines(); const cur=lines[i]; if(cur===undefined) return;
   const isSub=/^-/.test(cur.trim());
@@ -6734,18 +7019,29 @@ function renderDrivePage(){
           </select></div>
         <button class="btn btn-blue btn-sm" onclick="drBrowseParent(true)" title="เปิดดูโฟลเดอร์ในไดรฟ์จริง แล้วคลิกเลือกได้เลย">📂 เลือกจากไดรฟ์</button>
         <button class="btn btn-outline btn-sm" onclick="drAddParent()" title="อีกทาง: วางลิงก์โฟลเดอร์เอง">➕ วางลิงก์</button>
+        <button class="btn btn-outline btn-sm" onclick="drManageParents()" title="เปลี่ยนชื่อเรียก/เอาออกจากดร็อปดาวน์ (โฟลเดอร์จริงไม่ถูกลบ)">⚙️ จัดการ</button>
         <div style="flex:1;min-width:150px"><div class="pr-lbl">โฟลเดอร์หมวด (เช่น G, H, M — โหลดให้อัตโนมัติ)</div>
           <select id="dr-sub" class="pr-in" onchange="_drSub=this.value">
             <option value="">(วางตรงโฟลเดอร์หลักเลย)</option>
             ${_drSubs.map(x=>`<option value="${esc(x.id)}"${x.id===_drSub?' selected':''}>${esc(x.name)}</option>`).join('')}
           </select></div>
         <button class="btn btn-outline btn-sm" onclick="drNewSub()">➕ หมวดใหม่</button>
+        <button class="btn btn-outline btn-sm" onclick="drLoadSubs()" title="โหลดรายชื่อหมวดใหม่ — ใช้ตอนหมวดไม่ขึ้น">🔄</button>
       </div>
+      ${window._drSubsErr?`<div style="margin-top:8px;padding:8px 12px;background:rgba(255,64,64,.07);border:1px solid rgba(255,64,64,.3);border-radius:9px;font-size:11.5px;line-height:1.6;color:var(--red)">⚠️ โหลดโฟลเดอร์หมวดไม่สำเร็จ: ${esc(window._drSubsErr)} <button class="btn btn-sm btn-outline" style="margin-left:6px" onclick="drLoadSubs()">🔄 ลองใหม่</button></div>`:''}
     </div>
     <div class="pr-step"><div class="pr-step-t">3️⃣ สร้างโฟลเดอร์งานตามเทมเพลต</div>
       <div class="pr-lbl">ชื่อโฟลเดอร์งาน</div>
       <input id="dr-projname" class="pr-in" value="${esc(p?((code?code+' ':'')+(p.name||'')):'')}" placeholder="เลือกโปรเจกต์ก่อน">
-      <div class="pr-lbl">โฟลเดอร์ที่จะสร้างข้างใน (ติ๊ก = สร้าง · แก้ชื่อ/ลบ/เพิ่มได้เลย เทมเพลตจำถาวรใช้ทุกงาน · {รหัส} = รหัสงานแบบ G01 หรือชื่องานถ้าไม่ได้ตั้งรหัส · {ชื่อ} = ชื่องาน)</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 2px">
+        <span class="pr-lbl" style="margin:0">เทมเพลตที่ใช้กับงานนี้:</span>
+        ${_drTplScopeCode()
+          ? `<span style="font-size:11px;padding:2px 10px;border-radius:8px;background:rgba(0,180,255,.15);color:var(--accent2);font-weight:800">🔖 เฉพาะรหัส ${esc(_drTplScopeCode())}</span>
+             <button class="btn btn-sm btn-outline" style="padding:2px 9px;font-size:10.5px;border-color:rgba(255,64,64,.3);color:var(--red)" onclick="drTplDelCode()" title="ลบเทมเพลตเฉพาะรหัสนี้ กลับไปใช้เทมเพลตกลาง">🗑️ ลบของรหัสนี้</button>`
+          : `<span style="font-size:11px;padding:2px 10px;border-radius:8px;background:var(--bg2);border:1px solid var(--border2);color:var(--text2)">เทมเพลตกลาง (ทุกงานใช้ร่วมกัน)</span>
+             ${_drCurCode()?`<button class="btn btn-sm btn-outline" style="padding:2px 9px;font-size:10.5px" onclick="drTplMakeCode()" title="ก๊อปเทมเพลตกลางไปเป็นของรหัส ${esc(_drCurCode())} โดยเฉพาะ แล้วแก้ได้อิสระ">➕ แยกเทมเพลตเฉพาะรหัส ${esc(_drCurCode())}</button>`:''}`}
+      </div>
+      <div class="pr-lbl">โฟลเดอร์ที่จะสร้างข้างใน (ติ๊ก = สร้าง · แก้ชื่อ/ลบ/เพิ่มได้เลย · {รหัส} = รหัสงานแบบ G01 หรือชื่องานถ้าไม่ได้ตั้งรหัส · {ชื่อ} = ชื่องาน)</div>
       <div id="dr-tplchecks" style="display:flex;flex-direction:column;margin:4px 0 6px">
         ${tplRows||'<div style="color:var(--text2);font-size:12px;padding:6px 0">— เทมเพลตว่าง กด ➕ เพิ่มโฟลเดอร์หลัก —</div>'}
       </div>
@@ -6754,8 +7050,8 @@ function renderDrivePage(){
     </div>
     <div class="pr-step"><div class="pr-step-t">4️⃣ ไฟล์บท + เปิดโฟลเดอร์โยนไฟล์</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-        <button class="btn btn-outline btn-sm" onclick="drMakeScript()">📄 สร้างไฟล์บท (Script/CV_${esc(code||'…')})</button>
-        ${p&&p.driveFolderLink?`<button class="btn btn-blue btn-sm" onclick="window.open('${esc(p.driveFolderLink)}','_blank')">🔗 เปิดโฟลเดอร์งานในไดรฟ์</button>`:''}
+        <button class="btn btn-blue btn-sm" onclick="drMakeScript()">📄 สร้างไฟล์บท (Script/CV_${esc(code||'…')})</button>
+        ${p&&p.driveFolderLink?`<button class="btn btn-outline btn-sm" onclick="window.open('${esc(p.driveFolderLink)}','_blank')">🔗 เปิดโฟลเดอร์งานในไดรฟ์</button>`:''}
         <button class="btn btn-outline btn-sm" onclick="drRefreshProjFolders()">🔄 โหลดรายชื่อโฟลเดอร์</button>
       </div>
       <div class="pr-lbl">กดเปิดโฟลเดอร์ที่ต้องการ → เด้งไปไดรฟ์ตรงจุด แล้วลากไฟล์ลงได้เลย (เร็วสุดสำหรับไฟล์ใหญ่)</div>
@@ -13632,6 +13928,54 @@ function _assignCodes(){
     ...Object.keys(typeof getBriefTemplates==='function'?getBriefTemplates():{})
   ])].sort();
 }
+// 🔤 จัดการรหัสลูกค้า — เปลี่ยนชื่อ (ตามไปทุกโปรเจกต์+บรีฟ) / ลบ (งานเดิมอยู่ครบ แค่ไม่มีรหัส)
+function openCodeManager(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const codes=_assignCodes();
+  const rows=codes.map(c=>{
+    const n=(getProjects()||[]).filter(p=>(p.clientCode||'').trim().toUpperCase()===c).length;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border2)">
+      <span style="flex:1;font-size:13.5px;font-weight:800;color:var(--accent2)">${esc(c)} <span style="font-size:11px;color:var(--text2);font-weight:400">· ใช้อยู่ ${n} งาน</span></span>
+      <button class="btn btn-sm btn-outline" onclick="codeRename('${escJs(c)}')">✏️ เปลี่ยนชื่อ</button>
+      <button class="btn btn-sm btn-outline" style="border-color:rgba(255,64,64,.35);color:var(--red)" onclick="codeDelete('${escJs(c)}')">🗑️ ลบ</button>
+    </div>`;
+  }).join('');
+  _tagOverlayShow('🔤 จัดการรหัสลูกค้า', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.7;margin-bottom:8px">
+      ✏️ เปลี่ยนชื่อ = รหัสใหม่ตามไปทุกโปรเจกต์และบรีฟงานของรหัสนั้นอัตโนมัติ · 🗑️ ลบ = งานเดิมอยู่ครบ แค่ไม่มีรหัสกำกับ (บรีฟของรหัสนั้นถูกลบด้วย)
+    </div>
+    ${rows||'<div style="color:var(--text2);text-align:center;padding:14px">ยังไม่มีรหัสในระบบ — รหัสใหม่สร้างได้ตอนกรอกงาน</div>'}
+    <div style="display:flex;margin-top:10px"><button class="btn btn-outline" style="flex:1" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button></div>`, 480);
+}
+async function codeRename(oldCode){
+  const nw=prompt('เปลี่ยนรหัส "'+oldCode+'" เป็น:', oldCode);
+  if(!nw||!nw.trim()) return;
+  const up=nw.trim().toUpperCase();
+  if(up===oldCode) return;
+  const ids=(getProjects()||[]).filter(p=>(p.clientCode||'').trim().toUpperCase()===oldCode).map(p=>p.id);
+  showLoader(true);
+  try{
+    if(ids.length) await bulkMutateProjects(ids, p=>{ p.clientCode=up; });
+    const lib=getBriefTemplates();
+    if(lib[oldCode] && !lib[up]){ lib[up]=lib[oldCode]; delete lib[oldCode]; await saveBriefTemplates(lib); }
+    try{ logAudit('project.edit','รหัส '+oldCode,'เปลี่ยนรหัสเป็น '+up+' ('+ids.length+' งาน)'); }catch(e){}
+    toast('✏️ เปลี่ยน '+oldCode+' → '+up+' แล้ว ('+ids.length+' งาน)','success');
+  }finally{ showLoader(false); }
+  openCodeManager(); renderAssign();
+}
+async function codeDelete(code){
+  const ids=(getProjects()||[]).filter(p=>(p.clientCode||'').trim().toUpperCase()===code).map(p=>p.id);
+  if(!confirm('ลบรหัส "'+code+'" ?\n\n• งาน '+ids.length+' งานที่ใช้รหัสนี้จะไม่มีรหัสกำกับ (ชื่อ/ข้อมูล/ทีมอยู่ครบ)\n• บรีฟงานของรหัสนี้จะถูกลบด้วย')) return;
+  showLoader(true);
+  try{
+    if(ids.length) await bulkMutateProjects(ids, p=>{ p.clientCode=''; });
+    const lib=getBriefTemplates();
+    if(lib[code]){ delete lib[code]; await saveBriefTemplates(lib); }
+    try{ logAudit('project.edit','รหัส '+code,'ลบรหัสออกจากระบบ ('+ids.length+' งาน)'); }catch(e){}
+    toast('🗑️ ลบรหัส '+code+' แล้ว','info');
+  }finally{ showLoader(false); }
+  openCodeManager(); renderAssign();
+}
 // ── ฟอร์มกรอก (ใหม่/แก้ไข) — การ์ดแนวตั้ง จัดกลุ่มช่องเป็นหมวด อ่านง่าย ไม่ต้องเลื่อนขวา ──
 function _assignEditRowHTML(p){
   p=p||{};
@@ -13649,7 +13993,10 @@ function _assignEditRowHTML(p){
     <input id="ar-code-new" placeholder="รหัสใหม่" maxlength="6" style="display:none;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;background:var(--bg2);border:1px solid var(--accent2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;text-transform:uppercase">`;
   let mgrSel;
   if(currentUser?.role==='manager'){
-    mgrSel=`<div style="font-size:13px;padding:8px 0">🗂️ ฉันเอง</div>`;
+    // เมเนเจอร์แก้งานของเพื่อนได้ แต่เปลี่ยนเจ้าของงานไม่ได้ — โชว์ชื่อผู้รับผิดชอบเดิมเฉย ๆ
+    let _mgrName='ฉันเอง';
+    try{ if(p.managerId && p.managerId!==currentUser.uid){ const mm=getAllManagerUsers().find(m=>m.uid===p.managerId); _mgrName=mm?(mm.nickname||mm.email):'เมเนเจอร์ท่านอื่น'; } }catch(e){}
+    mgrSel=`<div style="font-size:13px;padding:8px 0">🗂️ ${esc(_mgrName)}</div>`;
   } else {
     const ms=(typeof getAllManagerUsers==='function'?getAllManagerUsers():[]);
     mgrSel=`<select id="ar-mgr" style="${selStyle}">
@@ -13661,8 +14008,8 @@ function _assignEditRowHTML(p){
   const types=['หนัง','ซีรีย์','อนิเมะ','อนิเมชัน','หนังแนวตั้ง','เกม','โฆษณา','บรรยาย','หนังสือเสียง','เพลง','มิกซ์'];
   if(p.type && !types.includes(p.type)) types.push(p.type);
   const typeSel=`<select id="ar-type" style="${selStyle}"><option value="">— ประเภท —</option>${types.map(t=>`<option${p.type===t?' selected':''}>${esc(t)}</option>`).join('')}</select>`;
-  // 💰 งบลูกค้า: เรท + หน่วย (เหมือนฟอร์มโปรเจกต์) — budgetRate × หน่วย = budget
-  const bt=p.budgetType||'flat';
+  // 💰 งบลูกค้า: เรท + หน่วย (เหมือนฟอร์มโปรเจกต์) — งานใหม่เริ่มที่ "ต่อนาที" (หน่วยที่ใช้บ่อยสุด)
+  const bt=p.budgetType||(isNew?'per-minute':'flat');
   const rate=(p.budgetRate!=null&&p.budgetRate!==0)?p.budgetRate:(p.budget||'');
   const btOpts=[['flat','เหมา'],['per-minute','ต่อนาที'],['per-hour','ต่อชั่วโมง'],['per-page','ต่อหน้า'],['per-day','ต่อวัน'],['per-episode','ต่อตอน/บท'],['per-project','ต่อโปรเจกต์']];
   const budgetBox=`<div style="margin-top:12px;padding:10px 12px;background:var(--bg2);border-radius:10px">
@@ -13677,18 +14024,22 @@ function _assignEditRowHTML(p){
     </div>
     <div id="ar-bcalc" style="font-size:11.5px;margin-top:5px;color:var(--text2)"></div>
   </div>`;
-  // เดทไลน์ราย Role: ใส่เวลาได้ + กด "＋ รอบ 2" เพิ่มเดทไลน์รอบสองของหน้าที่นั้นได้
+  // เดทไลน์ราย Role: ปุ่ม 📅 เปิดปฏิทินทุกช่อง · รอบ 2 มีปุ่มเพิ่ม/ลบแยกชัดเจน
   const _dtVal=v=>v?(String(v).includes('T')?v:v+'T23:59'):'';
+  const _cal=id=>`<span onclick="var i=document.getElementById('${id}');if(i){try{i.showPicker()}catch(e){i.focus()}}" style="cursor:pointer;font-size:14px;flex:none" title="เปิดปฏิทินเลือกวัน-เวลา">📅</span>`;
   const phCards=_ASSIGN_PHASES.map(([k,l])=>{
     const ph=(p.phases||{})[k]||{};
     const has2=!!ph.deadline2;
     return `<div style="padding:9px 10px;background:var(--bg2);border-radius:9px">
       <div style="display:flex;align-items:center;margin-bottom:4px"><span style="font-size:11.5px;font-weight:700;flex:1">DL ${l}</span>
         <span onclick="var i=document.getElementById('ar-ph-${k}');if(i)i.value='';" style="font-size:10px;color:var(--text2);cursor:pointer;padding:1px 6px;border:1px solid var(--border2);border-radius:6px" title="ล้างเดทไลน์ของ ${l} (เซฟแล้วถือว่าไม่ตั้ง)">✕ ล้าง</span></div>
-      ${inp('ar-ph-'+k,'datetime-local',_dtVal(ph.deadline),'','background:var(--bg)')}
-      <div id="ar-ph2wrap-${k}" style="margin-top:4px;${has2?'':'display:none'}">${inp('ar-ph2-'+k,'datetime-local',_dtVal(ph.deadline2),'','background:var(--bg)')}</div>
+      <div style="display:flex;gap:5px;align-items:center">${inp('ar-ph-'+k,'datetime-local',_dtVal(ph.deadline),'','background:var(--bg)')}${_cal('ar-ph-'+k)}</div>
+      <div id="ar-ph2wrap-${k}" style="margin-top:4px;${has2?'':'display:none'}">
+        <div style="display:flex;gap:5px;align-items:center"><span style="font-size:10px;color:var(--orange);flex:none">รอบ2</span>${inp('ar-ph2-'+k,'datetime-local',_dtVal(ph.deadline2),'','background:var(--bg)')}${_cal('ar-ph2-'+k)}</div>
+        <div style="text-align:right;margin-top:2px"><span onclick="_arPh2Toggle('${k}',false)" style="font-size:10px;color:var(--red);cursor:pointer;user-select:none">🗑️ ลบเดทไลน์รอบ 2</span></div>
+      </div>
+      <div id="ar-ph2add-${k}" style="margin-top:3px;${has2?'display:none':''}"><span onclick="_arPh2Toggle('${k}',true)" style="font-size:10px;color:var(--accent2);cursor:pointer;user-select:none">＋ เพิ่มเดทไลน์รอบ 2</span></div>
       <div style="margin-top:4px">${inp('ar-phn-'+k,'text',ph.note||'','📝 โน้ต','background:var(--bg)')}</div>
-      <div style="margin-top:3px"><span onclick="var w=document.getElementById('ar-ph2wrap-${k}');var i=document.getElementById('ar-ph2-${k}');if(w.style.display==='none'){w.style.display='block'}else{w.style.display='none';if(i)i.value='';}" style="font-size:10px;color:var(--accent2);cursor:pointer;user-select:none" title="กดเปิดเพื่อเพิ่ม · กดซ้ำเพื่อลบรอบ 2 ออก">＋ เพิ่ม / ✕ ลบ เดทไลน์รอบ 2</span></div>
     </div>`;
   }).join('');
   return `<div id="${isNew?'assign-newrow':'assign-editrow'}" style="margin-bottom:12px;padding:14px 16px;background:var(--card);border:1.5px solid var(--accent2);border-radius:12px;box-shadow:0 3px 14px rgba(0,0,0,.3)">
@@ -13717,6 +14068,14 @@ function _assignEditRowHTML(p){
       <button class="btn btn-outline" onclick="assignCancelRow()">✖ ยกเลิก</button>
     </div>
   </div>`;
+}
+// เพิ่ม/ลบ เดทไลน์รอบ 2 ของหน้าที่นั้น — ปุ่มแยกชัดเจน (ลบ = ล้างค่าแล้วซ่อน เซฟแล้วหายจริง)
+function _arPh2Toggle(k, on){
+  const w=document.getElementById('ar-ph2wrap-'+k), a=document.getElementById('ar-ph2add-'+k), i=document.getElementById('ar-ph2-'+k);
+  if(w) w.style.display=on?'':'none';
+  if(a) a.style.display=on?'none':'';
+  if(!on && i) i.value='';
+  if(on && i){ try{ i.showPicker(); }catch(e){ i.focus(); } }
 }
 // โชว์/ซ่อนช่องจำนวน+ความยาวตามหน่วยที่เลือก + คำนวนยอดรวมให้เห็นทันที
 function _arBudgetUI(){
@@ -13756,7 +14115,10 @@ async function assignSaveRow(projId){
     clientCode:code,
     seq:parseInt(g('ar-seq')?.value)||0,
     episodes:parseInt(g('ar-episodes')?.value)||0,
-    managerId:(currentUser?.role==='manager')?currentUser.uid:(g('ar-mgr')?.value||''),
+    // เมเนเจอร์แก้งานเพื่อน → คงเจ้าของงานเดิมไว้ (ไม่เผลอย้ายงานมาเป็นของตัวเอง)
+    managerId:(currentUser?.role==='manager')
+      ? (projId ? ((getProjects().find(x=>x.id===projId)||{}).managerId||currentUser.uid) : currentUser.uid)
+      : (g('ar-mgr')?.value||''),
     name,
     downloadLink:(g('ar-link')?.value||'').trim(),
     secretKey:(g('ar-secret')?.value||'').trim(),
@@ -13807,11 +14169,11 @@ async function assignSaveRow(projId){
     };
     await saveProjectDB(proj);
     if(vals.managerId && vals.managerId!==currentUser?.uid){ try{ addNotification({type:'project',title:`📁 คุณได้รับมอบหมายโปรเจกต์ "${vals.name}"`,recipientUid:vals.managerId,projId:proj.id}); }catch(e){} }
-    // 🎯 ลดคลิก: สร้างเสร็จพาไปหน้าจัดสรรคนต่อเลย เพื่อลากคนเข้าโปรเจกต์นี้
-    toast('เพิ่มงาน "'+esc(vals.name)+'" แล้ว ✅ — พามาหน้าจัดสรรคน ลากคนเข้าโปรเจกต์ได้เลย','success');
+    // อยู่หน้าเดิมหลังบันทึก (เจ้าของขอ 2026-08-04) — แค่บอกทางไปจัดสรรคนต่อ
+    toast('เพิ่มงาน "'+esc(vals.name)+'" แล้ว ✅ — พร้อมเมื่อไหร่ไปหน้า 🎯 จัดสรรคน เพื่อลากคนเข้างานนี้','success');
     window._assignCopySrc=null;
     _assignAdding=false; _assignEditId=null;
-    nav('alloc');
+    renderAssign();
     return;
   }
   _assignAdding=false; _assignEditId=null;
@@ -13820,7 +14182,8 @@ async function assignSaveRow(projId){
 function renderAssign(){
   const el=document.getElementById('assign-table'); if(!el) return;
   let list=(getProjects()||[]).slice();
-  if(currentUser?.role==='manager') list=list.filter(p=>p.managerId===currentUser.uid);
+  // 🗂️ เมเนเจอร์เห็น/แก้งานของกันและกันได้ทุกคน — ยกเว้นงานที่แอดมินถือเอง (ไม่มีเมเนเจอร์)
+  if(currentUser?.role==='manager') list=list.filter(p=>p.managerId);
   if(!_assignShowAll) list=list.filter(p=>p.projStatus!=='done'&&p.projStatus!=='cancelled');
   const months=[...new Set(list.map(p=>(p.deadline||'').slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
   if(_assignMonth) list=list.filter(p=>(p.deadline||'').slice(0,7)===_assignMonth);
@@ -13842,6 +14205,7 @@ function renderAssign(){
       <option value="code"${_assignSort==='code'?' selected':''}>🔤 ตามรหัส / ลำดับ</option>
       <option value="newest"${_assignSort==='newest'?' selected':''}>🆕 เพิ่มล่าสุดก่อน</option>
     </select>
+    ${currentUser?.role==='admin'?'<button class="btn btn-sm btn-outline" onclick="openCodeManager()" title="เปลี่ยนชื่อ/ลบรหัสลูกค้า — เปลี่ยนแล้วตามไปทุกงานอัตโนมัติ">🔤 จัดการรหัส</button>':''}
     <span style="font-size:12px;color:var(--text2)">${list.length} งาน</span>
     ${(()=>{ // 📅 ปีแสดงรวมที่หัวครั้งเดียว — ชิปวันที่ในการ์ดจะได้ไม่ต้องพ่วงปีทุกอัน
       const ys=[...new Set(list.map(p=>(p.deadline||'').slice(0,4)).filter(y=>/^\d{4}$/.test(y)))].sort();
