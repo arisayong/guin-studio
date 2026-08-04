@@ -6197,12 +6197,72 @@ function _prFillTpl(p, tplText){
     'เดทไลน์ซับ':_prPhaseDL(p,'subVideo'), 'เดทไลน์แปล':_prPhaseDL(p,'translation'),
     'หมายเหตุ':(p.note||'').trim()||'—',
   };
+  // 🎤 นักพากย์แยกเพศ + จำนวน + ราคารายคน (เรียงตามลำดับที่จัดคนเข้าไว้)
+  const _tagOf=s=>s.discordId?('<@'+s.discordId+'>'):('@'+(s.nickname||s.name||''));
+  const _priceOf=w=>w.amount?fmtB(w.amount):(w.ratePerUnit?(fmtB(w.ratePerUnit)+'/'+(w.unit||'หน่วย')):'—');
+  const _wOf=pre=>{
+    const seen=new Set();
+    return (p.workers||[]).filter(w=>w&&w.id&&(w.slot||'').split('-')[0]===pre)
+      .filter(w=>{ if(seen.has(w.id)) return false; seen.add(w.id); return true; })
+      .map(w=>({w, s:getStaffById(w.id)})).filter(x=>x.s);
+  };
+  const dubP=_wOf('dub');
+  const dubM=dubP.filter(x=>String(x.s.gender||'')!=='หญิง');
+  const dubF=dubP.filter(x=>String(x.s.gender||'')==='หญิง');
+  vals['นักพากย์ชาย']=dubM.map(x=>_tagOf(x.s)).join(' / ')||'—';
+  vals['นักพากย์หญิง']=dubF.map(x=>_tagOf(x.s)).join(' / ')||'—';
+  vals['จำนวนพากย์ชญ']=dubP.length?(dubP.length+' คน (ช '+dubM.length+' / ญ '+dubF.length+')'):'—';
+  const adpP=_wOf('adp');
+  for(let i=1;i<=8;i++){
+    vals['ราคาพากย์'+i]=dubP[i-1]?_priceOf(dubP[i-1].w):'—';
+    vals['ราคาเกลา'+i]=adpP[i-1]?_priceOf(adpP[i-1].w):'—';
+  }
+  // เดทไลน์รวมแยก วัน/เวลา (เวลาโชว์เมื่อตั้งไว้)
+  vals['เดทไลน์วัน']=p.deadline?fmtDate(p.deadline):'—';
+  (function(){ const v=p.deadline||''; const d=new Date(v);
+    vals['เดทไลน์เวลา']=(String(v).includes('T')&&!String(v).includes('T23:59')&&!isNaN(d))?(String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+' น.'):'—'; })();
   let t=(tplText!=null)?String(tplText):getProjPostTplFor(p);
+  // 🔗 วงเล็บชื่อที่ตั้งเอง → จับคู่กับช่องระบบ (มีชุดสำเร็จของเจ้าของ + ตั้งเพิ่มเองได้ในตัวแก้เทมเพลต)
+  const alias={..._PR_TPL_BUILTIN_ALIAS, ...getTplAliases()};
+  Object.entries(alias).forEach(([c,k])=>{
+    if(vals[k]==null) return;
+    t=t.split('('+c+')').join(String(vals[k]));
+    t=t.split('{'+c+'}').join(String(vals[k]));
+  });
   Object.entries(vals).forEach(([k,v])=>{
     t=t.split('{'+k+'}').join(String(v));
     t=t.split('('+k+')').join(String(v));
   });
   return t;
+}
+// ชุดจับคู่สำเร็จรูป — วงเล็บที่เจ้าของใช้ในเทมเพลตจริง ใช้ได้ทันทีไม่ต้องแก้เทมเพลต
+const _PR_TPL_BUILTIN_ALIAS={
+  'รหัส+ลำดับ':'รหัส',
+  'ลิงค์โฟรเดอร์ไดรฟที่สร้างขึ้น':'ไฟล์', 'ลิงก์โฟลเดอร์ไดรฟ์ที่สร้างขึ้น':'ไฟล์',
+  'EP/ตอน':'ตอน', 'เวลารวม':'นาที',
+  'จำนวนนักพากย์ ช/ญ และรวมทั้งหมดเช่น 6 คน ช 3 /ญ 2':'จำนวนพากย์ชญ',
+  'จำนวนนักพากย์':'จำนวนพากย์ชญ',
+  'แท็กนักพากย์หญิง':'นักพากย์หญิง', 'แท็กนักพากย์ชาย':'นักพากย์ชาย',
+  'แท็กชื่อนักเกลา':'ทีมบท', 'แท็กชื่อนักมิกซ์':'ทีมมิกซ์', 'แท็กชื่อนักแปล':'ทีมแปล',
+  'แท็กชื่อคนทำซับ':'ทีมซับ', 'แท็กคนทำQC':'ทีมQC', 'แท็กเมเนเจอร์':'เมเนเจอร์',
+};
+// ช่องระบบทั้งหมด (ใช้ทำดร็อปดาวน์จับคู่)
+const PR_TPL_KEYS=['รหัส','ชื่อ','ชื่อเรื่อง','ไฟล์','ตอน','นาที','งบ','เดทไลน์','เดทไลน์วัน','เดทไลน์เวลา','ทีมแปล','ทีมบท','นักพากย์','นักพากย์ชาย','นักพากย์หญิง','จำนวนพากย์','จำนวนพากย์ชญ','ทีมมิกซ์','ทีมQC','ทีมซับ','เมเนเจอร์','แท็ก','เดทไลน์บท','เดทไลน์พากย์','เดทไลน์QC','เดทไลน์มิกซ์','เดทไลน์ซับ','เดทไลน์แปล','หมายเหตุ','ราคาเกลา1','ราคาเกลา2','ราคาเกลา3','ราคาเกลา4','ราคาเกลา5','ราคาเกลา6','ราคาพากย์1','ราคาพากย์2','ราคาพากย์3','ราคาพากย์4','ราคาพากย์5','ราคาพากย์6'];
+function getTplAliases(){ const v=ls('posttplalias'); return (v&&typeof v==='object')?v:{}; }
+async function saveTplAliases(v){ ls('posttplalias', v); try{ await fbSaveKeyed('posttplalias', v); }catch(e){} }
+async function tplAliasAdd(){
+  const name=(document.getElementById('prta-name')?.value||'').trim().replace(/^[({]|[)}]$/g,'');
+  const key=document.getElementById('prta-key')?.value||'';
+  if(!name||!key){ toast('พิมพ์ชื่อวงเล็บ + เลือกช่องระบบก่อน','warn'); return; }
+  const a=getTplAliases(); a[name]=key;
+  await saveTplAliases(a);
+  toast('🔗 จับคู่ ('+name+') → '+key+' แล้ว','success');
+  openProjPostTplEditor();
+}
+async function tplAliasDel(name){
+  const a=getTplAliases(); delete a[name];
+  await saveTplAliases(a);
+  openProjPostTplEditor();
 }
 // ✂️ แบ่งข้อความยาวเป็นก้อน ๆ ละไม่เกิน 1,900 ตัวอักษร (ลิมิต Discord = 2,000) — ตัดตามบรรทัด ไม่ตัดกลางคำ
 function _prChunks(txt){
@@ -6241,6 +6301,20 @@ function openProjPostTplEditor(selId){
       🔗 ฝังลิงก์ในคำได้: <code>[คำที่ให้กด](https://ลิงก์)</code> — หรือกดปุ่ม "แทรกลิงก์" ด้านล่าง
     </div>
     <textarea id="prtpl-text" rows="13" class="pr-in" style="line-height:1.6;resize:vertical">${esc(cur.text||'')}</textarea>
+    <div style="margin-top:10px;padding:9px 11px;background:var(--bg2);border-radius:9px">
+      <div style="font-size:11.5px;font-weight:700;margin-bottom:4px">🔗 วงเล็บที่ตั้งชื่อเอง — จับคู่กับช่องระบบ</div>
+      <div style="font-size:10.5px;color:var(--text2);line-height:1.6;margin-bottom:6px">ตั้งชื่อวงเล็บแบบไหนก็ได้ในเทมเพลต แล้วบอกระบบว่ามันคือช่องอะไร เช่น (ราคานักพากย์คนแรก) → ราคาพากย์1 · ชื่อที่เจ้าของใช้อยู่ (แท็กชื่อนักเกลา ฯลฯ) ระบบรู้จักให้แล้วไม่ต้องเพิ่ม</div>
+      ${Object.entries(getTplAliases()).map(([c,k])=>`<div style="display:flex;gap:6px;align-items:center;font-size:11.5px;padding:3px 0">
+        <span style="flex:1;min-width:0">(${esc(c)}) → <strong style="color:var(--accent2)">${esc(k)}</strong></span>
+        <button class="btn btn-sm btn-outline" style="padding:1px 7px;font-size:10px;border-color:rgba(255,64,64,.3);color:var(--red)" onclick="tplAliasDel('${escJs(c)}')">🗑️</button>
+      </div>`).join('')}
+      <div style="display:flex;gap:6px;align-items:center;margin-top:5px;flex-wrap:wrap">
+        <input id="prta-name" class="pr-in" placeholder="ชื่อในวงเล็บ (ไม่ต้องพิมพ์วงเล็บ)" style="flex:1;min-width:150px;margin:0;padding:6px 9px;font-size:11.5px">
+        <span style="font-size:11px;color:var(--text2)">→</span>
+        <select id="prta-key" class="pr-in" style="width:auto;margin:0;padding:6px 9px;font-size:11.5px">${PR_TPL_KEYS.map(k=>`<option>${esc(k)}</option>`).join('')}</select>
+        <button class="btn btn-sm btn-outline" onclick="tplAliasAdd()">➕ จับคู่</button>
+      </div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
       <button class="btn btn-green" style="flex:1" onclick="saveProjPostTpl()">💾 บันทึกเทมเพลต</button>
       <button class="btn btn-outline btn-sm" onclick="prTplInsertLink()" title="แทรก [คำ](ลิงก์) ตรงตำแหน่งเคอร์เซอร์">🔗 แทรกลิงก์</button>
@@ -6412,6 +6486,16 @@ async function createProjRoomCat(projId){
     toast('🏗️ สร้างหมวด "'+cat+'" + ห้องแล้ว'+(isPrivate?' 🔒':''),'success');
     if(talkErr) toast('⚠️ ห้อง 🎙พูดคุย สร้างไม่สำเร็จ: '+talkErr+' — กดปุ่ม "➕ สร้างห้องพูดคุย" เพื่อลองใหม่ได้','warn');
     await postProjRoomMsg(projId);   // โพสต์คู่มือต่อเลย (แบ่งก้อนอัตโนมัติถ้ายาว)
+    // 👥 ห้องส่วนตัว = ทีมยังมองไม่เห็น — ชวนดึงทีม (จากหน้าจัดสรรคน) เข้าห้องต่อทันที ไม่ต้องหาปุ่มเอง
+    if(isPrivate){
+      const _p2=getProjects().find(x=>x.id===projId);
+      const _team=[...new Set(((_p2&&_p2.workers)||[]).map(w=>w&&w.id).filter(Boolean))].map(id=>getStaffById(id)).filter(s=>s&&s.discordId);
+      if(_team.length){
+        if(confirm('ดึงทีม '+_team.length+' คน ('+_team.map(s=>s.nickname||s.name).slice(0,8).join(', ')+(_team.length>8?' …':'')+') เข้าห้องเลยไหม?\n\nห้องส่วนตัว — ทีมจะมองเห็นห้องได้ก็ต่อเมื่อถูกดึงเข้า')) await prPullTeam(projId);
+      } else {
+        toast('ℹ️ ห้องส่วนตัวสร้างแล้ว แต่ยังดึงทีมเข้าไม่ได้ — ต้องจัดคนเข้างานนี้ (หน้า 🎯 จัดสรรคน) และผูก Discord ก่อน แล้วค่อยกด "👥 ดึงทีมเข้าห้อง"','info');
+      }
+    }
   }catch(e){
     toast(String(e.message||'').includes('ไม่รู้จักคำสั่ง')
       ? 'Worker ของบอทยังเป็นเวอร์ชันเก่า — วางโค้ด worker.js ล่าสุดแล้ว Deploy ก่อน'
@@ -9831,7 +9915,7 @@ async function enterApp(){
   try { await fbLoadKeyed('tags_master'); await fbLoadKeyed('brief_templates'); await fbLoadKeyed('company_expenses');
         await fbLoadKeyed('payroll_profiles'); await fbLoadKeyed('payroll_runs');
         await fbLoadKeyed('recruit_rounds'); await fbLoadKeyed('discord_cfg'); await fbLoadKeyed('allocdraft'); await fbLoadKeyed('announcetpl'); await fbLoadKeyed('wipecode');
-        await fbLoadKeyed('projposttpl'); await fbLoadKeyed('drivecfg'); await fbLoadKeyed('posttpls'); } catch(e) {}
+        await fbLoadKeyed('projposttpl'); await fbLoadKeyed('drivecfg'); await fbLoadKeyed('posttpls'); await fbLoadKeyed('posttplalias'); } catch(e) {}
   try { logLogin(); startIdleWatch(); } catch(e) {}
   // 🕐 สำรองอัตโนมัติรายวัน — รอ 8 วิ ให้ข้อมูลโหลดครบก่อน
   try { setTimeout(()=>{ try{ autoDailyBackup(); }catch(e){} }, 8000); } catch(e) {}
