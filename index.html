@@ -4585,40 +4585,60 @@ function _renderBulkDiscordLink(){
   const order={'name':0,'name+ชื่อย่อ':0,'ambiguous':1,'none':2,'linked':3};
   rows.sort((a,b)=>((order[a.match.how]??2)-(order[b.match.how]??2)) || a.disp.localeCompare(b.disp,'th'));
   window._blkRows=rows;
-  const guessable=rows.filter(r=>r.match.staff && r.match.how!=='linked').length;
+  // นับทุกแถวที่มีตัวเลือกพร้อมผูก (เดาได้ + ชื่อซ้ำที่มีตัวเลือกแรกให้แล้ว) — ปุ่มเขียวจัดการทีเดียวหมด แล้วค่อยแก้รายคนทีหลัง
+  const guessable=rows.filter(r=>r.match.how!=='linked' && (r.match.staff || (r.match.options||[]).length)).length;
   const linked=rows.filter(r=>r.match.how==='linked').length;
+  const selHTML=(i,preId)=>`<select id="blk-sel-${i}" style="min-width:140px;padding:6px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px">
+        <option value="">— ไม่ผูก —</option>
+        ${opts.map(s=>`<option value="${esc(s.id)}"${s.id===preId?' selected':''}>${esc(s.nickname||s.name)}${s.name&&s.nickname?' · '+esc(s.name):''}</option>`).join('')}
+      </select>`;
   const rowHTML=rows.map((r,i)=>{
     if(r.match.how==='linked'){
       const s=r.match.staff;
-      return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--border2);font-size:12.5px;opacity:.65">
-        <span style="flex:1;min-width:0">${esc(r.disp)} <span style="font-size:10.5px;color:var(--text2)">@${esc(r.m.username||'')}</span></span>
-        <span style="color:var(--green);font-size:11.5px">✅ ผูกแล้ว → ${esc(s.nickname||s.name)}</span>
+      // ผูกแล้วก็แก้ได้: ✏️ เปลี่ยนคน (กางช่องเลือก) หรือ 🔓 เลิกผูก
+      return `<div style="padding:6px 0;border-top:1px solid var(--border2)">
+        <div style="display:flex;gap:8px;align-items:center;font-size:12.5px">
+          <span style="flex:1;min-width:0;opacity:.75">${esc(r.disp)} <span style="font-size:10.5px;color:var(--text2)">@${esc(r.m.username||'')}</span></span>
+          <span style="color:var(--green);font-size:11.5px">✅ → ${esc(s.nickname||s.name)}</span>
+          <button class="btn btn-sm btn-outline" style="padding:2px 8px;font-size:10.5px" onclick="var e=document.getElementById('blk-edit-${i}');e.style.display=e.style.display==='none'?'flex':'none'" title="ผูกผิดคน? เปลี่ยนได้">✏️</button>
+          <button class="btn btn-sm btn-outline" style="padding:2px 8px;font-size:10.5px;border-color:rgba(255,64,64,.3);color:var(--red)" onclick="blkUnlink('${esc(s.id)}')" title="เลิกผูกคนนี้">🔓</button>
+        </div>
+        <div id="blk-edit-${i}" style="display:none;gap:8px;align-items:center;margin-top:5px">
+          ${selHTML(i, s.id)}
+          <button class="btn btn-sm" onclick="blkLinkOne(${i})">🔗 ผูกใหม่</button>
+        </div>
       </div>`;
     }
-    const guessId=r.match.staff?r.match.staff.id:'';
-    const ambiIds=(r.match.options||[]).map(o=>o.id);
+    const guessId=r.match.staff?r.match.staff.id:((r.match.options||[])[0]?.id||'');
     return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--border2)">
       <div style="flex:1;min-width:150px">
         <div style="font-size:12.5px;font-weight:700">${esc(r.disp)}</div>
-        <div style="font-size:10.5px;color:var(--text2)">@${esc(r.m.username||'')}${r.match.how==='ambiguous'?' · <span style="color:var(--orange)">ชื่อซ้ำหลายคน เลือกเอง</span>':r.match.staff?' · เดาว่าเป็นคนนี้':''}</div>
+        <div style="font-size:10.5px;color:var(--text2)">@${esc(r.m.username||'')}${r.match.how==='ambiguous'?' · <span style="color:var(--orange)">ชื่อซ้ำ — เดาตัวแรกให้ เช็คก่อนผูก</span>':r.match.staff?' · เดาว่าเป็นคนนี้':''}</div>
       </div>
-      <select id="blk-sel-${i}" style="min-width:140px;padding:6px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px">
-        <option value="">— ไม่ผูก —</option>
-        ${opts.map(s=>`<option value="${esc(s.id)}"${s.id===guessId||(!guessId&&ambiIds[0]===s.id)?' selected':''}>${esc(s.nickname||s.name)}${s.name&&s.nickname?' · '+esc(s.name):''}</option>`).join('')}
-      </select>
+      ${selHTML(i, guessId)}
       <button class="btn btn-sm" onclick="blkLinkOne(${i})">🔗 ผูก</button>
     </div>`;
   }).join('');
   _tagOverlayShow('🔗 ผูกบัญชี Discord ทั้งทีมรวดเดียว', `
     <div style="font-size:11.5px;color:var(--text2);line-height:1.7;margin-bottom:8px">
-      สมาชิกในเซิร์ฟเวอร์ ${members.length} คน · ผูกแล้ว ${linked} คน — ระบบเดาจากชื่อให้แล้ว กด 🔗 ยืนยันรายคน หรือกดปุ่มเขียวผูกทั้งหมดที่เดาได้ทีเดียว
-      <strong>ผูกครั้งเดียวจำตลอด</strong> ใช้ทั้งดึงคำตอบลงคิวและดึงทีมเข้าห้องโปรเจกต์
+      สมาชิกในเซิร์ฟเวอร์ ${members.length} คน · ผูกแล้ว ${linked} คน — <strong>กดปุ่มเขียวทีเดียว ระบบผูกตามที่เดา/เลือกไว้ทุกแถว</strong>
+      ผูกผิดคนค่อยกด ✏️ เปลี่ยน หรือ 🔓 เลิกผูก เป็นรายคนทีหลังได้ · ผูกครั้งเดียวจำตลอด
     </div>
-    ${guessable?`<button class="btn btn-green" style="width:100%;margin-bottom:6px" onclick="blkLinkAllGuessed()">✅ ผูกทั้งหมดที่เดาได้ (${guessable} คน)</button>`:''}
+    ${guessable?`<button class="btn btn-green" style="width:100%;margin-bottom:6px" onclick="blkLinkAllGuessed()">✅ ผูกทั้งหมดตามที่เดา/เลือกไว้ (${guessable} คน)</button>`:''}
     <div style="max-height:380px;overflow-y:auto">${rowHTML||'<div style="color:var(--text2);text-align:center;padding:16px">ไม่มีสมาชิก</div>'}</div>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="btn btn-outline" style="flex:1" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
     </div>`, 620);
+}
+// 🔓 เลิกผูกรายคน (ใช้ตอนผูกผิด) — ลบ discordId ออกจากทุก record ของคนนั้น
+function blkUnlink(staffId){
+  const s=getStaffById(staffId);
+  if(!confirm('เลิกผูกบัญชี Discord ของ "'+(s?(s.nickname||s.name):'')+'" ?')) return;
+  _updateStaffRecords(staffId, x=>{ delete x.discordId; delete x.discordName; });
+  _roleCatCache=null;
+  try{ logAudit('staff.edit', s?(s.nickname||s.name):staffId, 'เลิกผูกบัญชี Discord'); }catch(e){}
+  toast('🔓 เลิกผูกแล้ว','info');
+  _renderBulkDiscordLink();
 }
 function blkLinkOne(i){
   const r=(window._blkRows||[])[i]; if(!r) return;
@@ -4632,12 +4652,14 @@ function blkLinkOne(i){
 }
 function blkLinkAllGuessed(){
   const rows=window._blkRows||[]; let n=0;
-  // ⚡ รวมทุกคนแล้วเซฟทะเบียนครั้งเดียว — เดิมเซฟทั้งก้อนซ้ำต่อคน (50 คน = เขียน Firebase 50 รอบ ช้ามาก)
+  // ผูกตามค่าที่เลือกอยู่ในดร็อปดาวน์ของทุกแถว (เดาได้ + ชื่อซ้ำที่เดาตัวแรกไว้) — ผิดคนค่อยกด ✏️ แก้รายคนทีหลัง
+  // ⚡ รวมทุกคนแล้วเซฟทะเบียนครั้งเดียว — ไม่เขียน Firebase ซ้ำต่อคน
   const want={};   // staffId → {id,name}
-  rows.forEach(r=>{
-    if(!r.match.staff || r.match.how==='linked') return;
-    if(want[r.match.staff.id]) return;
-    want[r.match.staff.id]={ id:r.m.id, name:r.disp };
+  rows.forEach((r,i)=>{
+    if(r.match.how==='linked') return;
+    const sid=document.getElementById('blk-sel-'+i)?.value || (r.match.staff&&r.match.staff.id) || '';
+    if(!sid || want[sid]) return;   // ไม่ได้เลือก หรือคนนี้ถูกจับคู่กับแถวก่อนหน้าแล้ว
+    want[sid]={ id:r.m.id, name:r.disp };
   });
   const d=getStaffData();
   Object.keys(d||{}).forEach(cat=>{
@@ -4651,7 +4673,7 @@ function blkLinkAllGuessed(){
   if(n) saveStaffData(d);
   _roleCatCache=null;
   try{ logAudit('staff.edit','ทั้งทีม','ผูกบัญชี Discord รวดเดียว '+n+' คน'); }catch(e){}
-  toast('✅ ผูกแล้ว '+n+' คน','success');
+  toast('✅ ผูกแล้ว '+n+' คน — ผิดคนไหนกด ✏️ เปลี่ยน หรือ 🔓 เลิกผูก ได้เลย','success');
   _renderBulkDiscordLink();
 }
 // ── โพสประกาศลงห้อง ──
