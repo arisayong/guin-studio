@@ -1142,8 +1142,7 @@ body.sidebar-collapsed .main-content{
    <div class="nav-section">การเงิน</div>
    <div class="nav-item" onclick="nav('queue')"><span class="nav-icon">💸</span><span>คิวจ่ายเงิน</span><span class="nav-badge hidden" id="queue-badge">0</span></div>
    <div class="nav-item" onclick="nav('payroll')"><span class="nav-icon">📆</span><span>รอบจ่ายรายเดือน</span></div>
-   <div class="nav-item" onclick="nav('payment-history')"><span class="nav-icon">📜</span><span>ประวัติการจ่ายเงิน</span></div>
-   <div class="nav-item" onclick="nav('profit')"><span class="nav-icon">📊</span><span>กำไร-ขาดทุน</span></div>
+   <div class="nav-item" onclick="nav('profit')"><span class="nav-icon">📊</span><span>สรุปการเงิน</span></div>
    <div class="nav-item" onclick="nav('docs')"><span class="nav-icon">🗂️</span><span>เอกสาร</span></div>
    <div class="nav-item" onclick="nav('payment')"><span class="nav-icon">💳</span><span>บัญชีรับเงิน</span></div>
    <div class="nav-section">ทีมงาน</div>
@@ -1543,6 +1542,7 @@ body.sidebar-collapsed .main-content{
      <input id="alc-proj-search" class="form-input" placeholder="🔍 ค้นหาโปรเจกต์" style="width:auto;min-width:150px;padding:7px 12px;font-size:13px" oninput="renderAlloc()">
      <button class="btn btn-outline" onclick="nav('availability')" title="เปิดรอบ/โพสประกาศ/ผูกชื่อ Discord ที่หน้าลงคิว">📌 ไปหน้าลงคิว</button>
      <button class="btn btn-outline" onclick="alcPullAll()" title="ดึงข้อความตอบรับล่าสุดจาก Discord ของทุกรอบที่เปิดอยู่">🔄 ดึงคำตอบล่าสุด</button>
+     <button class="btn btn-outline" onclick="alcResetPool()" title="ล้างรายชื่อคนตอบทั้งหมดออกจากกระดาน (ปิดรอบลงคิวที่เปิดอยู่ — คำตอบยังดูย้อนหลังได้ที่หน้าลงคิว)">🧹 รีเซ็ตรายชื่อ</button>
      <button class="btn btn-blue" onclick="openNewProject()">＋ สร้างโปรเจกต์ใหม่</button>
     </div>
    </div>
@@ -1760,23 +1760,17 @@ body.sidebar-collapsed .main-content{
   </div>
 
   <!-- ── ประวัติการจ่ายเงิน (โปรเจกต์ที่จ่ายครบแล้ว) ── -->
-  <div id="page-payment-history" class="page hidden">
-   <div class="page-header">
-    <div class="page-title">📜 ประวัติการจ่ายเงิน</div>
-    <div class="page-subtitle">โปรเจกต์ที่จ่ายค่าตอบแทนครบทุกคนแล้ว — แยกออกจากคิวที่กำลังดำเนินการ</div>
-    <div class="page-actions"><div class="search-bar" style="margin:0;width:260px"><span class="icon">🔍</span><input id="payhist-search" placeholder="ค้นหาโปรเจกต์/ลูกค้า..." oninput="renderPaymentHistory()"></div></div>
-   </div>
-   <div id="payhist-summary" style="margin-bottom:14px"></div>
-   <div id="payhist-list"></div>
-  </div>
+  <!-- 📜 ประวัติการจ่ายเงิน ถูกย้ายไปรวมในหน้า 📊 รายงานการเงิน (page-profit) แล้ว — เหลือ stub กันโค้ดเก่าอ้างถึง -->
+  <div id="page-payment-history" class="page hidden"></div>
 
   <!-- ── PROFIT ── -->
   <div id="page-profit" class="page hidden">
    <!-- === Header === -->
    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
     <div>
-     <div class="page-title" style="margin:0">📊 รายงานการเงิน</div>
+     <div class="page-title" style="margin:0">📊 สรุปการเงิน</div>
      <div class="page-subtitle" style="margin-top:2px" id="profit-subtitle">สรุปครบทุกโปรเจกต์</div>
+     <div style="font-size:11px;color:var(--text2);margin-top:4px;line-height:1.6">💡 เลขในหน้านี้มี 3 ความหมาย: <strong style="color:var(--text)">ยอดบิล</strong> = ที่มีสิทธิ์เก็บจากลูกค้า · <strong style="color:var(--green)">เก็บแล้ว/จ่ายแล้ว</strong> = เงินเข้า-ออกจริง · <strong style="color:var(--text)">กำไรทั้งหมด</strong> = ยอดบิล − ค่าจ้างทีมทั้งหมด (สูตรเดียวกับการ์ดหน้าหลัก)</div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
      <button class="btn btn-blue btn-sm" onclick="openFinanceReport()" title="รายงานรายรับ-รายจ่าย-กำไร เลือกช่วงเวลา + ดาวน์โหลด">📄 ออกรายงาน</button>
@@ -1810,7 +1804,7 @@ body.sidebar-collapsed .main-content{
     <!-- Hero: 6 cols x 2 rows -->
     <div style="grid-column:span 6;grid-row:span 2;background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:20px;display:flex;flex-direction:column;justify-content:space-between" id="profit-hero">
      <div>
-      <div style="font-size:10.5px;color:var(--text2);letter-spacing:0.5px;text-transform:uppercase;font-weight:700">กำไรสุทธิ · <span style="font-weight:400;color:var(--text2)">ทั้งหมด</span></div>
+      <div style="font-size:10.5px;color:var(--text2);letter-spacing:0.5px;text-transform:uppercase;font-weight:700">กำไรทั้งหมด · <span style="font-weight:400;color:var(--text2)">ยอดบิล − ค่าจ้างทีม (ตรงกับการ์ดหน้าหลัก)</span></div>
       <div style="font-size:44px;font-weight:800;margin-top:6px;letter-spacing:-1.2px;line-height:1" id="profit-hero-amount">฿0</div>
       <div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--text2)" id="profit-hero-sub">—</div>
      </div>
@@ -1919,6 +1913,16 @@ body.sidebar-collapsed .main-content{
      </div>
     </div>
    </div>
+
+   <!-- === 📜 ประวัติการจ่ายเงิน (ย้ายมารวมหน้าเดียว — ลดคลิก) === -->
+   <div style="margin-top:20px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+     <div style="font-size:16px;font-weight:800">📜 ประวัติการจ่ายเงิน <span style="font-size:11.5px;color:var(--text2);font-weight:400">โปรเจกต์ที่จ่ายทีมครบทุกคนแล้ว — กดชื่องานเพื่อกางดูรายคน</span></div>
+     <div class="search-bar" style="margin:0 0 0 auto;width:240px"><span class="icon">🔍</span><input id="payhist-search" placeholder="ค้นหาโปรเจกต์/ลูกค้า..." oninput="renderPaymentHistory()"></div>
+    </div>
+    <div id="payhist-summary" style="margin-bottom:12px"></div>
+    <div id="payhist-list"></div>
+   </div>
   </div>
 
   <!-- ── STAFF ── -->
@@ -1930,6 +1934,7 @@ body.sidebar-collapsed .main-content{
      <div class="search-bar" style="margin:0;flex:1;max-width:260px"><span class="icon">🔍</span><input placeholder="ค้นหาสมาชิก..." id="staff-search" oninput="renderStaffGrid()"></div>
      <select id="staff-tag-filter" class="form-input form-select" style="width:auto;max-width:180px;padding:7px 26px 7px 10px;font-size:12.5px" onchange="renderStaffGrid()" title="กรองรายชื่อตาม Tag ประจำตัว"><option value="">🏷️ ทุก Tag</option></select>
      <button class="btn btn-outline" onclick="openTagManager()" title="สร้าง/ลบหัวข้อ Tag หมายเหตุประจำตัว">🏷️ จัดการ Tag</button>
+     <button class="btn btn-outline" onclick="openBulkDiscordLink()" title="ดึงสมาชิกทั้งเซิร์ฟเวอร์ Discord มาจับคู่กับทะเบียนทีม ผูกครั้งเดียวจำตลอด — ใครผูกแล้วมีป้าย 🔗 บนการ์ด">🔗 ผูก Discord ทั้งทีม</button>
      <button class="btn btn-blue" onclick="openAddStaff()">➕ เพิ่มสมาชิก</button>
     </div>
    </div>
@@ -5458,6 +5463,19 @@ function _alcPersonRow(o, busy){
     +'<div class="alc-p-quote">'+(msg?('💬 “'+esc(msg.slice(0,140))+'”'):'<span style="color:var(--orange)">⚠️ อ่านข้อความไม่ได้ — เช็คสิทธิ์บอท</span>')+'</div>'
     +'</div>';
 }
+// 🧹 รีเซ็ตกระดาน — ล้างรายชื่อคนตอบออกทั้งหมดโดยการปิดรอบลงคิวที่เปิดอยู่
+//    คำตอบไม่หาย: ยังเปิดดู/เปิดรอบซ้ำได้ที่หน้า 📌 ลงคิว — กระดานจะโชว์เฉพาะรอบที่เปิดอยู่เท่านั้น
+async function alcResetPool(){
+  const rounds=getRounds().filter(r=>r.status==='open');
+  if(!rounds.length){ toast('กระดานว่างอยู่แล้ว — ไม่มีรอบลงคิวที่เปิดอยู่','info'); return; }
+  if(!confirm('รีเซ็ตรายชื่อบนกระดาน?\n\nระบบจะปิดรอบลงคิวที่เปิดอยู่ '+rounds.length+' รอบ รายชื่อ "คนที่ตอบรับ" และกลุ่ม "แจ้งไม่ว่าง" จะหายจากกระดานทั้งหมด\n\nคำตอบไม่ได้ถูกลบ — ดูย้อนหลัง/กด "เปิดอีกครั้ง" ได้ที่หน้า 📌 ลงคิว')) return;
+  const list=getRounds();
+  list.forEach(r=>{ if(r.status==='open') r.status='closed'; });
+  await saveRounds(list);
+  try{ logAudit('recruit.round','ทุกรอบ','รีเซ็ตกระดานจัดสรรคน — ปิดรอบที่เปิดอยู่ '+rounds.length+' รอบ'); }catch(e){}
+  toast('🧹 ล้างรายชื่อออกจากกระดานแล้ว ('+rounds.length+' รอบถูกปิด — เปิดคืนได้ที่หน้าลงคิว)','success');
+  renderAlloc();
+}
 // สลับสถานะ ว่าง ⇄ ไม่ว่าง ด้วยมือ — มีผลกับทุกรอบที่เปิดอยู่ที่คนนี้ตอบไว้
 async function alcSetAvail(sid, val){
   const rounds=getRounds().filter(r=>r.status==='open');
@@ -5539,7 +5557,8 @@ function renderAlloc(){
       const n=people.filter(o=>!o.unavail && _alcPres(o.staff).includes(pre) && !_alcDraftOf(o.sid).length).length;
       return '<div class="alc-railbtn'+(_alcFilter===pre?' on':'')+'" onclick="_alcFilter=\''+pre+'\';renderAlloc()">'+((ALC_ROLE[pre]||'').split(' ')[0])+'<small>'+(ALC_ROLE[pre]||'').split(' ').slice(1).join(' ')+' '+n+'</small></div>';
     }).join('')+'</div>';
-  const roundChips=openRounds.map(r=>{const c=AV_CATS[r.cat]||{};return '<span class="alc-chip alc-c-day">'+(c.icon||'')+' '+esc(c.label||r.cat)+'</span>';}).join(' ');
+  const roundChips=openRounds.map(r=>{const c=AV_CATS[r.cat]||{};return '<span class="alc-chip alc-c-day">'+(c.icon||'')+' '+esc(c.label||r.cat)
+    +' <span style="cursor:pointer;opacity:.75;font-weight:800" title="ปิดรอบนี้ — รายชื่อคนที่ตอบจากรอบนี้จะออกจากกระดานทันที" onclick="alcCloseRound(\''+esc(r.id)+'\')">✕</span></span>';}).join(' ');
   // กล่องผูกชื่อ: คนที่ตอบใน Discord แต่ระบบจับคู่ชื่อไม่ได้ — เลือกครั้งเดียว จำตลอด
   const unm=_alcUnmatched();
   const _staffSeen=new Set();
@@ -5579,7 +5598,8 @@ function renderAlloc(){
   const shown=_alcShowAll?projs:projs.slice(0,18);
   body.innerHTML=
     '<div class="alc-live"><span class="alc-dot"></span><strong>เรียลไทม์</strong> ใครลากใครไปไหน แอดมิน/เมเนเจอร์ทุกคนเห็นทันที · ชื่อที่ลากเป็น "ฉบับร่าง" (สีม่วง) จนกว่าจะกด ✅ ยืนยันของโปรเจกต์นั้น'
-    +(roundChips?' <span style="margin-left:auto">รอบที่เปิดอยู่: '+roundChips+'</span>':'')+'</div>'
+    +(roundChips?' <span style="margin-left:auto">รอบที่เปิดอยู่ (กด ✕ เพื่อปิดรอบ): '+roundChips+'</span>':'')
+    +' <button class="btn btn-sm btn-outline" style="'+(roundChips?'':'margin-left:auto;')+'flex-shrink:0" onclick="alcClearDrafts()" title="ล้างชื่อฉบับร่าง (สีม่วง) ทั้งกระดาน — คนที่กดยืนยันเข้าโปรเจกต์แล้วไม่ถูกแตะ">🧹 ล้างกระดานร่าง</button></div>'
     +'<div class="alc-layout">'
     +'<div class="alc-pool"><div style="font-size:13px;font-weight:800;margin-bottom:2px">👥 คนที่ตอบรับ</div>'
     +'<div style="font-size:11px;color:var(--text2);margin-bottom:10px">กดไอคอนซ้ายเพื่อเลือกหมวด · ชี้เมาส์ค้างที่ชื่อเพื่อดูข้อความเต็ม · ลากชื่อไปวางในโปรเจกต์ทางขวา — คนเดียวลากได้หลายงาน</div>'
@@ -5596,6 +5616,28 @@ function renderAlloc(){
     +(projs.length>18&&!_alcShowAll?'<button class="btn btn-outline" style="margin-top:10px;width:100%" onclick="_alcShowAll=true;renderAlloc()">แสดงทั้งหมด '+projs.length+' โปรเจกต์</button>':'')
     +'</div></div>';
   _alcBindDnD();
+}
+// 🧹 ล้างชื่อฉบับร่างทั้งกระดาน (เฉพาะที่ยังไม่กดยืนยัน) — ใช้ตอนเริ่มจัดรอบใหม่
+async function alcClearDrafts(){
+  const d=getAllocDraft();
+  const n=Object.values(d||{}).reduce((a,v)=>a+_alcArr(v).length,0);
+  if(!n){ toast('กระดานร่างว่างอยู่แล้ว','info'); return; }
+  if(!confirm('ล้างชื่อฉบับร่าง (สีม่วง) ทั้งหมด '+n+' รายการออกจากกระดาน?\n\nเฉพาะร่างที่ยังไม่ได้กดยืนยัน — คนที่ยืนยันเข้าโปรเจกต์จริงแล้วไม่ถูกแตะ')) return;
+  await saveAllocDraft({});
+  try{ logAudit('alloc','กระดานจัดสรร','ล้างฉบับร่างทั้งกระดาน ('+n+' รายการ)'); }catch(e){}
+  toast('🧹 ล้างกระดานร่างแล้ว','success');
+  renderAlloc();
+}
+// 🔒 ปิดรอบจากหน้ากระดานได้เลย — รายชื่อ "คนที่ตอบรับ" มาจากรอบที่เปิดอยู่เท่านั้น ปิดรอบ = ชื่อชุดนั้นออกทันที
+async function alcCloseRound(roundId){
+  const list=getRounds(); const r=list.find(x=>x.id===roundId); if(!r) return;
+  const c=AV_CATS[r.cat]||{};
+  if(!confirm('ปิดรอบ '+(c.label||r.cat)+' ('+_roundRangeLabel(r)+')?\n\nรายชื่อคนที่ตอบจากรอบนี้จะออกจากกระดานจัดสรร\n(กลับไปเปิดรอบอีกครั้งได้ที่หน้า 📌 ลงคิว)')) return;
+  r.status='closed';
+  await saveRounds(list);
+  try{ logAudit('recruit.round', c.label||r.cat, 'ปิดรอบจากหน้าจัดสรรคน'); }catch(e){}
+  toast('🔒 ปิดรอบแล้ว — รายชื่อจากรอบนี้ออกจากกระดาน','success');
+  renderAlloc();
 }
 function _alcBindDnD(){
   document.querySelectorAll('#page-alloc .alc-person').forEach(el=>{
@@ -9718,6 +9760,7 @@ const MANAGER_PAGES=['mgr-home','mgr-projects','mgr-track','mgr-calc','mgr-team'
 // Manager เข้าถึงหน้า admin บางหน้าได้ (track = ติดตามงาน แต่กรองเฉพาะโปรเจกต์ที่ดูแล)
 const MGR_ALLOWED_ADMIN_PAGES=['track','projects','assign'];
 function nav(page){
+  if(page==='payment-history') page='profit';   // ประวัติการจ่ายเงินรวมอยู่ท้ายหน้าสรุปการเงินแล้ว (หน้าเดียวจบ ลดคลิก)
   const role=currentUser?.role||'staff';
   if(role!=='admin'&&ADMIN_PAGES.includes(page)&&!(role==='manager'&&MGR_ALLOWED_ADMIN_PAGES.includes(page))){toast('ไม่มีสิทธิ์เข้าถึง 🔒','error');return}
   if(role==='staff'&&MANAGER_PAGES.includes(page)){toast('ไม่มีสิทธิ์เข้าถึง 🔒','error');return}
@@ -15150,6 +15193,7 @@ function _isProjectFullyPaid(p){
   return ws.length>0 && ws.every(w=>w.status==='paid');
 }
 // 📜 หน้าประวัติการจ่ายเงิน — โปรเจกต์ที่จ่ายครบทุกคนแล้ว
+// 📜 ประวัติการจ่ายเงิน — แสดงรวมอยู่ท้ายหน้า 📊 รายงานการเงิน (page-profit) หน้าเดียวจบ
 function renderPaymentHistory(){
   if(currentUser?.role!=='admin'){ const e=document.getElementById('payhist-list'); if(e)e.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin เท่านั้น</div>'; return; }
   const el=document.getElementById('payhist-list'); if(!el) return;
@@ -15159,9 +15203,16 @@ function renderPaymentHistory(){
   const paidProjs=getProjects().filter(p=>_isProjectFullyPaid(p)).filter(p=>!q||(p.name||'').toLowerCase().includes(q)||(p.client||'').toLowerCase().includes(q));
   paidProjs.sort((a,b)=>lastPaid(b).localeCompare(lastPaid(a)));
   const totalPaid=paidProjs.reduce((a,p)=>a+(p.workers||[]).reduce((s,w)=>s+(w.amount||0),0),0);
+  // 💸 ยอดจ่ายจริงทั้งหมด (หลังหักภาษี ทุกโปรเจกต์) — ใช้ getProjectFinance ให้ตรงกับ "จ่ายทีม" ในกระแสเงินสดด้านบนเป๊ะ
+  const allPaidNet=getProjects().filter(p=>p&&p.projStatus!=='cancelled').reduce((a,p)=>{ try{ return a+getProjectFinance(p).expensePaid; }catch(e){ return a; } },0);
   if(sumEl) sumEl.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">
     <div class="stat-card"><div class="stat-label">📜 โปรเจกต์จ่ายครบ</div><div style="font-size:24px;font-weight:800;margin-top:4px">${paidProjs.length}</div></div>
-    <div class="stat-card" style="border-color:rgba(0,223,160,.35)"><div class="stat-label">✅ จ่ายทีมรวม</div><div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--green)">${fmtB(totalPaid)}</div></div>
+    <div class="stat-card" style="border-color:rgba(0,223,160,.35)"><div class="stat-label">✅ ยอดในโปรเจกต์ที่จ่ายครบ (ก่อนหักภาษี)</div><div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--green)">${fmtB(totalPaid)}</div></div>
+    <div class="stat-card" style="border-color:rgba(0,180,255,.35)"><div class="stat-label">💸 จ่ายทีมแล้วจริงทั้งหมด (ทุกโปรเจกต์)</div><div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--accent2)">${fmtB(allPaidNet)}</div></div>
+  </div>
+  <div style="font-size:11px;color:var(--text2);line-height:1.7;margin-top:7px">
+    💡 ตัวเลขแต่ละที่ตอบคนละคำถาม: <strong>"จ่ายทีมแล้วจริงทั้งหมด"</strong> = เงินที่ออกจากกระเป๋าแล้ว (ตรงกับ "จ่ายทีม" ในกระแสเงินสดด้านบน) ·
+    <strong>"รายจ่ายทีม"</strong> การ์ดบน = ภาระค่าจ้างทั้งหมดรวมที่ยังไม่ได้จ่าย · <strong>"ยอดในโปรเจกต์ที่จ่ายครบ"</strong> = เฉพาะงานที่ปิดจ่ายครบแล้วด้านล่างนี้
   </div>`;
   if(!paidProjs.length){ el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:12px">ยังไม่มีโปรเจกต์ที่จ่ายครบ — เมื่อจ่ายทีมครบทุกคนในโปรเจกต์ จะถูกย้ายมาที่นี่อัตโนมัติ</div>'; return; }
   el.innerHTML=paidProjs.map(p=>{
@@ -17995,6 +18046,7 @@ function _profUpdateSelection(){
 }
 
 function renderProfit(){
+  try{ renderPaymentHistory(); }catch(e){}   // 📜 ประวัติการจ่ายเงินรวมอยู่ท้ายหน้านี้
   // 🔒 Admin guard: หน้านี้มี budget + กำไร — ทีมงาน/manager ห้ามเห็น
   if(currentUser?.role !== 'admin'){
     const pg = document.getElementById('page-profit');
