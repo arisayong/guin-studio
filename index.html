@@ -6288,7 +6288,8 @@ function renderProjRoom(){
   const role=currentUser?.role;
   if(role!=='admin'&&role!=='manager'){ el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin และ Manager เท่านั้น</div>'; return; }
   let list=getProjects().filter(p=>p&&p.projStatus!=='cancelled'&&p.projStatus!=='done');
-  if(role==='manager') list=list.filter(p=>p.managerId===currentUser.uid);
+  // เมเนเจอร์เห็นงานของเมเนเจอร์ทุกคน (ช่วยกันดู/แก้โพสต์ได้) — ยกเว้นงานที่แอดมินถือเอง
+  if(role==='manager') list=list.filter(p=>p.managerId);
   list.sort((a,b)=>String(a.deadline||'9999').localeCompare(String(b.deadline||'9999')));
   if(_prSel && !list.some(p=>p.id===_prSel)) _prSel='';
   const p=list.find(x=>x.id===_prSel);
@@ -6342,7 +6343,8 @@ function renderProjRoom(){
   const tpls=getPostTpls();
   const curTplId=(p.postTplId&&tpls.some(t=>t.id===p.postTplId))?p.postTplId:tpls[0].id;
   const hasDraft=!!(p.postDraft&&String(p.postDraft).trim());
-  const draftProjs=list.filter(x=>x.postDraft&&String(x.postDraft).trim());
+  // 📝 ลิสต์ข้อความที่เคยแก้: เห็นของทุกโปรเจกต์ทุกคน (แอดมิน+เมเนเจอร์ช่วยกันแก้ได้)
+  const draftProjs=getProjects().filter(x=>x&&x.postDraft&&String(x.postDraft).trim());
   const step3=`<div class="pr-step"><div class="pr-step-t">3️⃣ โพสต์คู่มืองาน ${p.discordMsgId?'<span class="alc-chip alc-c-all">เคยโพสต์แล้ว — กดอัปเดตจะแก้โพสต์เดิม</span>':''}${hasDraft?' <span class="alc-chip" style="background:rgba(255,158,0,.16);color:var(--orange)">📝 มีข้อความที่แก้เก็บไว้</span>':''}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:7px">
       <span style="font-size:11.5px;color:var(--text2)">ชุดเทมเพลต:</span>
@@ -6376,10 +6378,13 @@ async function createProjRoomCat(projId){
     let c2=null, talkErr='';
     try{ c2=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'🎙│พูดคุย', ...(isPrivate?{private:true}:{})}); }
     catch(e){ talkErr=String(e.message||e); }
+    // 📝 เก็บข้อความในกล่องไว้กับงานตั้งแต่ตอนสร้างห้อง — ต่อให้โพสต์ขั้นถัดไปสะดุด ข้อความที่แก้ไว้ก็ไม่หาย
+    const _draftNow=String(document.getElementById('pr-post')?.value||'').trim();
     await saveProjectMerge(projId, f=>{
       f.discordCategoryName=cat; f.discordChannelId=c1.channelId; f.discordChannelName=c1.channelName||'📁│project';
       f.discordPrivate=isPrivate;
       if(c2) f.discordTalkId=c2.channelId;
+      if(_draftNow) f.postDraft=_draftNow;
     });
     try{ logAudit('project.discord', cat, 'สร้างหมวด+ห้องโปรเจกต์ใน Discord'+(isPrivate?' (ส่วนตัว)':'')); }catch(e){}
     toast('🏗️ สร้างหมวด "'+cat+'" + ห้องแล้ว'+(isPrivate?' 🔒':''),'success');
@@ -13323,8 +13328,8 @@ function renderProjList(){
         const _n=new Date(); _n.setHours(0,0,0,0);
         if(_d.getTime()!==_n.getTime())return false;
       }
-      // Search
-      if(q&&!(p.name||'').toLowerCase().includes(q)&&!(p.client||'').toLowerCase().includes(q))return false;
+      // Search — ค้นด้วยรหัสงาน (G02) ได้ด้วย
+      if(q&&!(p.name||'').toLowerCase().includes(q)&&!(p.client||'').toLowerCase().includes(q)&&!projCode(p).toLowerCase().includes(q))return false;
       return true;
     });
     const today=new Date();today.setHours(0,0,0,0);
@@ -13373,7 +13378,9 @@ function renderProjList(){
         return '<tr style="font-size:12px;cursor:pointer" onclick="toggleAdminProjRow(\''+pid+'\')" title="กดเพื่อดู/ซ่อนรายละเอียด">'
           +actionBtns
           +'<td style="max-width:220px;padding:8px 6px">'
-          +'<div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(p.name||'—')+'</div>'
+          +'<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+            +(projCode(p)?'<span style="font-weight:800;color:var(--text);background:rgba(0,180,255,.14);padding:1px 8px;border-radius:7px;margin-right:6px">'+esc(projCode(p))+'</span>':'')
+            +'<span style="font-weight:600;color:var(--accent2)">'+(p.name||'—')+'</span></div>'
           +'<div data-presence-proj="'+pid+'" style="margin-top:2px;display:inline-flex;gap:4px;flex-wrap:wrap">'+presenceBadgeHTML(pid)+'</div>'
           +(roleBadges?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+roleBadges+'</div>':'')
           +(p.note?'<div style="font-size:10px;color:var(--text2)">📝 '+p.note+'</div>':'')
@@ -15148,7 +15155,8 @@ function openProjDetail(id){
 function renderProjDetail(){
   if(currentUser?.role !== 'admin') return; // 🔒 double-check
   const p=getProjects().find(x=>x.id===currentProjId);if(!p)return;
-  document.getElementById('det-name').textContent=p.name;
+  // 🔖 รหัสงานไฮไลต์นำหน้า + ชื่อเรื่องสีฟ้า — มาตรฐานเดียวกับหน้ามอบหมายงาน
+  document.getElementById('det-name').innerHTML=(projCode(p)?'<span style="font-weight:800;background:rgba(0,180,255,.16);padding:2px 12px;border-radius:8px;margin-right:8px">'+esc(projCode(p))+'</span>':'')+'<span style="color:var(--accent2)">'+esc(p.name||'')+'</span>';
   const _mi=_projManagerLabel(p);
   const _mgrTxt=_mi.isAdmin?'👑 แอดมินจัดการเอง':('🗂️ ดูแลโดย '+(_mi.name||'Manager'));
   document.getElementById('det-meta').textContent=`${p.client||''} | ${p.type||''} | ${fmtDate(p.date)} | ${_mgrTxt}`;
@@ -27690,7 +27698,7 @@ function syncManagerCategoryFromRoles(){
 function renderMgrProjects() {
   const el = document.getElementById('mgr-proj-list'); if (!el) return;
   const q = (document.getElementById('mgr-proj-search')?.value||'').toLowerCase();
-  const projs = getMgrProjects().filter(p => !q || p.name.toLowerCase().includes(q));
+  const projs = getMgrProjects().filter(p => !q || (p.name||'').toLowerCase().includes(q) || projCode(p).toLowerCase().includes(q));
   if (!projs.length) {
     el.innerHTML = '<div style="text-align:center;padding:48px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:12px">ยังไม่มีโปรเจกต์ที่ได้รับมอบหมาย</div>';
     return;
@@ -27740,7 +27748,7 @@ function renderMgrProjects() {
     return `<div style="background:var(--card);border:1px solid rgba(21,101,255,.2);border-radius:12px;margin-bottom:12px;overflow:hidden">
       <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;cursor:pointer" onclick="toggleEl('mgr-pbody-${p.id}','mgr-pchv-${p.id}')" title="กดเพื่อดู/ซ่อนรายละเอียด">
         <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:700;color:var(--text)">${p.name} <span style="padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;background:rgba(155,111,255,.15);color:#9B6FFF;border:1px solid rgba(155,111,255,.3)">ของฉัน</span></div>
+          <div style="font-size:14px;font-weight:700;color:var(--text)">${projCode(p)?`<span style="font-weight:800;background:rgba(0,180,255,.14);padding:1px 9px;border-radius:7px;margin-right:6px">${esc(projCode(p))}</span>`:''}<span style="font-weight:600;color:var(--accent2)">${p.name}</span> <span style="padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;background:rgba(155,111,255,.15);color:#9B6FFF;border:1px solid rgba(155,111,255,.3)">ของฉัน</span></div>
           <div style="font-size:11px;color:var(--text2);margin-top:2px">ลูกค้า: ${p.client||'—'} · Deadline: ${fmtDate(p.deadline)||'—'} · งบ <span style="color:var(--accent2);font-weight:700">${p.budget?fmtB(p.budget):'—'}</span></div>
           ${projRoleBadges(p)?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${projRoleBadges(p)}</div>`:''}
         </div>
