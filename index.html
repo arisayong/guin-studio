@@ -2547,9 +2547,9 @@ body.sidebar-collapsed .main-content{
    <div id="edit-presence-banner" style="display:none;background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.4);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--orange);line-height:1.5"></div>
    <!-- 🔖 รหัสงาน+ลำดับขึ้นก่อน — ทีมจำงานด้วยรหัสแบบ G01 เป็นหลัก ชื่อเรื่องยาว ๆ เป็นรอง -->
    <div style="display:grid;grid-template-columns:90px 90px 1fr;gap:12px;margin-bottom:12px">
-    <div class="form-group" style="margin:0"><label class="form-label">รหัสงาน</label><input class="form-input" id="pj-clientcode" list="pj-clientcode-list" placeholder="เช่น G" maxlength="6" style="text-transform:uppercase;font-weight:800"><datalist id="pj-clientcode-list"></datalist></div>
-    <div class="form-group" style="margin:0"><label class="form-label">ลำดับ</label><input class="form-input" id="pj-seq" type="number" placeholder="1" min="0" onwheel="this.blur()" style="font-weight:800"></div>
-    <div class="form-group" style="margin:0"><label class="form-label">ชื่อโปรเจกต์ *</label><input class="form-input" id="pj-name" placeholder="เช่น One Piece Ep.1100" oninput="const t=document.getElementById('proj-modal-title');if(t)t.textContent=this.value.trim()||'โปรเจกต์ใหม่'"></div>
+    <div class="form-group" style="margin:0"><label class="form-label">รหัสงาน</label><input class="form-input" id="pj-clientcode" list="pj-clientcode-list" placeholder="เช่น G" maxlength="6" style="text-transform:uppercase;font-weight:800" oninput="_pjTitleSync()"><datalist id="pj-clientcode-list"></datalist></div>
+    <div class="form-group" style="margin:0"><label class="form-label">ลำดับ</label><input class="form-input" id="pj-seq" type="number" placeholder="1" min="0" onwheel="this.blur()" style="font-weight:800" oninput="_pjTitleSync()"></div>
+    <div class="form-group" style="margin:0"><label class="form-label">ชื่อโปรเจกต์ *</label><input class="form-input" id="pj-name" placeholder="เช่น One Piece Ep.1100" oninput="_pjTitleSync()"></div>
    </div>
    <div style="margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">ประเภทงาน</label>
@@ -13637,7 +13637,9 @@ function renderProjList(){
           +'<div style="display:flex;gap:3px">'
           +'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();openEditProject(\''+pid+'\')" title="แก้ไข">✏️</button>'
           +'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();copyProject(\''+pid+'\')" title="คัดลอก">📋</button>'
-          +(p.discordCategoryName?'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();syncProjStatusEmoji(\''+pid+'\', true)" title="ซิงก์อิโมจิสถานะหน้าชื่อหมวดห้องดิส (🟡🟠🟢🔴) — ปกติเปลี่ยนเองตอนติ๊กสถานะ">🎨</button>':'')
+          +(p.discordCategoryName
+            ?'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();syncProjStatusEmoji(\''+pid+'\', true)" title="ซิงก์อิโมจิสถานะหน้าชื่อหมวดห้องดิส (🟡🟠🟢🔴) — ปกติเปลี่ยนเองตอนติ๊กสถานะ">🎨</button>'
+            :'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();prBindCategory(\''+pid+'\')" title="ผูกหมวดหมู่ห้องดิสของงานนี้ (พิมพ์ชื่อหมวดตรงเป๊ะครั้งเดียว) — ผูกแล้วอิโมจิสถานะ 🟡🟠🟢🔴 จะเปลี่ยนให้อัตโนมัติ">🏷️</button>')
           +'<button class="btn btn-xs btn-red" onclick="event.stopPropagation();deleteProjConfirm(\''+pid+'\')" title="ลบ">🗑️</button>'
           +'</div></td>';
         const roleBadges=(typeof projRoleBadges==='function')?projRoleBadges(p):'';
@@ -14055,6 +14057,13 @@ function toggleCat(key){
 }
 
 function _setVal(id,v){ const el=document.getElementById(id); if(el) el.value=v; }
+// หัวโมดัลโปรเจกต์ = "รหัส · ชื่อเรื่อง" เสมอ (ทีมดูรหัสเป็นหลัก) — อัปเดตสดตอนพิมพ์รหัส/ลำดับ/ชื่อ
+function _pjTitleSync(){
+  const t=document.getElementById('proj-modal-title'); if(!t) return;
+  const code=projCode({clientCode:(document.getElementById('pj-clientcode')?.value||'').trim(), seq:parseInt(document.getElementById('pj-seq')?.value)||0});
+  const nm=(document.getElementById('pj-name')?.value||'').trim();
+  t.textContent=(code?code+' · ':'')+(nm&&nm!==code?nm:(code?'':'โปรเจกต์ใหม่'));
+}
 // ══════════════════════════════════════════════
 // 💰 งวดรับเงินจากลูกค้าในฟอร์มโปรเจกต์
 // ══════════════════════════════════════════════
@@ -14919,7 +14928,7 @@ async function saveProject(){
       arr.forEach(w=>{
         if(!w.staffId) return; // ข้าม placeholder ที่ยังไม่เลือกคน (ก๊อปปี้ค่าไว้/จาก calc)
         const amt=calcWorkerAmt(w,dur);
-        workers.push({id:w.staffId,slot:cat+'-'+slot,amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,status:'pending',note:'',comment:w.comment||'',...(cat==='dub'&&w.tier?{tier:w.tier}:{})});
+        workers.push({id:w.staffId,slot:(cat==='dub'&&w.keepSlot)?w.keepSlot:(cat+'-'+slot),amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,status:'pending',note:'',comment:w.comment||'',...(cat==='dub'&&w.tier?{tier:w.tier}:{})});
       });
     });
   });
@@ -15391,7 +15400,7 @@ async function openEditProject(id){
   window._formDirty = false;
   initFormSlots();
   document.getElementById('proj-modal-mode').textContent='✏️ กำลังแก้ไข';
-  document.getElementById('proj-modal-title').textContent= p.name || '(ไม่มีชื่อ)';
+  document.getElementById('proj-modal-title').textContent=projDisp(p);
   const _metaEl = document.getElementById('proj-modal-meta');
   if(_metaEl){
     const _metaParts = [];
@@ -15444,7 +15453,9 @@ async function openEditProject(id){
     const parts=w.slot.split('-');const cat=parts[0];let slot=parts.slice(1).join('-')||'only';
     if(cat==='dub') slot='main';   // ระบบใหม่: นักพากย์รวมลิสต์เดียว (dub-sub ของเก่าย้ายมาที่เดียวกัน)
     if(!activeCats.has(cat)){activeCats.add(cat);const btn=document.getElementById('toggle-'+cat);const block=document.getElementById('catblock-'+cat);if(btn)btn.classList.add('on');if(block)block.classList.remove('hidden')}
-    if(formSlots[cat]&&formSlots[cat][slot]!==undefined)formSlots[cat][slot].push({staffId:w.id,amount:w.ratePerUnit||w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,comment:w.comment||'',...(cat==='dub'&&w.tier?{tier:w.tier}:{})});
+    // keepSlot: นักพากย์รองของเก่า (dub-sub) โชว์รวมในลิสต์เดียว แต่ตอนเซฟคง slot เดิมไว้
+    //           — ไม่งั้นสถานะจ่ายแล้ว/เลขใบสำคัญจ่ายที่ผูกกับ slot เดิมจะหลุด
+    if(formSlots[cat]&&formSlots[cat][slot]!==undefined)formSlots[cat][slot].push({staffId:w.id,amount:w.ratePerUnit||w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,comment:w.comment||'',...(cat==='dub'&&w.tier?{tier:w.tier}:{}),...(cat==='dub'&&w.slot!=='dub-main'?{keepSlot:w.slot}:{})});
   });
   // โหลดเรทเบอร์นักพากย์ของงานนี้ (ไม่มี = ชุดว่าง 3 เบอร์)
   formDubTiers=(Array.isArray(p.dubTiers)&&p.dubTiers.length)?JSON.parse(JSON.stringify(p.dubTiers)):_dubTierDefaults();
