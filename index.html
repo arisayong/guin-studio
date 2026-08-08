@@ -6449,6 +6449,7 @@ function renderProjRoom(){
           ${p.discordTalkId?'':`<button class="btn btn-outline btn-sm" onclick="prCreateTalk('${esc(p.id)}')" title="ห้องพูดคุยยังไม่ถูกสร้าง — กดสร้างเพิ่มในหมวดเดิมได้เลย">➕ สร้างห้องพูดคุย</button>`}
           <button class="btn btn-outline btn-sm" onclick="openBulkDiscordLink()" title="ดึงรายชื่อสมาชิกทั้งเซิร์ฟเวอร์มาจับคู่กับทะเบียนทีม — ผูกครั้งเดียว ดึงทีมเข้าห้องได้ครบ">🔗 ผูกทั้งทีมกับ Discord</button>
           <button class="btn btn-outline btn-sm" onclick="syncProjStatusEmoji('${esc(p.id)}', true)" title="เปลี่ยนอิโมจิหน้าชื่อหมวดในดิสให้ตรงสถานะปัจจุบัน (🟡กำลังทำ 🟠เสร็จ 🟢จ่ายแล้ว 🔴ยกเลิก) — ปกติเปลี่ยนเองตอนติ๊กสถานะ ปุ่มนี้ไว้ซิงก์ย้อนหลัง/เช็คปัญหา">🎨 อัปเดตอิโมจิสถานะ</button>
+          ${p.discordCategoryName?'':`<button class="btn btn-outline btn-sm" onclick="prBindCategory('${esc(p.id)}')" title="งานนี้ยังไม่รู้จักหมวดหมู่ในดิส — พิมพ์ชื่อหมวดให้ตรงเป๊ะครั้งเดียว แล้วระบบจะเปลี่ยนอิโมจิสถานะให้ได้">🏷️ ผูกหมวดหมู่</button>`}
           <button class="btn btn-outline btn-sm" onclick="prRecreateRooms('${esc(p.id)}')" title="ห้องเดิมใน Discord ถูกลบไปแล้ว? กดนี่เพื่อเลิกจำห้องเก่า แล้วสร้างหมวด+ห้องชุดใหม่ได้ทันที (สร้างซ้ำกี่รอบก็ได้)">🔄 สร้างห้องชุดใหม่</button>
           <button class="btn btn-outline btn-sm" onclick="prUnlink('${esc(p.id)}')">🔓 เลิกผูกห้อง</button>
         </div></div>`
@@ -6631,7 +6632,24 @@ async function prPickExisting(projId, chId, chName){
   try{ logAudit('project.discord', chName, 'ผูกห้อง Discord ที่มีอยู่กับโปรเจกต์'); }catch(e){}
   document.getElementById('tag-overlay')?.remove();
   toast('🔗 ผูกห้อง #'+chName+' แล้ว','success');
+  // ถามชื่อหมวดต่อเลย — จะได้เปลี่ยนอิโมจิสถานะหน้าชื่อหมวดให้ได้ด้วย
+  const cat=prompt('ห้องนี้อยู่ใต้ "หมวดหมู่" ชื่ออะไรใน Discord?\n\nพิมพ์/วางชื่อหมวดให้ตรงเป๊ะทุกตัวอักษรรวมอิโมจิ (คลิกขวาชื่อหมวด → แก้ไขหมวดหมู่ แล้วก๊อปชื่อมาวาง)\nระบบจะใช้เปลี่ยนอิโมจิสถานะ 🟡🟠🟢🔴 ให้อัตโนมัติ · เว้นว่าง = ข้ามไปก่อน');
+  if(cat&&cat.trim()){
+    await saveProjectMerge(projId, f=>{ f.discordCategoryName=cat.trim(); delete f.discordCategoryId; });
+    toast('🏷️ ผูกหมวด "'+cat.trim()+'" แล้ว — อิโมจิสถานะจะเปลี่ยนอัตโนมัติเมื่อติ๊กสถานะ','success');
+  }
   renderProjRoom();
+}
+// 🏷️ ผูกหมวดหมู่ให้งานที่ระบบยังไม่รู้จักหมวด (เช่น ห้องที่สร้างเองใน Discord) — พิมพ์ชื่อให้ตรงเป๊ะครั้งเดียว
+async function prBindCategory(projId){
+  const p=getProjects().find(x=>x.id===projId); if(!p) return;
+  const guess=p.discordCategoryName||'';
+  const cat=prompt('พิมพ์/วางชื่อ "หมวดหมู่" ของงานนี้ใน Discord ให้ตรงเป๊ะทุกตัวอักษรรวมอิโมจิ\n(วิธีก๊อปชื่อ: คลิกขวาที่ชื่อหมวดใน Discord → แก้ไขหมวดหมู่ → ก๊อปข้อความในช่องชื่อ)\n\nระบบจะใช้ชื่อนี้ตามหาหมวดเพื่อเปลี่ยนอิโมจิสถานะ 🟡🟠🟢🔴', guess);
+  if(!cat||!cat.trim()) return;
+  await saveProjectMerge(projId, f=>{ f.discordCategoryName=cat.trim(); delete f.discordCategoryId; });
+  toast('🏷️ ผูกหมวด "'+cat.trim()+'" แล้ว — กด 🎨 เพื่อลองซิงก์อิโมจิได้เลย','success');
+  renderProjRoom();
+  try{ if(!document.getElementById('page-projects').classList.contains('hidden')) renderProjects(); }catch(e){}
 }
 async function postProjRoomMsg(projId){
   const p=getProjects().find(x=>x.id===projId);
