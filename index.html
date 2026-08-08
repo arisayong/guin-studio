@@ -308,7 +308,11 @@ input[type="number"] {
 /* TABLE */
 .reg-role-active{opacity:1!important;filter:brightness(1.2);box-shadow:0 0 0 2px currentColor!important}
 #reg-role-checks label input[type=checkbox]:checked + span{opacity:1}
-.table-wrap{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.table-wrap{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow-x:auto;overflow-y:hidden;margin-bottom:14px;-webkit-overflow-scrolling:touch}
+/* จอแคบ (เปิดคู่ Discord) — สกอร์ลบาร์แนวนอนต้องเห็นชัด + ลากตารางเลื่อนได้ */
+.table-wrap::-webkit-scrollbar{height:10px}
+.table-wrap::-webkit-scrollbar-thumb{background:rgba(120,140,180,.45);border-radius:6px}
+.table-wrap::-webkit-scrollbar-thumb:hover{background:rgba(120,140,180,.7)}
 #projects-table td, #page-projects thead th{padding:6px 4px;font-size:11px;word-break:break-word}
 .table-header{padding:15px 20px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between}
 .table-title{font-size:14px;font-weight:700}
@@ -6444,6 +6448,7 @@ function renderProjRoom(){
           <button class="btn btn-blue btn-sm" onclick="prPullTeam('${esc(p.id)}')" title="เปิดสิทธิ์ให้ทีมที่ผูก Discord แล้วเห็นห้อง">👥 ดึงทีมเข้าห้อง</button>
           ${p.discordTalkId?'':`<button class="btn btn-outline btn-sm" onclick="prCreateTalk('${esc(p.id)}')" title="ห้องพูดคุยยังไม่ถูกสร้าง — กดสร้างเพิ่มในหมวดเดิมได้เลย">➕ สร้างห้องพูดคุย</button>`}
           <button class="btn btn-outline btn-sm" onclick="openBulkDiscordLink()" title="ดึงรายชื่อสมาชิกทั้งเซิร์ฟเวอร์มาจับคู่กับทะเบียนทีม — ผูกครั้งเดียว ดึงทีมเข้าห้องได้ครบ">🔗 ผูกทั้งทีมกับ Discord</button>
+          <button class="btn btn-outline btn-sm" onclick="syncProjStatusEmoji('${esc(p.id)}', true)" title="เปลี่ยนอิโมจิหน้าชื่อหมวดในดิสให้ตรงสถานะปัจจุบัน (🟡กำลังทำ 🟠เสร็จ 🟢จ่ายแล้ว 🔴ยกเลิก) — ปกติเปลี่ยนเองตอนติ๊กสถานะ ปุ่มนี้ไว้ซิงก์ย้อนหลัง/เช็คปัญหา">🎨 อัปเดตอิโมจิสถานะ</button>
           <button class="btn btn-outline btn-sm" onclick="prRecreateRooms('${esc(p.id)}')" title="ห้องเดิมใน Discord ถูกลบไปแล้ว? กดนี่เพื่อเลิกจำห้องเก่า แล้วสร้างหมวด+ห้องชุดใหม่ได้ทันที (สร้างซ้ำกี่รอบก็ได้)">🔄 สร้างห้องชุดใหม่</button>
           <button class="btn btn-outline btn-sm" onclick="prUnlink('${esc(p.id)}')">🔓 เลิกผูกห้อง</button>
         </div></div>`
@@ -6801,6 +6806,25 @@ window.addEventListener('guindatachange', e=>{
     if(pg && !pg.classList.contains('hidden')) try{ renderDrivePage(); }catch(_){}
   }
 });
+// 🖱️ กดค้างแล้วลากบนตาราง = เลื่อนซ้าย-ขวา (จอแคบตารางกว้างกว่ากรอบ) — ไม่ต้องหาสกอร์ลบาร์
+(function(){
+  let sc=null, sx=0, sl=0, moved=false;
+  document.addEventListener('mousedown', e=>{
+    const w=e.target.closest('.table-wrap');
+    if(!w || w.scrollWidth<=w.clientWidth+2) return;
+    if(e.target.closest('button,select,input,textarea,a')) return;
+    sc=w; sx=e.pageX; sl=w.scrollLeft; moved=false;
+  });
+  document.addEventListener('mousemove', e=>{
+    if(!sc) return;
+    const dx=e.pageX-sx;
+    if(Math.abs(dx)>5) moved=true;
+    if(moved){ sc.scrollLeft=sl-dx; e.preventDefault(); }
+  });
+  document.addEventListener('mouseup', ()=>{ setTimeout(()=>{ sc=null; },0); });
+  // ลากอยู่ = ไม่ให้กลายเป็นคลิกแถวโดยไม่ตั้งใจ
+  document.addEventListener('click', e=>{ if(moved){ e.stopPropagation(); e.preventDefault(); moved=false; } }, true);
+})();
 function _drIdFromLink(s){ const m=String(s||'').match(/[-\w]{25,}/); return m?m[0]:String(s||'').trim(); }
 function openDriveSetup(){
   if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
@@ -13595,6 +13619,7 @@ function renderProjList(){
           +'<div style="display:flex;gap:3px">'
           +'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();openEditProject(\''+pid+'\')" title="แก้ไข">✏️</button>'
           +'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();copyProject(\''+pid+'\')" title="คัดลอก">📋</button>'
+          +(p.discordCategoryName?'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();syncProjStatusEmoji(\''+pid+'\', true)" title="ซิงก์อิโมจิสถานะหน้าชื่อหมวดห้องดิส (🟡🟠🟢🔴) — ปกติเปลี่ยนเองตอนติ๊กสถานะ">🎨</button>':'')
           +'<button class="btn btn-xs btn-red" onclick="event.stopPropagation();deleteProjConfirm(\''+pid+'\')" title="ลบ">🗑️</button>'
           +'</div></td>';
         const roleBadges=(typeof projRoleBadges==='function')?projRoleBadges(p):'';
@@ -28656,12 +28681,14 @@ function _stripLeadEmoji(s){
   try{ return String(s||'').replace(/^[\p{Extended_Pictographic}‍️]+\s*/u,''); }
   catch(e){ return String(s||''); }
 }
-async function syncProjStatusEmoji(projId){
+async function syncProjStatusEmoji(projId, manual){
   const p=getProjects().find(x=>x.id===projId);
-  if(!p||!p.discordCategoryName) return;
-  const em=PROJ_STATUS_EMOJI[p.projStatus]; if(!em) return;
+  if(!p) return;
+  if(!p.discordCategoryName){ if(manual) toast('งานนี้ยังไม่ได้ผูกหมวดหมู่ Discord กับเว็บ — สร้างห้องผ่านหน้าห้องโปรเจกต์ก่อน ระบบถึงจะรู้ว่าต้องเปลี่ยนชื่อหมวดไหน','warn'); return; }
+  const em=PROJ_STATUS_EMOJI[p.projStatus];
+  if(!em){ if(manual) toast('สถานะปัจจุบัน ("'+(p.projStatus||'ยังไม่เริ่ม')+'") ไม่มีอิโมจิกำกับ — ตั้งเป็น กำลังทำ/เสร็จแล้ว/จ่ายเงินแล้ว/ยกเลิก ก่อน','info'); return; }
   const newName=em+_stripLeadEmoji(p.discordCategoryName);
-  if(newName===p.discordCategoryName) return;
+  if(newName===p.discordCategoryName){ if(manual) toast('✅ อิโมจิหมวด "'+p.discordCategoryName+'" ตรงกับสถานะอยู่แล้ว','success'); return; }
   try{
     const r=await callProjBot({action:'discordRenameChannel', ...(p.discordCategoryId?{channelId:p.discordCategoryId}:{categoryName:p.discordCategoryName}), newName});
     await saveProjectMerge(projId, f=>{ f.discordCategoryName=newName; if(r.channelId) f.discordCategoryId=r.channelId; });
