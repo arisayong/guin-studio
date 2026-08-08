@@ -3959,13 +3959,20 @@ function saveStaffData(d){
     _fbDatabase.ref().update(updates).catch(e=>console.warn('Staff save error:',e));
   }
 }
+// ⚡ แคชทะเบียนทีม — getAllStaff ถูกเรียกซ้ำหลายสิบครั้งต่อการวาดหน้าเดียว (การ์ดละครั้ง)
+//    เดิมแต่ละครั้ง = JSON.parse ทะเบียนทั้งก้อนจาก localStorage → หน่วงชัดเจนเมื่อทีม 170+ คน
+//    แคชถูกล้างอัตโนมัติทุกครั้งที่ทะเบียนถูกเขียน (ls('staff_v3',...) ยิง guindatachange)
+let _allStaffCache=null;
+window.addEventListener('guindatachange', e=>{ if(e.detail&&e.detail.key==='staff_v3'){ _allStaffCache=null; try{ _roleCatCache=null; }catch(_){} } });
 function getAllStaff(){
+  if(_allStaffCache) return _allStaffCache;
   const d=getStaffData();
   let a=[];
   Object.entries(d).forEach(([cat,val])=>{
     const arr=Array.isArray(val)?val:Object.values(val||{});
     arr.filter(Boolean).forEach(s=>a.push({...s,category:cat}));
   });
+  _allStaffCache=a;
   return a;
 }
 function getStaffById(id){return getAllStaff().find(s=>s.id===id)}
@@ -5991,6 +5998,27 @@ function projCode(p){
   if(!c && !n) return '';
   return c+(/^\d+$/.test(n)?n.padStart(2,'0'):n);
 }
+// ══ 📄 ตัวแบ่งหน้ากลาง — ลิสต์ยาว ๆ วาดทีละหน้า (กันหน่วงจากวาดทีละหลายร้อยแถว) ══
+const _pgState={};
+function pageSlice(key, arr, per){
+  per=per||15;
+  const total=arr.length, pages=Math.max(1, Math.ceil(total/per));
+  const cur=Math.min(_pgState[key]||1, pages);
+  _pgState[key]=cur;
+  return {items:arr.slice((cur-1)*per, cur*per), cur, pages, total, per};
+}
+function pagerHTML(key, pg, renderFn){
+  if(pg.pages<=1) return '';
+  const btn=(p,label,dis,on)=>`<button class="btn btn-sm ${on?'btn-blue':'btn-outline'}" ${dis?'disabled style="opacity:.4"':''} onclick="_pgState['${key}']=${p};${renderFn}()">${label}</button>`;
+  const nums=[]; for(let p=1;p<=pg.pages;p++){ if(p===1||p===pg.pages||Math.abs(p-pg.cur)<=2) nums.push(p); }
+  let out='<div style="display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;margin:12px 0">';
+  out+=btn(Math.max(1,pg.cur-1),'‹ ก่อนหน้า',pg.cur===1,false);
+  let last=0;
+  nums.forEach(p=>{ if(p-last>1) out+='<span style="color:var(--text2)">…</span>'; out+=btn(p,p,false,p===pg.cur); last=p; });
+  out+=btn(Math.min(pg.pages,pg.cur+1),'ถัดไป ›',pg.cur===pg.pages,false);
+  out+=`<span style="font-size:11px;color:var(--text2)">หน้า ${pg.cur}/${pg.pages} · ทั้งหมด ${pg.total} รายการ</span></div>`;
+  return out;
+}
 // 🔖 ป้ายชื่อมาตรฐาน "รหัส · ชื่อเรื่อง" — รหัสนำหน้าเสมอ (ทีมจำงานด้วยรหัสเป็นหลัก)
 function projDisp(p){
   const c=projCode(p);
@@ -6647,9 +6675,11 @@ async function prBindCategory(projId){
   const cat=prompt('พิมพ์/วางชื่อ "หมวดหมู่" ของงานนี้ใน Discord ให้ตรงเป๊ะทุกตัวอักษรรวมอิโมจิ\n(วิธีก๊อปชื่อ: คลิกขวาที่ชื่อหมวดใน Discord → แก้ไขหมวดหมู่ → ก๊อปข้อความในช่องชื่อ)\n\nระบบจะใช้ชื่อนี้ตามหาหมวดเพื่อเปลี่ยนอิโมจิสถานะ 🟡🟠🟢🔴', guess);
   if(!cat||!cat.trim()) return;
   await saveProjectMerge(projId, f=>{ f.discordCategoryName=cat.trim(); delete f.discordCategoryId; });
-  toast('🏷️ ผูกหมวด "'+cat.trim()+'" แล้ว — กด 🎨 เพื่อลองซิงก์อิโมจิได้เลย','success');
+  toast('🏷️ ผูกหมวด "'+cat.trim()+'" แล้ว — กำลังซิงก์อิโมจิให้เลย...','success');
   renderProjRoom();
   try{ if(!document.getElementById('page-projects').classList.contains('hidden')) renderProjects(); }catch(e){}
+  // ผูกเสร็จลองซิงก์ทันที — ถ้าชื่อไม่ตรง จะเด้งถามให้พิมพ์ใหม่เอง วนจนกว่าจะเจอหรือกดยกเลิก
+  await syncProjStatusEmoji(projId, true);
 }
 async function postProjRoomMsg(projId){
   const p=getProjects().find(x=>x.id===projId);
@@ -13599,7 +13629,8 @@ function renderProjList(){
     const today=new Date();today.setHours(0,0,0,0);
     const tbody=document.getElementById('projects-table');
     if(!tbody)return;
-    tbody.innerHTML=projs.map(p=>{
+    const _pgP=pageSlice('projects', projs, 15);   // 📄 หน้าละ 15 งาน — กันหน่วง
+    tbody.innerHTML=_pgP.items.map(p=>{
       try {
         const exp=getProjExpense(p);
         const profit=(p.budget||0)-exp;
@@ -13670,7 +13701,9 @@ function renderProjList(){
           +'</tr>'
           +'<tr id="apdetail-'+pid+'" style="display:none"><td colspan="10" style="padding:0;background:rgba(0,0,0,.18)">'+adminProjDetailHTML(p)+'</td></tr>';
       } catch(rowErr){console.warn('Row render error:',rowErr);return '';}
-    }).join('')||'<tr><td colspan="10" style="text-align:center;color:var(--text2);padding:32px">ไม่พบโปรเจกต์</td></tr>';
+    }).join('')
+      +(pagerHTML('projects',_pgP,'renderProjList')?'<tr><td colspan="10" style="padding:4px">'+pagerHTML('projects',_pgP,'renderProjList')+'</td></tr>':'')
+      ||'<tr><td colspan="10" style="text-align:center;color:var(--text2);padding:32px">ไม่พบโปรเจกต์</td></tr>';
   } catch(e){console.error('renderProjList error:',e);}
 }
 
@@ -14506,8 +14539,9 @@ function renderAssign(){
   const codeColors={}; const palette=['#FF6FAE','#9B6FFF','#00B4FF','#00DFA0','#FF9E00','#FF6060','#5AD1E6'];
   let ci=0;
   const todayIso=new Date().toISOString().split('T')[0];
-  // 🃏 รายการเป็นการ์ดคั่นชัด — อ่านแยกงานง่าย ไม่ต้องเลื่อนขวา (เดิมเป็นตารางกว้าง 1250px)
-  const cards=list.map((p,ri)=>{
+  // 🃏 รายการเป็นการ์ดคั่นชัด + 📄 หน้าละ 12 งาน
+  const _pgA=pageSlice('assign', list, 12);
+  const cards=_pgA.items.map((p,ri)=>{
     if(p.id===_assignEditId) return _assignEditRowHTML(p);
     const code=(p.clientCode||'').toUpperCase();
     if(code && !codeColors[code]){ codeColors[code]=palette[ci++%palette.length]; }
@@ -14551,7 +14585,7 @@ function renderAssign(){
   const newRow=_assignAdding?_assignEditRowHTML(window._assignCopySrc||null):'';
   const emptyHint=(!list.length&&!_assignAdding)
     ? `<div style="padding:36px;text-align:center;color:var(--text2);background:var(--card);border:1px dashed rgba(128,150,180,.3);border-radius:11px">ไม่มีงานในมุมมองนี้ — กด "➕ มอบหมายงานใหม่" ด้านบนเพื่อเปิดฟอร์มกรอก</div>`:'';
-  el.innerHTML=toolbar+newRow+cards+emptyHint;
+  el.innerHTML=toolbar+newRow+cards+emptyHint+pagerHTML('assign',_pgA,'renderAssign');
   // 🔒 เมเนเจอร์ไม่มีปุ่มสร้างงานใหม่ (แก้งานเดิมได้อย่างเดียว)
   const _addBtn=document.querySelector('#page-assign button[onclick="assignAddRow()"]');
   if(_addBtn) _addBtn.style.display=(currentUser?.role==='manager')?'none':'';
@@ -16337,7 +16371,8 @@ function renderQueue() {
   }
 
   /* ── render each project group as a collapsible card ── */
-  const groupCards = groups.map((g, gi) => {
+  const _pgQ=pageSlice('queue', groups, 10);   // 📄 คิวจ่ายเงิน หน้าละ 10 โปรเจกต์ — หน้านี้หนักสุด
+  const groupCards = _pgQ.items.map((g, gi) => {
     const p = g.proj;
     const groupId = `qgrp-${gi}`;
     const totalAmt = g.workers.reduce((a, w) => a + (w.amount||0), 0);
@@ -16588,7 +16623,7 @@ function renderQueue() {
   else { el.classList.remove('has-bulk-bar'); }
 
   // groupCards อยู่ใน list ปกติ · bulkBar เป็น fixed → append ทีหลัง
-  el.innerHTML = rejectionBanner + summaryBar + groupCards + bulkBar;
+  el.innerHTML = rejectionBanner + summaryBar + groupCards + pagerHTML('queue',_pgQ,'renderQueue') + bulkBar;
 
   } catch(e){console.error('renderQueue failed:',e); toast('queue error: '+e.message,'error');}
 }
@@ -22545,8 +22580,9 @@ function renderDocsHistory() {
     receipt:  { icon:'🧾', label:'ใบเสร็จรับเงิน', color:'var(--green)', bg:'rgba(0,223,160,.1)', border:'rgba(0,223,160,.25)' },
     voucher:  { icon:'💸', label:'ใบสำคัญจ่าย', color:'var(--green)',  bg:'rgba(0,223,160,.1)', border:'rgba(0,223,160,.25)' },
   };
+  const _pgD=pageSlice('docs', all, 15);   // 📄 ประวัติเอกสาร หน้าละ 15 ใบ
   el.innerHTML='<div class="table-wrap"><table><thead><tr><th>เลขที่</th><th>ประเภท</th><th>สถานะ</th><th>ถึง</th><th>โปรเจกต์</th><th>ยอด</th><th>วันที่</th><th>Action</th></tr></thead><tbody>'+
-  all.map(d=>{
+  _pgD.items.map(d=>{
     const t=typeInfo[d.type]||typeInfo.quotation;
     let to;
     if(d.type==='voucher'){
@@ -22587,7 +22623,7 @@ function renderDocsHistory() {
         <button class="btn btn-xs" style="background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.3);color:#FF6060" onclick="deleteDoc('${d.type}','${d.docNo}')" title="ลบเฉพาะ record (ไม่คืนสถานะ)">🗑️</button>
       </div></td>
     </tr>`;
-  }).join('')+'</tbody></table></div>';
+  }).join('')+'</tbody></table></div>'+pagerHTML('docs',_pgD,'renderDocsHistory');
 }
 
 function deleteDoc(type, docNo){
@@ -28723,9 +28759,17 @@ async function syncProjStatusEmoji(projId, manual){
     await saveProjectMerge(projId, f=>{ f.discordCategoryName=newName; if(r.channelId) f.discordCategoryId=r.channelId; });
     toast('🐧 เปลี่ยนอิโมจิหมวดห้องดิสเป็น '+em+' ตามสถานะแล้ว','info');
   }catch(e){
-    toast(String(e.message||'').includes('ไม่รู้จักคำสั่ง')
+    const msg=String(e.message||'');
+    // ชื่อหมวดที่จำไว้ไม่ตรงกับในเซิร์ฟ (เว้นวรรค/อิโมจิต่างกันนิดเดียวก็ไม่เจอ) → ให้พิมพ์ใหม่ได้ทันที
+    if(msg.includes('ไม่พบหมวดหมู่')){
+      if(confirm('❌ หาหมวดชื่อ\n"'+p.discordCategoryName+'"\nในเซิร์ฟเวอร์ไม่เจอ — ชื่อที่จำไว้ไม่ตรงเป๊ะกับของจริง (เว้นวรรค/อิโมจิต่างนิดเดียวก็ไม่เจอ)\n\nพิมพ์/วางชื่อหมวดใหม่เลยไหม?\n(วิธีก๊อปชัวร์ ๆ: คลิกขวาชื่อหมวดใน Discord → แก้ไขหมวดหมู่ → ก๊อปจากช่องชื่อ)')){
+        prBindCategory(projId);
+      }
+      return;
+    }
+    toast(msg.includes('ไม่รู้จักคำสั่ง')
       ? 'เปลี่ยนอิโมจิห้องดิสไม่ได้ — ต้อง Deploy worker.js เวอร์ชันล่าสุดก่อน'
-      : 'เปลี่ยนชื่อหมวดห้องดิสไม่สำเร็จ: '+e.message,'warn');
+      : 'เปลี่ยนชื่อหมวดห้องดิสไม่สำเร็จ: '+msg,'warn');
   }
 }
 
