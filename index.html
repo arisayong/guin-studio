@@ -1648,6 +1648,8 @@ body.sidebar-collapsed .main-content{
       <option value="qc">✅ QC</option>
       <option value="sub">🎬 Sub &amp; Video</option>
      </select>
+     <button class="btn btn-outline btn-sm" onclick="exportAccountingCSV()" title="รายจ่ายประจำเดือน คอลัมน์มาตรฐานสำหรับนักบัญชี (Import เข้า FlowAccount ฯลฯ ได้)">🧾 Export บัญชี CSV</button>
+     <button class="btn btn-outline btn-sm" onclick="exportBankPayoutFile()" title="ไฟล์รายการโอนเงิน (ชื่อ/ธนาคาร/เลขบัญชี/ยอด) เอาไปอัปโหลดเข้าเว็บธนาคารเพื่อโอนเป็นชุด">🏦 Export ไฟล์โอนธนาคาร</button>
     </div>
    </div>
    <div id="pr-summary" style="margin-bottom:14px"></div>
@@ -2576,8 +2578,11 @@ body.sidebar-collapsed .main-content{
    <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">ชื่อ / URL ลูกค้า</label><input class="form-input" id="pj-client" placeholder="ชื่อลูกค้า หรือ link"></div>
    </div>
-   <div style="margin-bottom:12px;max-width:200px">
-    <div class="form-group" style="margin:0"><label class="form-label">จำนวนตอน (Ep.)</label><input class="form-input" id="pj-episodes" type="number" placeholder="เช่น 100" min="0" onwheel="this.blur()"></div>
+   <div style="display:flex;gap:16px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
+    <div class="form-group" style="margin:0;width:180px"><label class="form-label">จำนวนตอน (Ep.)</label><input class="form-input" id="pj-episodes" type="number" placeholder="เช่น 100" min="0" onwheel="this.blur()"></div>
+    <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;padding-bottom:8px" title="บริษัทควักเงินสำรองจ่ายทีมไปก่อนแล้ว — จะขึ้นป้ายส้มชัด ๆ ในหน้ารายการโปรเจกต์">
+      <input type="checkbox" id="pj-advancepaid"> <span>💸 บริษัท<strong>สำรองจ่าย</strong>ไปก่อนแล้ว</span>
+    </label>
    </div>
    <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:12px;margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">🔗 Link โหลดงาน</label><input class="form-input" id="pj-downloadlink" placeholder="https://..."></div>
@@ -2680,7 +2685,9 @@ body.sidebar-collapsed .main-content{
      <input type="text" id="ph-dub-note" placeholder="📝 โน้ตแบ่งงาน เช่น ใช้ 4 คน · คนที่1 Ep.1-21" onchange="onPhaseDateChange('dub','note',this.value)" style="flex:1;min-width:150px">
     </div>
     <div class="cat-block-body">
-     <div style="font-size:11px;color:var(--text2);margin-bottom:7px;font-weight:700;letter-spacing:1px">🌟 นักพากย์หลัก</div>
+     <!-- 💰 เรทนักพากย์แบบเบอร์ 1-10 (ตั้งราคาครั้งเดียว แล้วเลือกเบอร์ให้แต่ละคน) -->
+     <div id="dub-tier-box" style="margin-bottom:12px"></div>
+     <div style="font-size:11px;color:var(--text2);margin-bottom:7px;font-weight:700;letter-spacing:1px">🎤 นักพากย์ (เลือกเบอร์ราคาให้แต่ละคน)</div>
      <div id="dub-main-list"></div>
      <div class="worker-dropdown-wrap">
   <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('dub-main-select')">
@@ -2691,18 +2698,6 @@ body.sidebar-collapsed .main-content{
     <div id="dub-main-select-list" class="worker-dropdown-list"></div>
   </div>
   <select id="dub-main-select" style="display:none" onchange="addWorkerToSlot('dub','main')"></select>
-</div>
-     <div style="font-size:11px;color:var(--text2);margin-bottom:7px;font-weight:700;letter-spacing:1px">🎭 นักพากย์รอง</div>
-     <div id="dub-sub-list"></div>
-     <div class="worker-dropdown-wrap">
-  <button type="button" class="worker-dropdown-btn" onclick="toggleWorkerDropdown('dub-sub-select')">
-    <span>➕ เพิ่มสมาชิก</span><span>▾</span>
-  </button>
-  <div id="dub-sub-select-popup" class="worker-dropdown-popup">
-    <input class="worker-dropdown-search" type="text" placeholder="🔍 ค้นหาชื่อ..." oninput="filterWorkerDropdown('dub-sub-select', this.value)" autocomplete="off">
-    <div id="dub-sub-select-list" class="worker-dropdown-list"></div>
-  </div>
-  <select id="dub-sub-select" style="display:none" onchange="addWorkerToSlot('dub','sub')"></select>
 </div>
     </div>
    </div>
@@ -5566,10 +5561,35 @@ function _alcPersonRow(o, busy){
     +'<span class="alc-roles">'+_alcPres(s).map(p2=>'<span class="alc-rl">'+((ALC_ROLE[p2]||'').split(' ')[0])+'</span>').join('')+'</span>'
     +(busy
       ? '<span class="alc-chip alc-c-warn">🙅 แจ้งไม่ว่าง</span><span class="alc-tgl" onclick="alcSetAvail(\''+esc(o.sid)+'\',true)" title="ถ้าจริง ๆ แล้วเขาว่าง กดปุ่มนี้ — จะย้ายกลับมาให้ลากเข้างานได้">↩️ ว่างแล้ว</span>'
-      : _alcAvailChip(rep)+' '+_alcJobChip(o.sid)+(drafted?' '+_alcDraftChips(o.sid):'')
+      : _alcAvailChip(rep)+' '+_alcJobChip(o.sid)+' '+loadChipHTML(o.sid)+(drafted?' '+_alcDraftChips(o.sid):'')
         +'<span class="alc-tgl" onclick="alcSetAvail(\''+esc(o.sid)+'\',false)" title="ย้ายไปกลุ่มแจ้งไม่ว่าง (แก้ด้วยมือ)">🙅 ไม่ว่าง</span>')
     +'<div class="alc-p-quote">'+(msg?('💬 “'+esc(msg.slice(0,140))+'”'):'<span style="color:var(--orange)">⚠️ อ่านข้อความไม่ได้ — เช็คสิทธิ์บอท</span>')+'</div>'
     +'</div>';
+}
+// ══ 3.2 ความหนาแน่นคิวงาน (Capacity Heatmap) — รวม "นาที" ของงานกำลังทำที่แต่ละคนถืออยู่ ══
+function staffLoadMinutes(staffId){
+  let m=0;
+  (getProjects()||[]).forEach(p=>{
+    if(!p||p.projStatus==='done'||p.projStatus==='cancelled'||p.projStatus==='paid') return;
+    if(!(p.workers||[]).some(w=>w&&w.id===staffId)) return;
+    m+=parseFloat(p.duration)||0;
+  });
+  return Math.round(m);
+}
+function loadChipHTML(staffId){
+  const m=staffLoadMinutes(staffId);
+  const max=parseFloat(ls('capmax'))||300;
+  const icon=m>=max?'🔴':m>=max*0.7?'🟡':'🟢';
+  const col=m>=max?'var(--red)':m>=max*0.7?'var(--orange)':'var(--green)';
+  return '<span onclick="event.stopPropagation();alcSetCapMax()" style="font-size:9.5px;color:'+col+';white-space:nowrap;cursor:pointer" title="งานกำลังทำที่ถืออยู่รวม '+m+' นาที · เพดาน '+max+' นาที (🟢 ว่างรับได้ · 🟡 เริ่มตึง · 🔴 ล้นมือ) — กดเพื่อตั้งเพดานใหม่">'+icon+' '+m+'น.</span>';
+}
+async function alcSetCapMax(){
+  const cur=parseFloat(ls('capmax'))||300;
+  const v=prompt('เพดานความจุต่อคน (นาทีของงานที่ถือพร้อมกัน):\n🟢 ต่ำกว่า 70% = ว่างรับได้ · 🟡 70%+ = เริ่มตึง · 🔴 เต็ม = ล้นมือ', cur);
+  if(!v) return;
+  ls('capmax', parseFloat(v)||300);
+  try{ await fbSaveKeyed('capmax', parseFloat(v)||300); }catch(e){}
+  renderAlloc();
 }
 // 🧹 รีเซ็ตกระดาน — ล้างรายชื่อคนตอบออกทั้งหมดโดยการปิดรอบลงคิวที่เปิดอยู่
 //    คำตอบไม่หาย: ยังเปิดดู/เปิดรอบซ้ำได้ที่หน้า 📌 ลงคิว — กระดานจะโชว์เฉพาะรอบที่เปิดอยู่เท่านั้น
@@ -5832,19 +5852,27 @@ function alcOpenPrice(projId, items){
   const p=getProjects().find(x=>x.id===projId); if(!p||!items||!items.length) return;
   window._alcPriceCtx={projId, items};
   const dur=parseFloat(p.duration)||0;
-  const rowsH=items.map((it,i)=>{
+  // 1.5 จัดกรอบแยกตามโรล — เห็นชัดว่าใครทำหน้าที่อะไร ใส่เงินไม่ผิดคน
+  const _rowOf=(it,i)=>{
     const w=[...(p.workers||[])].reverse().find(w=>w&&w.id===it.sid&&(w.slot||'').split('-')[0]===it.pre)||{};
     const s=getStaffById(it.sid);
     const unit=w.unit||'นาที', rate=w.ratePerUnit||0, qty=w.qty||0;
-    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">'
-      +'<span style="min-width:118px;font-weight:700">'+esc(s?s.nickname:'?')+' <span style="font-size:10.5px;color:var(--text2)">'+(ALC_ROLE[it.pre]||'')+'</span></span>'
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap">'
+      +'<span style="min-width:110px;font-weight:700">'+esc(s?s.nickname:'?')+'</span>'
       +'<input id="alc-pr-r-'+i+'" type="number" value="'+rate+'" class="form-input" style="width:90px;padding:6px 9px" oninput="_alcPriceCalc('+i+')">'
       +'<select id="alc-pr-u-'+i+'" class="form-input form-select" style="width:auto;padding:6px 26px 6px 9px" onchange="_alcPriceCalc('+i+')">'+PRICE_UNITS.map(u=>'<option'+(u===unit?' selected':'')+'>'+u+'</option>').join('')+'</select>'
       +'<input id="alc-pr-q-'+i+'" type="number" value="'+qty+'" placeholder="จำนวน" class="form-input" style="width:72px;padding:6px 9px;'+(PRICE_QTY_UNITS.includes(unit)?'':'display:none')+'" oninput="_alcPriceCalc('+i+')">'
       +'<span id="alc-pr-t-'+i+'" style="margin-left:auto;font-weight:800;color:var(--green)">'+fmtB(calcWorkerAmt({amount:rate,unit,qty},dur))+'</span>'
       +'</div>';
-  }).join('');
-  _tagOverlayShow('💰 ใส่ราคา — '+esc(p.name||''),
+  };
+  const _byPre={};
+  items.forEach((it,i)=>{ (_byPre[it.pre]=_byPre[it.pre]||[]).push(_rowOf(it,i)); });
+  const _preColor={dub:'var(--orange)',adp:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',sub:'var(--red)',trn:'#FF6FAE',mgr:'var(--accent2)'};
+  const rowsH=Object.entries(_byPre).map(([pre,rows])=>
+    '<div style="border:1px solid var(--border2);border-left:3px solid '+(_preColor[pre]||'var(--border2)')+';border-radius:10px;padding:9px 11px;margin-bottom:9px;background:var(--bg2)">'
+    +'<div style="font-size:12px;font-weight:800;margin-bottom:7px">'+(ALC_ROLE[pre]||pre)+' <span style="font-weight:400;color:var(--text2);font-size:10.5px">· '+rows.length+' คน</span></div>'
+    +rows.join('')+'</div>').join('');
+  _tagOverlayShow('💰 ใส่ราคา — '+esc(projDisp(p)),
     '<div style="font-size:11.5px;color:var(--text2);margin-bottom:10px">เรทถูกเติมให้อัตโนมัติจากเรทเดิมของโปรเจกต์ (แก้ได้) · หน่วย "นาที" = เรท × ความยาว '+(dur||'?')+' นาที</div>'
     +rowsH
     +'<div style="display:flex;gap:8px;margin-top:12px">'
@@ -5883,7 +5911,7 @@ async function alcSavePrice(){
 // 🚶 สายพานลดคลิก: จัดคน+ราคาเสร็จ → ชวนไปขั้นถัดไปทันที ไม่ต้องหาเมนูเอง
 function _alcNextSteps(projId){
   const p=getProjects().find(x=>x.id===projId); if(!p) return;
-  _tagOverlayShow('✅ จัดคนเข้า "'+esc(p.name||'')+'" เรียบร้อย — ไปต่อเลยไหม?', `
+  _tagOverlayShow('✅ จัดคนเข้า "'+esc(projDisp(p))+'" เรียบร้อย — ไปต่อเลยไหม?', `
     <div style="display:flex;flex-direction:column;gap:8px">
       <button class="btn btn-blue" onclick="document.getElementById('tag-overlay')?.remove();_prSel='${esc(projId)}';nav('projroom')">🐧 สร้างห้อง + โพสต์คู่มือใน Discord</button>
       <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove();_drSel='${esc(projId)}';nav('drive')">📂 สร้างโฟลเดอร์งานในไดรฟ์</button>
@@ -5957,6 +5985,12 @@ function projCode(p){
   const n=String(p.seq==null?'':p.seq).trim();
   if(!c && !n) return '';
   return c+(/^\d+$/.test(n)?n.padStart(2,'0'):n);
+}
+// 🔖 ป้ายชื่อมาตรฐาน "รหัส · ชื่อเรื่อง" — รหัสนำหน้าเสมอ (ทีมจำงานด้วยรหัสเป็นหลัก)
+function projDisp(p){
+  const c=projCode(p);
+  const n=(p&&p.name&&p.name!==c)?p.name:'';
+  return c?(n?c+' · '+n:c):(n||'(ไม่มีชื่อ)');
 }
 function buildProjPostText(p){
   const code=projCode(p);
@@ -6383,7 +6417,7 @@ function renderProjRoom(){
   const el=document.getElementById('pr-body'); if(!el) return;
   const role=currentUser?.role;
   if(role!=='admin'&&role!=='manager'){ el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin และ Manager เท่านั้น</div>'; return; }
-  let list=getProjects().filter(p=>p&&p.projStatus!=='cancelled'&&p.projStatus!=='done');
+  let list=getProjects().filter(p=>p&&p.projStatus!=='cancelled'&&p.projStatus!=='done'&&p.projStatus!=='paid');
   // เมเนเจอร์เห็นงานของเมเนเจอร์ทุกคน (ช่วยกันดู/แก้โพสต์ได้) — ยกเว้นงานที่แอดมินถือเอง
   if(role==='manager') list=list.filter(p=>p.managerId);
   list.sort((a,b)=>String(a.deadline||'9999').localeCompare(String(b.deadline||'9999')));
@@ -6477,7 +6511,7 @@ async function createProjRoomCat(projId){
     // 📝 เก็บข้อความในกล่องไว้กับงานตั้งแต่ตอนสร้างห้อง — ต่อให้โพสต์ขั้นถัดไปสะดุด ข้อความที่แก้ไว้ก็ไม่หาย
     const _draftNow=String(document.getElementById('pr-post')?.value||'').trim();
     await saveProjectMerge(projId, f=>{
-      f.discordCategoryName=cat; f.discordChannelId=c1.channelId; f.discordChannelName=c1.channelName||'📁│project';
+      f.discordCategoryName=cat; f.discordCategoryId=c1.categoryId||''; f.discordChannelId=c1.channelId; f.discordChannelName=c1.channelName||'📁│project';
       f.discordPrivate=isPrivate;
       if(c2) f.discordTalkId=c2.channelId;
       if(_draftNow) f.postDraft=_draftNow;
@@ -6656,7 +6690,7 @@ async function prAutoRecreate(projId, rawTxt){
     const c1=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'📁│project', ...(priv?{private:true}:{})});
     let c2=null; try{ c2=await callProjBot({action:'discordCreateChannel', categoryName:cat, channelName:'🎙│พูดคุย', ...(priv?{private:true}:{})}); }catch(e){}
     await saveProjectMerge(projId, f=>{
-      f.discordCategoryName=cat; f.discordChannelId=c1.channelId; f.discordChannelName=c1.channelName||'📁│project';
+      f.discordCategoryName=cat; f.discordCategoryId=c1.categoryId||''; f.discordChannelId=c1.channelId; f.discordChannelName=c1.channelName||'📁│project';
       f.discordPrivate=priv; f.discordTalkId=c2?c2.channelId:''; f.discordMsgId=''; f.discordMsgIds=[];
       if(rawTxt) f.postDraft=rawTxt;
     });
@@ -7080,7 +7114,7 @@ function renderDrivePage(){
     </div>`;
     return;
   }
-  let list=getProjects().filter(p=>p&&p.projStatus!=='cancelled'&&p.projStatus!=='done');
+  let list=getProjects().filter(p=>p&&p.projStatus!=='cancelled'&&p.projStatus!=='done'&&p.projStatus!=='paid');
   if(role==='manager') list=list.filter(p=>p.managerId===currentUser.uid);
   list.sort((a,b)=>String(a.deadline||'9999').localeCompare(String(b.deadline||'9999')));
   if(_drSel && !list.some(p=>p.id===_drSel)) _drSel='';
@@ -7716,7 +7750,88 @@ async function prMarkPaid(staffId){
   const ok=res.ok, fail=res.failed.length;
   if(ok) logAudit('payment.pay', rec.staff.nickname||rec.staff.name, `รอบเดือน ${monthKey} · ${todo.length} งาน · ${fmtB(total)}`);
   toast(fail? `บันทึกแล้ว ${ok} โปรเจกต์ · ล้มเหลว ${fail}` : `✅ บันทึกจ่ายแล้ว ${todo.length} งาน (${fmtB(total)})`, fail?'warn':'success');
+  // 2.1 มีหักภาษี ณ ที่จ่าย → ออกใบ 50 ทวิให้อัตโนมัติ
+  try{ await _autoWhtOnPay(rec.staff, todo, monthKey); }catch(e){}
   renderPayrollMonth();
+}
+// ══ 2.1 ออกใบ 50 ทวิอัตโนมัติหลังบันทึกจ่าย (เฉพาะคน/เดือนที่มีหักภาษี) ══
+async function _autoWhtOnPay(staff, items, monthKey){
+  let gross=0, tax=0;
+  items.forEach(it=>{
+    const t=parseFloat((it.p.tax||{})[it.pre])||0;
+    const amt=it.w.amount||0;
+    gross+=amt; tax+=amt-Math.round(amt*(1-t/100));
+  });
+  if(tax<=0) return;
+  const payer=ls('wht_payer')||{};
+  if(!payer.name){ toast('งวดนี้มีหักภาษี '+fmtB(tax)+' แต่ยังไม่ได้ตั้งข้อมูลผู้จ่าย — ตั้งครั้งเดียวที่หน้าเอกสาร แท็บ 🏛️ 50 ทวิ แล้วระบบจะออกใบให้อัตโนมัติ','warn'); return; }
+  const yearBE=new Date().getFullYear()+543;
+  const docNo='WHT'+yearBE+'-'+String(getWhtDocs().length+1).padStart(3,'0');
+  const doc={
+    id:'WHT'+Date.now(), docNo,
+    payer:{name:payer.name||'', taxid:payer.taxid||'', addr:payer.addr||''},
+    payee:{name:staff.name||staff.nickname||'', taxid:staff.taxId||'', addr:staff.address||'', staffId:staff.id},
+    incomeType:'402', payDate:new Date().toISOString().split('T')[0],
+    amount:gross, tax, taxPct:0, auto:true, payrollMonth:monthKey,
+    createdAt:new Date().toISOString(), createdBy:currentUser?.nickname||currentUser?.email||''
+  };
+  const all=getWhtDocs(); all.unshift(doc); await saveWhtDocs(all);
+  try{ renderWhtRecent(); }catch(e){}
+  toast('🏛️ ออกใบ 50 ทวิอัตโนมัติ '+docNo+' (ภาษี '+fmtB(tax)+') — พิมพ์/ส่งได้ที่หน้าเอกสาร แท็บ 50 ทวิ','success');
+}
+// ══ 2.2 Export บัญชีรายเดือน CSV — คอลัมน์มาตรฐานส่งนักบัญชี (Import เข้าโปรแกรมบัญชีได้) ══
+function exportAccountingCSV(){
+  const monthKey=document.getElementById('pr-month')?.value||new Date().toISOString().slice(0,7);
+  const byPerson=buildPayrollMonth(monthKey,'all');
+  const esc2=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const L=[['วันที่จ่าย','ชื่อ-นามสกุล','เลขบัตรประชาชน','ยอดเงินรวม','หัก ณ ที่จ่าย','ยอดสุทธิ','VAT','ธนาคาร','เลขบัญชี','งาน'].map(esc2).join(',')];
+  let rows=0;
+  [...byPerson.entries()].forEach(([sid,v])=>{
+    const s=v.staff;
+    let gross=0, tax=0; const names=[];
+    v.items.forEach(it=>{
+      const t=parseFloat((it.p.tax||{})[it.pre])||0;
+      const amt=it.w.amount||0;
+      gross+=amt; tax+=amt-Math.round(amt*(1-t/100));
+      names.push(projDisp(it.p));
+    });
+    if(!gross) return;
+    const payDate=String((v.items.find(it=>it.w.paidAt)||{}).w?.paidAt||'').split('T')[0];
+    L.push([payDate, s.name||s.nickname||'', s.taxId||'', gross, tax, gross-tax, 0, s.bank||'', s.account||'', [...new Set(names)].join(' | ')].map(esc2).join(','));
+    rows++;
+  });
+  if(!rows){ toast('เดือนนี้ไม่มีรายการจ่าย','info'); return; }
+  const blob=new Blob(['﻿'+L.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='บัญชีรายจ่าย_'+monthKey+'.csv'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  try{ logAudit('report.export', monthKey, 'Export บัญชีรายเดือน CSV'); }catch(e){}
+  toast('🧾 ได้ไฟล์บัญชี '+_thaiMonthLabel(monthKey)+' แล้ว ('+rows+' คน) — เลขบัตร ปชช. ดึงจากที่เคยกรอกในใบ 50 ทวิ','success');
+}
+// ══ 3.1 ไฟล์โอนเงินธนาคารแบบกลุ่ม — เฉพาะยอดที่ยังไม่จ่ายของเดือนที่เลือก ══
+function exportBankPayoutFile(){
+  const monthKey=document.getElementById('pr-month')?.value||new Date().toISOString().slice(0,7);
+  const byPerson=buildPayrollMonth(monthKey,'all');
+  const esc2=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const L=[['ลำดับ','ชื่อบัญชี','ธนาคาร','เลขบัญชี','จำนวนเงิน','หมายเหตุ'].map(esc2).join(',')];
+  let i=0; const missing=[];
+  [...byPerson.entries()].forEach(([sid,v])=>{
+    const s=v.staff;
+    let net=0;
+    v.items.filter(it=>it.w.status!=='paid').forEach(it=>{
+      const t=parseFloat((it.p.tax||{})[it.pre])||0;
+      net+=Math.round((it.w.amount||0)*(1-t/100));
+    });
+    if(net<=0) return;
+    if(!String(s.account||'').trim()){ missing.push(s.nickname||s.name); return; }
+    i++;
+    L.push([i, s.name||s.nickname||'', s.bank||'', String(s.account||'').replace(/[^0-9]/g,''), net, 'ค่าจ้าง '+_thaiMonthLabel(monthKey)].map(esc2).join(','));
+  });
+  if(!i){ toast('ไม่มียอดค้างจ่ายของเดือนนี้'+(missing.length?' · ขาดเลขบัญชี: '+missing.join(', '):''),'info'); return; }
+  const blob=new Blob(['﻿'+L.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='โอนเงินทีม_'+monthKey+'.csv'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  try{ logAudit('report.export', monthKey, 'Export ไฟล์โอนเงินธนาคาร ('+i+' รายการ)'); }catch(e){}
+  toast('🏦 ได้ไฟล์โอน '+i+' รายการ'+(missing.length?' · ⚠️ ขาดเลขบัญชี '+missing.length+' คน: '+missing.slice(0,5).join(', '):''), missing.length?'warn':'success');
 }
 // ออกใบสำคัญจ่าย 1 ใบ รวมงานทั้งเดือนของคนนั้น
 async function prIssueVoucher(staffId){
@@ -7750,7 +7865,7 @@ async function prIssueVoucher(staffId){
   const saved=getDocsStore('vouchers')||[];
   saved.push({
     type:'voucher', docNo:vNo, staffId, staffName:s.name, staffLastName:s.lastName||'', staffNickname:s.nickname,
-    items: items.map(it=>({projId:it.p.id, projName:it.p.name, slot:it.w.slot, amount:it.w.amount||0})),
+    items: items.map(it=>({projId:it.p.id, projName:projDisp(it.p), slot:it.w.slot, amount:it.w.amount||0})),
     amount: totalAmt, totalAmount: totalAmt, multiItem:true,
     bank:s.bank||'', account:s.account||'', email:s.email||'',
     date, note:'ค่าตอบแทนรอบเดือน '+_thaiMonthLabel(monthKey), createdAt:new Date().toISOString(),
@@ -10395,11 +10510,11 @@ function renderDash(){
     </div>`;
   const urgentEl=document.getElementById('dash-queue');
   urgentEl.innerHTML=urgent.length?urgent.map(p=>{const dl=new Date(p.deadline);dl.setHours(0,0,0,0);const diff=Math.ceil((dl-today)/(864e5));const color=diff<=1?'var(--red)':diff<=3?'var(--orange)':'var(--text2)';
-    return`<tr style="cursor:pointer" onclick="openProjDetail('${p.id}')"><td><strong>${p.name}</strong></td><td style="color:var(--text2);font-size:12px">${p.client||'-'}</td><td style="color:${color};font-weight:700">${diff===0?'🔴 วันนี้':diff+' วัน'}</td><td>${fmtDate(p.deadline)}</td></tr>`}).join('')
+    return`<tr style="cursor:pointer" onclick="openProjDetail('${p.id}')"><td><strong>${projDisp(p)}</strong></td><td style="color:var(--text2);font-size:12px">${p.client||'-'}</td><td style="color:${color};font-weight:700">${diff===0?'🔴 วันนี้':diff+' วัน'}</td><td>${fmtDate(p.deadline)}</td></tr>`}).join('')
     :'<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:20px">✅ ไม่มี deadline ใน 7 วัน</td></tr>';
   const projTb=document.getElementById('dash-projects');
   projTb.innerHTML=pendingWorkers.length?pendingWorkers.slice(0,8).map(({proj:p,worker:w})=>{const s=getStaffById(w.id);if(!s)return'';
-    return`<tr><td><strong>${esc(s.nickname)}</strong></td><td style="font-size:12px;color:var(--text2)">${esc(p.name)}</td><td style="color:var(--accent2);font-weight:700">${fmtB(w.amount)}</td><td>${statusBadge(w.status, p.id)}</td></tr>`}).join('')
+    return`<tr><td><strong>${esc(s.nickname)}</strong></td><td style="font-size:12px;color:var(--text2)">${esc(projDisp(p))}</td><td style="color:var(--accent2);font-weight:700">${fmtB(w.amount)}</td><td>${statusBadge(w.status, p.id)}</td></tr>`}).join('')
     :'<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:20px">🎉 ไม่มีค้างจ่าย</td></tr>';
 }
 
@@ -11549,7 +11664,7 @@ function runProjectStaffAudit(){
       // Orphan: worker ID ไม่อยู่ใน staff records
       const entry = {
         projId: p.id,
-        projName: p.name,
+        projName: projDisp(p),
         workerId: w.id,
         workerName: w.name || '(ไม่มีชื่อ)',
         slot: w.slot,
@@ -13341,7 +13456,7 @@ function renderProjects(){
   const types=[...new Set(projs.map(p=>p.type).filter(Boolean))];
   const tf=document.getElementById('type-filter');
   // 🔥 ปุ่มช็อตคัท "งานที่ยังไม่จบ" = ยังไม่เริ่ม + กำลังทำ (ไม่รวมเสร็จแล้ว/ยกเลิก)
-  const _activeCount=projs.filter(p=>p.projStatus!=='done'&&p.projStatus!=='cancelled').length;
+  const _activeCount=projs.filter(p=>p.projStatus!=='done'&&p.projStatus!=='cancelled'&&p.projStatus!=='paid').length;
   const _statusChip=`<div class="filter-chip${selectedProjStatusQ==='active'?' active':''}" style="${selectedProjStatusQ==='active'?'':'border-color:rgba(255,158,0,.45);color:var(--orange);'}font-weight:700" onclick="selectedProjStatusQ=selectedProjStatusQ==='active'?'all':'active';renderProjects()">🔥 งานที่ยังไม่จบ (${_activeCount})</div>`;
   // 💸 ชิปกรองสถานะจ่ายทีม: จ่ายครบ / จ่ายบางส่วน / ยังไม่จ่าย (กดซ้ำเพื่อยกเลิก)
   const _payCounts={full:0,partial:0,none:0};
@@ -13468,9 +13583,10 @@ function renderProjList(){
         }
         const statusSel='<select style="padding:3px 6px;font-size:11px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:Kanit;cursor:pointer;max-width:110px" onchange="saveProjStatus(\''+p.id+'\',this.value)" onclick="event.stopPropagation()">'
           +'<option value="notstarted" '+((!p.projStatus||p.projStatus==='notstarted')?'selected':'')+'>⬜ ยังไม่เริ่ม</option>'
-          +'<option value="inprogress" '+(p.projStatus==='inprogress'?'selected':'')+'>⚙️ กำลังทำ</option>'
-          +'<option value="done" '+(p.projStatus==='done'?'selected':'')+'>✅ เสร็จแล้ว</option>'
-          +'<option value="cancelled" '+(p.projStatus==='cancelled'?'selected':'')+'>❌ ยกเลิก</option>'
+          +'<option value="inprogress" '+(p.projStatus==='inprogress'?'selected':'')+'>🟡 กำลังทำ</option>'
+          +'<option value="done" '+(p.projStatus==='done'?'selected':'')+'>🟠 เสร็จแล้ว</option>'
+          +'<option value="paid" '+(p.projStatus==='paid'?'selected':'')+'>🟢 จ่ายเงินแล้ว</option>'
+          +'<option value="cancelled" '+(p.projStatus==='cancelled'?'selected':'')+'>🔴 ยกเลิก</option>'
           +'</select>';
         const pid=String(p.id);
         // Actions column FIRST - always visible
@@ -13486,7 +13602,9 @@ function renderProjList(){
           +'<td style="max-width:220px;padding:8px 6px">'
           +'<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
             +(projCode(p)?'<span style="font-weight:800;color:var(--text);background:rgba(0,180,255,.14);padding:1px 8px;border-radius:7px;margin-right:6px">'+esc(projCode(p))+'</span>':'')
-            +'<span style="font-weight:600;color:var(--accent2)">'+(p.name||'—')+'</span></div>'
+            +'<span style="font-weight:600;color:var(--accent2)">'+((p.name&&p.name!==projCode(p))?p.name:'')+'</span>'
+            +(p.isAdvancePaid?'<span title="บริษัทสำรองจ่ายทีมไปก่อนแล้ว" style="margin-left:6px;font-size:10px;padding:2px 9px;border-radius:8px;background:rgba(255,158,0,.18);color:var(--orange);font-weight:800;border:1px solid rgba(255,158,0,.4)">💸 สำรองจ่าย</span>':'')
+            +'</div>'
           +'<div data-presence-proj="'+pid+'" style="margin-top:2px;display:inline-flex;gap:4px;flex-wrap:wrap">'+presenceBadgeHTML(pid)+'</div>'
           +(roleBadges?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+roleBadges+'</div>':'')
           +(p.note?'<div style="font-size:10px;color:var(--text2)">📝 '+p.note+'</div>':'')
@@ -13564,7 +13682,9 @@ function adminProjDetailHTML(p){
 // ══════════════════════════════════════════════
 // PROJECT FORM
 // ══════════════════════════════════════════════
-function initFormSlots(){formSlots={dub:{main:[],sub:[]},adp:{only:[]},mix:{only:[]},qc:{only:[]},sub:{only:[]},trn:{only:[]},mgr:{only:[]}};activeCats=new Set()}
+let formDubTiers=[];
+function _dubTierDefaults(){ return [{rate:'',unit:'นาที',qty:0},{rate:'',unit:'นาที',qty:0},{rate:'',unit:'นาที',qty:0}]; }
+function initFormSlots(){formSlots={dub:{main:[],sub:[]},adp:{only:[]},mix:{only:[]},qc:{only:[]},sub:{only:[]},trn:{only:[]},mgr:{only:[]}};activeCats=new Set();formDubTiers=_dubTierDefaults();}
 
 // ══ 💰 ค่าเหมา Manager ตรงจุดมอบหมาย — กรอกครั้งเดียว ระบบใส่ลงหมวด Manager ให้เอง ══
 function _mgrStaffIdOf(uid){
@@ -13836,6 +13956,7 @@ async function openNewProject(){
   const _metaEl = document.getElementById('proj-modal-meta');
   if(_metaEl){ _metaEl.textContent=''; _metaEl.style.display='none'; }
   ['pj-name','pj-client','pj-budget','pj-budget-qty','pj-duration','pj-note','pj-clientcode','pj-seq','pj-episodes','pj-downloadlink','pj-secretkey'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  { const _ap=document.getElementById('pj-advancepaid'); if(_ap) _ap.checked=false; }
   _fillClientCodeDatalist();
   initFormIncome(null);
   toggleBudgetQty();
@@ -13856,7 +13977,7 @@ async function openNewProject(){
   // Default phase dates = project today
   applyProjectDatesToEmptyPhases();
   populateFormPhasesUI();
-  populateWorkerSelects();clearAllWorkerLists();calcProjSummary();
+  populateWorkerSelects();clearAllWorkerLists();renderDubTiers();calcProjSummary();
   openModal('modal-project');
   // ─ prompt draft restore (กรณีสร้างใหม่แล้ว refresh) ─
   const draft = loadDraft(null);
@@ -14219,10 +14340,13 @@ function _arUnitHint(p){
 async function assignSaveRow(projId){
   const g=id=>document.getElementById(id);
   const name=(g('ar-name')?.value||'').trim();
-  if(!name){ toast('กรอกชื่อโปรเจกต์ก่อน','error'); g('ar-name')?.focus(); return; }
   let code=(g('ar-code')?.value||'');
   if(code==='__new') code=(g('ar-code-new')?.value||'');
   code=code.trim().toUpperCase();
+  // มีรหัส+ลำดับ = ถือว่ามีชื่อแล้ว (เช่น H33) — เซฟได้เลย ระบบใช้รหัสเป็นชื่อชั่วคราว
+  const _seqTxt=(g('ar-seq')?.value||'').trim();
+  if(!name && !(code && _seqTxt)){ toast('กรอกชื่อโปรเจกต์ หรืออย่างน้อย รหัส + ลำดับ','error'); g('ar-name')?.focus(); return; }
+  const nameFinal=name||projCode({clientCode:code, seq:parseInt(_seqTxt)||0});
   const vals={
     deadline:g('ar-deadline')?.value||'',
     clientCode:code,
@@ -14232,7 +14356,7 @@ async function assignSaveRow(projId){
     managerId:(currentUser?.role==='manager')
       ? (projId ? ((getProjects().find(x=>x.id===projId)||{}).managerId||currentUser.uid) : currentUser.uid)
       : (g('ar-mgr')?.value||''),
-    name,
+    name:nameFinal,
     downloadLink:(g('ar-link')?.value||'').trim(),
     secretKey:(g('ar-secret')?.value||'').trim(),
     note:(g('ar-note')?.value||'').trim(),
@@ -14272,7 +14396,7 @@ async function assignSaveRow(projId){
     const phases={};
     _ASSIGN_PHASES.forEach(([k])=>{ const v=phVals[k]; if(v.deadline||v.deadline2||v.note) phases[k]={startDate:'',deadline:v.deadline,deadline2:v.deadline2,submitTime:'',status:'none',note:v.note}; });
     const proj={
-      id:'P'+Date.now(), name, date:today, client:vals.client||'', type:vals.type||'',
+      id:'P'+Date.now(), name:nameFinal, date:today, client:vals.client||'', type:vals.type||'',
       budget:calcBudgetTotal(bRate||0, bType, bDur, bQty), budgetRate:bRate||0, budgetType:bType, budgetQty:bQty, duration:bDur||0,
       startDate:today, deadline:vals.deadline, cycle:'', note:vals.note,
       clientCode:vals.clientCode, seq:vals.seq, episodes:vals.episodes,
@@ -14297,7 +14421,7 @@ function renderAssign(){
   let list=(getProjects()||[]).slice();
   // 🗂️ เมเนเจอร์เห็น/แก้งานของกันและกันได้ทุกคน — ยกเว้นงานที่แอดมินถือเอง (ไม่มีเมเนเจอร์)
   if(currentUser?.role==='manager') list=list.filter(p=>p.managerId);
-  if(!_assignShowAll) list=list.filter(p=>p.projStatus!=='done'&&p.projStatus!=='cancelled');
+  if(!_assignShowAll) list=list.filter(p=>p.projStatus!=='done'&&p.projStatus!=='cancelled'&&p.projStatus!=='paid');
   const months=[...new Set(list.map(p=>(p.deadline||'').slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
   if(_assignMonth) list=list.filter(p=>(p.deadline||'').slice(0,7)===_assignMonth);
   const sorters={
@@ -14425,7 +14549,10 @@ function addWorkerToSlot(cat,slot){
   const _seed=_last?{amount:_last.amount,unit:_last.unit||'นาที',qty:_last.qty||0}
              :_hint?{amount:_hint.rate||0,unit:_hint.unit||'นาที',qty:_hint.qty||0}
              :{amount:0,unit:'นาที',qty:0};
-  formSlots[cat][slot].push({staffId,amount:_seed.amount,unit:_seed.unit,qty:_seed.qty});sel.value='';
+  const _row={staffId,amount:_seed.amount,unit:_seed.unit,qty:_seed.qty};
+  if(cat==='dub') _row.tier=1;   // นักพากย์เริ่มที่เบอร์ 1 — เปลี่ยนได้ที่แถว
+  formSlots[cat][slot].push(_row);sel.value='';
+  if(cat==='dub') _applyDubTiers();   // เขียนเรทของเบอร์ลงแถวทันที (ถ้าตั้งเรทไว้แล้ว)
   renderWorkerList(cat,slot);calcProjSummary();
 }
 function renderAllWorkerLists(){
@@ -14446,6 +14573,52 @@ function calcWorkerAmt(w, dur){
   if(u === 'นาที') return dur > 0 ? rate * dur : rate;
   if(PRICE_QTY_UNITS.includes(u)) return rate * (parseFloat(w.qty) || 0);
   return rate; // เหมา / โปรเจกต์
+}
+// ══ 💰 เรทนักพากย์แบบเบอร์ (นักพากย์ 1-10) — ตั้งราคาที่หัวหมวดครั้งเดียว แต่ละคนแค่เลือกเบอร์ ══
+//    เลือกเบอร์แล้วระบบเขียน ราคา/หน่วย/จำนวน ลงช่องเดิมของคนนั้น → การคำนวณ/บันทึกที่มีอยู่ทำงานต่อได้ทั้งหมด
+function renderDubTiers(){
+  const box=document.getElementById('dub-tier-box'); if(!box) return;
+  if(!Array.isArray(formDubTiers)||!formDubTiers.length) formDubTiers=_dubTierDefaults();
+  box.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--orange);margin-bottom:6px;letter-spacing:.5px">💰 เรทราคานักพากย์ (เบอร์ 1-10 · ค่าเริ่มต้นต่อนาที)</div>'
+    +formDubTiers.map((t,i)=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:700;min-width:78px">นักพากย์ ${i+1}</span>
+      <input type="number" value="${t.rate??''}" placeholder="ราคา" min="0" step="any" onwheel="this.blur()" style="width:92px;padding:6px 9px;background:rgba(0,0,0,.35);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px" oninput="updateDubTier(${i},'rate',this.value)">
+      <span style="color:var(--text2);font-size:12px">/</span>
+      <select style="padding:5px 8px;background:rgba(0,0,0,.35);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:12px" onchange="updateDubTier(${i},'unit',this.value)">
+        ${PRICE_UNITS.map(u=>`<option value="${u}"${(t.unit||'นาที')===u?' selected':''}>${u}</option>`).join('')}
+      </select>
+      ${PRICE_QTY_UNITS.includes(t.unit)?`<span style="color:var(--text2);font-size:12px">×</span>
+      <input type="number" value="${t.qty||''}" placeholder="กี่${t.unit}" min="0" step="any" onwheel="this.blur()" style="width:74px;padding:6px 9px;background:rgba(0,0,0,.35);border:1px solid rgba(0,180,255,.35);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px;text-align:center" oninput="updateDubTier(${i},'qty',this.value)">`:''}
+      ${i>=1?`<button type="button" class="btn btn-xs btn-red" onclick="delDubTier(${i})" title="ลบเบอร์นี้">✕</button>`:''}
+    </div>`).join('')
+    +(formDubTiers.length<10?'<button type="button" class="btn btn-xs btn-outline" onclick="addDubTier()">➕ เพิ่มเบอร์ราคา (สูงสุด 10)</button>':'');
+}
+function updateDubTier(i,f,v){
+  if(!formDubTiers[i]) return;
+  formDubTiers[i][f]=(f==='unit')?v:(v===''?'':(parseFloat(v)||0));
+  if(f==='unit') renderDubTiers();
+  _applyDubTiers();
+}
+function addDubTier(){ if(formDubTiers.length>=10) return; formDubTiers.push({rate:'',unit:'นาที',qty:0}); renderDubTiers(); }
+function delDubTier(i){
+  formDubTiers.splice(i,1);
+  ((formSlots.dub||{}).main||[]).forEach(w=>{ if((w.tier||0)>formDubTiers.length) w.tier=0; });
+  renderDubTiers(); _applyDubTiers();
+}
+// เขียนเรทของเบอร์ลงช่องราคาของทุกคนที่เลือกเบอร์นั้น
+function _applyDubTiers(){
+  const arr=((formSlots.dub||{}).main)||[];
+  arr.forEach(w=>{
+    const t=formDubTiers[(w.tier||0)-1];
+    if(!t||t.rate===''||t.rate==null) return;
+    w.amount=parseFloat(t.rate)||0; w.unit=t.unit||'นาที'; w.qty=parseFloat(t.qty)||0;
+  });
+  renderWorkerList('dub','main'); calcProjSummary();
+}
+function updateSlotTier(i,val){
+  const arr=((formSlots.dub||{}).main)||[]; if(!arr[i]) return;
+  arr[i].tier=parseInt(val)||0;
+  _applyDubTiers();
 }
 function renderWorkerList(cat,slot){
   const listId=cat==='dub'?`dub-${slot}-list`:`${cat}-list`;
@@ -14471,9 +14644,13 @@ function renderWorkerList(cat,slot){
       : `<span id="wamt-${cat}-${slot}-${i}"></span>`;
     const calcHtml = amtLabel;
     const hasComment = !!(w.comment||'').trim();
-    return`<div class="worker-rate-row" style="flex-wrap:wrap">
-      ${nameBadge}
-      <input type="number" value="${w.amount||''}" placeholder="ราคา" min="0" step="any" data-price
+    // 🎤 นักพากย์: เลือก "เบอร์ราคา" แทนการกรอกเงินตรง ๆ (ราคามาจากเรทที่ตั้งไว้หัวหมวด)
+    const priceControls = cat==='dub'
+      ? `<select style="flex:1;min-width:130px;padding:6px 9px;background:rgba(0,0,0,.35);border:1px solid rgba(255,158,0,.45);border-radius:7px;color:#fff;font-family:Kanit;font-size:12.5px" onchange="updateSlotTier(${i},this.value)" title="เลือกเบอร์ราคานักพากย์ (ตั้งเรทที่หัวหมวด)">
+          <option value="">— เลือกเบอร์ —${w.amount?' (เดิม '+fmtB(w.amount)+'/'+(w.unit||'นาที')+')':''}</option>
+          ${formDubTiers.map((t,ti)=>`<option value="${ti+1}"${(w.tier||0)===ti+1?' selected':''}>นักพากย์ ${ti+1}${(t.rate!==''&&t.rate!=null)?' · '+fmtB(t.rate)+'/'+(t.unit||'นาที'):''}</option>`).join('')}
+        </select>`
+      : `<input type="number" value="${w.amount||''}" placeholder="ราคา" min="0" step="any" data-price
         style="flex:1;min-width:80px;padding:6px 9px;background:rgba(0,0,0,.35);border:1px solid var(--border2);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px"
         onwheel="this.blur()"
         oninput="updateSlotAmount('${cat}','${slot}',${i},this.value)">
@@ -14485,7 +14662,10 @@ function renderWorkerList(cat,slot){
       <input type="number" value="${w.qty||''}" placeholder="กี่${w.unit}" min="0" step="any" onwheel="this.blur()" title="จำนวน${w.unit}ของคนนี้"
         style="width:76px;padding:6px 9px;background:rgba(0,0,0,.35);border:1px solid rgba(0,180,255,.35);border-radius:7px;color:#fff;font-family:Kanit;font-size:13px;text-align:center"
         oninput="updateSlotQty('${cat}','${slot}',${i},this.value)">
-      <span style="color:var(--text2);font-size:11px">${w.unit}</span>`:''}
+      <span style="color:var(--text2);font-size:11px">${w.unit}</span>`:''}`;
+    return`<div class="worker-rate-row" style="flex-wrap:wrap">
+      ${nameBadge}
+      ${priceControls}
       ${calcHtml}
       <button class="btn btn-xs" style="background:${hasComment?'rgba(155,111,255,.18)':'rgba(255,255,255,.05)'};color:${hasComment?'#9B6FFF':'var(--text2)'};border:1px solid ${hasComment?'rgba(155,111,255,.35)':'var(--border2)'};padding:3px 8px" onclick="toggleWorkerComment('${cat}','${slot}',${i})" title="หมายเหตุ/คอมเมนต์">💬${hasComment?' •':''}</button>
       <button class="btn btn-xs" style="background:rgba(0,180,255,.1);color:var(--accent2);border:1px solid rgba(0,180,255,.3);padding:3px 8px" onclick="copyWorkerRow('${cat}','${slot}',${i})" title="ก๊อปปี้ค่า (ราคา/หน่วย) เป็นแถวใหม่ แล้วเลือกคนเพิ่ม">📋</button>
@@ -14615,7 +14795,22 @@ function toggleBudgetQty(){
   const q=document.getElementById('pj-budget-qty');
   if(q){ q.style.display = BUDGET_QTY_LABEL[t] ? '' : 'none'; q.placeholder = BUDGET_QTY_LABEL[t] ? 'กี่'+BUDGET_QTY_LABEL[t] : 'จำนวน'; }
 }
+// 1.3 โน้ตแบ่งงานอัตโนมัติ — เติม "ใช้ N คน" ตามจำนวนคนจริงในหมวด (พิมพ์อะไรเองไว้แล้ว ระบบไม่ทับ)
+function _autoPhaseNotes(){
+  ['dub','adp','mix','qc','sub','trn','mgr'].forEach(cat=>{
+    const el=document.getElementById('ph-'+cat+'-note'); if(!el) return;
+    const ids=new Set();
+    Object.values(formSlots[cat]||{}).forEach(arr=>(arr||[]).forEach(w=>{ if(w&&w.staffId) ids.add(w.staffId); }));
+    const cur=(el.value||'').trim();
+    if(cur && !/^ใช้ \d+ คน$/.test(cur)) return;
+    const next=ids.size?('ใช้ '+ids.size+' คน'):'';
+    if(cur===next) return;
+    el.value=next;
+    try{ onPhaseDateChange(cat,'note',next); }catch(e){}
+  });
+}
 function calcProjSummary(){
+  try{ _autoPhaseNotes(); }catch(e){}
   const dur=parseFloat(document.getElementById('pj-duration')?.value)||0;
   let totalExp=0;
   const catKeys=['dub','adp','mix','qc','sub','trn','mgr'];
@@ -14669,7 +14864,10 @@ function calcProjSummary(){
 async function saveProject(){
   console.log('saveProject called');
   try {
-  const name=document.getElementById('pj-name')?.value?.trim()||'';if(!name){toast('กรุณากรอกชื่อโปรเจกต์','error');return}if(!name){toast('กรุณากรอกชื่อโปรเจกต์','error');return}
+  const name=document.getElementById('pj-name')?.value?.trim()||'';
+  // มีรหัสงาน+ลำดับ (เช่น H33) = ถือว่ามีชื่อแล้ว เซฟได้เลยแม้ไม่ตั้งชื่อเรื่อง
+  const _hasCode=(document.getElementById('pj-clientcode')?.value||'').trim() && (document.getElementById('pj-seq')?.value||'').trim();
+  if(!name && !_hasCode){toast('กรอกชื่อโปรเจกต์ หรืออย่างน้อย รหัสงาน + ลำดับ','error');return}
   const dur=parseFloat(document.getElementById('pj-duration')?.value)||0;
   const workers=[];
   Object.entries(formSlots).forEach(([cat,slots])=>{
@@ -14677,7 +14875,7 @@ async function saveProject(){
       arr.forEach(w=>{
         if(!w.staffId) return; // ข้าม placeholder ที่ยังไม่เลือกคน (ก๊อปปี้ค่าไว้/จาก calc)
         const amt=calcWorkerAmt(w,dur);
-        workers.push({id:w.staffId,slot:cat+'-'+slot,amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,status:'pending',note:'',comment:w.comment||''});
+        workers.push({id:w.staffId,slot:cat+'-'+slot,amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,status:'pending',note:'',comment:w.comment||'',...(cat==='dub'&&w.tier?{tier:w.tier}:{})});
       });
     });
   });
@@ -14707,10 +14905,14 @@ async function saveProject(){
     episodes:parseInt(document.getElementById('pj-episodes')?.value)||0,
     downloadLink:(document.getElementById('pj-downloadlink')?.value||'').trim(),
     secretKey:(document.getElementById('pj-secretkey')?.value||'').trim(),
+    isAdvancePaid:!!document.getElementById('pj-advancepaid')?.checked,
     managerId:(currentUser?.role==='manager')?currentUser.uid:(document.getElementById('pj-manager')?.value||''),
+    dubTiers: formDubTiers.map(t=>({rate:(t.rate===''||t.rate==null)?'':(parseFloat(t.rate)||0), unit:t.unit||'นาที', qty:parseFloat(t.qty)||0})),
     workers,tax,evidenceLogs:[],snapshot:null,createdAt:new Date(),
     phases: collectFormPhasesForSave()
   };
+  // 1.2 ไม่ตั้งชื่อ → ใช้รหัส+ลำดับเป็นชื่อชั่วคราว (เช่น H33) หา/บันทึกได้ไม่ error
+  if(!proj.name) proj.name=projCode(proj);
   let _resendCandidates = []; // คนที่ยอดเปลี่ยน + เคยส่งใบยืนยันแล้ว → ถามส่งใหม่หลังบันทึก
   if(editingProjId){
     const existing=getProjects().find(p=>p.id===editingProjId);
@@ -15164,6 +15366,7 @@ async function openEditProject(id){
   _setVal('pj-episodes', p.episodes||'');
   _setVal('pj-downloadlink', p.downloadLink||'');
   _setVal('pj-secretkey', p.secretKey||'');
+  { const _ap=document.getElementById('pj-advancepaid'); if(_ap) _ap.checked=!!p.isAdvancePaid; }
   _fillClientCodeDatalist();
   // Populate manager dropdown (income ถูกโหลดไว้แล้วด้านบน)
   const mgrSel=document.getElementById('pj-manager');
@@ -15194,10 +15397,14 @@ async function openEditProject(id){
   ['dub','adp','mix','qc','sub','trn','mgr'].forEach(k=>{const c=document.getElementById('catblock-'+k);if(c)c.classList.add('hidden')});
   activeCats=new Set();
   (p.workers||[]).forEach(w=>{
-    const parts=w.slot.split('-');const cat=parts[0];const slot=parts.slice(1).join('-')||'only';
+    const parts=w.slot.split('-');const cat=parts[0];let slot=parts.slice(1).join('-')||'only';
+    if(cat==='dub') slot='main';   // ระบบใหม่: นักพากย์รวมลิสต์เดียว (dub-sub ของเก่าย้ายมาที่เดียวกัน)
     if(!activeCats.has(cat)){activeCats.add(cat);const btn=document.getElementById('toggle-'+cat);const block=document.getElementById('catblock-'+cat);if(btn)btn.classList.add('on');if(block)block.classList.remove('hidden')}
-    if(formSlots[cat]&&formSlots[cat][slot]!==undefined)formSlots[cat][slot].push({staffId:w.id,amount:w.ratePerUnit||w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,comment:w.comment||''});
+    if(formSlots[cat]&&formSlots[cat][slot]!==undefined)formSlots[cat][slot].push({staffId:w.id,amount:w.ratePerUnit||w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,comment:w.comment||'',...(cat==='dub'&&w.tier?{tier:w.tier}:{})});
   });
+  // โหลดเรทเบอร์นักพากย์ของงานนี้ (ไม่มี = ชุดว่าง 3 เบอร์)
+  formDubTiers=(Array.isArray(p.dubTiers)&&p.dubTiers.length)?JSON.parse(JSON.stringify(p.dubTiers)):_dubTierDefaults();
+  renderDubTiers();
   // ─ Load phases (กำหนดส่งของแต่ละทีม) จาก project หรือจาก trkCard เก่าเป็น fallback ─
   loadPhasesFromProject(p);
   // Fallback: ถ้า project ยังไม่มี phases (ไฟล์เก่า) แต่มี trkCard ที่ link โปรเจกต์นี้ → merge มาให้
@@ -15722,7 +15929,7 @@ function renderPaymentHistory(){
     const rows=ws.map(w=>{const s=getStaffById(w.id);const pre=(w.slot||'').split('-')[0];const lbl={dub:'🎤 พากย์',adp:'✍️ บท',mix:'🎧 มิกซ์',qc:'✅ QC',sub:'🎬 ซับ/วิดีโอ',mgr:'🗂️ จัดการ'}[pre]||'';return `<div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-top:1px solid rgba(255,255,255,.05)"><div style="flex:1;font-size:12px">${s.nickname||s.name} <span style="font-size:10px;color:var(--text2)">${lbl}</span></div>${w.voucherNo?`<span style="font-size:10px;color:var(--text2)">${w.voucherNo}</span>`:''}<div style="font-size:13px;font-weight:700;color:var(--accent2)">${fmtB(w.amount||0)}</div><span style="font-size:10px;padding:1px 8px;border-radius:20px;background:rgba(0,223,160,.1);color:#00DFA0;border:1px solid rgba(0,223,160,.2)">จ่ายแล้ว</span></div>`;}).join('');
     return `<div style="background:var(--card);border:1px solid rgba(0,223,160,.2);border-radius:12px;margin-bottom:10px;overflow:hidden">
       <div style="padding:13px 16px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="toggleEl('ph-body-${p.id}','ph-chv-${p.id}')">
-        <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">${p.name} <span style="font-size:10px;padding:2px 9px;border-radius:20px;background:rgba(0,223,160,.12);color:#00DFA0;font-weight:700;border:1px solid rgba(0,223,160,.25)">✅ จ่ายครบ</span></div><div style="font-size:11px;color:var(--text2);margin-top:2px">${p.client||'—'} · จ่ายล่าสุด ${lpTxt}</div></div>
+        <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">${projDisp(p)} <span style="font-size:10px;padding:2px 9px;border-radius:20px;background:rgba(0,223,160,.12);color:#00DFA0;font-weight:700;border:1px solid rgba(0,223,160,.25)">✅ จ่ายครบ</span></div><div style="font-size:11px;color:var(--text2);margin-top:2px">${p.client||'—'} · จ่ายล่าสุด ${lpTxt}</div></div>
         <div style="text-align:right;flex-shrink:0"><div style="font-size:16px;font-weight:800;color:var(--green)">${fmtB(tot)}</div><div style="font-size:10px;color:var(--text2)">${ws.length} คน</div></div>
         <span id="ph-chv-${p.id}" style="font-size:11px;color:var(--text2);flex-shrink:0">▼</span>
       </div>
@@ -15857,7 +16064,7 @@ function renderQueue() {
               const reasonShort = reason.length > 60 ? reason.slice(0,60)+'…' : reason;
               return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(0,0,0,.25);border:1px solid rgba(255,64,64,.2);border-radius:8px;flex-wrap:wrap">
                 <div style="flex:1;min-width:200px">
-                  <div style="font-size:12.5px;font-weight:700"><strong>${nick}</strong> — ${fmtB(w.confirmAmount || w.amount || 0)} · ${p.name}</div>
+                  <div style="font-size:12.5px;font-weight:700"><strong>${nick}</strong> — ${fmtB(w.confirmAmount || w.amount || 0)} · ${projDisp(p)}</div>
                   ${reasonShort ? `<div style="font-size:11px;color:#FFB0B0;margin-top:2px"><strong>เหตุผล:</strong> ${reasonShort}</div>` : '<div style="font-size:11px;color:var(--text2);margin-top:2px;font-style:italic">(ไม่ระบุเหตุผล)</div>'}
                 </div>
                 <div style="display:flex;gap:5px;flex-wrap:wrap">
@@ -15870,7 +16077,7 @@ function renderQueue() {
             const projList = arr.map(({p,w})=>{
               const r = (w.confirmRejectReason||'').replace(/</g,'&lt;');
               return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(0,0,0,.15);border-radius:6px;margin-top:4px;flex-wrap:wrap">
-                <div style="flex:1;min-width:160px;font-size:11.5px"><strong>${p.name}</strong> — ${fmtB(w.confirmAmount||w.amount||0)}${r?` <span style="color:#FFB0B0;font-size:10.5px">· ${r.length>50?r.slice(0,50)+'…':r}</span>`:''}</div>
+                <div style="flex:1;min-width:160px;font-size:11.5px"><strong>${projDisp(p)}</strong> — ${fmtB(w.confirmAmount||w.amount||0)}${r?` <span style="color:#FFB0B0;font-size:10.5px">· ${r.length>50?r.slice(0,50)+'…':r}</span>`:''}</div>
                 <div style="display:flex;gap:4px">
                   <button class="btn btn-xs" style="background:rgba(0,180,255,.15);border:1px solid rgba(0,180,255,.4);color:var(--accent2);font-size:10px" onclick="openPayAmt('${p.id}','${w.id}','${w.slot}')">💰</button>
                   <button class="btn btn-xs" style="background:#9B6FFF;color:#fff;border:none;font-weight:700;font-size:10px" onclick="askSendConfirmRequest('${p.id}','${w.id}','${w.slot}')" title="เพิ่มเข้าตะกร้า">🛒</button>
@@ -18194,7 +18401,7 @@ function openTeamEarningsDetail(staffId){
         const slotSuf = (w.slot||'').includes('main') ? ' · หลัก' : (w.slot||'').includes('-sub') ? ' · รอง' : '';
         jobs.push({
           projId: p.id,
-          projName: p.name,
+          projName: projDisp(p),
           client: p.client||'-',
           deadline: p.deadline || p.date,
           paidAt: w.paidAt || '',
@@ -19659,7 +19866,7 @@ function renderMyDash(){
       const _ph = (p.phases && _phKey) ? (p.phases[_phKey]||{}) : {};
       allItems.push({
         projId: p.id,
-        projName: p.name,
+        projName: projDisp(p),
         projDate: p.date,
         projStatus: p.projStatus || 'active',
         date: fmtDate(p.date),
@@ -21112,7 +21319,7 @@ async function _vcIssueRetro(staffId){
   const saved = getDocsStore('vouchers') || [];
   saved.push({
     type:'voucher', docNo:vNo, staffId, staffName:s.name, staffLastName:s.lastName||'', staffNickname:s.nickname,
-    items: items.map(it=>({projId:it.p.id, projName:it.p.name, slot:it.w.slot, amount:it.w.amount||0})),
+    items: items.map(it=>({projId:it.p.id, projName:projDisp(it.p), slot:it.w.slot, amount:it.w.amount||0})),
     amount: totalAmt, totalAmount: totalAmt, multiItem:true,
     bank:s.bank||'', account:s.account||'', email:s.email||'',
     date, note, createdAt: nowIso, retro:true,
@@ -23045,7 +23252,8 @@ async function saveProjStatus(projId, status) {
   const result = await saveProjectMerge(projId, (p)=>{ p.projStatus = status; });
   if(!result.ok){ toast('บันทึกไม่สำเร็จ: '+(result.error?.message||''),'error'); return; }
   updateQueueBadge();
-  // Refresh row styling if needed
+  // 🐧 อิโมจิหน้าชื่อหมวดห้องดิสเปลี่ยนตามสถานะอัตโนมัติ (ทำเงียบ ๆ เบื้องหลัง)
+  try{ syncProjStatusEmoji(projId); }catch(e){}
 }
 
 async function saveProjStatusAndRefreshCal(projId, status) {
@@ -23056,7 +23264,7 @@ async function saveProjStatusAndRefreshCal(projId, status) {
   if (document.getElementById('page-projects')?.classList.contains('hidden') === false) {
     renderProjects();
   }
-  const labels = { notstarted:'⬜ ยังไม่เริ่ม', inprogress:'⚙️ กำลังทำ', done:'✅ เสร็จแล้ว', cancelled:'❌ ยกเลิก' };
+  const labels = { notstarted:'⬜ ยังไม่เริ่ม', inprogress:'🟡 กำลังทำ', done:'🟠 เสร็จแล้ว', paid:'🟢 จ่ายเงินแล้ว', cancelled:'🔴 ยกเลิก' };
   toast(labels[status]+' — บันทึกแล้ว','success');
 }
 
@@ -24755,7 +24963,7 @@ function renderMyCalendar(){
       // หา worker ของ phase นี้เพื่อเช็ค paid status
       const myW = myWorkers.find(w=>(w.slot||'').split('-')[0] === (Object.entries(SLOT_PHASE).find(([,v])=>v===ph.key)?.[0]));
       events.push({
-        projName: p.name,
+        projName: projDisp(p),
         projId: p.id,
         projStatus: p.projStatus || 'active',
         phaseKey: ph.key,
@@ -28433,12 +28641,35 @@ function staffRoleBadges(p, staffId){
 // dropdown สถานะงาน (ใช้ร่วมการ์ด manager) — กดแล้วไม่ขยายการ์ด
 function projStatusSelectHTML(p){
   const st=p.projStatus||'notstarted';
-  return `<select onclick="event.stopPropagation()" onchange="saveProjStatus('${p.id}',this.value)" style="padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;font-family:Kanit;cursor:pointer;background:var(--bg2);border:1px solid var(--border2);color:var(--text);max-width:130px">
+  return `<select onclick="event.stopPropagation()" onchange="saveProjStatus('${p.id}',this.value)" style="padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;font-family:Kanit;cursor:pointer;background:var(--bg2);border:1px solid var(--border2);color:var(--text);max-width:140px">
     <option value="notstarted" ${st==='notstarted'?'selected':''}>⬜ ยังไม่เริ่ม</option>
-    <option value="inprogress" ${st==='inprogress'?'selected':''}>⚙️ กำลังทำ</option>
-    <option value="done" ${st==='done'?'selected':''}>✅ เสร็จแล้ว</option>
-    <option value="cancelled" ${st==='cancelled'?'selected':''}>❌ ยกเลิก</option>
+    <option value="inprogress" ${st==='inprogress'?'selected':''}>🟡 กำลังทำ</option>
+    <option value="done" ${st==='done'?'selected':''}>🟠 เสร็จแล้ว</option>
+    <option value="paid" ${st==='paid'?'selected':''}>🟢 จ่ายเงินแล้ว</option>
+    <option value="cancelled" ${st==='cancelled'?'selected':''}>🔴 ยกเลิก</option>
   </select>`;
+}
+// ══ 🐧 อิโมจิสถานะหน้าชื่อหมวดห้องดิส — ติ๊กสถานะในเว็บ บอทเปลี่ยนชื่อหมวดให้อัตโนมัติ ══
+const PROJ_STATUS_EMOJI={inprogress:'🟡', done:'🟠', paid:'🟢', cancelled:'🔴'};
+function _stripLeadEmoji(s){
+  try{ return String(s||'').replace(/^[\p{Extended_Pictographic}‍️]+\s*/u,''); }
+  catch(e){ return String(s||''); }
+}
+async function syncProjStatusEmoji(projId){
+  const p=getProjects().find(x=>x.id===projId);
+  if(!p||!p.discordCategoryName) return;
+  const em=PROJ_STATUS_EMOJI[p.projStatus]; if(!em) return;
+  const newName=em+_stripLeadEmoji(p.discordCategoryName);
+  if(newName===p.discordCategoryName) return;
+  try{
+    const r=await callProjBot({action:'discordRenameChannel', ...(p.discordCategoryId?{channelId:p.discordCategoryId}:{categoryName:p.discordCategoryName}), newName});
+    await saveProjectMerge(projId, f=>{ f.discordCategoryName=newName; if(r.channelId) f.discordCategoryId=r.channelId; });
+    toast('🐧 เปลี่ยนอิโมจิหมวดห้องดิสเป็น '+em+' ตามสถานะแล้ว','info');
+  }catch(e){
+    toast(String(e.message||'').includes('ไม่รู้จักคำสั่ง')
+      ? 'เปลี่ยนอิโมจิห้องดิสไม่ได้ — ต้อง Deploy worker.js เวอร์ชันล่าสุดก่อน'
+      : 'เปลี่ยนชื่อหมวดห้องดิสไม่สำเร็จ: '+e.message,'warn');
+  }
 }
 
 // รีเฟรชหน้าคำนวนราคาให้ตรง role (admin → calc-list / manager → mgr-calc-list ซ่อนกำไร)
