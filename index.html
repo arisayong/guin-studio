@@ -2122,6 +2122,7 @@ body.sidebar-collapsed .main-content{
      <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-outline" onclick="previewQuotation()">👁️ ดูตัวอย่าง</button>
       <button class="btn btn-outline" onclick="saveQuotationDraft()" style="border-color:var(--orange);color:var(--orange)">📝 บันทึกเป็นดราฟ</button>
+      <button class="btn btn-green" onclick="saveQuotationOnly()" title="บันทึกโดยไม่ส่งเมล — ไม่ต้องกรอกอีเมลลูกค้า">💾 บันทึก</button>
       <button class="btn btn-blue" onclick="saveAndSendQuotation()">📧 บันทึก & ส่ง Email</button>
       <button class="btn btn-outline" onclick="downloadQuotation()">⬇️ ดาวน์โหลด PDF</button>
      </div>
@@ -2205,6 +2206,7 @@ body.sidebar-collapsed .main-content{
      <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-outline" onclick="previewInvoice()">👁️ ดูตัวอย่าง</button>
       <button class="btn btn-outline" onclick="saveInvoiceDraft()" style="border-color:var(--orange);color:var(--orange)">📝 บันทึกเป็นดราฟ</button>
+      <button class="btn btn-green" onclick="saveInvoiceOnly()" title="บันทึกโดยไม่ส่งเมล — ไม่ต้องกรอกอีเมลลูกค้า">💾 บันทึก</button>
       <button class="btn btn-blue" onclick="saveAndSendInvoice()">📧 บันทึก & ส่ง Email</button>
       <button class="btn btn-outline" onclick="downloadInvoice()">⬇️ ดาวน์โหลด PDF</button>
      </div>
@@ -21166,6 +21168,31 @@ function saveQuotationDraft() {
   try{renderQtDocNoBar();}catch(e){}
   toast('📝 บันทึกเป็นดราฟแล้ว ('+data.docNo+')','success');
   renderDocsHistory();
+}
+// 💾 บันทึกอย่างเดียว ไม่ส่งเมล — ลูกค้าบางเจ้าคุยช่องทางอื่น ไม่บังคับกรอกอีเมล (ส่ง/โหลดทีหลังได้ที่ประวัติเอกสาร)
+function saveQuotationOnly(){
+  const data=getQuotationData();
+  if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
+  if(!data.items.length){toast('กรุณาเพิ่มรายการ','error');return;}
+  const total=calcQtTotal();
+  const all=(getDocsStore('quotations')||[]).filter(x=>x.docNo!==data.docNo);
+  all.push({...data, total, createdAt:new Date().toISOString(), isDraft:false});
+  saveDocsStore('quotations', all);
+  _qtEditingDocNo=null; try{renderQtDocNoBar();}catch(e){}
+  try{renderDocsHistory();}catch(e){}
+  toast('💾 บันทึกใบเสนอราคา '+data.docNo+' แล้ว (ไม่ส่งเมล) — ดู/โหลด PDF ได้ที่ประวัติเอกสาร','success');
+}
+function saveInvoiceOnly(){
+  const data=getInvoiceData();
+  if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
+  if(!data.items.length){toast('กรุณาเพิ่มรายการ','error');return;}
+  const total=calcInvTotal();
+  const all=(getDocsStore('invoices')||[]).filter(x=>x.docNo!==data.docNo);
+  all.push({...data, total, createdAt:new Date().toISOString(), isDraft:false});
+  saveDocsStore('invoices', all);
+  _invEditingDocNo=null; try{renderInvDocNoBar();}catch(e){}
+  try{renderDocsHistory();}catch(e){}
+  toast('💾 บันทึกใบแจ้งหนี้ '+data.docNo+' แล้ว (ไม่ส่งเมล) — ดู/โหลด PDF ได้ที่ประวัติเอกสาร','success');
 }
 function saveAndSendQuotation() {
   const data = getQuotationData();
