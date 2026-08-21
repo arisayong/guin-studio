@@ -2277,7 +2277,8 @@ body.sidebar-collapsed .main-content{
        <span style="font-size:17px">💡</span>
        <div>1 ใบสำคัญจ่าย = 1 คน <strong>(รวมหลายงานในใบเดียว)</strong> · เห็นเฉพาะคนที่ <strong style="color:#9B6FFF">staff ยืนยันยอดแล้ว</strong> และ <strong style="color:var(--green)">ยังไม่ได้จ่าย</strong></div>
       </div>
-      <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+      <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+       <button class="btn btn-xs" style="background:#00A950;color:#fff;border:none;font-weight:700" onclick="openKbizExport()" title="ทำไฟล์โอนเงิน K-BIZ จากรายชื่อที่รอจ่าย แบ่งอัตโนมัติรอบละ 10 คน (K-BIZ จ่ายกลุ่มได้สูงสุด 10 คน/รอบ)">🏦 ไฟล์โอน K-BIZ (รอบละ 10)</button>
        <button id="vc-show-paid-toggle" class="btn btn-xs btn-outline" onclick="toggleVcShowPaid()">🕓 แสดงคนที่จ่ายแล้ว (ออกเอกสารย้อนหลัง)</button>
       </div>
       <div id="vc-byperson-list"></div>
@@ -4694,7 +4695,10 @@ async function postRoundToDiscord(){
   if(!confirm(`โพสประกาศลงห้อง Discord ของ${(AV_CATS[r.cat]||{}).label||''}?\n\n${text.slice(0,300)}`)) return;
   showLoader(true);
   try{
-    const res=await callAppsScript({action:'discordPost', channelId:chId, content:text});
+    // 🏷️ แปลง "@ชื่อโรล" ที่ตรงกับโรลจริงในเซิร์ฟเวอร์ → <@&id> เพื่อให้แท็กโรลแล้ว ping ได้จริง
+    let content=text;
+    try{ content=_prApplyRoleMentions(content, await _dcRoleMap()); }catch(e){}
+    const res=await callAppsScript({action:'discordPost', channelId:chId, content});
     const list=getRounds(); const rr=list.find(x=>x.id===r.id);
     if(rr){ rr.channelId=chId; rr.postedMessageId=res.messageId; rr.postedAt=new Date().toISOString(); await saveRounds(list); }
     logAudit('recruit.round',(AV_CATS[r.cat]||{}).label||r.cat,'โพสประกาศลง Discord');
@@ -4859,6 +4863,29 @@ function _annMention(cat){
   const m=(getDiscordCfg().mentions||{})[cat];
   return (m!==undefined && m!==null && String(m).trim()!=='') ? String(m).trim() : ((AV_CATS[cat]||{}).mention||'');
 }
+// 🏷️ ดึงรายชื่อโรลจากเซิร์ฟเวอร์ (ผ่านบอทลงคิว) → map ชื่อโรล→id · ใช้แปลง "@ชื่อโรล" ให้ ping ได้จริง
+let _dcRoleCache=null;
+async function _dcRoleMap(force){
+  if(_dcRoleCache && !force) return _dcRoleCache;
+  try{
+    const d=await callAppsScript({action:'discordRoles'});
+    const map={};
+    (d.roles||[]).forEach(r=>{ const n=String(r.name||'').trim(); if(n) map[n]=r.id; });
+    _dcRoleCache=map;
+  }catch(e){ if(!_dcRoleCache) _dcRoleCache={}; }
+  return _dcRoleCache;
+}
+// แสดงรายชื่อโรลจริงในเซิร์ฟเวอร์ (ในตัวแก้เทมเพลตประกาศ) — ให้กดคัดลอกชื่อไปวางเป็น @ชื่อโรล ได้
+async function _annShowRoles(){
+  const el=document.getElementById('ann-roles-list'); if(!el) return;
+  el.innerHTML='⏳ กำลังดึงรายชื่อโรล...';
+  const map=await _dcRoleMap(true);
+  const names=Object.keys(map||{});
+  if(!names.length){ el.innerHTML='<span style="color:var(--orange)">ดึงรายชื่อโรลไม่ได้ — เช็คว่าตั้งค่าตัวกลาง Discord แล้ว (บอทต้องมีสิทธิ์เห็นโรล)</span>'; return; }
+  el.innerHTML='โรลในเซิร์ฟเวอร์ (คลิกเพื่อคัดลอก): '+names.map(n=>
+    `<span onclick="navigator.clipboard&&navigator.clipboard.writeText('@${esc(n)}');toast('คัดลอก @${esc(n)} แล้ว','success')" style="display:inline-block;cursor:pointer;background:rgba(0,180,255,.12);border:1px solid rgba(0,180,255,.3);border-radius:12px;padding:1px 9px;margin:2px 3px 0 0">@${esc(n)}</span>`
+  ).join('');
+}
 // ช่วงวันแบบเลข 2 หลัก เช่น "02-09 สิงหาคม" (ข้ามเดือน: "30 กรกฎาคม - 05 สิงหาคม")
 function _annRangeLabel(r){
   if(!r||!r.dateFrom) return '—';
@@ -4908,6 +4935,11 @@ function openAnnounceTplEditor(roundId){
     <div style="font-size:12px;font-weight:700;margin:10px 0 4px">👨 สำนวนชาย (ครับ)</div>
     <textarea id="tpl-m" rows="5" style="${ta}">${esc(t.male)}</textarea>
     <div style="font-size:12px;font-weight:700;margin:14px 0 6px;padding-top:10px;border-top:1px solid var(--border2)">แท็กของแต่ละทีม — ใช้แทน {แท็ก} ตามห้องที่เปิดรอบ</div>
+    <div style="font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:8px">
+      💡 พิมพ์ <code>@ชื่อโรล</code> ให้ <strong>ตรงกับชื่อโรลจริงใน Discord</strong> ระบบจะแปลงเป็นแท็กที่ <strong>ping ได้จริง</strong> ตอนโพสต์ (เช่น <code>@นักพากย์หญิง</code>) · โรลต้องตั้งเป็น "Allow anyone to mention" หรือให้บอทมีสิทธิ์แท็ก
+      <button class="btn btn-xs btn-outline" style="margin-left:6px" onclick="_annShowRoles()">🔍 ดึงรายชื่อโรลจาก Discord</button>
+    </div>
+    <div id="ann-roles-list" style="font-size:11px;color:var(--accent2);margin-bottom:8px"></div>
     ${Object.entries(AV_CATS).map(([k,v])=>`
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
         <span style="width:118px;font-size:12px;flex-shrink:0">${v.icon} ${esc(v.label)}</span>
@@ -5057,12 +5089,15 @@ function showRoundAnnounce(roundId){
 // 📤 โพสต์/อัปเดตประกาศหลายห้องพร้อมกัน — ห้องที่เคยโพสต์ = แก้โพสต์เดิม, ห้องใหม่ = โพสต์ใหม่
 async function postRoundAnnounceMulti(roundId){
   const list=getRounds(); const r=list.find(x=>x.id===roundId); if(!r) return;
-  const txt=String(document.getElementById('ra-text')?.value||'').trim();
-  if(!txt){ toast('ข้อความว่าง','error'); return; }
+  const raw=String(document.getElementById('ra-text')?.value||'').trim();
+  if(!raw){ toast('ข้อความว่าง','error'); return; }
   const chosen=[...document.querySelectorAll('.ra-ch:checked')].map(x=>x.value);
   if(!chosen.length){ toast('ติ๊กเลือกอย่างน้อย 1 ห้องก่อน','warn'); return; }
   if(!confirm('รีเช็คข้อความเรียบร้อยแล้วใช่ไหม?\n\nบอทจะโพสต์/อัปเดตประกาศลง '+chosen.length+' ห้องพร้อมกัน')) return;
   showLoader(true);
+  // 🏷️ แปลง "@ชื่อโรล" → <@&id> ให้แท็กโรล ping ได้จริง (ครั้งเดียว ใช้กับทุกห้อง)
+  let txt=raw;
+  try{ txt=_prApplyRoleMentions(txt, await _dcRoleMap()); }catch(e){}
   let posted=0, edited=0, fail=0, failMsg='';
   try{
     r.posts=Array.isArray(r.posts)?r.posts:(r.postedMessageId?[{channelId:r.channelId, messageId:r.postedMessageId}]:[]);
@@ -5959,11 +5994,14 @@ async function updateRoundPost(roundId){
   const r=getRound(roundId);
   if(!r || !r.postedMessageId){ toast('รอบนี้ยังไม่เคยโพสผ่านบอท — กดโพสก่อน','warn'); return; }
   const el=document.getElementById('ra-text');
-  const content=String(el?el.value:'').trim();
-  if(!content){ toast('ข้อความว่าง','error'); return; }
+  const raw=String(el?el.value:'').trim();
+  if(!raw){ toast('ข้อความว่าง','error'); return; }
   if(!confirm('อัปเดตข้อความในโพสเดิมบน Discord?\n(แก้โพสเดิม ไม่โพสใหม่ให้รก)')) return;
   showLoader(true);
   try{
+    // 🏷️ แปลง "@ชื่อโรล" → <@&id> ให้แท็กโรล ping ได้จริง
+    let content=raw;
+    try{ content=_prApplyRoleMentions(content, await _dcRoleMap()); }catch(e){}
     await callAppsScript({action:'discordEdit', channelId:r.channelId, messageId:r.postedMessageId, content});
     logAudit('recruit.round',(AV_CATS[r.cat]||{}).label||r.cat,'แก้ไขโพสประกาศใน Discord');
     toast('🔄 แก้โพสเดิมใน Discord ให้แล้ว','success');
@@ -6094,10 +6132,13 @@ async function createProjRoom(projId){
 async function postProjToDiscord(projId){
   const p=getProjects().find(x=>x.id===projId);
   if(!p||!p.discordChannelId){ toast('ยังไม่มีห้องของโปรเจกต์นี้ — กดสร้างห้องก่อน','warn'); return; }
-  const txt=String(document.getElementById('pjdc-preview')?.value||buildProjPostText(p)).trim();
-  if(!txt){ toast('ข้อความว่าง','error'); return; }
+  const raw=String(document.getElementById('pjdc-preview')?.value||buildProjPostText(p)).trim();
+  if(!raw){ toast('ข้อความว่าง','error'); return; }
   showLoader(true);
   try{
+    // 🏷️ แปลง "@ชื่อโรล" → <@&id> ให้แท็กโรล ping ได้จริง
+    let txt=raw;
+    try{ txt=_prApplyRoleMentions(txt, await _dcRoleMap()); }catch(e){}
     if(p.discordMsgId){
       await callAppsScript({action:'discordEdit', channelId:p.discordChannelId, messageId:p.discordMsgId, content:txt});
       toast('📣 แก้โพสต์เดิมในห้องให้ตรงข้อมูลล่าสุดแล้ว','success');
@@ -21347,6 +21388,181 @@ function toggleVcShowPaid(){
   }
   renderVcByPerson();
 }
+
+// ═══════════════════════════════════════════════
+// 🏦 K-BIZ — ไฟล์โอนเงินทีม แบ่งอัตโนมัติรอบละ 10 คน
+//    (K-BIZ จ่ายเงินแบบกลุ่มได้สูงสุด 10 รายการ / รอบ)
+//    รองรับทั้งเลขบัญชีธนาคาร และ PromptPay (บางคนไม่ให้เลขบัญชี)
+// ═══════════════════════════════════════════════
+const KBIZ_BATCH = 10;
+let _kbizBatches = [];
+function _kbizChunk(arr, n){ const out=[]; for(let i=0;i<arr.length;i+=n) out.push(arr.slice(i,i+n)); return out; }
+// รวบรวมคนที่ "ยืนยันแล้ว + ยังไม่จ่าย" → 1 คน/รายการ (รวมยอดทุกงาน) เหมือนที่ขึ้นในลิสต์รอจ่าย
+function _kbizGatherPayees(){
+  const byPerson = new Map();
+  getProjects().forEach(p => {
+    (p.workers||[]).forEach(w => {
+      if(w.status === 'paid') return;
+      if(getWorkerConfirmStatus(w) !== 'confirmed') return;
+      const s = getStaffById(w.id);
+      if(!s) return;
+      if(!byPerson.has(w.id)) byPerson.set(w.id, {s, total:0, njobs:0});
+      const e = byPerson.get(w.id);
+      e.total += (w.amount||0);
+      e.njobs++;
+    });
+  });
+  return [...byPerson.values()]
+    .filter(e => e.total > 0)
+    .sort((a,b)=> b.total - a.total)
+    .map(({s,total,njobs}) => {
+      const acct = String(s.account||'').replace(/[^0-9]/g,'');
+      const pp = String(s.promptpay||'').replace(/[^0-9]/g,'');
+      return {
+        name: ((s.name||'') + (s.lastName?(' '+s.lastName):'')).trim() || s.nickname || '',
+        nickname: s.nickname||'',
+        bank: s.bank||'', account: acct, promptpay: pp,
+        dest: acct ? 'bank' : (pp ? 'promptpay' : 'none'),
+        amount: Math.round(total), njobs,
+      };
+    });
+}
+function openKbizExport(){
+  const payees = _kbizGatherPayees();
+  if(!payees.length){ toast('ไม่มีรายชื่อที่รอจ่าย (คนที่ยืนยันยอดแล้วและยังไม่จ่าย)','info'); return; }
+  _kbizBatches = _kbizChunk(payees, KBIZ_BATCH);
+  const nMissing = payees.filter(p=>p.dest==='none').length;
+  const grand = payees.reduce((a,p)=>a+p.amount,0);
+  const batchCards = _kbizBatches.map((b,i)=>{
+    const sum = b.reduce((a,p)=>a+p.amount,0);
+    const rows = b.map((p,j)=>{
+      const destTxt = p.dest==='bank' ? `${esc(p.bank)} · ${esc(p.account)}`
+        : p.dest==='promptpay' ? `📱 PromptPay ${esc(p.promptpay)}`
+        : '<span style="color:#FF6060">⚠️ ไม่มีบัญชี/พร้อมเพย์</span>';
+      return `<div style="display:flex;gap:8px;font-size:11.5px;padding:4px 0;border-bottom:1px solid var(--border2)">
+        <span style="width:18px;color:var(--text2);flex-shrink:0">${j+1}</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}${p.nickname?` <span style="color:var(--text2)">(${esc(p.nickname)})</span>`:''}</span>
+        <span style="flex:1.2;min-width:0;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${destTxt}</span>
+        <span style="width:82px;text-align:right;font-weight:700;color:var(--green);flex-shrink:0">${fmtB(p.amount)}</span>
+      </div>`;
+    }).join('');
+    return `<div style="border:1px solid var(--border2);border-radius:11px;padding:12px;margin-bottom:10px;background:rgba(0,0,0,.12)">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+        <div style="font-weight:800;color:var(--accent2)">🔢 รอบที่ ${i+1} <span style="font-size:11px;color:var(--text2);font-weight:500">· ${b.length} คน · รวม ${fmtB(sum)}</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-xs" style="background:#00A950;color:#fff;border:none;font-weight:700" onclick="_kbizDownloadCSV(${i})">⬇️ CSV</button>
+          <button class="btn btn-xs btn-outline" onclick="_kbizDownloadDoc(${i})">🖨️ เอกสาร</button>
+        </div>
+      </div>
+      ${rows}
+    </div>`;
+  }).join('');
+  const div=document.createElement('div');
+  div.id='kbiz-modal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);overflow-y:auto';
+  div.onclick=function(e){ if(e.target===div) div.remove(); };
+  div.innerHTML=`<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;width:720px;max-width:98vw;max-height:94vh;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px">
+      <div>
+        <div style="font-size:17px;font-weight:800">🏦 ไฟล์โอนเงิน K-BIZ</div>
+        <div style="font-size:11.5px;color:var(--text2);margin-top:2px">${payees.length} คน · รวม <strong style="color:var(--green)">${fmtB(grand)}</strong> · แบ่ง <strong>${_kbizBatches.length} รอบ</strong> (รอบละไม่เกิน ${KBIZ_BATCH} คน — K-BIZ จ่ายกลุ่มได้สูงสุด ${KBIZ_BATCH} รายการ/รอบ)</div>
+      </div>
+      <button class="btn-close" onclick="document.getElementById('kbiz-modal')?.remove()">✕</button>
+    </div>
+    ${nMissing?`<div style="background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.35);border-radius:8px;padding:8px 12px;margin:8px 0;font-size:12px;color:#FF6060">⚠️ มี ${nMissing} คนที่ยังไม่มีทั้งเลขบัญชีและพร้อมเพย์ — ไปเติมข้อมูลในทะเบียนทีมก่อน ไม่งั้นโอนไม่ได้ (ในไฟล์จะเว้นช่องปลายทางไว้)</div>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
+      <button class="btn btn-sm" style="background:#00A950;color:#fff;border:none;font-weight:700;flex:1;min-width:150px" onclick="_kbizDownloadCSVEach()">⬇️ CSV แยกทุกรอบ (อัปโหลด K-BIZ)</button>
+      <button class="btn btn-sm btn-outline" style="flex:1;min-width:130px" onclick="_kbizDownloadAllCSV()">📄 CSV รวม 1 ไฟล์</button>
+      <button class="btn btn-sm btn-outline" style="flex:1;min-width:130px" onclick="_kbizDownloadAllDoc()">🖨️ เอกสารทุกรอบ</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;margin-top:4px">${batchCards}</div>
+    <div style="font-size:10.5px;color:var(--text2);text-align:center;margin-top:10px">💡 ใช้อ้างอิงตอนกรอกจ่ายกลุ่มใน K-BIZ · ระบบไม่ได้ตัดสถานะ "จ่ายแล้ว" ให้ — จ่ายจริงแล้วค่อยออกใบสำคัญจ่ายในหน้านี้ตามปกติ</div>
+  </div>`;
+  document.body.appendChild(div);
+}
+function _kbizSaveFile(content, type, filename){
+  const blob=new Blob([content],{type});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+function _kbizCSVFor(batch){
+  const esc2=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const L=[['ลำดับ','ชื่อ-นามสกุล','ชื่อเล่น','ธนาคาร','เลขบัญชี','PromptPay','จำนวนเงิน','หมายเหตุ'].map(esc2).join(',')];
+  batch.forEach((p,i)=>{ L.push([i+1, p.name, p.nickname, p.bank, p.account, p.promptpay, p.amount, 'ค่าจ้างทีม'].map(esc2).join(',')); });
+  return '﻿'+L.join('\r\n');
+}
+function _kbizDownloadCSV(i){
+  const b=_kbizBatches[i]; if(!b) return;
+  _kbizSaveFile(_kbizCSVFor(b), 'text/csv;charset=utf-8', `KBIZ_โอนทีม_รอบ${i+1}.csv`);
+  toast(`⬇️ CSV รอบ ${i+1} (${b.length} คน)`,'success');
+}
+function _kbizDownloadCSVEach(){
+  if(!_kbizBatches.length) return;
+  _kbizBatches.forEach((b,i)=> setTimeout(()=>{
+    _kbizSaveFile(_kbizCSVFor(b), 'text/csv;charset=utf-8', `KBIZ_โอนทีม_รอบ${i+1}.csv`);
+  }, i*350));
+  toast(`⬇️ ดาวน์โหลด CSV ${_kbizBatches.length} ไฟล์ (แยกรอบ)`,'success');
+}
+function _kbizDownloadAllCSV(){
+  const esc2=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const L=[['รอบ','ลำดับ','ชื่อ-นามสกุล','ชื่อเล่น','ธนาคาร','เลขบัญชี','PromptPay','จำนวนเงิน','หมายเหตุ'].map(esc2).join(',')];
+  _kbizBatches.forEach((b,bi)=>{ b.forEach((p,i)=>{ L.push([bi+1, i+1, p.name, p.nickname, p.bank, p.account, p.promptpay, p.amount, 'ค่าจ้างทีม'].map(esc2).join(',')); }); });
+  _kbizSaveFile('﻿'+L.join('\r\n'), 'text/csv;charset=utf-8', 'KBIZ_โอนทีม_รวมทุกรอบ.csv');
+  toast('📄 CSV รวมทุกรอบแล้ว','success');
+}
+function _kbizDocFor(batch, batchNo, totalBatches){
+  const sum=batch.reduce((a,p)=>a+p.amount,0);
+  const today=new Date();
+  const rows=batch.map((p,i)=>{
+    const dest = p.dest==='bank' ? `${esc(p.bank)}<br><span style="color:#6b7280">${esc(p.account)}</span>`
+      : p.dest==='promptpay' ? `📱 PromptPay<br><span style="color:#6b7280">${esc(p.promptpay)}</span>`
+      : '<span style="color:#dc2626">— ไม่มีบัญชี/พร้อมเพย์ —</span>';
+    return `<tr>
+      <td style="padding:9px 10px;text-align:center;border-bottom:1px solid #eef2f7">${i+1}</td>
+      <td style="padding:9px 10px;border-bottom:1px solid #eef2f7">${esc(p.name)}${p.nickname?` <span style="color:#9ca3af">(${esc(p.nickname)})</span>`:''}</td>
+      <td style="padding:9px 10px;border-bottom:1px solid #eef2f7">${dest}</td>
+      <td style="padding:9px 10px;text-align:right;font-weight:700;border-bottom:1px solid #eef2f7">฿${(p.amount||0).toLocaleString()}.00</td>
+    </tr>`;
+  }).join('');
+  return `<div style="background:#fff;color:#111;font-family:'Kanit',Arial,sans-serif;max-width:720px;margin:0 auto 28px;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;page-break-after:always">
+    <div style="background:#0d0d2b;padding:20px 26px;display:flex;justify-content:space-between;align-items:center">
+      <div><div style="color:#fff;font-size:18px;font-weight:700">รายการโอนเงินทีม · K-BIZ</div>
+      <div style="color:#8b8fa8;font-size:11px;margin-top:3px">Guin Home Studio · จ่ายกลุ่ม (สูงสุด ${KBIZ_BATCH} รายการ/รอบ)</div></div>
+      <div style="text-align:right;color:#fff"><div style="background:rgba(255,255,255,.08);border-radius:8px;padding:8px 14px">
+        <div style="font-size:10px;color:#8b8fa8;letter-spacing:1px">รอบที่</div>
+        <div style="font-size:20px;font-weight:700">${batchNo} / ${totalBatches}</div>
+      </div></div>
+    </div>
+    <div style="height:4px;background:linear-gradient(90deg,#00A950,#00B4FF,#1565FF)"></div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="background:#f3f4f6">
+        <th style="padding:9px 10px;text-align:center;width:40px;font-size:11px;color:#6b7280">#</th>
+        <th style="padding:9px 10px;text-align:left;font-size:11px;color:#6b7280">ชื่อผู้รับเงิน</th>
+        <th style="padding:9px 10px;text-align:left;font-size:11px;color:#6b7280">ปลายทางรับโอน</th>
+        <th style="padding:9px 10px;text-align:right;font-size:11px;color:#6b7280;width:120px">จำนวนเงิน</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr style="background:#0d0d2b">
+        <td colspan="3" style="padding:11px 14px;text-align:right;color:#fff;font-weight:700">รวมรอบนี้ (${batch.length} รายการ)</td>
+        <td style="padding:11px 14px;text-align:right;color:#00E39A;font-weight:800;font-size:16px">฿${sum.toLocaleString()}.00</td>
+      </tr></tfoot>
+    </table>
+    <div style="padding:13px 26px;font-size:11px;color:#9ca3af;display:flex;justify-content:space-between">
+      <span>ออกเมื่อ ${today.toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}</span>
+      <span>GUIN HOME STUDIO · Payment System</span>
+    </div>
+  </div>`;
+}
+function _kbizDownloadDoc(i){
+  const b=_kbizBatches[i]; if(!b) return;
+  downloadDocHTML(_kbizDocFor(b, i+1, _kbizBatches.length), `KBIZ_เอกสารโอน_รอบ${i+1}`);
+}
+function _kbizDownloadAllDoc(){
+  if(!_kbizBatches.length) return;
+  const html=_kbizBatches.map((b,i)=>_kbizDocFor(b,i+1,_kbizBatches.length)).join('');
+  downloadDocHTML(html, 'KBIZ_เอกสารโอน_ทุกรอบ');
+}
+
 function _vcRenderRetroSection(){
   const byPerson = _vcGetRetroByPerson();
   let inner;
