@@ -1729,6 +1729,8 @@ body.sidebar-collapsed .main-content{
     <div class="page-title">💸 คิวจ่ายเงิน</div>
     <div class="page-subtitle">จัดการการจ่ายค่าตอบแทนทีมงาน</div>
     <div class="page-actions" style="flex-wrap:wrap;gap:10px">
+     <!-- 🔍 ค้นหาโปรเจกต์ -->
+     <div class="search-bar" style="margin:0;flex:1;min-width:200px;max-width:280px"><span class="icon">🔍</span><input id="queue-search" placeholder="ค้นหาโปรเจกต์ / รหัส / ลูกค้า..." oninput="onQueueSearch(this.value)"></div>
      <!-- Status filter -->
      <div class="tabs" style="margin:0">
       <div class="tab active" id="qst-all" onclick="setQueueFilter('all',this)">ทั้งหมด</div>
@@ -15844,6 +15846,7 @@ function downloadReceiptHTML(){
 let queueFilter = 'all';
 let queueCycleFilter='all';
 let queueConfirmFilter = 'all'; // all | none | sent | confirmed | rejected
+let queueSearch = ''; // ค้นหาโปรเจกต์ในคิวจ่ายเงิน (ชื่อ/รหัส/ลูกค้า)
 let _selectedProjIds = new Set(); // ── Multi-select: เก็บ projId ที่ admin ติ๊กเลือกเพื่อส่งใบยืนยันรวม ──
 let _expandedQueueGroups = new Set(); // ── เก็บ groupId ของ project card ที่ "ขยาย" อยู่ · กันยุบเองตอน re-render ──
 
@@ -16017,6 +16020,13 @@ async function saveEv(){
 // ══════════════════════════════════════════════
 // QUEUE — connected status + action flow
 // ══════════════════════════════════════════════
+// 🔍 ค้นหาโปรเจกต์ในคิว — debounce เล็กน้อยกัน re-render ถี่ตอนพิมพ์
+let _queueSearchTimer=null;
+function onQueueSearch(v){
+  queueSearch = String(v||'').trim().toLowerCase();
+  clearTimeout(_queueSearchTimer);
+  _queueSearchTimer = setTimeout(()=>{ renderQueue(); }, 180);
+}
 function setQueueFilter(f, el) {
   queueFilter = f;
   // 🐛 Fix: ใช้ prefix qst-* เท่านั้น · เดิม "#page-queue .tab" จะปิด active ของแท็บ confirm + cycle ด้วย
@@ -16122,6 +16132,12 @@ function renderQueue() {
   // === Step 3: Build display groups — apply status + confirm filter ===
   const groups = [];
   activeProjs.forEach(p => {
+    // 🔍 กรองด้วยคำค้นหา (ชื่อโปรเจกต์ / รหัส / ลูกค้า) — ไม่กระทบตัวเลขสรุปด้านบน
+    if(queueSearch){
+      const code = (typeof projCode==='function' ? (projCode(p)||'') : '');
+      const hay = `${p.name||''} ${code} ${p.client||''} ${p.type||''}`.toLowerCase();
+      if(!hay.includes(queueSearch)) return;
+    }
     const workers = (p.workers||[]).filter(w => {
       const s = getStaffById(w.id);
       if(!s) return false;
@@ -16229,7 +16245,14 @@ function renderQueue() {
     : '';
 
   if (!groups.length) {
-    el.innerHTML = '<div style="text-align:center;padding:56px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">ไม่มีรายการในเงื่อนไขนี้</div>';
+    el.classList.remove('has-bulk-bar');
+    el.innerHTML = queueSearch
+      ? `<div style="text-align:center;padding:48px 20px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">
+          <div style="font-size:34px;margin-bottom:8px">🔍</div>
+          <div style="font-size:14px;font-weight:700;color:var(--text)">ไม่พบโปรเจกต์ "${esc(queueSearch)}"</div>
+          <div style="font-size:11.5px;color:var(--text2);margin-top:6px">ลองพิมพ์ชื่อโปรเจกต์ / รหัส / ชื่อลูกค้า · <span onclick="document.getElementById('queue-search').value='';onQueueSearch('')" style="color:var(--accent2);cursor:pointer;text-decoration:underline">ล้างคำค้นหา</span></div>
+        </div>`
+      : '<div style="text-align:center;padding:56px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">ไม่มีรายการในเงื่อนไขนี้</div>';
     return;
   }
 
