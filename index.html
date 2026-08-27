@@ -4869,12 +4869,18 @@ function _annMention(cat){
 let _dcRoleCache=null;
 async function _dcRoleMap(force){
   if(_dcRoleCache && !force) return _dcRoleCache;
-  try{
-    const d=await callAppsScript({action:'discordRoles'});
-    const map={};
-    (d.roles||[]).forEach(r=>{ const n=String(r.name||'').trim(); if(n) map[n]=r.id; });
-    _dcRoleCache=map;
-  }catch(e){ if(!_dcRoleCache) _dcRoleCache={}; }
+  let map=null;
+  // ลองบอทลงคิวก่อน (callAppsScript) ถ้าไม่ได้ค่อยลองบอทโปรเจกต์ (callProjBot) — เผื่อ Worker คนละตัว
+  for(const caller of [callAppsScript, callProjBot]){
+    try{
+      const d=await caller({action:'discordRoles'});
+      if(d && Array.isArray(d.roles) && d.roles.length){
+        map={}; d.roles.forEach(r=>{ const n=String(r.name||'').trim(); if(n) map[n]=r.id; });
+        break;
+      }
+    }catch(e){ /* ลองตัวถัดไป */ }
+  }
+  _dcRoleCache = map || _dcRoleCache || {};
   return _dcRoleCache;
 }
 // แสดงรายชื่อโรลจริงในเซิร์ฟเวอร์ (ในตัวแก้เทมเพลตประกาศ) — ให้กดคัดลอกชื่อไปวางเป็น @ชื่อโรล ได้
@@ -7488,8 +7494,9 @@ function renderPayrollMonth(){
     const lines=e.items.map(it=>{
       const paidTag = it.w.status==='paid' ? '<span style="color:var(--green)">✅ จ่ายแล้ว</span>' : '<span style="color:var(--orange)">⏳ ยังไม่จ่าย</span>';
       const docTag  = it.hasDoc ? '<span style="color:var(--green)">✓ มีใบ</span>' : '<span style="color:var(--text2)">• ยังไม่มีใบ</span>';
+      const _code = (typeof projCode==='function' ? (projCode(it.p)||'') : '');
       return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--text2);padding:3px 0">
-        <span style="flex:1;min-width:0">${esc(it.p.name||'')} <span style="opacity:.7">· ${PR_SLOT_LABEL[it.pre]||it.pre}</span> ${paidTag} ${docTag}</span>
+        <span style="flex:1;min-width:0">${_code?`<span style="color:var(--accent2);font-weight:700">${esc(_code)}</span> `:''}${esc(it.p.name||'')} <span style="opacity:.7">· ${PR_SLOT_LABEL[it.pre]||it.pre}</span> ${paidTag} ${docTag}</span>
         <span style="white-space:nowrap">${fmtB(it.w.amount||0)}</span></div>`;
     }).join('');
     const btns = [];
@@ -7509,7 +7516,7 @@ function renderPayrollMonth(){
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,180,255,.15);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-weight:800">${esc(String((s.nickname||s.name||'?')[0]).toUpperCase())}</div>
         <div style="flex:1;min-width:150px">
-          <div style="font-size:14.5px;font-weight:800">${esc(s.nickname||s.name)} <span style="font-size:12px;color:var(--text2);font-weight:500">${esc(s.name||'')}</span> ${badge}</div>
+          <div style="font-size:14.5px;font-weight:800">${esc(s.nickname||s.name)} <span style="font-size:12px;color:var(--text2);font-weight:500">${esc(s.name||'')}</span> ${badge} <span style="font-size:10px;background:rgba(0,180,255,.12);color:var(--accent2);border:1px solid rgba(0,180,255,.3);padding:2px 9px;border-radius:8px;font-weight:700">📅 รอบจ่าย ${esc(_thaiMonthLabel(monthKey))}</span></div>
           <div style="font-size:11px;color:var(--text2);margin-top:2px">🏦 ${esc(s.bank||'—')} ${esc(s.account||'')}${hasEmail?' · 📧 '+esc(s.email):' · <span style="color:var(--orange)">⚠️ ไม่มีอีเมล ส่งใบไม่ได้</span>'}</div>
         </div>
         <div style="text-align:right">
@@ -13727,6 +13734,7 @@ function renderProjList(){
             +'<span style="font-weight:600;color:var(--accent2)">'+((p.name&&p.name!==projCode(p))?p.name:'')+'</span>'
             +(p.isAdvancePaid?'<span title="บริษัทสำรองจ่ายทีมไปก่อนแล้ว" style="margin-left:6px;font-size:10px;padding:2px 9px;border-radius:8px;background:rgba(255,158,0,.18);color:var(--orange);font-weight:800;border:1px solid rgba(255,158,0,.4)">💸 สำรองจ่าย</span>':'')
             +'</div>'
+          +((p.duration||p.episodes)?'<div style="font-size:10px;color:var(--text2);margin-top:2px">⏱️ ความยาว '+(p.duration?esc(String(p.duration))+' นาที':'')+((p.duration&&p.episodes)?' · ':'')+(p.episodes?esc(String(p.episodes))+' ตอน':'')+'</div>':'')
           +'<div data-presence-proj="'+pid+'" style="margin-top:2px;display:inline-flex;gap:4px;flex-wrap:wrap">'+presenceBadgeHTML(pid)+'</div>'
           +(roleBadges?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+roleBadges+'</div>':'')
           +(p.note?'<div style="font-size:10px;color:var(--text2)">📝 '+p.note+'</div>':'')
@@ -16024,6 +16032,7 @@ async function saveEv(){
 let _queueSearchTimer=null;
 function onQueueSearch(v){
   queueSearch = String(v||'').trim().toLowerCase();
+  _pgState['queue'] = 1; // 🔧 เริ่มหน้าใหม่ทุกครั้งที่ค้นหา — กันค้างหน้าเดิมแล้วผลลัพธ์ไม่ขึ้น
   clearTimeout(_queueSearchTimer);
   _queueSearchTimer = setTimeout(()=>{ renderQueue(); }, 180);
 }
