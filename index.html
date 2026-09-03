@@ -15069,8 +15069,12 @@ async function saveProject(){
         merged.confirmAmount = ex.confirmAmount;
         merged.confirmRespondedAt = ex.confirmRespondedAt;
         merged.confirmRejectReason = ex.confirmRejectReason;
-      } else if(ex.confirmStatus==='sent' || ex.confirmStatus==='confirmed'){
-        // ยอดเปลี่ยน + เคยส่ง/ยืนยันใบแล้ว → ต้องยกเลิกใบเดิม + ส่งใหม่ (confirm ถูกรีเซ็ตเป็น none แล้วข้างบน)
+      } else if(ex.confirmStatus==='sent' || ex.confirmStatus==='confirmed' || ex.confirmStatus==='rejected'){
+        // ยอดเปลี่ยน + ใบยืนยันเดิม (ส่ง/ยืนยัน/ปฏิเสธ) ใช้ไม่ได้แล้ว → รีเซ็ตเป็น "ยังไม่ส่ง" + เสนอส่งใหม่
+        merged.confirmStatus = 'none';
+        merged.confirmSentAt = null;
+        merged.confirmRespondedAt = null;
+        merged.confirmRejectReason = null;
         _resendCandidates.push({id:w.id, slot:w.slot});
       }
       return merged;
@@ -15695,9 +15699,23 @@ async function savePayAmt(){
   if(!payAmtTarget)return;
   const amt = parseFloat(document.getElementById('payamt-val').value)||0;
   const note = document.getElementById('payamt-note').value;
+  let _resetConfirm = false; // ยอดเปลี่ยน + เคยส่ง/ยืนยัน/ปฏิเสธใบ → รีเซ็ตสถานะยืนยัน
   const result = await saveProjectMerge(payAmtTarget.projId, (p)=>{
     const w=(p.workers||[]).find(x=>x.id===payAmtTarget.workerId&&x.slot===payAmtTarget.slot);
-    if(w){ w.amount = amt; w.note = note; }
+    if(w){
+      const cs = w.confirmStatus || 'none';
+      const amtChanged = (w.amount||0) !== amt;
+      w.amount = amt; w.note = note;
+      // 🔑 ยอดเปลี่ยน + ใบยืนยันเดิม (ส่งแล้ว/ยืนยันแล้ว/ปฏิเสธ) ใช้ไม่ได้แล้ว → ล้างสถานะยืนยัน
+      //    กันบั๊ก: แก้ยอดของคนที่ "ปฏิเสธยอด" แล้วแบนเนอร์ยังค้างว่าต้องแก้อยู่
+      if(amtChanged && (cs==='sent' || cs==='confirmed' || cs==='rejected')){
+        w.confirmStatus = 'none';
+        w.confirmSentAt = null;
+        w.confirmRespondedAt = null;
+        w.confirmRejectReason = null;
+        _resetConfirm = true;
+      }
+    }
   });
   if(!result.ok){ toast('บันทึกไม่สำเร็จ: '+(result.error?.message||''),'error'); return; }
   closeModal('modal-payamt');
@@ -15707,6 +15725,14 @@ async function savePayAmt(){
   try { updateQueueBadge(); } catch(e){}
   try { renderMgrProjects(); } catch(e){}
   toast('บันทึกยอดแล้ว ✅','success');
+  // 📤 ยอดเปลี่ยนของคนที่เคยส่ง/ยืนยัน/ปฏิเสธ → ถามส่งใบยืนยันใหม่ทันที (เด้งกลับไป "รอ staff ยืนยัน")
+  if(_resetConfirm){
+    const tgt = {...payAmtTarget};
+    const s = getStaffById(tgt.workerId);
+    if(confirm(`ยอดเปลี่ยนแล้ว — ส่งใบยืนยันยอดใหม่ให้ ${s?.nickname||s?.name||'staff'} เลยไหม?\n\n(สถานะจะกลับไป "⏳ รอ staff ยืนยัน" อีกครั้ง · ถ้ายังไม่ส่ง ใบเดิมถูกยกเลิกแล้ว)`)){
+      try { await sendConfirmRequest(tgt.projId, tgt.workerId, tgt.slot); } catch(e){ console.warn('resend after payamt:', e); }
+    }
+  }
 }
 
 // SLIP / PAYMENT
