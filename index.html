@@ -2217,6 +2217,8 @@ body.sidebar-collapsed .main-content{
 
    <!-- ══ TAB: ทีมงาน — ใบสำคัญจ่าย ══ -->
    <div id="docs-worker" class="hidden">
+    <!-- 💰 สรุปการเงินรวม (งานที่ยังไม่จ่ายครบ) — ได้รับ · เตรียมจ่าย · กำไร -->
+    <div id="vc-finance-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px"></div>
     <div class="section-card" style="margin-bottom:14px">
      <div class="section-title">💸 ออกใบสำคัญจ่าย</div>
      <!-- 🔀 Mode toggle: ตามคน (default) / ตามโปรเจกต์ -->
@@ -16122,6 +16124,7 @@ function renderQueue() {
     return;
   }
   try {
+  try{ _maybeAutoConfirm(); }catch(e){} // ⏱️ ยืนยันอัตโนมัติใบที่ค้างเกิน 3 วัน (throttled)
   initQueueMonthFilter();
   const el = document.getElementById('queue-list'); if (!el) return;
   const projs = getProjects();
@@ -16329,6 +16332,7 @@ function renderQueue() {
           <div class="stat-label">⏳ รอ Staff ยืนยัน</div>
           <div style="font-size:22px;font-weight:800;margin-top:4px;color:#9B6FFF">${peopleSent} คน</div>
           <div style="font-size:10px;color:var(--text2);margin-top:2px">${cntConfirmSent} รายการ · คลิกกรอง →</div>
+          <button class="btn btn-xs" style="margin-top:8px;width:100%;background:#9B6FFF;color:#fff;border:none;font-weight:700" onclick="event.stopPropagation();adminConfirmAllSent()" title="แอดมินยืนยันแทน staff ทุกคนที่รอยืนยันอยู่ตอนนี้ (เฉพาะใบที่ส่งแล้ว)">✓ ยืนยันแทนทั้งหมด (${peopleSent})</button>
         </div>`
       :`<div class="stat-card" style="padding:12px;opacity:.55"><div class="stat-label">⏳ รอ Staff ยืนยัน</div><div style="font-size:22px;font-weight:800;margin-top:4px;color:var(--text2)">— ไม่มี —</div></div>`
     }
@@ -17071,6 +17075,104 @@ async function adminMarkConfirmed(projId, workerId, slot){
   updateQueueBadge();
   renderQueue();
   toast(`✅ ทำเครื่องหมายยืนยันแล้ว — ${s?.nickname||workerId} · ${p.name}`,'success');
+}
+
+// ════════════════════════════════════════════════════════════
+// ⏱️ ยืนยันอัตโนมัติ — ใบยืนยันที่ส่งเกิน N วันแล้ว staff ยังไม่ตอบ → นับเป็น "ยืนยันแล้ว"
+//    (ถือว่าแจ้งทีมแล้ว · ไม่ตอบภายในกำหนด = ยอมรับยอด) · ทำเฉพาะฝั่ง admin กันเขียนซ้ำ
+// ════════════════════════════════════════════════════════════
+const AUTO_CONFIRM_DAYS = 3;
+let _autoConfirmAt = 0, _autoConfirmBusy = false;
+async function autoConfirmOverdue(){
+  if(currentUser?.role !== 'admin') return 0;
+  const cutoff = Date.now() - AUTO_CONFIRM_DAYS*864e5;
+  const byProj = {};
+  getProjects().forEach(p=>{
+    if(p.projStatus === 'cancelled') return;
+    (p.workers||[]).forEach(w=>{
+      if((w.confirmStatus||'none') !== 'sent') return;
+      const t = w.confirmSentAt ? new Date(w.confirmSentAt).getTime() : 0;
+      if(!t || t >= cutoff) return;
+      if(!getStaffById(w.id)) return;
+      (byProj[p.id] = byProj[p.id] || []).push({id:w.id, slot:w.slot});
+    });
+  });
+  const projIds = Object.keys(byProj);
+  if(!projIds.length) return 0;
+  let n = 0;
+  for(const projId of projIds){
+    const keys = new Set(byProj[projId].map(w=>w.id+'|'+w.slot));
+    const res = await saveProjectMerge(projId, (p)=>{
+      (p.workers||[]).forEach(w=>{
+        if(!keys.has(w.id+'|'+w.slot)) return;
+        if((w.confirmStatus||'none') !== 'sent') return;
+        const t = w.confirmSentAt ? new Date(w.confirmSentAt).getTime() : 0;
+        if(!t || t >= cutoff) return; // เช็คซ้ำบนข้อมูลล่าสุด กันยืนยันคนที่เพิ่งตอบ/แก้
+        w.confirmStatus = 'confirmed';
+        w.confirmRespondedAt = new Date().toISOString();
+        w.confirmAmount = w.amount || 0;
+        w.confirmRejectReason = null;
+        w.confirmAuto = true; // ธงบอกว่ายืนยันอัตโนมัติ (ไม่ใช่ staff กดเอง)
+      });
+    });
+    if(res.ok) n += byProj[projId].length;
+  }
+  if(n){
+    try{ logAudit('payment.autoconfirm','',`ยืนยันอัตโนมัติ ${n} รายการ (staff ไม่ตอบเกิน ${AUTO_CONFIRM_DAYS} วัน)`); }catch(e){}
+    try{ toast(`⏱️ ยืนยันยอดอัตโนมัติ ${n} รายการ — staff ไม่ตอบเกิน ${AUTO_CONFIRM_DAYS} วัน`,'info'); }catch(e){}
+  }
+  return n;
+}
+// เรียกแบบ throttle (ทุก 5 นาที/เซสชัน) จากหน้าคิว/หน้าเอกสาร — ไม่บล็อกการ render
+function _maybeAutoConfirm(){
+  if(currentUser?.role !== 'admin' || _autoConfirmBusy) return;
+  const now = Date.now();
+  if(now - _autoConfirmAt < 5*60000) return;
+  _autoConfirmAt = now; _autoConfirmBusy = true;
+  autoConfirmOverdue().then(n=>{
+    _autoConfirmBusy = false;
+    if(n>0){ try{renderQueue();}catch(e){} try{updateQueueBadge();}catch(e){} try{if(_vcMode==='byperson')renderVcByPerson();}catch(e){} }
+  }).catch(()=>{ _autoConfirmBusy = false; });
+}
+
+// ════════════════════════════════════════════════════════════
+// ✓ แอดมินยืนยันแทนทั้งหมด — เฉพาะใบที่ "ส่งแล้ว รอยืนยัน" (sent) ตอนนี้เท่านั้น
+//    ไม่แตะใบที่ยังไม่ส่ง (none) / จ่ายแล้ว / ปฏิเสธ
+// ════════════════════════════════════════════════════════════
+async function adminConfirmAllSent(){
+  const byProj = {};
+  let count = 0, sum = 0; const staffSet = new Set();
+  getProjects().forEach(p=>{
+    if(p.projStatus === 'cancelled') return;
+    (p.workers||[]).forEach(w=>{
+      if(getWorkerConfirmStatus(w) !== 'sent') return;
+      if(!getStaffById(w.id)) return;
+      (byProj[p.id] = byProj[p.id] || []).push({id:w.id, slot:w.slot});
+      count++; staffSet.add(w.id); sum += (w.confirmAmount||w.amount||0);
+    });
+  });
+  if(!count){ toast('ไม่มีเอกสารที่ "รอยืนยัน" อยู่ตอนนี้','info'); return; }
+  if(!confirm(`✓ แอดมินยืนยันแทน staff ทั้งหมดที่ "รอยืนยัน" ณ ตอนนี้?\n\n${staffSet.size} คน · ${count} รายการ · รวม ${fmtB(sum)}\n\n⚠️ ทำเฉพาะใบที่ "ส่งแล้ว-รอยืนยัน" เท่านั้น — ไม่แตะใบที่ยังไม่ได้ส่ง\nหลังจากนี้จะนับเป็น "✅ ยืนยันแล้ว" พร้อมจ่าย`)) return;
+  toast(`⏳ กำลังยืนยัน ${count} รายการ...`,'info');
+  let n = 0, fail = 0;
+  for(const projId of Object.keys(byProj)){
+    const keys = new Set(byProj[projId].map(w=>w.id+'|'+w.slot));
+    const res = await saveProjectMerge(projId, (p)=>{
+      (p.workers||[]).forEach(w=>{
+        if(!keys.has(w.id+'|'+w.slot)) return;
+        if((w.confirmStatus||'none') !== 'sent') return; // เช็คบนข้อมูลล่าสุด กันยืนยันใบที่เพิ่งเปลี่ยนสถานะ
+        w.confirmStatus = 'confirmed';
+        w.confirmRespondedAt = new Date().toISOString();
+        w.confirmAmount = w.amount || 0;
+        w.confirmRejectReason = null;
+        w.confirmByAdmin = true;
+      });
+    });
+    if(res.ok) n += byProj[projId].length; else fail += byProj[projId].length;
+  }
+  try{ logAudit('payment.confirm','',`แอดมินยืนยันแทนทั้งหมด ${n} รายการ (รอยืนยัน)`); }catch(e){}
+  updateQueueBadge(); renderQueue();
+  toast(`✅ ยืนยันแทนแล้ว ${n} รายการ${fail?(' · ล้มเหลว '+fail):''} — พร้อมจ่าย`, fail?'warn':'success');
 }
 
 // === Bulk: เพิ่มทุกคนในโปรเจกต์เข้าตะกร้า (ไม่ส่งทันที) ===
@@ -20649,9 +20751,28 @@ function switchDocsMain(tab, el) {
     try { populateDocsProjSelects(); } catch(e){}
     const _vd = document.getElementById('vc-date');
     if(_vd && !_vd.value) _vd.value = isoToThai(new Date().toISOString().split('T')[0]);
+    try { renderVcFinanceSummary(); } catch(e){}
+    try { _maybeAutoConfirm(); } catch(e){} // ⏱️ ยืนยันอัตโนมัติใบที่ค้างเกิน 3 วัน
     // sync mode toggle visual + render byperson เริ่มต้น (โหมด default จาก _vcMode)
     try { setVcMode(_vcMode || 'byproj'); } catch(e){}
   }
+}
+// 💰 สรุปการเงินรวมบนหน้าใบสำคัญจ่ายทีม — ได้รับ · เตรียมจ่าย · กำไร (ใช้ SSOT getProjectFinance)
+function renderVcFinanceSummary(){
+  const el = document.getElementById('vc-finance-summary'); if(!el) return;
+  let t;
+  try { t = sumProjectFinance(getProjects()); } catch(e){ el.innerHTML=''; return; }
+  const received = t.received||0, toPay = t.expensePending||0, profit = t.profitReal||0;
+  const paidOut = t.expensePaid||0;
+  const card = (icon,label,val,color,sub)=>`<div class="stat-card" style="padding:14px;border-color:${color}55">
+    <div class="stat-label">${icon} ${label}</div>
+    <div style="font-size:22px;font-weight:800;margin-top:5px;color:${color}">${fmtB(val)}</div>
+    ${sub?`<div style="font-size:10.5px;color:var(--text2);margin-top:3px">${sub}</div>`:''}
+  </div>`;
+  el.innerHTML =
+    card('💰','ได้รับจากลูกค้า', received, 'var(--green)', 'เงินที่เก็บเข้าจริงแล้ว')
+    + card('💸','เตรียมจ่ายทีม', toPay, 'var(--orange)', `ยังไม่จ่าย (หลังหักภาษี) · จ่ายแล้ว ${fmtB(paidOut)}`)
+    + card('📈','กำไร (ได้รับ − ค่าทีม)', profit, profit>=0?'var(--accent2)':'var(--red)', 'กำไรจากเงินที่เข้าจริง');
 }
 function populateDocsProjSelects() {
   // qt-proj, inv-proj และ vc-proj ใช้ multi-select picker (ติ๊กได้หลายโปรเจกต์)
@@ -21756,6 +21877,7 @@ function _vcGetPersonItems(staffId){
 }
 
 function renderVcByPerson(){
+  try { renderVcFinanceSummary(); } catch(e){}
   const listEl = document.getElementById('vc-byperson-list');
   if(!listEl) return;
   // จัดกลุ่ม workers ที่ "confirmed + not paid" ตาม staff (รวมงานยกเลิก — จ่ายชดเชยได้)
