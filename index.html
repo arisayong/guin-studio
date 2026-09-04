@@ -22021,6 +22021,20 @@ function _loadScriptOnce(src){
     document.head.appendChild(el);
   });
 }
+// ถอด letter-spacing ออกก่อนแปลงเป็น PDF — html2canvas จะแยกสระ/วรรณยุกต์ไทยออกจากตัวอักษรถ้ามี letter-spacing
+function _vcStripLS(html){ return String(html||'').replace(/letter-spacing:[^;"']+/g,'letter-spacing:normal'); }
+// รอฟอนต์ไทย (Kanit) โหลดครบก่อนสร้าง PDF — กันสระ/วรรณยุกต์ตกใน html2canvas
+async function _vcEnsureFonts(){
+  try{
+    if(document.fonts){
+      await Promise.all([
+        document.fonts.load('400 16px Kanit'), document.fonts.load('600 16px Kanit'),
+        document.fonts.load('700 16px Kanit'), document.fonts.load('800 16px Kanit'),
+      ]).catch(()=>{});
+      if(document.fonts.ready) await document.fonts.ready;
+    }
+  }catch(e){}
+}
 // 🗂️ กรองตาม "รอบยืนยัน" (วันที่ส่งใบยืนยันยอด) — 'all' หรือ 'YYYY-MM-DD' หรือ 'none'
 //    ใช้แยกก้อนจ่าย: ก้อนที่ยืนยันก่อนจ่ายก่อน · ยอดไม่รวมข้ามรอบ
 let _vcDateSel = new Set();        // รอบ (วันส่งใบ) ที่เลือก · เลือกได้หลายรอบ
@@ -22086,6 +22100,7 @@ async function downloadAllVouchersZip(){
     await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
   }catch(e){ _vcProgress('error',{title:'โหลดตัวสร้าง PDF ไม่สำเร็จ', sub:'เช็คเน็ตแล้วลองใหม่'}); toast('โหลดตัวสร้าง PDF ไม่สำเร็จ (เช็คเน็ต): '+e.message,'error'); return; }
   if(typeof JSZip==='undefined' || typeof html2pdf==='undefined'){ toast('ตัวสร้าง PDF/ZIP ยังไม่พร้อม','error'); return; }
+  await _vcEnsureFonts();   // รอฟอนต์ไทยโหลดครบ กันสระ/วรรณยุกต์ตก
   const zip=new JSZip();
   const date=document.getElementById('vc-date')?.value||new Date().toISOString().split('T')[0];
   // เรียงยอดมาก→น้อย ให้เหมือนลิสต์
@@ -22106,8 +22121,8 @@ async function downloadAllVouchersZip(){
       totalAmt: works.reduce((a,{w})=>a+(w.amount||0),0),
       date, note:'',
     });
-    host.innerHTML=html;
-    await new Promise(r=>setTimeout(r,150)); // รอรูป (โลโก้/QR) โหลด
+    host.innerHTML=_vcStripLS(html);
+    await new Promise(r=>setTimeout(r,300)); // รอรูป (โลโก้/QR) โหลด
     try{
       const el=host.firstElementChild||host;
       const blob=await html2pdf().set({
@@ -22262,6 +22277,7 @@ async function issueAndAutoEmailAll(){
   try{ await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'); }
   catch(e){ _vcProgress('error',{title:'โหลดตัวสร้าง PDF ไม่สำเร็จ', sub:'เช็คเน็ตแล้วลองใหม่'}); toast('โหลดตัวสร้าง PDF ไม่สำเร็จ (เช็คเน็ต)','error'); return; }
   if(typeof html2pdf==='undefined'){ toast('ตัวสร้าง PDF ยังไม่พร้อม','error'); return; }
+  await _vcEnsureFonts();   // รอฟอนต์ไทยโหลดครบ กันสระ/วรรณยุกต์ตก
   const date=document.getElementById('vc-date')?.value||new Date().toISOString().split('T')[0];
   const host=document.createElement('div');
   host.style.cssText='position:fixed;left:-99999px;top:0;width:640px;background:#fff;z-index:-1';
@@ -22293,8 +22309,8 @@ async function issueAndAutoEmailAll(){
     if(hasEmail){
       try{
         const html=buildMultiVoucherHTML({ vNo, staff:s, items:works.map(({w,p})=>({projName:p.name,slot:w.slot,amount:w.amount||0})), totalAmt, date, note:'' });
-        host.innerHTML=html; await new Promise(r=>setTimeout(r,150));
-        const blob=await html2pdf().set({ margin:4, image:{type:'jpeg',quality:0.95}, html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false}, jsPDF:{unit:'mm',format:'a4',orientation:'portrait'} }).from(host.firstElementChild).outputPdf('blob');
+        host.innerHTML=_vcStripLS(html); await new Promise(r=>setTimeout(r,300));
+        const blob=await html2pdf().set({ margin:4, image:{type:'jpeg',quality:0.96}, html2canvas:{scale:2.4,useCORS:true,backgroundColor:'#ffffff',logging:false}, jsPDF:{unit:'mm',format:'a4',orientation:'portrait'} }).from(host.firstElementChild).outputPdf('blob');
         const b64=await _blobToBase64(blob);
         const full=((s.name||'')+(s.lastName?(' '+s.lastName):'')).trim()||s.nickname||wid;
         const pdfName=('ใบสำคัญจ่าย_'+full).replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_').slice(0,80)+'.pdf';
@@ -22322,12 +22338,13 @@ function _voucherPdfHtml(v){
   return buildMultiVoucherHTML({ vNo:v.docNo, staff:s, items:(v.items||[]).map(it=>({projName:it.projName,slot:it.slot,amount:it.amount})), totalAmt:v.totalAmount||v.amount||0, date:v.date, note:v.note||'' });
 }
 async function _vcHtmlToPdfBlob(html){
+  await _vcEnsureFonts();   // รอฟอนต์ไทยโหลดครบ กันสระ/วรรณยุกต์ตก
   const host=document.createElement('div');
   host.style.cssText='position:fixed;left:-99999px;top:0;width:640px;background:#fff;z-index:-1';
   document.body.appendChild(host);
   try{
-    host.innerHTML=html; await new Promise(r=>setTimeout(r,150));
-    return await html2pdf().set({ margin:4, image:{type:'jpeg',quality:0.95}, html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false}, jsPDF:{unit:'mm',format:'a4',orientation:'portrait'} }).from(host.firstElementChild||host).outputPdf('blob');
+    host.innerHTML=_vcStripLS(html); await new Promise(r=>setTimeout(r,300));
+    return await html2pdf().set({ margin:4, image:{type:'jpeg',quality:0.96}, html2canvas:{scale:2.4,useCORS:true,backgroundColor:'#ffffff',logging:false}, jsPDF:{unit:'mm',format:'a4',orientation:'portrait'} }).from(host.firstElementChild||host).outputPdf('blob');
   } finally { host.remove(); }
 }
 function _vcSetVoucherEmailStatus(docNo, status, err){
