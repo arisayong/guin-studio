@@ -20773,7 +20773,7 @@ function renderVcFinanceSummary(){
   getProjects().forEach(p=>{
     if(!p) return;
     (p.workers||[]).forEach(w=>{
-      if(getStaffById(w.id) && w.status!=='paid' && getWorkerConfirmStatus(w)==='confirmed' && _vcWorkPassesDateFilter(w)){
+      if(getStaffById(w.id) && w.status!=='paid' && getWorkerConfirmStatus(w)==='confirmed' && _vcWorkPassesDateFilter(w, p)){
         toPay += (w.amount||0);
         roundIds.add(p.id);
       }
@@ -21611,7 +21611,7 @@ function _kbizGatherPayees(){
     (p.workers||[]).forEach(w => {
       if(w.status === 'paid') return;
       if(getWorkerConfirmStatus(w) !== 'confirmed') return;
-      if(!_vcWorkPassesDateFilter(w)) return;   // เคารพตัวกรองรอบยืนยัน
+      if(!_vcWorkPassesDateFilter(w, p)) return;   // เคารพตัวกรองรอบยืนยัน
       const s = getStaffById(w.id);
       if(!s) return;
       if(!byPerson.has(w.id)) byPerson.set(w.id, {s, total:0, njobs:0});
@@ -22025,17 +22025,28 @@ function _loadScriptOnce(src){
 let _vcDateSel = new Set();        // รอบ (วันส่งใบ) ที่เลือก · เลือกได้หลายรอบ
 let _vcDateAll = false;            // true = ดูทั้งหมด
 let _vcDateFilterUserSet = false;  // true เมื่อผู้ใช้กดเลือกเอง · ก่อนหน้านั้น default = วันส่งใบเก่าสุด
-// วันที่ "เราส่งใบยืนยันยอด" (confirmSentAt) — ไม่ใช่วันที่ staff กดรับยอด (confirmRespondedAt)
-function _vcWorkConfirmDate(w){
-  const t = (w && w.confirmSentAt) || '';
-  if(!t) return '';
-  const d = new Date(t); if(isNaN(d)) return '';
+// 🗂️ รอบจ่ายของโปรเจกต์ = วันแรกสุดที่ "ส่งใบยืนยันยอด" ของงานในโปรเจกต์นั้น (min confirmSentAt)
+//    → งานทุกรหัสในโปรเจกต์อ้างวันแรกที่ส่งใบ · แก้ยอดแล้วส่งใบใหม่ก็ไม่ย้ายรอบ (วันที่ 3 ไม่หลุดมา)
+function _vcProjRoundISO(p){
+  let min='';
+  ((p&&p.workers)||[]).forEach(w=>{
+    if(w.status==='paid') return;
+    if(getWorkerConfirmStatus(w)!=='confirmed') return;
+    const t=w.confirmSentAt||'';
+    if(t && (!min || t<min)) min=t;
+  });
+  return min;
+}
+function _vcDateKeyOf(iso){
+  if(!iso) return 'none';
+  const d=new Date(iso); if(isNaN(d)) return 'none';
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
-function _vcWorkPassesDateFilter(w){
+function _vcProjRoundKey(p){ return _vcDateKeyOf(_vcProjRoundISO(p)); }
+function _vcWorkPassesDateFilter(w, p){
   if(_vcDateAll) return true;
   if(_vcDateSel.size===0) return true;   // safety ก่อน init (render จะตั้ง default ให้)
-  return _vcDateSel.has(_vcWorkConfirmDate(w) || 'none');
+  return _vcDateSel.has(_vcProjRoundKey(p));
 }
 // เลือก/ยกเลิกรอบ (เลือกได้หลายรอบ) · 'all' = ดูทั้งหมด
 function _vcToggleDate(k){
@@ -22055,7 +22066,7 @@ function _vcGatherPendingByPerson(){
   getProjects().forEach(p=>{ (p.workers||[]).forEach(w=>{
     if(w.status==='paid') return;
     if(getWorkerConfirmStatus(w)!=='confirmed') return;
-    if(!_vcWorkPassesDateFilter(w)) return;
+    if(!_vcWorkPassesDateFilter(w, p)) return;
     const s=getStaffById(w.id); if(!s) return;
     if(!byPerson.has(w.id)) byPerson.set(w.id,{s,works:[]});
     byPerson.get(w.id).works.push({p,w});
@@ -22305,15 +22316,15 @@ function renderVcByPerson(){
   const allPeople = new Set(); let allSum = 0;
   const _allWorks = [];
   getProjects().forEach(p => {
+    const rk = _vcProjRoundKey(p);   // รอบของโปรเจกต์ = วันแรกที่ส่งใบ
     (p.workers||[]).forEach(w => {
       if(w.status === 'paid') return;
       if(getWorkerConfirmStatus(w) !== 'confirmed') return;
       const s = getStaffById(w.id);
       if(!s) return;
-      _allWorks.push({p, w, s});
-      const cd = _vcWorkConfirmDate(w) || 'none';
-      if(!dateMap.has(cd)) dateMap.set(cd, {people:new Set(), sum:0});
-      dateMap.get(cd).people.add(w.id); dateMap.get(cd).sum += (w.amount||0);
+      _allWorks.push({p, w, s, rk});
+      if(!dateMap.has(rk)) dateMap.set(rk, {people:new Set(), sum:0});
+      dateMap.get(rk).people.add(w.id); dateMap.get(rk).sum += (w.amount||0);
       allPeople.add(w.id); allSum += (w.amount||0);
     });
   });
@@ -22326,10 +22337,10 @@ function renderVcByPerson(){
   else if(!_vcDateAll && _vcDateSel.size===0){ _vcDateSel = new Set(_dateKeys.length ? [_dateKeys[0]] : []); if(!_dateKeys.length) _vcDateAll = true; }
   // ── pass 2: กรองตามรอบที่เลือก แล้วจัดกลุ่มตามคน ──
   const byPerson = new Map();
-  _allWorks.forEach(({p, w, s})=>{
-    if(!_vcWorkPassesDateFilter(w)) return;
+  _allWorks.forEach(({p, w, s, rk})=>{
+    if(!(_vcDateAll || _vcDateSel.size===0 || _vcDateSel.has(rk))) return;
     if(!byPerson.has(w.id)) byPerson.set(w.id, []);
-    byPerson.get(w.id).push({p, w, s});
+    byPerson.get(w.id).push({p, w, s, rk});
   });
   const _chip=(val,label,active)=>`<span onclick="_vcToggleDate('${val}')" style="cursor:pointer;padding:5px 12px;border-radius:16px;font-size:11.5px;font-weight:700;white-space:nowrap;border:1px solid ${active?'var(--accent2)':'var(--border2)'};background:${active?'rgba(0,180,255,.15)':'transparent'};color:${active?'var(--accent2)':'var(--text2)'}">${label}</span>`;
   const _selSum = _dateKeys.filter(k=>_vcDateSel.has(k)).reduce((a,k)=>a+dateMap.get(k).sum,0);
@@ -22354,8 +22365,8 @@ function renderVcByPerson(){
   }
   // เรียงตาม "วันส่งใบ" (ระดับวัน ไม่ใช่วินาที) น้อย→มาก · วันเดียวกันเรียงยอดมาก→น้อย
   const entries = Array.from(byPerson.entries()).sort((a,b) => {
-    const da = a[1].reduce((m,it)=>{ const d=_vcWorkConfirmDate(it.w)||'9999-99-99'; return d<m?d:m; }, '9999-99-99');
-    const db = b[1].reduce((m,it)=>{ const d=_vcWorkConfirmDate(it.w)||'9999-99-99'; return d<m?d:m; }, '9999-99-99');
+    const da = a[1].reduce((m,it)=>{ const d=(it.rk&&it.rk!=='none')?it.rk:'9999-99-99'; return d<m?d:m; }, '9999-99-99');
+    const db = b[1].reduce((m,it)=>{ const d=(it.rk&&it.rk!=='none')?it.rk:'9999-99-99'; return d<m?d:m; }, '9999-99-99');
     if(da!==db) return da.localeCompare(db);
     const sumA = a[1].reduce((s,it)=>s+(it.w.amount||0),0);
     const sumB = b[1].reduce((s,it)=>s+(it.w.amount||0),0);
@@ -22367,11 +22378,8 @@ function renderVcByPerson(){
     const sel = _vcByPersonSelected.get(staffId) || new Set();
     const isExpanded = _vcByPersonExpanded.has(staffId);
     const selectedAmt = items.filter(it => sel.has(`${it.p.id}|${it.w.slot}`)).reduce((sum, it) => sum + (it.w.amount||0), 0);
-    const lastConfirmAt = items.reduce((latest, it) => {
-      const t = it.w.confirmSentAt;
-      return (!latest || (t && t > latest)) ? t : latest;
-    }, null);
-    const confirmDate = lastConfirmAt ? new Date(lastConfirmAt).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '—';
+    const roundKey = items.reduce((m,it)=> (it.rk && it.rk!=='none' && (!m || it.rk<m)) ? it.rk : m, '');
+    const confirmDate = _vcThaiConfirmDate(roundKey || 'none');
     const itemsHTML = items.map(it => {
       const key = `${it.p.id}|${it.w.slot}`;
       const checked = sel.has(key);
