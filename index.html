@@ -20760,19 +20760,43 @@ function switchDocsMain(tab, el) {
 // 💰 สรุปการเงินรวมบนหน้าใบสำคัญจ่ายทีม — ได้รับ · เตรียมจ่าย · กำไร (ใช้ SSOT getProjectFinance)
 function renderVcFinanceSummary(){
   const el = document.getElementById('vc-finance-summary'); if(!el) return;
-  let t;
-  try { t = sumProjectFinance(getProjects()); } catch(e){ el.innerHTML=''; return; }
-  const received = t.received||0, toPay = t.expensePending||0, profit = t.profitReal||0;
-  const paidOut = t.expensePaid||0;
+  // 🎯 "รอบนี้" = เฉพาะโปรเจกต์ที่มีคน "ยืนยันแล้ว + ยังไม่จ่าย" (ตรงกับลิสต์ 'ตามคน')
+  //    ไม่รวมทุกงานทั้งระบบ · ไม่นับงานที่ลูกค้ายังไม่โอนเข้าจริง
+  let toPay = 0;               // ค่าตอบแทนทีมรอบนี้ (คนที่รอจ่ายในลิสต์)
+  const roundIds = new Set();  // โปรเจกต์ที่อยู่ในรอบจ่ายนี้
+  // ⚠️ ใช้เงื่อนไขเดียวกับลิสต์ 'ตามคน' เป๊ะ (renderVcByPerson) — ไม่ตัดงานยกเลิก เพราะจ่ายชดเชยได้
+  //    ยอดตรงนี้ = ผลรวมของทุกคนที่โชว์ในลิสต์ด้านล่าง
+  getProjects().forEach(p=>{
+    if(!p) return;
+    (p.workers||[]).forEach(w=>{
+      if(getStaffById(w.id) && w.status!=='paid' && getWorkerConfirmStatus(w)==='confirmed'){
+        toPay += (w.amount||0);
+        roundIds.add(p.id);
+      }
+    });
+  });
+  // 💰 ได้รับ = เงินที่ "โอนเข้าจริง" (งวด income ที่ติ๊ก paidAt) ของโปรเจกต์รอบนี้เท่านั้น
+  let received = 0;
+  getProjects().forEach(p=>{
+    if(!roundIds.has(p.id)) return;
+    const rows = Array.isArray(p.income) ? p.income : [];
+    if(rows.length){
+      rows.forEach(e=>{ if(e.paidAt) received += (parseFloat(e.amount)||0); });
+    } else if(ls('client_paid_'+p.id)){
+      // งานเก่าที่ไม่มีงวด income แต่ติ๊ก "รับเงินจากลูกค้าแล้ว" → ใช้งบเต็ม
+      received += (p.budget||0);
+    }
+  });
+  const profit = received - toPay;   // กำไรคงเหลือรอบนี้ = ได้รับ − จ่ายทีม
   const card = (icon,label,val,color,sub)=>`<div class="stat-card" style="padding:14px;border-color:${color}55">
     <div class="stat-label">${icon} ${label}</div>
     <div style="font-size:22px;font-weight:800;margin-top:5px;color:${color}">${fmtB(val)}</div>
     ${sub?`<div style="font-size:10.5px;color:var(--text2);margin-top:3px">${sub}</div>`:''}
   </div>`;
   el.innerHTML =
-    card('💰','ได้รับจากลูกค้า', received, 'var(--green)', 'เงินที่เก็บเข้าจริงแล้ว')
-    + card('💸','เตรียมจ่ายทีม', toPay, 'var(--orange)', `ยังไม่จ่าย (หลังหักภาษี) · จ่ายแล้ว ${fmtB(paidOut)}`)
-    + card('📈','กำไร (ได้รับ − ค่าทีม)', profit, profit>=0?'var(--accent2)':'var(--red)', 'กำไรจากเงินที่เข้าจริง');
+    card('💰','ได้รับจากลูกค้า (รอบนี้)', received, 'var(--green)', `โอนเข้าจริง · ${roundIds.size} โปรเจกต์ในรอบจ่าย`)
+    + card('💸','เตรียมจ่ายทีม (รอบนี้)', toPay, 'var(--orange)', 'คนที่ยืนยันแล้ว · ยังไม่จ่าย')
+    + card('📈','กำไรคงเหลือ', profit, profit>=0?'var(--accent2)':'var(--red)', 'ได้รับ − จ่ายทีมรอบนี้');
 }
 function populateDocsProjSelects() {
   // qt-proj, inv-proj และ vc-proj ใช้ multi-select picker (ติ๊กได้หลายโปรเจกต์)
