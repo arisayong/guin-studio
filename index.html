@@ -22023,18 +22023,21 @@ function _loadScriptOnce(src){
 // 🗂️ กรองตาม "รอบยืนยัน" (วันที่ส่งใบยืนยันยอด) — 'all' หรือ 'YYYY-MM-DD' หรือ 'none'
 //    ใช้แยกก้อนจ่าย: ก้อนที่ยืนยันก่อนจ่ายก่อน · ยอดไม่รวมข้ามรอบ
 let _vcConfirmDateFilter = 'all';
+let _vcDateFilterUserSet = false;   // true เมื่อผู้ใช้กดเลือกเอง · ก่อนหน้านั้น default = วันส่งใบเก่าสุด
+// วันที่ "เราส่งใบยืนยันยอด" (confirmSentAt) — ไม่ใช่วันที่ staff กดรับยอด (confirmRespondedAt)
 function _vcWorkConfirmDate(w){
-  const t = (w && (w.confirmSentAt || w.confirmRespondedAt)) || '';
+  const t = (w && w.confirmSentAt) || '';
   if(!t) return '';
   const d = new Date(t); if(isNaN(d)) return '';
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 function _vcWorkPassesDateFilter(w){
-  if(_vcConfirmDateFilter==='all') return true;
+  if(_vcConfirmDateFilter==='all' || !_vcConfirmDateFilter) return true;
   return (_vcWorkConfirmDate(w) || 'none') === _vcConfirmDateFilter;
 }
 function _vcSetConfirmDateFilter(d){
   _vcConfirmDateFilter = d || 'all';
+  _vcDateFilterUserSet = true;
   try{ renderVcByPerson(); }catch(e){}
 }
 function _vcThaiConfirmDate(k){
@@ -22293,28 +22296,35 @@ function renderVcByPerson(){
   const listEl = document.getElementById('vc-byperson-list');
   if(!listEl) return;
   // จัดกลุ่ม workers ที่ "confirmed + not paid" ตาม staff (รวมงานยกเลิก — จ่ายชดเชยได้)
-  const byPerson = new Map();
+  // ── pass 1: รวมงาน "ยืนยันแล้ว + ยังไม่จ่าย" ทั้งหมด + สถิติรอบตามวันส่งใบ (ไม่สนตัวกรอง) ──
   const dateMap = new Map();        // 'YYYY-MM-DD'|'none' → {people:Set, sum}
   const allPeople = new Set(); let allSum = 0;
+  const _allWorks = [];
   getProjects().forEach(p => {
     (p.workers||[]).forEach(w => {
       if(w.status === 'paid') return;
       if(getWorkerConfirmStatus(w) !== 'confirmed') return;
       const s = getStaffById(w.id);
       if(!s) return;
-      // สถิติ "รอบยืนยัน" ทุกวัน (ไม่สนตัวกรอง) — สำหรับทำแถบเลือกรอบ
+      _allWorks.push({p, w, s});
       const cd = _vcWorkConfirmDate(w) || 'none';
       if(!dateMap.has(cd)) dateMap.set(cd, {people:new Set(), sum:0});
       dateMap.get(cd).people.add(w.id); dateMap.get(cd).sum += (w.amount||0);
       allPeople.add(w.id); allSum += (w.amount||0);
-      // กรองตามรอบที่เลือกอยู่
-      if(!_vcWorkPassesDateFilter(w)) return;
-      if(!byPerson.has(w.id)) byPerson.set(w.id, []);
-      byPerson.get(w.id).push({p, w, s});
     });
   });
-  // 🗂️ แถบเลือกรอบยืนยัน (เรียงวันน้อย→มาก · 'none' ไว้ท้าย)
+  // 🗂️ แถบเลือกรอบ (เรียงวันน้อย→มาก · 'none' ไว้ท้าย)
   const _dateKeys = [...dateMap.keys()].sort((a,b)=> a==='none'?1 : b==='none'?-1 : a.localeCompare(b));
+  // ค่าเริ่มต้น = วันส่งใบ "เก่าสุด" (ค้างจ่ายนานสุด จ่ายก่อน) · ถ้าผู้ใช้เลือกเองแล้วเคารพตามนั้น
+  if(!_vcDateFilterUserSet){ _vcConfirmDateFilter = _dateKeys.length ? _dateKeys[0] : 'all'; }
+  else if(_vcConfirmDateFilter!=='all' && !dateMap.has(_vcConfirmDateFilter)){ _vcConfirmDateFilter = _dateKeys[0] || 'all'; }
+  // ── pass 2: กรองตามรอบที่เลือก แล้วจัดกลุ่มตามคน ──
+  const byPerson = new Map();
+  _allWorks.forEach(({p, w, s})=>{
+    if(!_vcWorkPassesDateFilter(w)) return;
+    if(!byPerson.has(w.id)) byPerson.set(w.id, []);
+    byPerson.get(w.id).push({p, w, s});
+  });
   const _chip=(val,label,active)=>`<span onclick="_vcSetConfirmDateFilter('${val}')" style="cursor:pointer;padding:5px 12px;border-radius:16px;font-size:11.5px;font-weight:700;white-space:nowrap;border:1px solid ${active?'var(--accent2)':'var(--border2)'};background:${active?'rgba(0,180,255,.15)':'transparent'};color:${active?'var(--accent2)':'var(--text2)'}">${label}</span>`;
   const chipsHtml = _dateKeys.length ? `<div style="background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:11px 14px;margin-bottom:12px">
       <div style="font-size:11px;color:var(--text2);margin-bottom:7px;font-weight:700">🗂️ เลือกรอบจ่าย (ตามวันส่งใบยืนยันยอด) — จ่ายทีละรอบ ยอดไม่รวมข้ามรอบ</div>
@@ -22337,8 +22347,8 @@ function renderVcByPerson(){
   }
   // ค่าเริ่มต้น: เรียงตาม "วันส่งใบยืนยันยอด" น้อย→มาก (ก้อนที่ยืนยันก่อนอยู่บน) · เท่ากันเรียงยอดมาก→น้อย
   const entries = Array.from(byPerson.entries()).sort((a,b) => {
-    const ea = a[1].reduce((m,it)=>{ const t=it.w.confirmSentAt||it.w.confirmRespondedAt||''; return (!m||(t&&t<m))?t:m; }, '');
-    const eb = b[1].reduce((m,it)=>{ const t=it.w.confirmSentAt||it.w.confirmRespondedAt||''; return (!m||(t&&t<m))?t:m; }, '');
+    const ea = a[1].reduce((m,it)=>{ const t=it.w.confirmSentAt||''; return (!m||(t&&t<m))?t:m; }, '');
+    const eb = b[1].reduce((m,it)=>{ const t=it.w.confirmSentAt||''; return (!m||(t&&t<m))?t:m; }, '');
     if(ea!==eb) return String(ea).localeCompare(String(eb));
     const sumA = a[1].reduce((s,it)=>s+(it.w.amount||0),0);
     const sumB = b[1].reduce((s,it)=>s+(it.w.amount||0),0);
@@ -22351,7 +22361,7 @@ function renderVcByPerson(){
     const isExpanded = _vcByPersonExpanded.has(staffId);
     const selectedAmt = items.filter(it => sel.has(`${it.p.id}|${it.w.slot}`)).reduce((sum, it) => sum + (it.w.amount||0), 0);
     const lastConfirmAt = items.reduce((latest, it) => {
-      const t = it.w.confirmRespondedAt || it.w.confirmSentAt;
+      const t = it.w.confirmSentAt;
       return (!latest || (t && t > latest)) ? t : latest;
     }, null);
     const confirmDate = lastConfirmAt ? new Date(lastConfirmAt).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '—';
@@ -22401,7 +22411,7 @@ function renderVcByPerson(){
             <span>🏦 <strong style="color:var(--text)">${s.bank||'—'}</strong> ${s.account||''}</span>
             ${(s.account||s.promptpay)?`<span onclick="event.stopPropagation();_kbizCopy('${String(s.account||s.promptpay).replace(/[^0-9]/g,'')}')" style="cursor:pointer;background:rgba(0,180,255,.14);color:var(--accent2);border:1px solid rgba(0,180,255,.35);border-radius:12px;padding:1px 9px;font-weight:700" title="คัดลอก${s.account?'เลขบัญชี':'พร้อมเพย์'} ไปแปะ K-BIZ">📋 ${s.account?'บัญชี':'พร้อมเพย์'}</span>`:'<span style="color:var(--orange)">⚠️ ไม่มีบัญชี</span>'}
             ${hasEmail ? `<span>📧 ${s.email}</span>` : '<span style="color:var(--orange)">⚠️ ไม่มี email</span>'}
-            <span>📅 ${confirmDate}</span>
+            <span title="วันที่เราส่งใบยืนยันยอด">📤 ส่งใบ ${confirmDate}</span>
           </div>
         </div>
         <div style="text-align:right">
