@@ -22022,8 +22022,9 @@ function _loadScriptOnce(src){
 }
 // 🗂️ กรองตาม "รอบยืนยัน" (วันที่ส่งใบยืนยันยอด) — 'all' หรือ 'YYYY-MM-DD' หรือ 'none'
 //    ใช้แยกก้อนจ่าย: ก้อนที่ยืนยันก่อนจ่ายก่อน · ยอดไม่รวมข้ามรอบ
-let _vcConfirmDateFilter = 'all';
-let _vcDateFilterUserSet = false;   // true เมื่อผู้ใช้กดเลือกเอง · ก่อนหน้านั้น default = วันส่งใบเก่าสุด
+let _vcDateSel = new Set();        // รอบ (วันส่งใบ) ที่เลือก · เลือกได้หลายรอบ
+let _vcDateAll = false;            // true = ดูทั้งหมด
+let _vcDateFilterUserSet = false;  // true เมื่อผู้ใช้กดเลือกเอง · ก่อนหน้านั้น default = วันส่งใบเก่าสุด
 // วันที่ "เราส่งใบยืนยันยอด" (confirmSentAt) — ไม่ใช่วันที่ staff กดรับยอด (confirmRespondedAt)
 function _vcWorkConfirmDate(w){
   const t = (w && w.confirmSentAt) || '';
@@ -22032,12 +22033,15 @@ function _vcWorkConfirmDate(w){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 function _vcWorkPassesDateFilter(w){
-  if(_vcConfirmDateFilter==='all' || !_vcConfirmDateFilter) return true;
-  return (_vcWorkConfirmDate(w) || 'none') === _vcConfirmDateFilter;
+  if(_vcDateAll) return true;
+  if(_vcDateSel.size===0) return true;   // safety ก่อน init (render จะตั้ง default ให้)
+  return _vcDateSel.has(_vcWorkConfirmDate(w) || 'none');
 }
-function _vcSetConfirmDateFilter(d){
-  _vcConfirmDateFilter = d || 'all';
+// เลือก/ยกเลิกรอบ (เลือกได้หลายรอบ) · 'all' = ดูทั้งหมด
+function _vcToggleDate(k){
   _vcDateFilterUserSet = true;
+  if(k==='all'){ _vcDateAll = true; _vcDateSel.clear(); }
+  else { _vcDateAll = false; if(_vcDateSel.has(k)) _vcDateSel.delete(k); else _vcDateSel.add(k); }
   try{ renderVcByPerson(); }catch(e){}
 }
 function _vcThaiConfirmDate(k){
@@ -22315,9 +22319,11 @@ function renderVcByPerson(){
   });
   // 🗂️ แถบเลือกรอบ (เรียงวันน้อย→มาก · 'none' ไว้ท้าย)
   const _dateKeys = [...dateMap.keys()].sort((a,b)=> a==='none'?1 : b==='none'?-1 : a.localeCompare(b));
-  // ค่าเริ่มต้น = วันส่งใบ "เก่าสุด" (ค้างจ่ายนานสุด จ่ายก่อน) · ถ้าผู้ใช้เลือกเองแล้วเคารพตามนั้น
-  if(!_vcDateFilterUserSet){ _vcConfirmDateFilter = _dateKeys.length ? _dateKeys[0] : 'all'; }
-  else if(_vcConfirmDateFilter!=='all' && !dateMap.has(_vcConfirmDateFilter)){ _vcConfirmDateFilter = _dateKeys[0] || 'all'; }
+  // เอารอบที่หมดแล้ว (จ่ายครบ) ออกจากที่เลือก
+  [..._vcDateSel].forEach(k=>{ if(!dateMap.has(k)) _vcDateSel.delete(k); });
+  // ค่าเริ่มต้น = รอบวันส่งใบ "เก่าสุด" (ค้างจ่ายนานสุด จ่ายก่อน) · ถ้าผู้ใช้เลือกเองแล้วเคารพตามนั้น
+  if(!_vcDateFilterUserSet){ _vcDateSel = new Set(_dateKeys.length ? [_dateKeys[0]] : []); _vcDateAll = (_dateKeys.length===0); }
+  else if(!_vcDateAll && _vcDateSel.size===0){ _vcDateSel = new Set(_dateKeys.length ? [_dateKeys[0]] : []); if(!_dateKeys.length) _vcDateAll = true; }
   // ── pass 2: กรองตามรอบที่เลือก แล้วจัดกลุ่มตามคน ──
   const byPerson = new Map();
   _allWorks.forEach(({p, w, s})=>{
@@ -22325,18 +22331,19 @@ function renderVcByPerson(){
     if(!byPerson.has(w.id)) byPerson.set(w.id, []);
     byPerson.get(w.id).push({p, w, s});
   });
-  const _chip=(val,label,active)=>`<span onclick="_vcSetConfirmDateFilter('${val}')" style="cursor:pointer;padding:5px 12px;border-radius:16px;font-size:11.5px;font-weight:700;white-space:nowrap;border:1px solid ${active?'var(--accent2)':'var(--border2)'};background:${active?'rgba(0,180,255,.15)':'transparent'};color:${active?'var(--accent2)':'var(--text2)'}">${label}</span>`;
+  const _chip=(val,label,active)=>`<span onclick="_vcToggleDate('${val}')" style="cursor:pointer;padding:5px 12px;border-radius:16px;font-size:11.5px;font-weight:700;white-space:nowrap;border:1px solid ${active?'var(--accent2)':'var(--border2)'};background:${active?'rgba(0,180,255,.15)':'transparent'};color:${active?'var(--accent2)':'var(--text2)'}">${label}</span>`;
+  const _selSum = _dateKeys.filter(k=>_vcDateSel.has(k)).reduce((a,k)=>a+dateMap.get(k).sum,0);
   const chipsHtml = _dateKeys.length ? `<div style="background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:11px 14px;margin-bottom:12px">
-      <div style="font-size:11px;color:var(--text2);margin-bottom:7px;font-weight:700">🗂️ เลือกรอบจ่าย (ตามวันส่งใบยืนยันยอด) — จ่ายทีละรอบ ยอดไม่รวมข้ามรอบ</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:7px;font-weight:700">🗂️ เลือกรอบจ่าย (ตามวันส่งใบยืนยันยอด) — <span style="color:var(--accent2)">ติ๊กได้หลายรอบ</span> · ค่าเริ่มต้น = รอบเก่าสุด${(!_vcDateAll && _vcDateSel.size>1)?` · <span style="color:var(--green)">เลือก ${_vcDateSel.size} รอบ · รวม ${fmtB(_selSum)}</span>`:''}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${_chip('all', `📋 ทั้งหมด · ${allPeople.size} คน · ${fmtB(allSum)}`, _vcConfirmDateFilter==='all')}
-        ${_dateKeys.map(k=>{ const v=dateMap.get(k); return _chip(k, `📅 ${_vcThaiConfirmDate(k)} · ${v.people.size} คน · ${fmtB(v.sum)}`, _vcConfirmDateFilter===k); }).join('')}
+        ${_chip('all', `📋 ทั้งหมด · ${allPeople.size} คน · ${fmtB(allSum)}`, _vcDateAll)}
+        ${_dateKeys.map(k=>{ const v=dateMap.get(k); const on=_vcDateSel.has(k); return _chip(k, `${on?'✅ ':'📅 '}${_vcThaiConfirmDate(k)} · ${v.people.size} คน · ${fmtB(v.sum)}`, on); }).join('')}
       </div>
     </div>` : '';
   const _retroHtml = _vcShowPaid ? _vcRenderRetroSection() : '';
   if(byPerson.size === 0){
-    const emptyMsg = _vcConfirmDateFilter!=='all'
-      ? `<div style="text-align:center;padding:32px 20px;color:var(--text2)"><div style="font-size:30px;margin-bottom:8px">🗂️</div><div style="font-size:13px;font-weight:700;color:var(--text)">ไม่มีคนในรอบยืนยันนี้</div><div style="font-size:11.5px;margin-top:6px">เลือก "ทั้งหมด" หรือรอบอื่นด้านบน</div></div>`
+    const emptyMsg = !_vcDateAll
+      ? `<div style="text-align:center;padding:32px 20px;color:var(--text2)"><div style="font-size:30px;margin-bottom:8px">🗂️</div><div style="font-size:13px;font-weight:700;color:var(--text)">ไม่มีคนในรอบที่เลือก</div><div style="font-size:11.5px;margin-top:6px">ติ๊กรอบอื่น หรือ "ทั้งหมด" ด้านบน</div></div>`
       : `<div style="text-align:center;padding:40px 20px;color:var(--text2)">
       <div style="font-size:36px;margin-bottom:8px">✅</div>
       <div style="font-size:14px;font-weight:700;color:var(--text)">ไม่มีรายการที่รอออกใบสำคัญจ่าย</div>
@@ -22345,11 +22352,11 @@ function renderVcByPerson(){
     listEl.innerHTML = chipsHtml + (_vcShowPaid ? '' : emptyMsg) + _retroHtml;
     return;
   }
-  // ค่าเริ่มต้น: เรียงตาม "วันส่งใบยืนยันยอด" น้อย→มาก (ก้อนที่ยืนยันก่อนอยู่บน) · เท่ากันเรียงยอดมาก→น้อย
+  // เรียงตาม "วันส่งใบ" (ระดับวัน ไม่ใช่วินาที) น้อย→มาก · วันเดียวกันเรียงยอดมาก→น้อย
   const entries = Array.from(byPerson.entries()).sort((a,b) => {
-    const ea = a[1].reduce((m,it)=>{ const t=it.w.confirmSentAt||''; return (!m||(t&&t<m))?t:m; }, '');
-    const eb = b[1].reduce((m,it)=>{ const t=it.w.confirmSentAt||''; return (!m||(t&&t<m))?t:m; }, '');
-    if(ea!==eb) return String(ea).localeCompare(String(eb));
+    const da = a[1].reduce((m,it)=>{ const d=_vcWorkConfirmDate(it.w)||'9999-99-99'; return d<m?d:m; }, '9999-99-99');
+    const db = b[1].reduce((m,it)=>{ const d=_vcWorkConfirmDate(it.w)||'9999-99-99'; return d<m?d:m; }, '9999-99-99');
+    if(da!==db) return da.localeCompare(db);
     const sumA = a[1].reduce((s,it)=>s+(it.w.amount||0),0);
     const sumB = b[1].reduce((s,it)=>s+(it.w.amount||0),0);
     return sumB - sumA;
