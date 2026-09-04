@@ -2287,6 +2287,7 @@ body.sidebar-collapsed .main-content{
        <button class="btn btn-xs" style="background:#9B6FFF;color:#fff;border:none;font-weight:700" onclick="downloadAllVouchersZip()" title="สร้างไฟล์ PDF แยกรายคน (ตั้งชื่อตามชื่อแต่ละคน) แล้วรวมเป็น ZIP ไฟล์เดียว — แตกออกโยนเข้า Drive ได้เลย">📦 PDF แยกรายคน (ZIP)</button>
        <button class="btn btn-xs" style="background:#1565FF;color:#fff;border:none;font-weight:700" onclick="downloadAllVouchersPreview()" title="รวมใบสำคัญจ่ายของทุกคนที่รอจ่ายเป็นไฟล์เดียว — เปิดแล้วสั่งพิมพ์/บันทึก PDF ได้ทีเดียวทุกคน">📥 โหลดใบทุกคน (พิมพ์รวดเดียว)</button>
        <button class="btn btn-xs" style="background:#00A950;color:#fff;border:none;font-weight:700" onclick="openKbizExport()" title="ทำไฟล์โอนเงิน K-BIZ จากรายชื่อที่รอจ่าย แบ่งอัตโนมัติรอบละ 10 คน (K-BIZ จ่ายกลุ่มได้สูงสุด 10 คน/รอบ)">🏦 ไฟล์โอน K-BIZ (รอบละ 10)</button>
+       <button class="btn btn-xs" style="background:#F59E0B;color:#231504;border:none;font-weight:700" onclick="openVcHistory()" title="ดูใบที่ออกไปแล้วย้อนหลังรายวัน · เช็คสถานะส่งเมล (ใครได้/ยังไม่ได้) · ส่งซ้ำ · โหลด ZIP ทั้งวัน">📅 ย้อนหลัง & สถานะเมล</button>
        <button id="vc-show-paid-toggle" class="btn btn-xs btn-outline" onclick="toggleVcShowPaid()">🕓 แสดงคนที่จ่ายแล้ว (ออกเอกสารย้อนหลัง)</button>
       </div>
       <div id="vc-byperson-list"></div>
@@ -22079,11 +22080,11 @@ async function downloadAllVouchersZip(){
   if(!byPerson.size){ toast('ไม่มีคนที่รอออกใบสำคัญจ่าย','info'); return; }
   const total=byPerson.size;
   if(!confirm(`📦 สร้างไฟล์ PDF แยกรายคน ${total} คน แล้วรวมเป็น ZIP?\n\n• ตั้งชื่อไฟล์ตามชื่อแต่ละคน\n• แตก ZIP แล้วโยนเข้า Google Drive ได้เลย\n• ใช้เวลาสักครู่ (ยิ่งคนเยอะยิ่งนาน)`)) return;
-  toast('⏳ กำลังเตรียมตัวสร้าง PDF...','info');
+  _vcProgress('run',{title:'📦 กำลังสร้าง PDF แยกรายคน', sub:'เตรียมตัวสร้าง PDF...', done:0, total:total});
   try{
     await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
     await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
-  }catch(e){ toast('โหลดตัวสร้าง PDF ไม่สำเร็จ (เช็คเน็ต): '+e.message,'error'); return; }
+  }catch(e){ _vcProgress('error',{title:'โหลดตัวสร้าง PDF ไม่สำเร็จ', sub:'เช็คเน็ตแล้วลองใหม่'}); toast('โหลดตัวสร้าง PDF ไม่สำเร็จ (เช็คเน็ต): '+e.message,'error'); return; }
   if(typeof JSZip==='undefined' || typeof html2pdf==='undefined'){ toast('ตัวสร้าง PDF/ZIP ยังไม่พร้อม','error'); return; }
   const zip=new JSZip();
   const date=document.getElementById('vc-date')?.value||new Date().toISOString().split('T')[0];
@@ -22098,7 +22099,7 @@ async function downloadAllVouchersZip(){
   let done=0, fail=0;
   for(const [wid,{s,works}] of entries){
     done++;
-    toast(`📄 สร้าง PDF ${done}/${total} · ${esc(s.nickname||s.name||'')}...`,'info');
+    _vcProgress('run',{title:'📦 กำลังสร้าง PDF แยกรายคน', sub:`กำลังทำของ ${esc(s.nickname||s.name||'')}`, done:done, total:total});
     const html=buildMultiVoucherHTML({
       vNo:'(ตัวอย่าง)', staff:s,
       items: works.map(({w,p})=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
@@ -22123,13 +22124,14 @@ async function downloadAllVouchersZip(){
     }catch(e){ console.warn('pdf gen fail:', wid, e); fail++; }
   }
   host.remove();
-  if(!Object.keys(zip.files).length){ toast('สร้าง PDF ไม่สำเร็จเลยสักไฟล์ — ลองใหม่','error'); return; }
-  toast('🗜️ กำลังบีบอัดเป็น ZIP...','info');
+  if(!Object.keys(zip.files).length){ _vcProgress('error',{title:'สร้าง PDF ไม่สำเร็จ', sub:'ลองใหม่อีกครั้ง'}); toast('สร้าง PDF ไม่สำเร็จเลยสักไฟล์ — ลองใหม่','error'); return; }
+  _vcProgress('run',{title:'🗜️ กำลังบีบอัดเป็น ZIP...', sub:'ใกล้เสร็จแล้ว', done:total, total:total});
   const zipBlob=await zip.generateAsync({type:'blob'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(zipBlob);
   a.download='ใบสำคัญจ่าย_'+total+'คน_'+new Date().toISOString().slice(0,10)+'.zip';
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  _vcProgress(fail?'error':'done',{title: fail?'⚠️ ได้ ZIP (มีบางไฟล์พลาด)':'✅ ได้ไฟล์ ZIP แล้ว', sub:`${total-fail} ไฟล์${fail?(' · ล้มเหลว '+fail):''} (ตั้งชื่อตามแต่ละคน)`, done:total, total:total});
   toast(`✅ ได้ ZIP · ${total-fail} ไฟล์${fail?(' · ล้มเหลว '+fail):''} (ตั้งชื่อตามแต่ละคน)`, fail?'warn':'success');
 }
 
@@ -22212,6 +22214,38 @@ async function testMailer(){
   }catch(e){ if(el) el.innerHTML='<span style="color:var(--red)">❌ '+esc(e.message)+'</span>'; }
 }
 // 📧 ออกใบจริง + ส่งเมลแนบ PDF ให้ทุกคนที่รอจ่าย อัตโนมัติ
+// 📌 แถบความคืบหน้าค้างมุมขวาล่าง — รู้ว่าระบบยังรัน (ไม่ใช่ toast ที่เด้งแล้วหาย)
+function _vcProgress(state, o){
+  o=o||{};
+  if(state==='hide'){ document.getElementById('vc-progress')?.remove(); return; }
+  if(!document.getElementById('vc-spin-style')){
+    const st=document.createElement('style'); st.id='vc-spin-style';
+    st.textContent='@keyframes vcspin{to{transform:rotate(360deg)}}'; document.head.appendChild(st);
+  }
+  let el=document.getElementById('vc-progress');
+  if(!el){
+    el=document.createElement('div'); el.id='vc-progress';
+    el.style.cssText='position:fixed;right:20px;bottom:20px;z-index:4000;background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 34px rgba(0,0,0,.55);padding:14px 16px;min-width:290px;max-width:380px;font-family:Kanit,sans-serif';
+    document.body.appendChild(el);
+  }
+  const pct=o.total?Math.round((o.done/o.total)*100):0;
+  const icon = state==='run'
+    ? '<span style="display:inline-block;width:16px;height:16px;border:2px solid rgba(0,180,255,.3);border-top-color:var(--accent2);border-radius:50%;animation:vcspin .8s linear infinite"></span>'
+    : (state==='error'?'<span style="font-size:16px">⚠️</span>':'<span style="font-size:16px">✅</span>');
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;${o.total?'margin-bottom:9px':''}">
+      <div style="flex-shrink:0;width:18px;text-align:center">${icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:800;color:var(--text)">${o.title||''}</div>
+        ${o.sub?`<div style="font-size:11px;color:var(--text2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.sub}</div>`:''}
+      </div>
+      ${state!=='run'?`<button onclick="document.getElementById('vc-progress')?.remove()" style="flex-shrink:0;background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;line-height:1">✕</button>`:''}
+    </div>
+    ${o.total?`<div style="height:7px;background:var(--bg2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${state==='error'?'var(--orange)':'var(--green)'};transition:width .25s"></div></div>
+    <div style="font-size:10.5px;color:var(--text2);margin-top:5px;display:flex;justify-content:space-between"><span>${o.done||0}/${o.total} คน</span><span>${pct}%</span></div>`:''}`;
+  if(state==='done' && o.autohide!==false){ setTimeout(()=>document.getElementById('vc-progress')?.remove(), 15000); }
+}
+
 async function issueAndAutoEmailAll(){
   const cfg=getMailerCfg();
   if(!cfg.url||!cfg.secret){
@@ -22224,9 +22258,9 @@ async function issueAndAutoEmailAll(){
   const grand=[...byPerson.values()].reduce((a,{works})=>a+works.reduce((x,{w})=>x+(w.amount||0),0),0);
   const noEmail=[...byPerson.values()].filter(({s})=>!(s.email&&s.email.includes('@'))).length;
   if(!confirm(`📧 ออกใบสำคัญจ่ายจริง + ส่งอีเมลแนบ PDF อัตโนมัติ ${total} คน?\n\nยอดรวม ${fmtB(grand)}\n${noEmail?('⚠️ '+noEmail+' คนไม่มีอีเมล — จะออกใบแต่ไม่ส่งเมล\n'):''}\nระบบจะ: ออกใบจริง + มาร์ค "จ่ายแล้ว" + ส่งเมลแนบ PDF ให้แต่ละคนทีละคนอัตโนมัติ\n(ยิ่งคนเยอะยิ่งใช้เวลา อย่าปิดหน้าจอ)`)) return;
-  toast('⏳ เตรียมตัวสร้าง PDF...','info');
+  _vcProgress('run',{title:'📧 กำลังออกใบ + ส่งเมลแนบ PDF', sub:'เตรียมตัวสร้าง PDF...', done:0, total:total});
   try{ await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'); }
-  catch(e){ toast('โหลดตัวสร้าง PDF ไม่สำเร็จ (เช็คเน็ต)','error'); return; }
+  catch(e){ _vcProgress('error',{title:'โหลดตัวสร้าง PDF ไม่สำเร็จ', sub:'เช็คเน็ตแล้วลองใหม่'}); toast('โหลดตัวสร้าง PDF ไม่สำเร็จ (เช็คเน็ต)','error'); return; }
   if(typeof html2pdf==='undefined'){ toast('ตัวสร้าง PDF ยังไม่พร้อม','error'); return; }
   const date=document.getElementById('vc-date')?.value||new Date().toISOString().split('T')[0];
   const host=document.createElement('div');
@@ -22245,15 +22279,18 @@ async function issueAndAutoEmailAll(){
     }
     if(!okAny) continue;
     const totalAmt=works.reduce((a,{w})=>a+(w.amount||0),0);
+    const hasEmail=!!(s.email && s.email.includes('@'));
     const saved=getDocsStore('vouchers')||[];
-    saved.push({ type:'voucher', docNo:vNo, staffId:wid, staffName:s.name, staffLastName:s.lastName||'', staffNickname:s.nickname,
+    const rec={ type:'voucher', docNo:vNo, staffId:wid, staffName:s.name, staffLastName:s.lastName||'', staffNickname:s.nickname,
       items: works.map(({w,p})=>({projId:p.id, projName:p.name, slot:w.slot, amount:w.amount||0})),
-      amount:totalAmt, totalAmount:totalAmt, multiItem:true, bank:s.bank||'', account:s.account||'', email:s.email||'', date, note:'', createdAt:nowIso });
+      amount:totalAmt, totalAmount:totalAmt, multiItem:true, bank:s.bank||'', account:s.account||'', email:s.email||'', date, note:'', createdAt:nowIso,
+      emailStatus: hasEmail?'pending':'noemail' };
+    saved.push(rec);
     saveDocsStore('vouchers', saved);
     issued++;
-    // 2) มีอีเมล → สร้าง PDF + ส่ง
-    if(s.email && s.email.includes('@')){
-      toast(`📄 ${done}/${total} · ส่งให้ ${esc(s.nickname||s.name||'')}...`,'info');
+    // 2) มีอีเมล → สร้าง PDF + ส่ง · บันทึกสถานะส่งเมลลงใบ (กันเผลอรีเฟรชแล้วไม่รู้ว่าใครยังไม่ได้)
+    _vcProgress('run',{title:'📧 กำลังส่งเมลแนบ PDF', sub:`กำลังทำของ ${esc(s.nickname||s.name||'')}`, done:done, total:total});
+    if(hasEmail){
       try{
         const html=buildMultiVoucherHTML({ vNo, staff:s, items:works.map(({w,p})=>({projName:p.name,slot:w.slot,amount:w.amount||0})), totalAmt, date, note:'' });
         host.innerHTML=html; await new Promise(r=>setTimeout(r,150));
@@ -22262,16 +22299,189 @@ async function issueAndAutoEmailAll(){
         const full=((s.name||'')+(s.lastName?(' '+s.lastName):'')).trim()||s.nickname||wid;
         const pdfName=('ใบสำคัญจ่าย_'+full).replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_').slice(0,80)+'.pdf';
         await _mailerSend({ to:s.email, subject:'ใบสำคัญจ่าย '+vNo+' — Guin Home Studio', htmlBody:_mailerBody(s,works,totalAmt,date,vNo), pdfBase64:b64, pdfName });
+        rec.emailStatus='sent'; rec.emailSentAt=new Date().toISOString();
         sent++;
-      }catch(e){ console.warn('auto email fail:', wid, e); failSend++; }
+      }catch(e){ console.warn('auto email fail:', wid, e); rec.emailStatus='failed'; rec.emailError=String((e&&e.message)||e); failSend++; }
+      saveDocsStore('vouchers', saved);
     }
   }
   host.remove();
   vcSelectedWorkers=new Set();
   try{ renderVcByPerson(); }catch(_){}
   try{ renderQueue(); }catch(_){} try{ updateQueueBadge(); }catch(_){} try{ renderDocsHistory(); }catch(_){}
+  _vcProgress(failSend?'error':'done',{title: failSend?'⚠️ เสร็จแล้ว (มีที่ส่งไม่สำเร็จ)':'✅ ส่งเสร็จเรียบร้อย', sub:`ออกใบ ${issued} · ส่งเมล ${sent}${failSend?(' · ล้มเหลว '+failSend):''}`, done:total, total:total});
   toast(`✅ ออกใบ ${issued} ใบ · ส่งเมลแนบ PDF ${sent} ฉบับ${failSend?(' · ส่งไม่สำเร็จ '+failSend):''}`, failSend?'warn':'success');
 }
+
+/* ══════════════════════════════════════════════════════════
+   📅 ย้อนหลังรายวัน + สถานะส่งเมล — ดู/โหลด/ส่งซ้ำ ใบที่ออกไปแล้ว
+   ══════════════════════════════════════════════════════════ */
+// สร้าง HTML ใบจาก voucher record (ใช้ข้อมูล staff ล่าสุดถ้ามี)
+function _voucherPdfHtml(v){
+  const s = v.staffId ? (getStaffById(v.staffId) || {name:v.staffName,lastName:v.staffLastName,nickname:v.staffNickname,bank:v.bank,account:v.account}) : {name:v.staffName,lastName:v.staffLastName,nickname:v.staffNickname,bank:v.bank,account:v.account};
+  return buildMultiVoucherHTML({ vNo:v.docNo, staff:s, items:(v.items||[]).map(it=>({projName:it.projName,slot:it.slot,amount:it.amount})), totalAmt:v.totalAmount||v.amount||0, date:v.date, note:v.note||'' });
+}
+async function _vcHtmlToPdfBlob(html){
+  const host=document.createElement('div');
+  host.style.cssText='position:fixed;left:-99999px;top:0;width:640px;background:#fff;z-index:-1';
+  document.body.appendChild(host);
+  try{
+    host.innerHTML=html; await new Promise(r=>setTimeout(r,150));
+    return await html2pdf().set({ margin:4, image:{type:'jpeg',quality:0.95}, html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false}, jsPDF:{unit:'mm',format:'a4',orientation:'portrait'} }).from(host.firstElementChild||host).outputPdf('blob');
+  } finally { host.remove(); }
+}
+function _vcSetVoucherEmailStatus(docNo, status, err){
+  const all=getDocsStore('vouchers')||[];
+  const v=all.find(x=>x.docNo===docNo);
+  if(!v) return;
+  v.emailStatus=status;
+  if(status==='sent') v.emailSentAt=new Date().toISOString();
+  if(err) v.emailError=err; else delete v.emailError;
+  saveDocsStore('vouchers', all);
+}
+// ส่งเมลแนบ PDF ของ 1 ใบ (จาก record) + อัปเดตสถานะ · คืน true ถ้าสำเร็จ
+async function _vcSendVoucherEmail(v){
+  const cfg=getMailerCfg();
+  if(!cfg.url||!cfg.secret) throw new Error('ยังไม่ได้ตั้งค่าระบบส่งเมล');
+  const s = v.staffId ? (getStaffById(v.staffId) || {name:v.staffName,lastName:v.staffLastName,nickname:v.staffNickname,bank:v.bank,account:v.account,email:v.email}) : {name:v.staffName,lastName:v.staffLastName,nickname:v.staffNickname,bank:v.bank,account:v.account,email:v.email};
+  const email = s.email || v.email;
+  if(!email || !email.includes('@')){ _vcSetVoucherEmailStatus(v.docNo,'noemail'); return false; }
+  try{
+    await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+    const blob=await _vcHtmlToPdfBlob(_voucherPdfHtml(v));
+    const b64=await _blobToBase64(blob);
+    const full=((s.name||'')+(s.lastName?(' '+s.lastName):'')).trim()||s.nickname||v.docNo;
+    const pdfName=('ใบสำคัญจ่าย_'+full).replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_').slice(0,80)+'.pdf';
+    const works=(v.items||[]).map(it=>({w:{slot:it.slot,amount:it.amount}, p:{name:it.projName}}));
+    await _mailerSend({ to:email, subject:'ใบสำคัญจ่าย '+v.docNo+' — Guin Home Studio', htmlBody:_mailerBody(s, works, v.totalAmount||v.amount||0, v.date, v.docNo), pdfBase64:b64, pdfName });
+    _vcSetVoucherEmailStatus(v.docNo,'sent');
+    return true;
+  }catch(e){ _vcSetVoucherEmailStatus(v.docNo,'failed', String((e&&e.message)||e)); return false; }
+}
+function _vcVoucherEmailStatus(v){ return v.emailStatus || ((v.email&&v.email.includes('@'))?'pending':'noemail'); }
+function _vcEmailBadge(v){
+  const map={
+    sent:['✅ ส่งแล้ว','var(--green)','rgba(0,223,160,.15)'],
+    pending:['❌ ยังไม่ส่ง','var(--orange)','rgba(255,158,0,.15)'],
+    failed:['⚠️ ล้มเหลว','var(--red)','rgba(255,64,64,.15)'],
+    noemail:['⚪ ไม่มีอีเมล','var(--text2)','rgba(255,255,255,.06)'],
+  };
+  const [txt,c,bg]=map[_vcVoucherEmailStatus(v)]||map.pending;
+  return `<span style="font-size:10px;padding:2px 8px;border-radius:8px;color:${c};background:${bg};font-weight:700;white-space:nowrap">${txt}</span>`;
+}
+// จัดกลุ่มใบที่ออกแล้วตามวัน (ตามวันที่ออกใบ createdAt) — ใหม่→เก่า
+function _vcHistDays(){
+  const vs=getDocsStore('vouchers')||[];
+  const days=new Map();
+  vs.forEach(v=>{ const k=_vcDateKeyOf(v.createdAt||''); (days.get(k)||days.set(k,[]).get(k)).push(v); });
+  return [...days.entries()].sort((a,b)=> String(b[0]).localeCompare(String(a[0])));
+}
+function openVcHistory(){
+  const old=document.getElementById('vc-hist-modal'); if(old) old.remove();
+  const d=document.createElement('div'); d.id='vc-hist-modal';
+  d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);overflow-y:auto';
+  d.onclick=function(e){ if(e.target===d) d.remove(); };
+  document.body.appendChild(d);
+  _renderVcHistory();
+}
+function _renderVcHistory(){
+  const host=document.getElementById('vc-hist-modal'); if(!host) return;
+  const days=_vcHistDays();
+  const _thai = k => (!k||k==='none')?'ไม่ระบุวัน':_vcThaiConfirmDate(k);
+  let body;
+  if(!days.length){ body='<div style="text-align:center;padding:44px;color:var(--text2)">ยังไม่มีใบสำคัญจ่ายที่ออกไว้</div>'; }
+  else body=days.map(([k, vs])=>{
+    const total=vs.reduce((a,v)=>a+(v.totalAmount||v.amount||0),0);
+    const st={sent:0,pending:0,failed:0,noemail:0};
+    vs.forEach(v=>{ st[_vcVoucherEmailStatus(v)]++; });
+    const unsent=st.pending+st.failed;
+    const rows=vs.map(v=>{
+      const canSend=(_vcVoucherEmailStatus(v)!=='sent') && (v.email&&v.email.includes('@'));
+      const sentTime = v.emailSentAt ? new Date(v.emailSentAt).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid var(--border2);flex-wrap:wrap">
+        <div style="flex:1;min-width:150px">
+          <div style="font-size:12.5px;font-weight:700">${esc(v.staffName||v.staffNickname||v.staffId||'')} <span style="color:var(--text2);font-size:11px">${esc(v.docNo)}</span></div>
+          <div style="font-size:10.5px;color:var(--text2)">${(v.items||[]).length} งาน · ${fmtB(v.totalAmount||v.amount||0)} · ${esc(v.email||'ไม่มีอีเมล')}${sentTime?' · ส่ง '+sentTime:''}</div>
+        </div>
+        ${_vcEmailBadge(v)}
+        <div style="display:flex;gap:5px;flex-shrink:0">
+          <button class="btn btn-xs btn-outline" onclick="_vcDownloadVoucherPDF('${esc(v.docNo)}')" title="โหลด PDF ใบนี้">📥</button>
+          ${canSend?`<button class="btn btn-xs" style="background:#9B6FFF;color:#fff;border:none;font-weight:700" onclick="_vcResendOne('${esc(v.docNo)}')">📧 ส่ง${_vcVoucherEmailStatus(v)==='failed'?'ซ้ำ':''}</button>`:''}
+        </div>
+      </div>`;
+    }).join('');
+    return `<div style="border:1px solid var(--border2);border-radius:11px;margin-bottom:12px;overflow:hidden">
+      <div style="background:rgba(0,0,0,.22);padding:11px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div style="min-width:0">
+          <div style="font-weight:800;color:var(--accent2)">📅 ${_thai(k)} <span style="font-size:11px;color:var(--text2);font-weight:500">· ${vs.length} ใบ · ${fmtB(total)}</span></div>
+          <div style="font-size:10.5px;color:var(--text2);margin-top:2px">✅ ส่งแล้ว ${st.sent}${st.pending?` · <span style="color:var(--orange)">❌ ยังไม่ส่ง ${st.pending}</span>`:''}${st.failed?` · <span style="color:var(--red)">⚠️ ล้มเหลว ${st.failed}</span>`:''}${st.noemail?` · ⚪ ไม่มีเมล ${st.noemail}`:''}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0">
+          <button class="btn btn-xs" style="background:#9B6FFF;color:#fff;border:none;font-weight:700" onclick="_vcDownloadDayZip('${k}')">📦 โหลด ZIP ทั้งวัน</button>
+          ${unsent?`<button class="btn btn-xs" style="background:#00B4FF;color:#fff;border:none;font-weight:700" onclick="_vcResendDay('${k}')">📧 ส่งเมลที่ค้าง (${unsent})</button>`:''}
+        </div>
+      </div>
+      <div>${rows}</div>
+    </div>`;
+  }).join('');
+  host.innerHTML=`<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;width:780px;max-width:98vw;max-height:94vh;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+      <div>
+        <div style="font-size:17px;font-weight:800">📅 ย้อนหลัง & สถานะเมล (รายวัน)</div>
+        <div style="font-size:11.5px;color:var(--text2);margin-top:2px">ใบที่ออกแล้ว แยกตามวัน · เช็คใครได้เมล/ยังไม่ได้ · ส่งซ้ำ · โหลด PDF ทั้งวันเป็น ZIP</div>
+      </div>
+      <button class="btn-close" onclick="document.getElementById('vc-hist-modal').remove()">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;margin-top:2px">${body}</div>
+  </div>`;
+}
+async function _vcResendOne(docNo){
+  const cfg=getMailerCfg();
+  if(!cfg.url||!cfg.secret){ if(confirm('ยังไม่ได้ตั้งค่าระบบส่งเมล — เปิดหน้าตั้งค่า?')) openMailerSetup(); return; }
+  const v=(getDocsStore('vouchers')||[]).find(x=>x.docNo===docNo); if(!v) return;
+  _vcProgress('run',{title:'📧 กำลังส่งเมล', sub:(v.staffNickname||v.staffName||docNo), done:0, total:1});
+  const ok=await _vcSendVoucherEmail(v);
+  _vcProgress(ok?'done':'error',{title:ok?'✅ ส่งแล้ว':'⚠️ ส่งไม่สำเร็จ', sub:(v.staffNickname||v.staffName||docNo)});
+  _renderVcHistory();
+}
+async function _vcResendDay(k){
+  const cfg=getMailerCfg();
+  if(!cfg.url||!cfg.secret){ if(confirm('ยังไม่ได้ตั้งค่าระบบส่งเมล — เปิดหน้าตั้งค่า?')) openMailerSetup(); return; }
+  const vs=(getDocsStore('vouchers')||[]).filter(v=> _vcDateKeyOf(v.createdAt||'')===k && _vcVoucherEmailStatus(v)!=='sent' && v.email && v.email.includes('@'));
+  if(!vs.length){ toast('ไม่มีเมลที่ค้างของวันนี้','info'); return; }
+  if(!confirm(`ส่งเมลแนบ PDF ที่ยังค้าง ${vs.length} คน ของวันนี้?`)) return;
+  let done=0, ok=0, fail=0;
+  for(const v of vs){ done++; _vcProgress('run',{title:'📧 กำลังส่งเมลที่ค้าง', sub:(v.staffNickname||v.staffName||''), done, total:vs.length}); const r=await _vcSendVoucherEmail(v); if(r)ok++; else fail++; try{_renderVcHistory();}catch(_){}
+  }
+  _vcProgress(fail?'error':'done',{title:fail?'⚠️ เสร็จ (มีล้มเหลว)':'✅ ส่งเมลที่ค้างครบแล้ว', sub:`ส่ง ${ok}${fail?(' · ล้มเหลว '+fail):''}`, done:vs.length, total:vs.length});
+}
+async function _vcDownloadDayZip(k){
+  const vs=(getDocsStore('vouchers')||[]).filter(v=> _vcDateKeyOf(v.createdAt||'')===k);
+  if(!vs.length){ toast('ไม่มีเอกสารของวันนี้','info'); return; }
+  _vcProgress('run',{title:'📦 กำลังทำ ZIP ทั้งวัน', sub:'เตรียมตัวสร้าง PDF...', done:0, total:vs.length});
+  try{
+    await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+  }catch(e){ _vcProgress('error',{title:'โหลดตัวสร้าง PDF ไม่สำเร็จ'}); return; }
+  const zip=new JSZip(); const used=new Set(); let done=0, fail=0;
+  for(const v of vs){
+    done++; _vcProgress('run',{title:'📦 กำลังทำ ZIP ทั้งวัน', sub:(v.staffNickname||v.staffName||''), done, total:vs.length});
+    try{
+      const blob=await _vcHtmlToPdfBlob(_voucherPdfHtml(v));
+      const full=((v.staffName||'')+(v.staffLastName?(' '+v.staffLastName):'')).trim()||v.staffNickname||v.docNo;
+      let base=('ใบสำคัญจ่าย_'+full).replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_').slice(0,80);
+      let name=base, kk=2; while(used.has(name)){ name=base+'_'+kk; kk++; } used.add(name);
+      zip.file(name+'.pdf', blob);
+    }catch(e){ console.warn('day zip pdf fail', v.docNo, e); fail++; }
+  }
+  if(!Object.keys(zip.files).length){ _vcProgress('error',{title:'สร้าง PDF ไม่สำเร็จ'}); return; }
+  const zb=await zip.generateAsync({type:'blob'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(zb);
+  a.download='ใบสำคัญจ่าย_'+(_thaiFile(k))+'.zip';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  _vcProgress(fail?'error':'done',{title:fail?'⚠️ ได้ ZIP (บางไฟล์พลาด)':'✅ ได้ ZIP ทั้งวันแล้ว', sub:`${vs.length-fail} ไฟล์`, done:vs.length, total:vs.length});
+}
+function _thaiFile(k){ return (!k||k==='none')?'ไม่ระบุวัน':k; }
 
 // 📥 รวมใบสำคัญจ่ายของ "ทุกคนที่รอจ่าย" (ยืนยันแล้ว + ยังไม่จ่าย) เป็นไฟล์เดียว — เปิดพิมพ์/บันทึก PDF ทีเดียวทุกคน
 function downloadAllVouchersPreview(){
