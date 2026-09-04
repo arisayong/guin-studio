@@ -2282,6 +2282,10 @@ body.sidebar-collapsed .main-content{
        <div>1 ใบสำคัญจ่าย = 1 คน <strong>(รวมหลายงานในใบเดียว)</strong> · เห็นเฉพาะคนที่ <strong style="color:#9B6FFF">staff ยืนยันยอดแล้ว</strong> และ <strong style="color:var(--green)">ยังไม่ได้จ่าย</strong></div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+       <button class="btn btn-xs" style="background:#00B4FF;color:#fff;border:none;font-weight:700" onclick="issueAndAutoEmailAll()" title="ออกใบสำคัญจ่ายจริง + ส่งอีเมลแนบไฟล์ PDF ให้ทุกคนอัตโนมัติ (ผ่าน Google Apps Script ฟรี) — ไม่ต้องทำทีละคน">📧 ออกใบ + ส่งเมลแนบ PDF ทุกคน</button>
+       <button class="btn btn-xs btn-outline" onclick="openMailerSetup()" title="ตั้งค่าระบบส่งเมลแนบ PDF (Google Apps Script)">⚙️</button>
+       <button class="btn btn-xs" style="background:#9B6FFF;color:#fff;border:none;font-weight:700" onclick="downloadAllVouchersZip()" title="สร้างไฟล์ PDF แยกรายคน (ตั้งชื่อตามชื่อแต่ละคน) แล้วรวมเป็น ZIP ไฟล์เดียว — แตกออกโยนเข้า Drive ได้เลย">📦 PDF แยกรายคน (ZIP)</button>
+       <button class="btn btn-xs" style="background:#1565FF;color:#fff;border:none;font-weight:700" onclick="downloadAllVouchersPreview()" title="รวมใบสำคัญจ่ายของทุกคนที่รอจ่ายเป็นไฟล์เดียว — เปิดแล้วสั่งพิมพ์/บันทึก PDF ได้ทีเดียวทุกคน">📥 โหลดใบทุกคน (พิมพ์รวดเดียว)</button>
        <button class="btn btn-xs" style="background:#00A950;color:#fff;border:none;font-weight:700" onclick="openKbizExport()" title="ทำไฟล์โอนเงิน K-BIZ จากรายชื่อที่รอจ่าย แบ่งอัตโนมัติรอบละ 10 คน (K-BIZ จ่ายกลุ่มได้สูงสุด 10 คน/รอบ)">🏦 ไฟล์โอน K-BIZ (รอบละ 10)</button>
        <button id="vc-show-paid-toggle" class="btn btn-xs btn-outline" onclick="toggleVcShowPaid()">🕓 แสดงคนที่จ่ายแล้ว (ออกเอกสารย้อนหลัง)</button>
       </div>
@@ -21653,7 +21657,7 @@ function openKbizExport(){
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">
         <div style="font-weight:800;color:var(--accent2)">🔢 รอบที่ ${i+1} <span style="font-size:11px;color:var(--text2);font-weight:500">· ${b.length} คน · รวม ${fmtB(sum)}</span></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-xs" style="background:#00A950;color:#fff;border:none;font-weight:700" onclick="_kbizDownloadCSV(${i})">⬇️ CSV</button>
+          <button class="btn btn-xs" style="background:#00A950;color:#fff;border:none;font-weight:700" onclick="_kbizDownloadCSV(${i})">⬇️ .txt</button>
           <button class="btn btn-xs btn-outline" onclick="_kbizDownloadDoc(${i})">🖨️ เอกสาร</button>
         </div>
       </div>
@@ -21674,12 +21678,12 @@ function openKbizExport(){
     </div>
     ${nMissing?`<div style="background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.35);border-radius:8px;padding:8px 12px;margin:8px 0;font-size:12px;color:#FF6060">⚠️ มี ${nMissing} คนที่ยังไม่มีทั้งเลขบัญชีและพร้อมเพย์ — ไปเติมข้อมูลในทะเบียนทีมก่อน ไม่งั้นโอนไม่ได้ (ในไฟล์จะเว้นช่องปลายทางไว้)</div>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
-      <button class="btn btn-sm" style="background:#00A950;color:#fff;border:none;font-weight:700;flex:1;min-width:150px" onclick="_kbizDownloadCSVEach()">⬇️ CSV แยกทุกรอบ (อัปโหลด K-BIZ)</button>
-      <button class="btn btn-sm btn-outline" style="flex:1;min-width:130px" onclick="_kbizDownloadAllCSV()">📄 CSV รวม 1 ไฟล์</button>
+      <button class="btn btn-sm" style="background:#00A950;color:#fff;border:none;font-weight:700;flex:1;min-width:150px" onclick="_kbizDownloadCSVEach()">⬇️ .txt แยกทุกรอบ (อัปโหลด K-BIZ)</button>
+      <button class="btn btn-sm btn-outline" style="flex:1;min-width:130px" onclick="_kbizDownloadAllCSV()">📄 ไฟล์บันทึกรวม (CSV)</button>
       <button class="btn btn-sm btn-outline" style="flex:1;min-width:130px" onclick="_kbizDownloadAllDoc()">🖨️ เอกสารทุกรอบ</button>
     </div>
     <div style="flex:1;overflow-y:auto;margin-top:4px">${batchCards}</div>
-    <div style="font-size:10.5px;color:var(--text2);text-align:center;margin-top:10px">💡 ใช้อ้างอิงตอนกรอกจ่ายกลุ่มใน K-BIZ · ระบบไม่ได้ตัดสถานะ "จ่ายแล้ว" ให้ — จ่ายจริงแล้วค่อยออกใบสำคัญจ่ายในหน้านี้ตามปกติ</div>
+    <div style="font-size:10.5px;color:var(--text2);text-align:center;margin-top:10px;line-height:1.6">📄 ไฟล์อัปโหลดเป็น <strong>.txt</strong> รูปแบบ K-BIZ (บัญชี+ยอด+รหัสธนาคาร) · โอนเข้า<strong>บัญชีธนาคาร</strong>เท่านั้น (คนที่มีแต่พร้อมเพย์ต้องโอนแยก) · ⚠️ ตรวจรายการใน K-BIZ ให้ครบก่อนกดโอนเสมอ · ตอนเซฟไฟล์เลือก Encoding เป็น UTF-8 หรือ ANSI</div>
   </div>`;
   document.body.appendChild(div);
 }
@@ -21688,30 +21692,70 @@ function _kbizSaveFile(content, type, filename){
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),1500);
 }
-function _kbizCSVFor(batch){
-  const esc2=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
-  const L=[['ลำดับ','ชื่อ-นามสกุล','ชื่อเล่น','ธนาคาร','เลขบัญชี','PromptPay','จำนวนเงิน','หมายเหตุ'].map(esc2).join(',')];
-  batch.forEach((p,i)=>{ L.push([i+1, p.name, p.nickname, p.bank, p.account, p.promptpay, p.amount, 'ค่าจ้างทีม'].map(esc2).join(',')); });
-  return '﻿'+L.join('\r\n');
+// ชื่อธนาคาร → รหัส 3 หลักตามมาตรฐาน K-BIZ / ธปท.
+function _kbizBankCode(bankName){
+  const s=String(bankName||'').toLowerCase().replace(/\s|ธนาคาร|จำกัด|มหาชน|\(|\)/g,'');
+  const map=[
+    [/กสิกร|kbank|kasikorn/,'004'],
+    [/ไทยพาณิชย์|scb|siamcommercial/,'014'],
+    [/กรุงไทย|ktb|krungthai/,'006'],
+    [/กรุงเทพ|bbl|bangkokbank/,'002'],
+    [/กรุงศรี|อยุธยา|bay|krungsri|ayudhya/,'025'],
+    [/ทหารไทย|ธนชาต|ttb|tmb|thanachart/,'011'],
+    [/ออมสิน|gsb|governmentsavings/,'030'],
+    [/เกษตร|ธกส|baac/,'034'],
+    [/อาคารสงเคราะห์|ธอส|ghb|ghbank/,'033'],
+    [/ซีไอเอ็มบี|cimb/,'022'],
+    [/ยูโอบี|uob/,'024'],
+    [/เกียรตินาคิน|kkp|kiatnakin/,'069'],
+    [/แลนด์|lhbank|landandhouse|lhb/,'073'],
+    [/ทิสโก้|tisco/,'067'],
+    [/ไอซีบีซี|icbc/,'070'],
+    [/อิสลาม|isbt|islamic/,'066'],
+    [/ซิตี้|citi/,'017'],
+    [/สแตนดาร์ด|standardchartered|scbt/,'020'],
+    [/hsbc|เอชเอสบีซี/,'031'],
+    [/มิซูโฮ|mizuho/,'039'],
+    [/ซูมิโตโม|sumitomo|smbc/,'018'],
+  ];
+  for(const [re,code] of map){ if(re.test(s)) return code; }
+  return '';
 }
+// 1 บรรทัด K-BIZ (fixed-width 25): 03 + บัญชี(10) + จำนวนเงินสตางค์(10) + รหัสธนาคาร(3)
+//   คืน null ถ้าไม่มีบัญชี หรือไม่รู้รหัสธนาคาร (เช่น พร้อมเพย์อย่างเดียว) → จะถูกข้าม
+function _kbizLine(p){
+  const acct=String(p.account||'').replace(/[^0-9]/g,'');
+  const code=_kbizBankCode(p.bank);
+  if(!acct || !code) return null;
+  const acct10=acct.padStart(10,'0');
+  const satang=Math.round((Number(p.amount)||0)*100);
+  const amt10=String(satang).padStart(10,'0');
+  return '03'+acct10+amt10+code;
+}
+function _kbizTxtFor(batch){ return batch.map(_kbizLine).filter(Boolean).join('\r\n'); }
+// รายชื่อคนที่ลงไฟล์ไม่ได้ (ไม่มีบัญชี/พร้อมเพย์อย่างเดียว/ไม่รู้รหัสธนาคาร)
+function _kbizExcluded(batch){ return batch.filter(p=>!_kbizLine(p)).map(p=>p.name||p.nickname||'?'); }
 function _kbizDownloadCSV(i){
   const b=_kbizBatches[i]; if(!b) return;
-  _kbizSaveFile(_kbizCSVFor(b), 'text/csv;charset=utf-8', `KBIZ_โอนทีม_รอบ${i+1}.csv`);
-  toast(`⬇️ CSV รอบ ${i+1} (${b.length} คน)`,'success');
+  const excl=_kbizExcluded(b);
+  _kbizSaveFile(_kbizTxtFor(b), 'text/plain;charset=utf-8', `KBIZ_โอนทีม_รอบ${i+1}.txt`);
+  toast(`⬇️ .txt รอบ ${i+1} · ${b.length-excl.length} รายการ`+(excl.length?` · ⚠️ ข้าม ${excl.length} (พร้อมเพย์/ไม่รู้รหัสธนาคาร): ${excl.slice(0,3).join(', ')}`:''), excl.length?'warn':'success');
 }
 function _kbizDownloadCSVEach(){
   if(!_kbizBatches.length) return;
   _kbizBatches.forEach((b,i)=> setTimeout(()=>{
-    _kbizSaveFile(_kbizCSVFor(b), 'text/csv;charset=utf-8', `KBIZ_โอนทีม_รอบ${i+1}.csv`);
+    _kbizSaveFile(_kbizTxtFor(b), 'text/plain;charset=utf-8', `KBIZ_โอนทีม_รอบ${i+1}.txt`);
   }, i*350));
-  toast(`⬇️ ดาวน์โหลด CSV ${_kbizBatches.length} ไฟล์ (แยกรอบ)`,'success');
+  const totalExcl=_kbizBatches.reduce((a,b)=>a+_kbizExcluded(b).length,0);
+  toast(`⬇️ ดาวน์โหลด .txt ${_kbizBatches.length} ไฟล์ (แยกรอบ)`+(totalExcl?` · ⚠️ มี ${totalExcl} คนที่ลงไฟล์ไม่ได้ (พร้อมเพย์/ไม่รู้รหัสธนาคาร) ต้องโอนแยก`:''), totalExcl?'warn':'success');
 }
+// ไฟล์รวมทุกรอบ — สำหรับเก็บบันทึก/ตรวจสอบ (อ่านง่าย มีหัวตาราง) ไม่ใช่ไฟล์อัปโหลด K-BIZ
 function _kbizDownloadAllCSV(){
   const esc2=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
   const L=[['รอบ','ลำดับ','ชื่อ-นามสกุล','ชื่อเล่น','ธนาคาร','เลขบัญชี','PromptPay','จำนวนเงิน','หมายเหตุ'].map(esc2).join(',')];
   _kbizBatches.forEach((b,bi)=>{ b.forEach((p,i)=>{ L.push([bi+1, i+1, p.name, p.nickname, p.bank, p.account, p.promptpay, p.amount, 'ค่าจ้างทีม'].map(esc2).join(',')); }); });
-  _kbizSaveFile('﻿'+L.join('\r\n'), 'text/csv;charset=utf-8', 'KBIZ_โอนทีม_รวมทุกรอบ.csv');
-  toast('📄 CSV รวมทุกรอบแล้ว','success');
+  _kbizSaveFile('﻿'+L.join('\r\n'), 'text/csv;charset=utf-8', 'KBIZ_บันทึกโอนทีม_รวมทุกรอบ.csv');
+  toast('📄 ไฟล์บันทึกรวมทุกรอบ (สำหรับเก็บ ไม่ใช่อัปโหลด K-BIZ)','success');
 }
 function _kbizDocFor(batch, batchNo, totalBatches){
   const sum=batch.reduce((a,p)=>a+p.amount,0);
@@ -21898,6 +21942,260 @@ function _vcGetPersonItems(staffId){
     });
   });
   return items;
+}
+
+// โหลดสคริปต์จาก CDN ครั้งเดียว (ใช้ตอนสร้าง PDF/ZIP — ไม่ถ่วงตอนเปิดหน้า)
+function _loadScriptOnce(src){
+  return new Promise((resolve,reject)=>{
+    if([...document.scripts].some(s=>s.src===src)) return resolve();
+    const el=document.createElement('script'); el.src=src;
+    el.onload=()=>resolve(); el.onerror=()=>reject(new Error('โหลดสคริปต์ไม่สำเร็จ: '+src));
+    document.head.appendChild(el);
+  });
+}
+// รวบรวมคนที่ "ยืนยันแล้ว + ยังไม่จ่าย" → 1 คน/ใบ (รวมทุกงานของคนนั้น)
+function _vcGatherPendingByPerson(){
+  const byPerson=new Map();
+  getProjects().forEach(p=>{ (p.workers||[]).forEach(w=>{
+    if(w.status==='paid') return;
+    if(getWorkerConfirmStatus(w)!=='confirmed') return;
+    const s=getStaffById(w.id); if(!s) return;
+    if(!byPerson.has(w.id)) byPerson.set(w.id,{s,works:[]});
+    byPerson.get(w.id).works.push({p,w});
+  }); });
+  return byPerson;
+}
+// 📦 สร้าง PDF แยกรายคน (ตั้งชื่อไฟล์ตามชื่อคน) แล้วรวมเป็น ZIP ไฟล์เดียว
+async function downloadAllVouchersZip(){
+  const byPerson=_vcGatherPendingByPerson();
+  if(!byPerson.size){ toast('ไม่มีคนที่รอออกใบสำคัญจ่าย','info'); return; }
+  const total=byPerson.size;
+  if(!confirm(`📦 สร้างไฟล์ PDF แยกรายคน ${total} คน แล้วรวมเป็น ZIP?\n\n• ตั้งชื่อไฟล์ตามชื่อแต่ละคน\n• แตก ZIP แล้วโยนเข้า Google Drive ได้เลย\n• ใช้เวลาสักครู่ (ยิ่งคนเยอะยิ่งนาน)`)) return;
+  toast('⏳ กำลังเตรียมตัวสร้าง PDF...','info');
+  try{
+    await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+  }catch(e){ toast('โหลดตัวสร้าง PDF ไม่สำเร็จ (เช็คเน็ต): '+e.message,'error'); return; }
+  if(typeof JSZip==='undefined' || typeof html2pdf==='undefined'){ toast('ตัวสร้าง PDF/ZIP ยังไม่พร้อม','error'); return; }
+  const zip=new JSZip();
+  const date=document.getElementById('vc-date')?.value||new Date().toISOString().split('T')[0];
+  // เรียงยอดมาก→น้อย ให้เหมือนลิสต์
+  const entries=[...byPerson.entries()].sort((a,b)=>
+    b[1].works.reduce((x,{w})=>x+(w.amount||0),0) - a[1].works.reduce((x,{w})=>x+(w.amount||0),0));
+  // กล่อง render ซ่อนนอกจอ
+  const host=document.createElement('div');
+  host.style.cssText='position:fixed;left:-99999px;top:0;width:640px;background:#fff;z-index:-1';
+  document.body.appendChild(host);
+  const usedNames=new Set();
+  let done=0, fail=0;
+  for(const [wid,{s,works}] of entries){
+    done++;
+    toast(`📄 สร้าง PDF ${done}/${total} · ${esc(s.nickname||s.name||'')}...`,'info');
+    const html=buildMultiVoucherHTML({
+      vNo:'(ตัวอย่าง)', staff:s,
+      items: works.map(({w,p})=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
+      totalAmt: works.reduce((a,{w})=>a+(w.amount||0),0),
+      date, note:'',
+    });
+    host.innerHTML=html;
+    await new Promise(r=>setTimeout(r,150)); // รอรูป (โลโก้/QR) โหลด
+    try{
+      const el=host.firstElementChild||host;
+      const blob=await html2pdf().set({
+        margin:4,
+        image:{type:'jpeg',quality:0.95},
+        html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false},
+        jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+      }).from(el).outputPdf('blob');
+      // ตั้งชื่อไฟล์ = ชื่อจริง(+นามสกุล) · กันชื่อซ้ำ
+      const full=((s.name||'')+(s.lastName?(' '+s.lastName):'')).trim() || s.nickname || wid;
+      let base=('ใบสำคัญจ่าย_'+full).replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_').slice(0,80);
+      let name=base, k=2; while(usedNames.has(name)){ name=base+'_'+k; k++; } usedNames.add(name);
+      zip.file(name+'.pdf', blob);
+    }catch(e){ console.warn('pdf gen fail:', wid, e); fail++; }
+  }
+  host.remove();
+  if(!Object.keys(zip.files).length){ toast('สร้าง PDF ไม่สำเร็จเลยสักไฟล์ — ลองใหม่','error'); return; }
+  toast('🗜️ กำลังบีบอัดเป็น ZIP...','info');
+  const zipBlob=await zip.generateAsync({type:'blob'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(zipBlob);
+  a.download='ใบสำคัญจ่าย_'+total+'คน_'+new Date().toISOString().slice(0,10)+'.zip';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  toast(`✅ ได้ ZIP · ${total-fail} ไฟล์${fail?(' · ล้มเหลว '+fail):''} (ตั้งชื่อตามแต่ละคน)`, fail?'warn':'success');
+}
+
+/* ══════════════════════════════════════════════════════════
+   📧 ส่งเมลแนบ PDF อัตโนมัติ ผ่าน Google Apps Script (ฟรี)
+   ────────────────────────────────────────────────────────
+   ฝั่งเว็บ: สร้าง PDF รายคน → base64 → POST ไป Apps Script
+   Apps Script: ส่งเมลจาก Gmail สตูดิโอ แนบ PDF ให้อัตโนมัติ
+   ══════════════════════════════════════════════════════════ */
+function getMailerCfg(){ const v=ls('mailer_cfg'); return (v&&typeof v==='object')?v:{}; }
+async function saveMailerCfg(v){ ls('mailer_cfg',v); try{ if(typeof fbSaveKeyed==='function') await fbSaveKeyed('mailer_cfg', v); }catch(e){} }
+function _blobToBase64(blob){
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||''); r.onerror=rej; r.readAsDataURL(blob); });
+}
+// POST ไป Apps Script — ใช้ text/plain กัน CORS preflight (Apps Script อ่าน e.postData.contents)
+async function _mailerSend(payload){
+  const cfg=getMailerCfg();
+  if(!cfg.url||!cfg.secret) throw new Error('ยังไม่ได้ตั้งค่าระบบส่งเมลแนบ PDF (กดปุ่ม ⚙️)');
+  const res=await fetch(cfg.url,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({ secret:cfg.secret, ...payload }) });
+  let d; try{ d=await res.json(); }catch(e){ throw new Error('ปลายทางตอบผิดรูปแบบ — เช็คว่า Deploy เป็น Web App สิทธิ์ "Anyone" แล้ว'); }
+  if(!d.ok) throw new Error(d.error||'ส่งไม่สำเร็จ');
+  return d;
+}
+// เนื้ออีเมล (HTML) สรุปยอด — ไฟล์ PDF ไปเป็นไฟล์แนบ
+function _mailerBody(s, works, totalAmt, date, vNo){
+  const first=((s.name||'').trim().split(/\s+/)[0])||s.nickname||'';
+  const SL={dub:'พากย์',adp:'บท',mix:'มิกซ์',qc:'QC',sub:'ซับ',trn:'แปล',mgr:'เมเนเจอร์'};
+  const lines=works.map(({w,p})=>{
+    const lbl=SL[(w.slot||'').split('-')[0]]||(w.slot||'');
+    return `<tr><td style="padding:7px 10px;border-bottom:1px solid #eee">${esc(p.name||'')} · ${lbl}</td><td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">${fmtB(w.amount||0)}</td></tr>`;
+  }).join('');
+  return `<div style="font-family:Kanit,Arial,sans-serif;color:#222;max-width:600px;font-size:15px;line-height:1.7">
+    <p>เรียน คุณ${esc(first)}</p>
+    <p>สตูดิโอได้โอนค่าตอบแทนให้คุณตามรายการต่อไปนี้ · แนบ<strong>ใบสำคัญจ่าย (PDF)</strong>มาด้วยแล้วค่ะ</p>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin:6px 0"><tbody>${lines}
+      <tr><td style="padding:9px 10px;font-weight:700;border-top:2px solid #0d0d2b">ยอดรวมทั้งสิ้น</td><td style="padding:9px 10px;text-align:right;font-weight:700;color:#1565FF;border-top:2px solid #0d0d2b">${fmtB(totalAmt)}</td></tr>
+    </tbody></table>
+    <p style="font-size:13px;color:#555">เลขที่ใบสำคัญ: <strong>${esc(vNo)}</strong> · วันที่ ${esc(date)}<br>เข้าบัญชี: ${esc(s.bank||'')} ${esc(s.account||'')}</p>
+    <p>ขอบคุณค่ะ<br><strong>Guin Home Studio</strong></p>
+  </div>`;
+}
+function openMailerSetup(){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  const cfg=getMailerCfg();
+  const inp='width:100%;padding:8px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:monospace;font-size:12px;box-sizing:border-box;margin-bottom:8px';
+  _tagOverlayShow('📧 ตั้งค่าส่งเมลแนบ PDF (ฟรี · Google Apps Script)', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.7;margin-bottom:10px">
+      ส่งอีเมลแนบไฟล์ PDF อัตโนมัติจาก Gmail ของสตูดิโอ (ฟรี ~100 เมล/วัน) · ทำตามขั้นตอนในหน้าแชท แล้วเอา <strong>URL (…/exec)</strong> + <strong>รหัสลับ</strong> มาใส่ที่นี่
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:3px">URL ของ Apps Script (ลงท้าย /exec)</div>
+    <input id="ml-url" value="${esc(cfg.url||'')}" placeholder="https://script.google.com/macros/s/....../exec" style="${inp}">
+    <div style="font-size:11px;color:var(--text2);margin-bottom:3px">รหัสลับ (ค่าเดียวกับ SECRET ในโค้ด Apps Script)</div>
+    <input id="ml-secret" type="password" value="${esc(cfg.secret||'')}" placeholder="รหัสลับ" style="${inp}">
+    <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+      <button class="btn" style="flex:1;min-width:110px" onclick="saveMailerSetup()">💾 บันทึก</button>
+      <button class="btn btn-outline" onclick="testMailer()">🧪 ส่งเมลทดสอบถึงตัวเอง</button>
+    </div>
+    <div id="ml-test-result" style="margin-top:10px;font-size:12px;line-height:1.7"></div>`, 560);
+}
+async function saveMailerSetup(){
+  const cfg=getMailerCfg();
+  cfg.url=(document.getElementById('ml-url')?.value||'').trim();
+  cfg.secret=(document.getElementById('ml-secret')?.value||'').trim();
+  await saveMailerCfg(cfg);
+  toast('บันทึกแล้ว ✅','success');
+}
+async function testMailer(){
+  const el=document.getElementById('ml-test-result');
+  const url=(document.getElementById('ml-url')?.value||'').trim();
+  const secret=(document.getElementById('ml-secret')?.value||'').trim();
+  if(!url||!secret){ if(el) el.innerHTML='<span style="color:var(--orange)">กรอก URL + รหัสลับให้ครบก่อน</span>'; return; }
+  const cfg=getMailerCfg(); cfg.url=url; cfg.secret=secret; await saveMailerCfg(cfg);
+  const to=(currentUser?.email)||prompt('ส่งเมลทดสอบไปที่อีเมลไหน?','');
+  if(!to){ return; }
+  if(el) el.innerHTML='⏳ กำลังส่งเมลทดสอบ...';
+  try{
+    await _mailerSend({ to, subject:'ทดสอบระบบส่งเมล — Guin Home Studio', htmlBody:'<div style="font-family:Kanit,sans-serif">✅ ระบบส่งเมลแนบ PDF พร้อมใช้งานแล้วค่ะ</div>', pdfBase64:'', pdfName:'' });
+    if(el) el.innerHTML='<span style="color:var(--green)">✅ ส่งเมลทดสอบไปที่ '+esc(to)+' แล้ว — ไปเช็คกล่องเมลได้เลย</span>';
+  }catch(e){ if(el) el.innerHTML='<span style="color:var(--red)">❌ '+esc(e.message)+'</span>'; }
+}
+// 📧 ออกใบจริง + ส่งเมลแนบ PDF ให้ทุกคนที่รอจ่าย อัตโนมัติ
+async function issueAndAutoEmailAll(){
+  const cfg=getMailerCfg();
+  if(!cfg.url||!cfg.secret){
+    if(confirm('ยังไม่ได้ตั้งค่าระบบส่งเมลแนบ PDF — เปิดหน้าตั้งค่าเลยไหม?')) openMailerSetup();
+    return;
+  }
+  const byPerson=_vcGatherPendingByPerson();
+  if(!byPerson.size){ toast('ไม่มีคนที่รอออกใบสำคัญจ่าย','info'); return; }
+  const total=byPerson.size;
+  const grand=[...byPerson.values()].reduce((a,{works})=>a+works.reduce((x,{w})=>x+(w.amount||0),0),0);
+  const noEmail=[...byPerson.values()].filter(({s})=>!(s.email&&s.email.includes('@'))).length;
+  if(!confirm(`📧 ออกใบสำคัญจ่ายจริง + ส่งอีเมลแนบ PDF อัตโนมัติ ${total} คน?\n\nยอดรวม ${fmtB(grand)}\n${noEmail?('⚠️ '+noEmail+' คนไม่มีอีเมล — จะออกใบแต่ไม่ส่งเมล\n'):''}\nระบบจะ: ออกใบจริง + มาร์ค "จ่ายแล้ว" + ส่งเมลแนบ PDF ให้แต่ละคนทีละคนอัตโนมัติ\n(ยิ่งคนเยอะยิ่งใช้เวลา อย่าปิดหน้าจอ)`)) return;
+  toast('⏳ เตรียมตัวสร้าง PDF...','info');
+  try{ await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'); }
+  catch(e){ toast('โหลดตัวสร้าง PDF ไม่สำเร็จ (เช็คเน็ต)','error'); return; }
+  if(typeof html2pdf==='undefined'){ toast('ตัวสร้าง PDF ยังไม่พร้อม','error'); return; }
+  const date=document.getElementById('vc-date')?.value||new Date().toISOString().split('T')[0];
+  const host=document.createElement('div');
+  host.style.cssText='position:fixed;left:-99999px;top:0;width:640px;background:#fff;z-index:-1';
+  document.body.appendChild(host);
+  const entries=[...byPerson.entries()].sort((a,b)=>
+    b[1].works.reduce((x,{w})=>x+(w.amount||0),0) - a[1].works.reduce((x,{w})=>x+(w.amount||0),0));
+  let issued=0, sent=0, failSend=0, done=0;
+  for(const [wid,{s,works}] of entries){
+    done++;
+    // 1) ออกใบจริง — มาร์ค paid + บันทึก voucher (เหมือน issueAndSendVouchers)
+    const vNo=nextVoucherNo(); const nowIso=new Date().toISOString(); let okAny=false;
+    for(const {w,p} of works){
+      const r=await saveProjectMerge(p.id,(proj)=>{ const w2=(proj.workers||[]).find(x=>x.id===wid&&x.slot===w.slot); if(w2){ w2.status='paid'; w2.voucherNo=vNo; w2.paidAt=nowIso; } });
+      if(r.ok) okAny=true;
+    }
+    if(!okAny) continue;
+    const totalAmt=works.reduce((a,{w})=>a+(w.amount||0),0);
+    const saved=getDocsStore('vouchers')||[];
+    saved.push({ type:'voucher', docNo:vNo, staffId:wid, staffName:s.name, staffLastName:s.lastName||'', staffNickname:s.nickname,
+      items: works.map(({w,p})=>({projId:p.id, projName:p.name, slot:w.slot, amount:w.amount||0})),
+      amount:totalAmt, totalAmount:totalAmt, multiItem:true, bank:s.bank||'', account:s.account||'', email:s.email||'', date, note:'', createdAt:nowIso });
+    saveDocsStore('vouchers', saved);
+    issued++;
+    // 2) มีอีเมล → สร้าง PDF + ส่ง
+    if(s.email && s.email.includes('@')){
+      toast(`📄 ${done}/${total} · ส่งให้ ${esc(s.nickname||s.name||'')}...`,'info');
+      try{
+        const html=buildMultiVoucherHTML({ vNo, staff:s, items:works.map(({w,p})=>({projName:p.name,slot:w.slot,amount:w.amount||0})), totalAmt, date, note:'' });
+        host.innerHTML=html; await new Promise(r=>setTimeout(r,150));
+        const blob=await html2pdf().set({ margin:4, image:{type:'jpeg',quality:0.95}, html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false}, jsPDF:{unit:'mm',format:'a4',orientation:'portrait'} }).from(host.firstElementChild).outputPdf('blob');
+        const b64=await _blobToBase64(blob);
+        const full=((s.name||'')+(s.lastName?(' '+s.lastName):'')).trim()||s.nickname||wid;
+        const pdfName=('ใบสำคัญจ่าย_'+full).replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_').slice(0,80)+'.pdf';
+        await _mailerSend({ to:s.email, subject:'ใบสำคัญจ่าย '+vNo+' — Guin Home Studio', htmlBody:_mailerBody(s,works,totalAmt,date,vNo), pdfBase64:b64, pdfName });
+        sent++;
+      }catch(e){ console.warn('auto email fail:', wid, e); failSend++; }
+    }
+  }
+  host.remove();
+  vcSelectedWorkers=new Set();
+  try{ renderVcByPerson(); }catch(_){}
+  try{ renderQueue(); }catch(_){} try{ updateQueueBadge(); }catch(_){} try{ renderDocsHistory(); }catch(_){}
+  toast(`✅ ออกใบ ${issued} ใบ · ส่งเมลแนบ PDF ${sent} ฉบับ${failSend?(' · ส่งไม่สำเร็จ '+failSend):''}`, failSend?'warn':'success');
+}
+
+// 📥 รวมใบสำคัญจ่ายของ "ทุกคนที่รอจ่าย" (ยืนยันแล้ว + ยังไม่จ่าย) เป็นไฟล์เดียว — เปิดพิมพ์/บันทึก PDF ทีเดียวทุกคน
+function downloadAllVouchersPreview(){
+  const byPerson = new Map();
+  getProjects().forEach(p=>{
+    (p.workers||[]).forEach(w=>{
+      if(w.status==='paid') return;
+      if(getWorkerConfirmStatus(w)!=='confirmed') return;
+      const s=getStaffById(w.id); if(!s) return;
+      if(!byPerson.has(w.id)) byPerson.set(w.id,{s,works:[]});
+      byPerson.get(w.id).works.push({p,w});
+    });
+  });
+  if(!byPerson.size){ toast('ไม่มีคนที่รอออกใบสำคัญจ่าย','info'); return; }
+  const date=document.getElementById('vc-date')?.value||new Date().toISOString().split('T')[0];
+  // เรียงยอดมาก→น้อยให้เหมือนลิสต์
+  const entries=[...byPerson.entries()].sort((a,b)=>
+    b[1].works.reduce((x,{w})=>x+(w.amount||0),0) - a[1].works.reduce((x,{w})=>x+(w.amount||0),0));
+  let html='';
+  entries.forEach(([wid,{s,works}], idx)=>{
+    const voucher = buildMultiVoucherHTML({
+      vNo:'(ตัวอย่าง · ยังไม่ออกจริง)', staff:s,
+      items: works.map(({w,p})=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
+      totalAmt: works.reduce((a,{w})=>a+(w.amount||0),0),
+      date, note:'',
+    });
+    // ขึ้นหน้าใหม่ต่อคน เวลาสั่งพิมพ์/บันทึก PDF (คนสุดท้ายไม่ต้องขึ้นหน้าเปล่า)
+    const brk = idx < entries.length-1 ? ';page-break-after:always' : '';
+    html += `<div style="${brk}">${voucher}</div>`;
+  });
+  downloadDocHTML(html, 'ใบสำคัญจ่าย_ทุกคน_'+byPerson.size+'คน');
+  toast(`📥 รวมใบ ${byPerson.size} คนเป็นไฟล์เดียว — เปิดแล้ว Ctrl+P สั่งพิมพ์/บันทึก PDF ได้ทุกคนทีเดียว`,'success');
 }
 
 function renderVcByPerson(){
