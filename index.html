@@ -21657,6 +21657,7 @@ function openKbizExport(){
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">
         <div style="font-weight:800;color:var(--accent2)">🔢 รอบที่ ${i+1} <span style="font-size:11px;color:var(--text2);font-weight:500">· ${b.length} คน · รวม ${fmtB(sum)}</span></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-xs" style="background:#1565FF;color:#fff;border:none;font-weight:700" onclick="openKbizManualHelper(${i})" title="โหมดช่วยกรอก K-BIZ ทีละคน — กดคัดลอกเลขบัญชี/ยอด แล้วแปะเข้า K-BIZ ได้เลย">⌨️ ช่วยกรอก K-BIZ</button>
           <button class="btn btn-xs" style="background:#00A950;color:#fff;border:none;font-weight:700" onclick="_kbizDownloadCSV(${i})">⬇️ .txt</button>
           <button class="btn btn-xs btn-outline" onclick="_kbizDownloadDoc(${i})">🖨️ เอกสาร</button>
         </div>
@@ -21735,6 +21736,71 @@ function _kbizLine(p){
 function _kbizTxtFor(batch){ return batch.map(_kbizLine).filter(Boolean).join('\r\n'); }
 // รายชื่อคนที่ลงไฟล์ไม่ได้ (ไม่มีบัญชี/พร้อมเพย์อย่างเดียว/ไม่รู้รหัสธนาคาร)
 function _kbizExcluded(batch){ return batch.filter(p=>!_kbizLine(p)).map(p=>p.name||p.nickname||'?'); }
+
+// ⌨️ โหมดช่วยกรอก K-BIZ ทีละคน — กดคัดลอกเลขบัญชี/ยอด แล้วแปะเข้า K-BIZ (K-BIZ กลุ่มอัปไฟล์ไม่ได้ ต้องพิมพ์มือ)
+let _kbizManualBatch=null, _kbizManualIdx=0;
+function openKbizManualHelper(batchIndex){
+  const b=_kbizBatches[batchIndex]; if(!b||!b.length){ toast('ไม่มีรายการในรอบนี้','info'); return; }
+  _kbizManualBatch=b; _kbizManualIdx=0;
+  const old=document.getElementById('kbiz-manual'); if(old) old.remove();
+  const d=document.createElement('div'); d.id='kbiz-manual';
+  d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:3200;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
+  d.onclick=function(e){ if(e.target===d) d.remove(); };
+  document.body.appendChild(d);
+  _renderKbizManual();
+}
+function _kbizManualNav(delta){
+  if(!_kbizManualBatch) return;
+  _kbizManualIdx=Math.max(0, Math.min(_kbizManualBatch.length-1, _kbizManualIdx+delta));
+  _renderKbizManual();
+}
+function _kbizCopy(text){
+  const t=String(text||'');
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(()=>toast('📋 คัดลอกแล้ว: '+t,'success'),()=>toast('คัดลอกไม่ได้','error')); }
+  else { toast('เบราว์เซอร์นี้คัดลอกอัตโนมัติไม่ได้','error'); }
+}
+function _kbizCopyField(field){
+  const p=_kbizManualBatch && _kbizManualBatch[_kbizManualIdx]; if(!p) return;
+  let v='';
+  if(field==='acct') v=String(p.account||'').replace(/[^0-9]/g,'') || String(p.promptpay||'').replace(/[^0-9]/g,'');
+  else if(field==='amount') v=String(p.amount||0);
+  else if(field==='name') v=String(p.name||'');
+  _kbizCopy(v);
+}
+function _renderKbizManual(){
+  const host=document.getElementById('kbiz-manual'); if(!host) return;
+  const b=_kbizManualBatch, i=_kbizManualIdx, p=b[i], total=b.length;
+  const acct=String(p.account||'').replace(/[^0-9]/g,'');
+  const dest=acct || String(p.promptpay||'').replace(/[^0-9]/g,'');
+  const isPP=!acct && !!p.promptpay;
+  const copyRow=(label, val, field, big)=>`<div style="display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:11px 14px;margin-bottom:9px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10.5px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">${label}</div>
+        <div style="font-size:${big?20:14}px;font-weight:800;color:var(--text);word-break:break-all">${esc(val||'—')}</div>
+      </div>
+      <button class="btn btn-sm" style="background:var(--accent2);color:#fff;border:none;font-weight:700;flex-shrink:0" onclick="_kbizCopyField('${field}')">📋 คัดลอก</button>
+    </div>`;
+  host.innerHTML=`<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;width:460px;max-width:96vw" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:16px;font-weight:800">⌨️ ช่วยกรอก K-BIZ</div>
+      <button class="btn-close" onclick="document.getElementById('kbiz-manual').remove()">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:10px">คนที่ <strong style="color:var(--accent2)">${i+1}</strong> / ${total} · กดคัดลอกแล้วแปะในช่อง K-BIZ</div>
+    <div style="height:5px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-bottom:14px"><div style="height:100%;width:${((i+1)/total)*100}%;background:var(--green)"></div></div>
+    <div style="font-size:15px;font-weight:800;margin-bottom:3px">${esc(p.name||'')}${p.nickname?` <span style="color:var(--text2);font-size:12px;font-weight:500">(${esc(p.nickname)})</span>`:''}</div>
+    <div style="font-size:11.5px;color:var(--text2);margin-bottom:12px">🏦 เลือกธนาคารใน K-BIZ: <strong style="color:var(--text)">${esc(p.bank||'—')}</strong>${isPP?' · <span style="color:var(--orange)">📱 พร้อมเพย์</span>':''}</div>
+    ${copyRow(isPP?'พร้อมเพย์':'เลขบัญชี', dest, 'acct', true)}
+    ${copyRow('จำนวนเงิน (บาท)', String(p.amount||0), 'amount', true)}
+    ${copyRow('ชื่อผู้รับ (ไว้ตรวจกับที่ K-BIZ ขึ้น)', p.name||'', 'name', false)}
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-outline" style="flex:1${i===0?';opacity:.4':''}" ${i===0?'disabled':''} onclick="_kbizManualNav(-1)">← ก่อนหน้า</button>
+      ${i<total-1
+        ? `<button class="btn btn-blue" style="flex:1.5;font-weight:800" onclick="_kbizManualNav(1)">กรอกแล้ว · ถัดไป →</button>`
+        : `<button class="btn" style="flex:1.5;background:var(--green);color:#04231a;border:none;font-weight:800" onclick="document.getElementById('kbiz-manual').remove();toast('✅ กรอกครบทั้งรอบแล้ว','success')">✅ เสร็จรอบนี้</button>`}
+    </div>
+    <div style="font-size:10.5px;color:var(--text2);text-align:center;margin-top:10px">💡 เปิดหน้านี้คู่กับ K-BIZ · คัดลอกทีละช่อง แปะแล้วกด "ถัดไป"</div>
+  </div>`;
+}
 function _kbizDownloadCSV(i){
   const b=_kbizBatches[i]; if(!b) return;
   const excl=_kbizExcluded(b);
@@ -22282,15 +22348,17 @@ function renderVcByPerson(){
         <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,180,255,.2);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0">${String((s.nickname||s.name||'?')[0]).toUpperCase()}</div>
         <div style="flex:1;min-width:0">
           <div style="font-size:14.5px;font-weight:800;color:var(--text)">${esc(s.name||s.nickname)}${s.nickname && s.name!==s.nickname?` <span style="color:var(--text2);font-weight:500;font-size:12px">(${esc(s.nickname)})</span>`:''}</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:2px;display:flex;flex-wrap:wrap;gap:8px">
-            <span>🏦 ${s.bank||'—'} ${s.account||''}</span>
+          <div style="font-size:11px;color:var(--text2);margin-top:3px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+            <span>🏦 <strong style="color:var(--text)">${s.bank||'—'}</strong> ${s.account||''}</span>
+            ${(s.account||s.promptpay)?`<span onclick="event.stopPropagation();_kbizCopy('${String(s.account||s.promptpay).replace(/[^0-9]/g,'')}')" style="cursor:pointer;background:rgba(0,180,255,.14);color:var(--accent2);border:1px solid rgba(0,180,255,.35);border-radius:12px;padding:1px 9px;font-weight:700" title="คัดลอก${s.account?'เลขบัญชี':'พร้อมเพย์'} ไปแปะ K-BIZ">📋 ${s.account?'บัญชี':'พร้อมเพย์'}</span>`:'<span style="color:var(--orange)">⚠️ ไม่มีบัญชี</span>'}
             ${hasEmail ? `<span>📧 ${s.email}</span>` : '<span style="color:var(--orange)">⚠️ ไม่มี email</span>'}
-            <span>📅 ยืนยันล่าสุด: ${confirmDate}</span>
+            <span>📅 ${confirmDate}</span>
           </div>
         </div>
         <div style="text-align:right">
           <div style="font-size:10.5px;color:var(--text2)">${items.length} งาน · รวม</div>
           <div style="font-size:17px;font-weight:800;color:var(--green)">${fmtB(totalAmt)}</div>
+          <span onclick="event.stopPropagation();_kbizCopy('${totalAmt}')" style="display:inline-block;margin-top:4px;cursor:pointer;background:rgba(0,223,160,.14);color:var(--green);border:1px solid rgba(0,223,160,.35);border-radius:12px;padding:1px 10px;font-size:10.5px;font-weight:700" title="คัดลอกยอดเงิน ไปแปะ K-BIZ">📋 คัดลอกยอด</span>
         </div>
         <div style="font-size:12px;color:var(--text2);transition:transform .2s;${isExpanded?'transform:rotate(90deg)':''}">▶</div>
       </div>
