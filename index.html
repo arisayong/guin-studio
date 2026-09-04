@@ -20773,7 +20773,7 @@ function renderVcFinanceSummary(){
   getProjects().forEach(p=>{
     if(!p) return;
     (p.workers||[]).forEach(w=>{
-      if(getStaffById(w.id) && w.status!=='paid' && getWorkerConfirmStatus(w)==='confirmed'){
+      if(getStaffById(w.id) && w.status!=='paid' && getWorkerConfirmStatus(w)==='confirmed' && _vcWorkPassesDateFilter(w)){
         toPay += (w.amount||0);
         roundIds.add(p.id);
       }
@@ -21611,6 +21611,7 @@ function _kbizGatherPayees(){
     (p.workers||[]).forEach(w => {
       if(w.status === 'paid') return;
       if(getWorkerConfirmStatus(w) !== 'confirmed') return;
+      if(!_vcWorkPassesDateFilter(w)) return;   // เคารพตัวกรองรอบยืนยัน
       const s = getStaffById(w.id);
       if(!s) return;
       if(!byPerson.has(w.id)) byPerson.set(w.id, {s, total:0, njobs:0});
@@ -22019,12 +22020,35 @@ function _loadScriptOnce(src){
     document.head.appendChild(el);
   });
 }
-// รวบรวมคนที่ "ยืนยันแล้ว + ยังไม่จ่าย" → 1 คน/ใบ (รวมทุกงานของคนนั้น)
+// 🗂️ กรองตาม "รอบยืนยัน" (วันที่ส่งใบยืนยันยอด) — 'all' หรือ 'YYYY-MM-DD' หรือ 'none'
+//    ใช้แยกก้อนจ่าย: ก้อนที่ยืนยันก่อนจ่ายก่อน · ยอดไม่รวมข้ามรอบ
+let _vcConfirmDateFilter = 'all';
+function _vcWorkConfirmDate(w){
+  const t = (w && (w.confirmSentAt || w.confirmRespondedAt)) || '';
+  if(!t) return '';
+  const d = new Date(t); if(isNaN(d)) return '';
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function _vcWorkPassesDateFilter(w){
+  if(_vcConfirmDateFilter==='all') return true;
+  return (_vcWorkConfirmDate(w) || 'none') === _vcConfirmDateFilter;
+}
+function _vcSetConfirmDateFilter(d){
+  _vcConfirmDateFilter = d || 'all';
+  try{ renderVcByPerson(); }catch(e){}
+}
+function _vcThaiConfirmDate(k){
+  if(k==='none' || !k) return 'ไม่ระบุวัน';
+  const [y,m,d]=k.split('-');
+  return new Date(+y,+m-1,+d).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'});
+}
+// รวบรวมคนที่ "ยืนยันแล้ว + ยังไม่จ่าย" → 1 คน/ใบ (รวมทุกงานของคนนั้น) · เคารพตัวกรองรอบยืนยัน
 function _vcGatherPendingByPerson(){
   const byPerson=new Map();
   getProjects().forEach(p=>{ (p.workers||[]).forEach(w=>{
     if(w.status==='paid') return;
     if(getWorkerConfirmStatus(w)!=='confirmed') return;
+    if(!_vcWorkPassesDateFilter(w)) return;
     const s=getStaffById(w.id); if(!s) return;
     if(!byPerson.has(w.id)) byPerson.set(w.id,{s,works:[]});
     byPerson.get(w.id).works.push({p,w});
@@ -22270,32 +22294,57 @@ function renderVcByPerson(){
   if(!listEl) return;
   // จัดกลุ่ม workers ที่ "confirmed + not paid" ตาม staff (รวมงานยกเลิก — จ่ายชดเชยได้)
   const byPerson = new Map();
+  const dateMap = new Map();        // 'YYYY-MM-DD'|'none' → {people:Set, sum}
+  const allPeople = new Set(); let allSum = 0;
   getProjects().forEach(p => {
     (p.workers||[]).forEach(w => {
       if(w.status === 'paid') return;
       if(getWorkerConfirmStatus(w) !== 'confirmed') return;
       const s = getStaffById(w.id);
       if(!s) return;
+      // สถิติ "รอบยืนยัน" ทุกวัน (ไม่สนตัวกรอง) — สำหรับทำแถบเลือกรอบ
+      const cd = _vcWorkConfirmDate(w) || 'none';
+      if(!dateMap.has(cd)) dateMap.set(cd, {people:new Set(), sum:0});
+      dateMap.get(cd).people.add(w.id); dateMap.get(cd).sum += (w.amount||0);
+      allPeople.add(w.id); allSum += (w.amount||0);
+      // กรองตามรอบที่เลือกอยู่
+      if(!_vcWorkPassesDateFilter(w)) return;
       if(!byPerson.has(w.id)) byPerson.set(w.id, []);
       byPerson.get(w.id).push({p, w, s});
     });
   });
+  // 🗂️ แถบเลือกรอบยืนยัน (เรียงวันน้อย→มาก · 'none' ไว้ท้าย)
+  const _dateKeys = [...dateMap.keys()].sort((a,b)=> a==='none'?1 : b==='none'?-1 : a.localeCompare(b));
+  const _chip=(val,label,active)=>`<span onclick="_vcSetConfirmDateFilter('${val}')" style="cursor:pointer;padding:5px 12px;border-radius:16px;font-size:11.5px;font-weight:700;white-space:nowrap;border:1px solid ${active?'var(--accent2)':'var(--border2)'};background:${active?'rgba(0,180,255,.15)':'transparent'};color:${active?'var(--accent2)':'var(--text2)'}">${label}</span>`;
+  const chipsHtml = _dateKeys.length ? `<div style="background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:11px 14px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:7px;font-weight:700">🗂️ เลือกรอบจ่าย (ตามวันส่งใบยืนยันยอด) — จ่ายทีละรอบ ยอดไม่รวมข้ามรอบ</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${_chip('all', `📋 ทั้งหมด · ${allPeople.size} คน · ${fmtB(allSum)}`, _vcConfirmDateFilter==='all')}
+        ${_dateKeys.map(k=>{ const v=dateMap.get(k); return _chip(k, `📅 ${_vcThaiConfirmDate(k)} · ${v.people.size} คน · ${fmtB(v.sum)}`, _vcConfirmDateFilter===k); }).join('')}
+      </div>
+    </div>` : '';
   const _retroHtml = _vcShowPaid ? _vcRenderRetroSection() : '';
   if(byPerson.size === 0){
-    listEl.innerHTML = (_vcShowPaid ? '' : `<div style="text-align:center;padding:40px 20px;color:var(--text2)">
+    const emptyMsg = _vcConfirmDateFilter!=='all'
+      ? `<div style="text-align:center;padding:32px 20px;color:var(--text2)"><div style="font-size:30px;margin-bottom:8px">🗂️</div><div style="font-size:13px;font-weight:700;color:var(--text)">ไม่มีคนในรอบยืนยันนี้</div><div style="font-size:11.5px;margin-top:6px">เลือก "ทั้งหมด" หรือรอบอื่นด้านบน</div></div>`
+      : `<div style="text-align:center;padding:40px 20px;color:var(--text2)">
       <div style="font-size:36px;margin-bottom:8px">✅</div>
       <div style="font-size:14px;font-weight:700;color:var(--text)">ไม่มีรายการที่รอออกใบสำคัญจ่าย</div>
       <div style="font-size:11.5px;color:var(--text2);margin-top:6px">ทีมงานที่ staff ยืนยันยอดแล้วและยังไม่ได้จ่าย จะปรากฏที่นี่</div>
-    </div>`) + _retroHtml;
+    </div>`;
+    listEl.innerHTML = chipsHtml + (_vcShowPaid ? '' : emptyMsg) + _retroHtml;
     return;
   }
-  // เรียงตามยอดรวมจากมาก → น้อย
+  // ค่าเริ่มต้น: เรียงตาม "วันส่งใบยืนยันยอด" น้อย→มาก (ก้อนที่ยืนยันก่อนอยู่บน) · เท่ากันเรียงยอดมาก→น้อย
   const entries = Array.from(byPerson.entries()).sort((a,b) => {
+    const ea = a[1].reduce((m,it)=>{ const t=it.w.confirmSentAt||it.w.confirmRespondedAt||''; return (!m||(t&&t<m))?t:m; }, '');
+    const eb = b[1].reduce((m,it)=>{ const t=it.w.confirmSentAt||it.w.confirmRespondedAt||''; return (!m||(t&&t<m))?t:m; }, '');
+    if(ea!==eb) return String(ea).localeCompare(String(eb));
     const sumA = a[1].reduce((s,it)=>s+(it.w.amount||0),0);
     const sumB = b[1].reduce((s,it)=>s+(it.w.amount||0),0);
     return sumB - sumA;
   });
-  listEl.innerHTML = entries.map(([staffId, items]) => {
+  listEl.innerHTML = chipsHtml + entries.map(([staffId, items]) => {
     const s = items[0].s;
     const totalAmt = items.reduce((sum, it) => sum + (it.w.amount||0), 0);
     const sel = _vcByPersonSelected.get(staffId) || new Set();
