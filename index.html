@@ -5110,20 +5110,30 @@ async function postRoundAnnounceMulti(roundId){
   if(!chosen.length){ toast('ติ๊กเลือกอย่างน้อย 1 ห้องก่อน','warn'); return; }
   if(!confirm('รีเช็คข้อความเรียบร้อยแล้วใช่ไหม?\n\nบอทจะโพสต์/อัปเดตประกาศลง '+chosen.length+' ห้องพร้อมกัน')) return;
   showLoader(true);
-  // 🏷️ แปลง "@ชื่อโรล" → <@&id> ให้แท็กโรล ping ได้จริง (ครั้งเดียว ใช้กับทุกห้อง)
-  let txt=raw;
-  try{ txt=_prApplyRoleMentions(txt, await _dcRoleMap()); }catch(e){}
+  // 🔑 แต่ละห้อง = แท็กของทีมประจำห้องนั้น · map ห้อง(channelId) → ทีม(category) จาก cfg.channels
+  const cfgCh=getDiscordCfg().channels||{};
+  const chCat={}; Object.entries(cfgCh).forEach(([cat,id])=>{ if(id) chCat[id]=cat; });
+  const roundMention=_annMention(r.cat);   // แท็กของทีมที่เปิดรอบ (ถูกแทนใน textarea แล้ว)
+  let roleMap={}; try{ roleMap=await _dcRoleMap(); }catch(e){}
   let posted=0, edited=0, fail=0, failMsg='';
   try{
     r.posts=Array.isArray(r.posts)?r.posts:(r.postedMessageId?[{channelId:r.channelId, messageId:r.postedMessageId}]:[]);
     for(const chId of chosen){
+      // แทนแท็กทีมที่เปิดรอบ ด้วยแท็กทีมของ "ห้องนี้" (ถ้าเป็นคนละทีม)
+      const cat=chCat[chId];
+      let perTxt=raw;
+      if(cat && cat!==r.cat && roundMention){
+        perTxt=raw.split(roundMention).join(_annMention(cat));
+      }
+      // แปลง "@ชื่อโรล" → <@&id> ให้ ping ได้จริง
+      try{ perTxt=_prApplyRoleMentions(perTxt, roleMap); }catch(e){}
       const ex=r.posts.find(p=>p&&p.channelId===chId);
       try{
-        if(ex){ await callAppsScript({action:'discordEdit', channelId:chId, messageId:ex.messageId, content:txt}); edited++; }
-        else{ const res=await callAppsScript({action:'discordPost', channelId:chId, content:txt}); r.posts.push({channelId:chId, messageId:res.messageId}); posted++; }
+        if(ex){ await callAppsScript({action:'discordEdit', channelId:chId, messageId:ex.messageId, content:perTxt}); edited++; }
+        else{ const res=await callAppsScript({action:'discordPost', channelId:chId, content:perTxt}); r.posts.push({channelId:chId, messageId:res.messageId}); posted++; }
       }catch(e){ fail++; failMsg=String(e.message||''); }
     }
-    r.announceText=txt;
+    r.announceText=raw;   // เก็บฉบับอ่านง่าย (@ชื่อโรล) ไว้แก้ต่อ
     // ห้องหลักของรอบ (ใช้ดึงคำตอบ) = ห้องของทีมที่เปิดรอบถ้าถูกเลือกไว้ ไม่งั้นห้องแรกที่โพสต์
     const own=_dcChannelOf(r.cat);
     const primary=r.posts.find(p=>p.channelId===own)||r.posts[0];
