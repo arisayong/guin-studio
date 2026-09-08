@@ -4854,50 +4854,43 @@ async function avClearAndRepull(){
 }
 async function pullFromDiscord(silent, allHistory){
   const r=getRound(_avRoundId); if(!r) return;
-  const chId=r.channelId || _dcChannelOf(r.cat);
-  if(!chId){ if(!silent){ toast('ยังไม่ได้ตั้ง ID ห้องของทีมนี้','error'); openDiscordSetup(); } return; }
+  // 🏠 ดึงจาก "ทุกห้อง" ที่รอบนี้โพสประกาศไป (r.posts) — ไม่ใช่แค่ห้องของทีมที่เปิดรอบ
+  //    แต่ละห้อง = ทีมของห้องนั้น (map channelId → cat) เพื่อจัดหมวดคำตอบให้ถูก (แก้บั๊ก: 1 รอบโพสหลายห้อง แต่ดึงแค่ห้องเดียว)
+  const cfgCh=getDiscordCfg().channels||{};
+  const chCat={}; Object.entries(cfgCh).forEach(([cat,id])=>{ if(id) chCat[id]=cat; });
+  let targets=[];
+  if(Array.isArray(r.posts)&&r.posts.length){ targets=r.posts.filter(p=>p&&p.channelId).map(p=>({channelId:p.channelId, afterId:p.messageId||''})); }
+  else { const ch=r.channelId||_dcChannelOf(r.cat); if(ch) targets=[{channelId:ch, afterId:r.postedMessageId||''}]; }
+  if(!targets.length){ if(!silent){ toast('ยังไม่ได้ตั้ง ID ห้องของทีมนี้','error'); openDiscordSetup(); } return; }
   if(!silent) showLoader(true);
   try{
-    // 🔑 ดึงเฉพาะข้อความ "หลังโพสต์ประกาศรอบนี้" (postedMessageId) — ห้องเดียวใช้ซ้ำทุกรอบ
-    //    ข้อความก่อนประกาศ = ของรอบเก่า (คนละเดือน) ต้องไม่เอามาปน · allHistory = เอาทั้งหมด (ดีบักเท่านั้น)
-    const afterId = (!allHistory && r.postedMessageId) ? r.postedMessageId : '';
-    const res=await callAppsScript({action:'discordFetch', channelId:chId, afterId, limit:100});
-    let msgs=res.messages||[];
-    const fetched=msgs.length;
-    let skipped=0;
-    // สำรอง: ถ้าไม่มี postedMessageId (โพสเองไม่ผ่านบอท) → กรองด้วยวันเปิดรอบแทน (เผื่อ 2 ชม.)
-    if(!allHistory && !r.postedMessageId && r.createdAt){
-      const since=new Date(new Date(r.createdAt).getTime() - 2*3600*1000).toISOString();
-      const inRange=msgs.filter(m=>String(m.at||'') >= since);
-      skipped=msgs.length-inRange.length;
-      msgs=inRange;
-    }
+    let totalFetched=0, n=0, emptyCount=0, skipped=0;
     const unmatched=[];
-    let n=0, emptyCount=0;
-    // ข้อความใหม่กว่าทับข้อความเก่าของคนเดียวกัน (เรียงเวลามาแล้วจาก Apps Script)
-    for(const m of msgs){
-      // เนื้อความว่าง = มักเกิดจากบอทไม่ได้เปิดสิทธิ์ Message Content Intent (Discord ส่งข้อความมาแบบไร้ตัวหนังสือ)
-      // → ห้ามข้ามเงียบ: ลองจับคู่จาก "ชื่อ" ก่อน จับได้ก็บันทึกเลย จับไม่ได้ก็ขึ้นกล่องส้มให้ผูกเอง
-      if(!String(m.content||'').trim()){
-        emptyCount++;
-        const lk=matchStaffByDiscord(m);
-        if(lk.staff){
-          _dcAutoLink(lk, m);
-          await saveRoundReply(r.id, lk.staff.id, {freeText:'', discordName:m.displayName||m.username, source:'discord'});
-          n++;
-        } else {
-          unmatched.push({...m, content:'', options:lk.options||[], noContent:true});
-        }
-        continue;
+    for(const t of targets){
+      const chId=t.channelId;
+      const afterId=(!allHistory && t.afterId)?t.afterId:'';
+      const res=await callAppsScript({action:'discordFetch', channelId:chId, afterId, limit:100});
+      let msgs=res.messages||[];
+      totalFetched+=msgs.length;
+      // ไม่มี afterId (โพสเอง/ไม่ผ่านบอท) → กรองด้วยวันเปิดรอบแทน (เผื่อ 2 ชม.)
+      if(!allHistory && !afterId && r.createdAt){
+        const since=new Date(new Date(r.createdAt).getTime()-2*3600*1000).toISOString();
+        const inRange=msgs.filter(m=>String(m.at||'')>=since);
+        skipped+=msgs.length-inRange.length; msgs=inRange;
       }
-      const match=matchStaffByDiscord(m);
-      if(match.staff){
-        _dcAutoLink(match, m);
-        await saveRoundReply(r.id, match.staff.id, {
-          freeText:m.content.trim(), discordName:m.displayName||m.username, source:'discord' });
-        n++;
-      } else {
-        unmatched.push({...m, options: match.options||[]});
+      const srcCat=chCat[chId]||r.cat;   // ทีมของ "ห้องนี้" (บท-qc→adaptation · มิกซ์-ซับ→mix · พากย์→dubbing)
+      for(const m of msgs){
+        const content=String(m.content||'').trim();
+        if(!content){
+          emptyCount++;
+          const lk=matchStaffByDiscord(m);
+          if(lk.staff){ _dcAutoLink(lk,m); await saveRoundReply(r.id, lk.staff.id, {freeText:'', discordName:m.displayName||m.username, source:'discord', srcCat}); n++; }
+          else { unmatched.push({...m, content:'', options:lk.options||[], noContent:true, srcCat}); }
+          continue;
+        }
+        const mt=matchStaffByDiscord(m);
+        if(mt.staff){ _dcAutoLink(mt,m); await saveRoundReply(r.id, mt.staff.id, {freeText:content, discordName:m.displayName||m.username, source:'discord', srcCat}); n++; }
+        else { unmatched.push({...m, options:mt.options||[], srcCat}); }
       }
     }
     // 🔗 คนเดียวกันตอบหลายข้อความ → รวมเหลือแถวเดียว (ผูกครั้งเดียวพอ ไม่ต้องผูกซ้ำทุกข้อความ)
@@ -4915,16 +4908,16 @@ async function pullFromDiscord(silent, allHistory){
     });
     // เก็บคนที่จับคู่ไม่ได้ไว้ให้แอดมินกดผูก
     const list=getRounds(); const rr=list.find(x=>x.id===r.id);
-    if(rr){ rr.unmatched=unDedup.slice(-30); rr.pulledAt=new Date().toISOString(); await saveRounds(list); }
+    if(rr){ rr.unmatched=unDedup.slice(-40); rr.pulledAt=new Date().toISOString(); await saveRounds(list); }
     if(!silent){
-      if(!msgs.length && skipped){
+      if(!totalFetched && skipped){
         // มีข้อความในห้องแต่เก่ากว่าเวลาที่เปิดรอบ — ถามว่าจะดึงย้อนหลังทั้งหมดไหม
-        if(confirm(`ไม่พบข้อความหลังเวลาเปิดรอบนี้\n(ในห้องมี ${skipped} ข้อความ แต่เก่ากว่าเวลาที่เปิดรอบ)\n\nดึงย้อนหลัง ${fetched} ข้อความล่าสุดทั้งหมดเลยไหม?`)){
+        if(confirm(`ไม่พบข้อความหลังเวลาเปิดรอบนี้\n(ในห้องมีข้อความเก่ากว่าเวลาที่เปิดรอบ ${skipped} ข้อความ)\n\nดึงย้อนหลังทั้งหมดเลยไหม?`)){
           showLoader(false);
           return pullFromDiscord(false, true);
         }
         toast('ไม่พบคำตอบใหม่','info');
-      } else if(msgs.length && !n && emptyCount){
+      } else if(totalFetched && !n && emptyCount){
         // ดึงมาได้แต่เนื้อความว่างหมด → บอทอ่านข้อความไม่ได้ ต้องเปิดสิทธิ์ก่อน
         alert('⚠️ ดึงมา '+emptyCount+' ข้อความ แต่เนื้อความว่างเปล่าทั้งหมด\n\n'
           +'สาเหตุ: บอทยังไม่ได้เปิดสิทธิ์อ่านข้อความ (MESSAGE CONTENT INTENT)\n\n'
@@ -4935,11 +4928,11 @@ async function pullFromDiscord(silent, allHistory){
           +'4. เปิดสวิตช์ "MESSAGE CONTENT INTENT" ให้ติด (สีเขียว/ฟ้า)\n'
           +'5. กด Save Changes แล้วกลับมากด "ดึงคำตอบจาก Discord" ใหม่');
       } else {
-        toast(`🔄 ดึงมา ${msgs.length} ข้อความ · จับคู่ได้ ${n} คน${unDedup.length?' · ผูกชื่อไม่ได้ '+unDedup.length+' คน (ดูกล่องส้ม)':''}${emptyCount?' · อ่านเนื้อความไม่ได้ '+emptyCount:''}${skipped?' · ข้ามข้อความเก่า '+skipped:''}`, unDedup.length?'warn':'success');
+        toast(`🔄 ดึงมา ${totalFetched} ข้อความ · จับคู่ได้ ${n} คน${unDedup.length?' · ผูกชื่อไม่ได้ '+unDedup.length+' คน (ดูกล่องส้ม)':''}${emptyCount?' · อ่านเนื้อความไม่ได้ '+emptyCount:''}${skipped?' · ข้ามข้อความเก่า '+skipped:''}`, unDedup.length?'warn':'success');
       }
     }
     renderAvailability();
-    return {fetched:msgs.length, matched:n, unmatched:unDedup.length, empty:emptyCount};
+    return {fetched:totalFetched, matched:n, unmatched:unDedup.length, empty:emptyCount};
   }catch(e){ if(!silent) toast('ดึงไม่สำเร็จ: '+e.message,'error'); return {fetched:0, matched:0, unmatched:0, error:String(e&&e.message||e)}; }
   finally{ if(!silent) showLoader(false); }
 }
@@ -5129,17 +5122,23 @@ function openNewRound(){
   const today=new Date();
   const nextWeek=new Date(today); nextWeek.setDate(today.getDate()+6);
   const g=getAnnounceGender();
+  const cfgCh=getDiscordCfg().channels||{};
   _tagOverlayShow('➕ เปิดรอบลงคิว', `
     <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:12px">
-      เลือกทีม + ช่วงวัน แล้วข้อความประกาศด้านล่างจะเติมให้เองจากเทมเพลต — เสร็จแล้วคัดลอกหรือโพสลง Discord ได้เลย
+      ติ๊กทีมที่จะขอคิว (เลือกได้หลายทีม) + ช่วงวัน — ระบบจะโพสประกาศ + ดึงคำตอบจาก<strong>ทุกห้องที่ติ๊ก</strong>ให้ครบ
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:5px">เปิดขอคิวทีมไหนบ้าง (ติ๊กได้หลายทีม)</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        ${Object.entries(AV_CATS).filter(([k,v])=>v.channel&&v.channel!=='-').map(([k,v])=>{
+          const hasCh=!!cfgCh[k];
+          return `<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:6px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;cursor:${hasCh?'pointer':'not-allowed'};opacity:${hasCh?1:.45}" title="${hasCh?'':'ยังไม่ตั้ง ID ห้องของทีมนี้ — ตั้งที่ปุ่ม 🐧 ตั้งค่า Discord'}">
+            <input type="checkbox" class="nr-team" value="${k}" ${hasCh?'checked':'disabled'} onchange="_nrRefreshPreview(true)"> ${v.icon} ${esc(v.label)}${hasCh?'':' ⚠️'}
+          </label>`;
+        }).join('')}
+      </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <div style="flex:1;min-width:150px">
-        <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:3px">ขอคิวจากทีม</div>
-        <select id="nr-cat" onchange="_nrRefreshPreview()" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
-          ${Object.entries(AV_CATS).map(([k,v])=>`<option value="${k}"${k==='dubbing'?' selected':''}>${v.icon} ${v.label}</option>`).join('')}
-        </select>
-      </div>
       <div style="min-width:145px">
         <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:3px">ตั้งแต่วันที่</div>
         <input id="nr-from" type="date" value="${_isoOf(today)}" onchange="_nrRefreshPreview()" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px">
@@ -5162,8 +5161,10 @@ function openNewRound(){
 }
 // สร้าง object รอบชั่วคราวจากค่าในฟอร์ม เพื่อพรีวิวข้อความประกาศ
 // (หมายเหตุ/NDA ไม่มีช่องแยกแล้ว — อยากเพิ่มอะไรพิมพ์ในกล่องประกาศได้เลย)
+function _nrCheckedTeams(){ return [...document.querySelectorAll('.nr-team:checked')].map(x=>x.value); }
 function _nrPreviewRound(){
-  return { cat:document.getElementById('nr-cat')?.value||'dubbing',
+  const checked=_nrCheckedTeams();
+  return { cat:checked[0]||'dubbing', targetCats:checked,
     dateFrom:document.getElementById('nr-from')?.value||'', dateTo:document.getElementById('nr-to')?.value||'',
     note:'', nda:false };
 }
@@ -5180,9 +5181,12 @@ async function createRound(){
   const to=document.getElementById('nr-to')?.value;
   if(!from||!to){ toast('เลือกช่วงวันที่ก่อน','error'); return; }
   if(to<from){ toast('วันที่สิ้นสุดต้องไม่น้อยกว่าวันเริ่ม','error'); return; }
+  const checked=_nrCheckedTeams();
+  if(!checked.length){ toast('ติ๊กเลือกทีมที่จะขอคิวอย่างน้อย 1 ทีม','error'); return; }
   const r={
     id:'RD'+Date.now(),
-    cat:document.getElementById('nr-cat')?.value||'dubbing',
+    cat:checked[0],           // ทีมหลัก (ใช้กับป้าย/พรีวิว)
+    targetCats:checked,       // ทุกทีมที่ติ๊ก → จะโพส+ดึงจากทุกห้องนี้
     dateFrom:from, dateTo:to,
     note:'', nda:false,
     status:'open', createdAt:new Date().toISOString(),
@@ -5203,14 +5207,15 @@ function showRoundAnnounce(roundId){
   const r=getRound(roundId); if(!r) return;
   const g=getAnnounceGender();
   const txt=r.announceText||roundAnnounceText(r, g);
-  // ☑️ เลือกห้องที่จะโพสต์ได้หลายห้องพร้อมกัน — ห้องของทีมที่เปิดรอบติ๊กมาให้ก่อน
+  // ☑️ เลือกห้องที่จะโพสต์ได้หลายห้องพร้อมกัน — ห้องของทุกทีมที่ติ๊กตอนเปิดรอบ ถูกติ๊กมาให้ก่อน
   const cfgCh=getDiscordCfg().channels||{};
+  const wantCats=new Set(Array.isArray(r.targetCats)&&r.targetCats.length?r.targetCats:[r.cat]);
   const postsArr=Array.isArray(r.posts)?r.posts:(r.postedMessageId?[{channelId:r.channelId, messageId:r.postedMessageId}]:[]);
   const chBoxes=Object.entries(AV_CATS).filter(([k])=>cfgCh[k]).map(([k,v])=>{
     const chId=cfgCh[k];
     const done=postsArr.some(p=>p.channelId===chId);
     return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;padding:4px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px">
-      <input type="checkbox" class="ra-ch" value="${esc(chId)}"${(k===r.cat||done)?' checked':''}> ${v.icon} ${esc(v.label)}${done?' <span style="color:var(--green);font-size:10px">เคยโพสต์—จะแก้โพสต์เดิม</span>':''}
+      <input type="checkbox" class="ra-ch" value="${esc(chId)}"${(wantCats.has(k)||done)?' checked':''}> ${v.icon} ${esc(v.label)}${done?' <span style="color:var(--green);font-size:10px">เคยโพสต์—จะแก้โพสต์เดิม</span>':''}
     </label>`;
   }).join('');
   _tagOverlayShow('📢 ประกาศขอคิว — รีเช็คข้อความแล้วให้บอทโพสต์เลย', `
@@ -5767,7 +5772,8 @@ function _alcPeople(){
       const s=getStaffById(sid); if(!s || !isStaffAssignable(s)) return;
       if(!map[sid]) map[sid]={sid, staff:s, replies:[]};
       // เก็บสถานะ + ชุดวันหักลบ ติดมากับคำตอบด้วย (คนไม่ว่างก็เก็บ — ไปแสดงในกลุ่ม "แจ้งไม่ว่าง")
-      map[sid].replies.push({cat:r.cat, freeText:e.freeText||'', at:e.updatedAt||'', round:r,
+      //   cat = หมวดตาม "ห้องที่เขามาตอบ" (e.srcCat) ถ้ามี ไม่งั้นใช้หมวดของรอบ — 1 รอบดึงหลายห้อง จัดหมวดถูกตามห้อง
+      map[sid].replies.push({cat:e.srcCat||r.cat, freeText:e.freeText||'', at:e.updatedAt||'', round:r,
         dayNums:Array.isArray(e.dayNums)?e.dayNums:null, everyday:e.everydayFlag===true, status:_avStatusOf(e)});
     });
   });
