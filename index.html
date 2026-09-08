@@ -1610,7 +1610,17 @@ body.sidebar-collapsed .main-content{
   .pr-in{width:100%;box-sizing:border-box;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px}
   .pr-lbl{font-size:11px;color:var(--text2);margin:8px 0 3px}
   /* ── 🐧 ห้องโปรเจกต์ · Design A — เขียน & เก็บโพสต์ ── */
-  .pr2-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .pr2-top{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px}
+  .pr2-projlist{margin-top:6px;max-height:250px;overflow-y:auto;border:1px solid var(--border2);border-radius:10px;background:var(--bg2)}
+  .pr2-projrow{display:flex;align-items:center;gap:9px;padding:9px 11px;cursor:pointer;border-bottom:1px solid var(--border2);transition:.12s}
+  .pr2-projrow:last-child{border-bottom:0}
+  .pr2-projrow:hover{background:rgba(0,180,255,.07)}
+  .pr2-projrow.on{background:rgba(0,180,255,.12)}
+  .pr2-projrow .nm{font-size:12.8px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pr2-projrow .ct{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .pr2-curbar{display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:11px;padding:9px 12px;flex:1;min-width:260px}
+  .pr2-curbar .nm{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pr2-curbar .ct{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
   .pr2-grid{display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start}
   .pr2-card{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:14px}
   .pr2-card + .pr2-card{margin-top:12px}
@@ -4591,7 +4601,13 @@ function matchStaffByDiscord(msg){
   if(!cand.length) return {staff:null, how:'none'};
   cand.sort((a,b)=>b.score-a.score);
   const top=cand.filter(c=>c.score===cand[0].score);
-  if(top.length===1) return {staff:top[0].s, how:'name'};
+  if(top.length===1){
+    // score: 4=ชื่อเล่นตรงเป๊ะ · 3=คำในชื่อเล่นตรง · 2=ชื่อจริงตรงเป๊ะ · 1=เจอแค่บางพยางค์ในชื่อจริง (อ่อนมาก)
+    // 🛡️ score 1 = เดาจากพยางค์เดียว คนละคนก็ชนกันได้ → ไม่เดา/ไม่ auto-link ให้แอดมินยืนยันเอง
+    //    (แก้บั๊ก: เดาผิดแล้ว _dcAutoLink บันทึก discordId ผิดถาวร → คำตอบขึ้นชื่อผิดคนตลอดไป)
+    if(cand[0].score>=2) return {staff:top[0].s, how:'name'};
+    return {staff:null, how:'ambiguous', options:top.map(c=>c.s)};
+  }
   // 🔎 ชื่อเล่นซ้ำกัน — ทีมแก้ด้วยการเขียนชื่อจริง/ชื่อย่อต่อท้ายใน Discord
   //    เช่น "รอย.เรื่องศักดิ์", "ไทเกอร์.พชร", "เจ๋ง ร." → ใช้ส่วนนั้นแยกว่าเป็นใคร
   const nickTokenSet=new Set();
@@ -6625,6 +6641,8 @@ function _prComposeCat(){
 // ══════════════════════════════════════════════
 let _prPostSel='';
 let _prAutosaveTimer=null;
+let _prShowPicker=false;   // เปิดตัวเลือก/ค้นหางาน (โชว์เสมอถ้ายังไม่ได้เลือก)
+let _prProjSearch='';      // คำค้นหางาน/หมวดหมู่/รหัส
 function _prNow(){ return new Date().toISOString(); }
 function _prTimeAgo(iso){
   if(!iso) return 'ยังไม่บันทึก';
@@ -6674,16 +6692,46 @@ function renderProjRoom(){
   if(_prSel && !list.some(p=>p.id===_prSel)) _prSel='';
   const p=list.find(x=>x.id===_prSel);
   const mgrs={}; try{ getAllManagerUsers().forEach(m=>{ mgrs[m.uid]=m.nickname||m.email||''; }); }catch(e){}
-  const sel=`<div class="pr2-top">
-    <div style="flex:1;min-width:240px;display:flex;gap:8px">
-      <select class="pr-in" style="flex:1;margin:0" onchange="_prSelectProject(this.value)">
-        <option value="">— เลือกโปรเจกต์ —</option>
-        ${list.map(x=>`<option value="${esc(x.id)}"${x.id===_prSel?' selected':''}>${esc(projCode(x)?projCode(x)+' · ':'')}${esc(x.name||'')}${x.discordChannelId?' 🐧':''}</option>`).join('')}
-      </select>
-      <button class="btn btn-blue btn-sm" onclick="openNewProject()" title="สร้างโปรเจกต์ใหม่">＋ โปรเจกต์ใหม่</button>
-    </div>
-    ${p&&p.discordChannelId?`<span class="alc-chip alc-c-all">🐧 สร้างห้องแล้ว</span>${p.discordPrivate?'<span class="alc-chip" style="background:rgba(150,154,180,.18)">🔒 ส่วนตัว</span>':''}`:''}
-  </div>`;
+  // 🔍 งานเยอะ + ชื่องานอยู่ที่ "หมวดหมู่" (เพราะโพสต์เป็นเทมเพลต) → โชว์หมวดหมู่ + ช่องค้นหาชัดเจน
+  const _projRow=x=>{
+    const cat=x.discordCategoryName||'';
+    const label=((projCode(x)?projCode(x)+' · ':'')+(x.name||''))||'(ไม่มีชื่อ)';
+    const hay=((projCode(x)||'')+' '+(x.name||'')+' '+cat).toLowerCase();
+    return `<div class="pr2-projrow${x.id===_prSel?' on':''}" data-hay="${esc(hay)}" onclick="_prPickProject('${esc(x.id)}')">
+      <div style="flex:1;min-width:0">
+        <div class="nm">${esc(label)}${x.discordChannelId?' 🐧':''}</div>
+        ${cat?`<div class="ct">🗂️ ${esc(cat)}</div>`:'<div class="ct" style="color:var(--orange)">ยังไม่มีห้อง/หมวดหมู่</div>'}
+      </div>
+    </div>`;
+  };
+  let sel;
+  if(!p || _prShowPicker){
+    sel=`<div class="pr2-top"><div style="flex:1;min-width:260px">
+      <div style="display:flex;gap:8px">
+        <input id="pr-projsearch" class="pr-in" style="flex:1;margin:0" placeholder="🔍 ค้นหาชื่องาน / หมวดหมู่ / รหัส..." value="${esc(_prProjSearch||'')}" oninput="_prProjSearch=this.value;_prFilterProjList()">
+        <button class="btn btn-blue btn-sm" onclick="openNewProject()" title="สร้างโปรเจกต์ใหม่">＋ ใหม่</button>
+        ${p?`<button class="btn btn-outline btn-sm" onclick="_prShowPicker=false;renderProjRoom()" title="ปิดตัวเลือก">✕</button>`:''}
+      </div>
+      <div id="pr-projlist" class="pr2-projlist">
+        ${list.map(_projRow).join('')||'<div style="padding:12px;color:var(--text2);font-size:12px;text-align:center">ไม่มีงาน</div>'}
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-top:5px">แสดง ${list.length} งาน · พิมพ์ชื่อเรื่อง/รหัส/ชื่อหมวดหมู่เพื่อกรอง</div>
+    </div></div>`;
+  } else {
+    const cat=p.discordCategoryName||'';
+    const label=((projCode(p)?projCode(p)+' · ':'')+(p.name||''))||'(ไม่มีชื่อ)';
+    sel=`<div class="pr2-top">
+      <div class="pr2-curbar">
+        <span style="font-size:17px">🐧</span>
+        <div style="flex:1;min-width:0">
+          <div class="nm">${esc(label)}</div>
+          ${cat?`<div class="ct">🗂️ ${esc(cat)}</div>`:''}
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="_prShowPicker=true;renderProjRoom()" title="เลือก/ค้นหางานอื่น">🔄 เปลี่ยนงาน</button>
+      </div>
+      ${p.discordChannelId?`<span class="alc-chip alc-c-all">🐧 สร้างห้องแล้ว</span>${p.discordPrivate?'<span class="alc-chip" style="background:rgba(150,154,180,.18)">🔒 ส่วนตัว</span>':''}`:''}
+    </div>`;
+  }
   if(!p){ el.innerHTML=sel+'<div style="color:var(--text2);font-size:12.5px;padding:14px 2px">เลือกโปรเจกต์ก่อน แล้วหน้าเขียน &amp; เก็บโพสต์จะโผล่ที่นี่ · โปรเจกต์ที่มี 🐧 = สร้างห้องแล้ว</div>'; return; }
   if(!p.discordChannelId){ el.innerHTML=sel+_prCreateBox(p, mgrs); _prComposeCat(); return; }
   el.innerHTML=sel+_prRoomView(p);
@@ -6820,6 +6868,15 @@ function _prRoomManage(projId){
 async function _prSelectProject(id){
   if(_prSel&&_prSel!==id){ try{ await _prFlush(_prSel); }catch(e){} }
   _prSel=id; _prPostSel=''; renderProjRoom();
+}
+// เลือกงานจากรายการค้นหา — เลือกแล้วปิดตัวเลือก โชว์แถบงานปัจจุบัน
+async function _prPickProject(id){ _prShowPicker=false; _prProjSearch=''; await _prSelectProject(id); }
+// กรองรายการงานตามคำค้นหา (ไม่รีเรนเดอร์ กันโฟกัสหลุด) — ค้นได้ทั้งชื่อเรื่อง/รหัส/ชื่อหมวดหมู่
+function _prFilterProjList(){
+  const q=String(document.getElementById('pr-projsearch')?.value||'').toLowerCase().trim();
+  document.querySelectorAll('#pr-projlist .pr2-projrow').forEach(r=>{
+    r.style.display=(!q||(r.dataset.hay||'').includes(q))?'flex':'none';
+  });
 }
 // เก็บข้อความในกล่องปัจจุบันลงโพสต์ที่เลือก (เรียกก่อนสลับโพสต์/สลับงาน)
 async function _prFlush(projId){
