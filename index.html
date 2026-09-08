@@ -2647,7 +2647,7 @@ body.sidebar-collapsed .main-content{
     </div>
     <div class="form-group" style="margin:0"><label class="form-label">ความยาว (นาที)</label><input class="form-input" id="pj-duration" type="number" placeholder="ถ้ามี" min="0" step="any" onwheel="this.blur()" oninput="calcProjSummary();renderAllWorkerLists()"></div>
    </div>
-   <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px">
+   <div id="pj-client-row" style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px">
     <div class="form-group" style="margin:0"><label class="form-label">ชื่อ / URL ลูกค้า</label><input class="form-input" id="pj-client" placeholder="ชื่อลูกค้า หรือ link"></div>
    </div>
    <div style="display:flex;gap:16px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
@@ -2705,7 +2705,6 @@ body.sidebar-collapsed .main-content{
      <div class="cat-toggle-btn" id="toggle-qc" onclick="toggleCat('qc')" style="border-color:rgba(155,111,255,.4);color:var(--purple)">✅ QC</div>
      <div class="cat-toggle-btn" id="toggle-sub" onclick="toggleCat('sub')" style="border-color:rgba(255,64,64,.4);color:var(--red)">🎬 Sub & Video</div>
      <div class="cat-toggle-btn" id="toggle-trn" onclick="toggleCat('trn')" style="border-color:rgba(255,111,174,.4);color:#FF6FAE">🌐 นักแปล</div>
-     <div class="cat-toggle-btn" id="toggle-mgr" onclick="toggleCat('mgr')" style="border-color:rgba(21,101,255,.4);color:var(--accent2)">🗂️ Manager</div>
     </div>
    </div>
 
@@ -4833,7 +4832,7 @@ async function avClearAndRepull(){
     await saveRounds(list);
   }catch(e){ toast('ล้างไม่สำเร็จ: '+e.message,'error'); showLoader(false); return; }
   showLoader(false);
-  await pullFromDiscord();   // ดึงสดใหม่ จับคู่ชื่อรอบใหม่
+  await pullFromDiscord(false, true);   // ดึงสดใหม่ "ทั้งหมด" (allHistory) กันพลาดข้อความที่ตกช่วงวันกรอง
   toast('🧹 ล้างของเก่า + ดึงคำตอบใหม่แล้ว','success');
 }
 async function pullFromDiscord(silent, allHistory){
@@ -5695,12 +5694,40 @@ function _allCatsOf(staffId){
   }catch(e){}
   return set;
 }
+// เดา "หน้าที่" จากข้อความชื่อ (ทีมใส่บทบาทในชื่อดิสอยู่แล้ว เช่น "นิว บท/QC ช") → คืน pre ที่เจอ
+function _alcPreFromName(txt){
+  const t=String(txt||''); const out=[];
+  if(/บท|เกลา/.test(t)) out.push('adp');
+  if(/qc/i.test(t)) out.push('qc');
+  if(/ซับ|วิดีโอ|วิดิโอ|sub|vdo|vid/i.test(t)) out.push('sub');
+  if(/พากย์|นักพากย์|dub/i.test(t)) out.push('dub');
+  if(/มิกซ์|mix/i.test(t)) out.push('mix');
+  if(/แปล|translat/i.test(t)) out.push('trn');
+  if(/เมเน|จัดการ|manager|mgr/i.test(t)) out.push('mgr');
+  return out;
+}
 function _alcPres(s){
   const set=new Set();
   const cats=Array.isArray(s.categories)&&s.categories.length ? s.categories : (s.category?[s.category]:[]);
   cats.forEach(c=>{ const p=ALC_CAT2PRE[c]; if(p) set.add(p); });
   // + ทุกหมวดที่คนนี้อยู่ในทะเบียน (กันหมวดรองหาย เช่น คนที่เป็นทั้งพากย์และมิกซ์)
   if(s&&s.id) _allCatsOf(s.id).forEach(c=>{ const p=ALC_CAT2PRE[c]; if(p) set.add(p); });
+  // + เดาหน้าที่จากชื่อใน Discord (ทีมเขียนบทบาทในชื่ออยู่แล้ว) — คนที่ชื่อบอกว่าทำ QC ให้ขึ้นหมวด QC ด้วย
+  _alcPreFromName(s&&(s.discordName||'')).forEach(p=>set.add(p));
+  return [...set];
+}
+// ทุกหมวดที่ "ห้องเดียวกัน" ครอบคลุม — ห้องบท-qc รวมบท+QC · ห้องมิกซ์-ซับ รวมมิกซ์+ซับ
+function _catsOfRoomChannel(cat){
+  const ch=(AV_CATS[cat]||{}).channel;
+  if(!ch || ch==='-') return [cat];
+  return Object.keys(AV_CATS).filter(k=>(AV_CATS[k]||{}).channel===ch);
+}
+// 🏠 หมวดที่คนนี้ควรขึ้น = "ตามห้องที่เขามาตอบ" (ไม่ใช่ทะเบียน) — ตอบห้องบท-qc = ขึ้นทั้งบท+QC
+//    + เดาจากชื่อในดิสด้วย (เผื่อบางห้องไม่ได้รวม แต่ชื่อบอกบทบาทไว้)
+function _alcRoomPres(o){
+  const set=new Set();
+  (o.replies||[]).forEach(rep=>{ _catsOfRoomChannel(rep.cat).forEach(c=>{ const p=ALC_CAT2PRE[c]; if(p) set.add(p); }); });
+  if(o.staff){ _alcPres(o.staff).forEach(p=>set.add(p)); }   // รวมของทะเบียน/ชื่อดิส เป็นตัวเสริม
   return [...set];
 }
 function _alcRoundDays(r){
@@ -5888,9 +5915,9 @@ function renderAlloc(){
   people.forEach(o=>{ o.unavail=o.replies.length>0 && o.replies.every(x=>x.status==='unavailable'); });
   const match=o=>{
     // 🎤 นักพากย์แยกเพศ: dubM = ชาย (รวมไม่ระบุ) · dubF = หญิง
-    if(_alcFilter==='dubM'){ if(!_alcPres(o.staff).includes('dub') || String(o.staff.gender||'')==='หญิง') return false; }
-    else if(_alcFilter==='dubF'){ if(!_alcPres(o.staff).includes('dub') || String(o.staff.gender||'')!=='หญิง') return false; }
-    else if(_alcFilter!=='all' && !_alcPres(o.staff).includes(_alcFilter)) return false;
+    if(_alcFilter==='dubM'){ if(!_alcRoomPres(o).includes('dub') || String(o.staff.gender||'')==='หญิง') return false; }
+    else if(_alcFilter==='dubF'){ if(!_alcRoomPres(o).includes('dub') || String(o.staff.gender||'')!=='หญิง') return false; }
+    else if(_alcFilter!=='all' && !_alcRoomPres(o).includes(_alcFilter)) return false;
     if(_alcSearch && !String((o.staff.nickname||'')+' '+(o.staff.name||'')).includes(_alcSearch)) return false;
     return true;
   };
@@ -5902,12 +5929,12 @@ function renderAlloc(){
     +ALC_PRE.map(pre=>{
       if(pre==='dub'){
         // นักพากย์แยกปุ่ม ชาย/หญิง
-        const nm=people.filter(o=>!o.unavail && _alcPres(o.staff).includes('dub') && String(o.staff.gender||'')!=='หญิง' && !_alcDraftOf(o.sid).length).length;
-        const nf=people.filter(o=>!o.unavail && _alcPres(o.staff).includes('dub') && String(o.staff.gender||'')==='หญิง' && !_alcDraftOf(o.sid).length).length;
+        const nm=people.filter(o=>!o.unavail && _alcRoomPres(o).includes('dub') && String(o.staff.gender||'')!=='หญิง' && !_alcDraftOf(o.sid).length).length;
+        const nf=people.filter(o=>!o.unavail && _alcRoomPres(o).includes('dub') && String(o.staff.gender||'')==='หญิง' && !_alcDraftOf(o.sid).length).length;
         return '<div class="alc-railbtn'+(_alcFilter==='dubM'?' on':'')+'" onclick="_alcFilter=\'dubM\';renderAlloc()">🎤<small>พากย์ ช '+nm+'</small></div>'
              + '<div class="alc-railbtn'+(_alcFilter==='dubF'?' on':'')+'" onclick="_alcFilter=\'dubF\';renderAlloc()">🎤<small>พากย์ ญ '+nf+'</small></div>';
       }
-      const n=people.filter(o=>!o.unavail && _alcPres(o.staff).includes(pre) && !_alcDraftOf(o.sid).length).length;
+      const n=people.filter(o=>!o.unavail && _alcRoomPres(o).includes(pre) && !_alcDraftOf(o.sid).length).length;
       return '<div class="alc-railbtn'+(_alcFilter===pre?' on':'')+'" onclick="_alcFilter=\''+pre+'\';renderAlloc()">'+((ALC_ROLE[pre]||'').split(' ')[0])+'<small>'+(ALC_ROLE[pre]||'').split(' ').slice(1).join(' ')+' '+n+'</small></div>';
     }).join('')+'</div>';
   const roundChips=openRounds.map(r=>{const c=AV_CATS[r.cat]||{};return '<span class="alc-chip alc-c-day">'+(c.icon||'')+' '+esc(c.label||r.cat)
@@ -14130,11 +14157,11 @@ function renderProjects(){
       <option value="all" ${selectedMonth==='all'?'selected':''}>ทุกเดือน</option>
       ${months.map(m=>`<option value="${m}" ${selectedMonth===m?'selected':''}>${TM[m]}</option>`).join('')}
     </select>
-    <label style="font-size:12px;color:var(--text2);font-weight:600;white-space:nowrap;margin-left:6px">👤 ลูกค้า</label>
+    ${currentUser?.role==='admin'?`<label style="font-size:12px;color:var(--text2);font-weight:600;white-space:nowrap;margin-left:6px">👤 ลูกค้า</label>
     <select class="form-input form-select" style="padding:7px 32px 7px 12px;font-size:13px;min-width:160px;max-width:240px" onchange="selectedClient=this.value;renderProjects()">
       <option value="all" ${selectedClient==='all'?'selected':''}>ทุกลูกค้า (${clients.length})</option>
       ${clients.map(c=>`<option value="${c.replace(/"/g,'&quot;')}" ${selectedClient===c?'selected':''}>${c}</option>`).join('')}
-    </select>
+    </select>`:''}
     ${currentUser?.role==='admin'?`<label style="font-size:12px;color:var(--text2);font-weight:600;white-space:nowrap;margin-left:6px">🗂️ ผู้ดูแล</label>
     <select class="form-input form-select" style="padding:7px 32px 7px 12px;font-size:13px;min-width:170px;max-width:240px" onchange="selectedManager=this.value;renderProjects()">
       <option value="all" ${selectedManager==='all'?'selected':''}>ทุกผู้ดูแล</option>
@@ -14305,7 +14332,7 @@ function renderProjList(){
           +(roleBadges?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+roleBadges+'</div>':'')
           +(p.note?'<div style="font-size:10px;color:var(--text2)">📝 '+p.note+'</div>':'')
           +'</td>'
-          +'<td style="padding:8px 6px;color:var(--text2)">'+(p.client||'—')+'</td>'
+          +'<td style="padding:8px 6px;color:var(--text2)">'+(currentUser?.role==='manager'?'—':(p.client||'—'))+'</td>'
           +(function(){const mi=_projManagerLabel(p);if(mi.isAdmin)
               return '<td style="padding:8px 6px"><span style="font-size:10px;padding:2px 9px;border-radius:8px;background:rgba(155,111,255,.12);color:#9B6FFF;border:1px solid rgba(155,111,255,.3);font-weight:700;white-space:nowrap">🛠️ Admin</span></td>';
             const _c=mi.color||'';
@@ -14415,10 +14442,8 @@ function syncManagerFee(){
       if(fee>0){
         if(!entry){ formSlots.mgr.only.push({staffId, amount:fee, unit:'เหมา'}); }
         else { entry.amount=fee; entry.unit='เหมา'; }
-        // เปิดหมวด Manager ให้เห็น (แสดงเป็นรายการเดียวกัน ไม่ต้องกรอกซ้ำ)
+        // เก็บ entry ไว้เงียบ ๆ (จัดการเมเนเจอร์จากช่องด้านบนที่เดียว — ไม่โชว์หมวด Manager ซ้ำด้านล่างแล้ว)
         activeCats.add('mgr');
-        const block=document.getElementById('catblock-mgr'); if(block)block.classList.remove('hidden');
-        const btn=document.getElementById('toggle-mgr'); if(btn)btn.classList.add('on');
       } else if(entry){
         formSlots.mgr.only = formSlots.mgr.only.filter(w=>w.staffId!==staffId);
       }
@@ -14654,6 +14679,8 @@ async function openNewProject(){
   const _metaEl = document.getElementById('proj-modal-meta');
   if(_metaEl){ _metaEl.textContent=''; _metaEl.style.display='none'; }
   ['pj-name','pj-client','pj-budget','pj-budget-qty','pj-duration','pj-note','pj-clientcode','pj-seq','pj-episodes','pj-downloadlink','pj-secretkey'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  // 🔒 เมเนเจอร์ต้องไม่เห็น/ไม่กรอกชื่อลูกค้า (แอดมินเห็นปกติ)
+  { const _cr=document.getElementById('pj-client-row'); if(_cr) _cr.style.display=(currentUser?.role==='manager')?'none':''; }
   { const _ap=document.getElementById('pj-advancepaid'); if(_ap) _ap.checked=false; }
   _fillClientCodeDatalist();
   initFormIncome(null);
@@ -16065,17 +16092,20 @@ async function openEditProject(id){
   initFormSlots();
   document.getElementById('proj-modal-mode').textContent='✏️ กำลังแก้ไข';
   document.getElementById('proj-modal-title').textContent=projDisp(p);
+  // 🔒 เมเนเจอร์ต้องไม่เห็น "ชื่อลูกค้า" — ซ่อนทั้งบนหัว modal และช่องกรอก
+  const _isMgr = currentUser?.role==='manager';
   const _metaEl = document.getElementById('proj-modal-meta');
   if(_metaEl){
     const _metaParts = [];
     if(p.type) _metaParts.push('🎬 '+p.type);
-    if(p.client) _metaParts.push('👤 '+p.client);
+    if(p.client && !_isMgr) _metaParts.push('👤 '+p.client);
     if(p.deadline) _metaParts.push('📅 '+fmtDate(p.deadline));
     _metaEl.textContent = _metaParts.join('  ·  ');
     _metaEl.style.display = _metaParts.length ? 'block' : 'none';
   }
   document.getElementById('pj-name').value=p.name||'';
   document.getElementById('pj-client').value=p.client||'';
+  { const _cr=document.getElementById('pj-client-row'); if(_cr) _cr.style.display=_isMgr?'none':''; }
   initFormIncome(p);
   // 📋 ข้อมูลชีทคิวเมเนเจอร์
   _setVal('pj-clientcode', p.clientCode||'');
@@ -16116,7 +16146,8 @@ async function openEditProject(id){
   (p.workers||[]).forEach(w=>{
     const parts=w.slot.split('-');const cat=parts[0];let slot=parts.slice(1).join('-')||'only';
     if(cat==='dub') slot='main';   // ระบบใหม่: นักพากย์รวมลิสต์เดียว (dub-sub ของเก่าย้ายมาที่เดียวกัน)
-    if(!activeCats.has(cat)){activeCats.add(cat);const btn=document.getElementById('toggle-'+cat);const block=document.getElementById('catblock-'+cat);if(btn)btn.classList.add('on');if(block)block.classList.remove('hidden')}
+    // หมวด Manager จัดการจากช่องด้านบน (มอบหมาย MANAGER + ค่าเหมา) ที่เดียว — ไม่โชว์บล็อกด้านล่าง (โหลดข้อมูลไปเข้า formSlots.mgr เฉย ๆ)
+    if(!activeCats.has(cat)){activeCats.add(cat);if(cat!=='mgr'){const btn=document.getElementById('toggle-'+cat);const block=document.getElementById('catblock-'+cat);if(btn)btn.classList.add('on');if(block)block.classList.remove('hidden');}}
     // keepSlot: นักพากย์รองของเก่า (dub-sub) โชว์รวมในลิสต์เดียว แต่ตอนเซฟคง slot เดิมไว้
     //           — ไม่งั้นสถานะจ่ายแล้ว/เลขใบสำคัญจ่ายที่ผูกกับ slot เดิมจะหลุด
     if(formSlots[cat]&&formSlots[cat][slot]!==undefined)formSlots[cat][slot].push({staffId:w.id,amount:w.ratePerUnit||w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,comment:w.comment||'',...(cat==='dub'&&w.tier?{tier:w.tier}:{}),...(cat==='dub'&&w.slot!=='dub-main'?{keepSlot:w.slot}:{})});
@@ -26369,6 +26400,7 @@ function _applyDraft(snap){
       if(block) block.classList.add('hidden');
     });
     activeCats.forEach(cat=>{
+      if(cat==='mgr') return;   // เมเนเจอร์จัดการจากช่องด้านบนที่เดียว ไม่โชว์บล็อกด้านล่าง
       const btn = document.getElementById('toggle-'+cat);
       const block = document.getElementById('catblock-'+cat);
       if(btn) btn.classList.add('on');
