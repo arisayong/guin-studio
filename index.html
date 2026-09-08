@@ -7057,22 +7057,55 @@ async function prSetTpl(projId, tplId){
   renderProjRoom();
 }
 // 🔗 ผูกห้องที่สร้างเองใน Discord กับโปรเจกต์ — สำหรับหมวดที่ทีมสร้างมือไว้ก่อนแล้ว
+// ตรวจว่า channel นี้เป็น "หมวดหมู่" (Discord category = type 4)
+function _isDcCategory(c){ return c && (c.type===4 || c.type==='4' || String(c.type||'').toLowerCase()==='category' || c.isCategory===true); }
 async function prLinkExisting(projId){
   showLoader(true);
   try{
     const d=await callProjBot({action:'discordChannels'});
     const chs=d.channels||[];
     if(!chs.length){ toast('บอทมองไม่เห็นห้องข้อความเลย — เช็คว่าเชิญบอทเข้าเซิร์ฟเวอร์และเปิดสิทธิ์ดูห้องแล้ว','warn'); return; }
+    // 🗂️ แผนที่หมวดหมู่: id → ชื่อ (Worker มักส่ง channel ชนิดหมวดหมู่ (type 4) มาในลิสต์เดียวกัน)
+    const catMap={};
+    chs.forEach(c=>{ if(_isDcCategory(c)) catMap[c.id]=c.name; });
+    // มีหมวด (จาก d.categories หรือ field parentName) → เก็บเพิ่ม
+    (d.categories||[]).forEach(c=>{ if(c&&c.id) catMap[c.id]=c.name; });
+    const catOf=c=> c.parentName || c.categoryName || c.category || (c.parentId&&catMap[c.parentId]) || (c.parent_id&&catMap[c.parent_id]) || '';
+    // เอาเฉพาะห้องข้อความ (ตัดตัวหมวดหมู่เองออก) + แนบชื่อหมวด แล้วเรียงตามหมวด→ชื่อ (สแกนง่าย)
+    const rooms=chs.filter(c=>!_isDcCategory(c)).map(c=>({id:c.id, name:c.name||'', cat:catOf(c)}))
+      .sort((a,b)=> String(a.cat||'￿').localeCompare(String(b.cat||'￿'),'th') || String(a.name).localeCompare(String(b.name),'th'));
+    window._prLinkRooms=rooms;
+    const anyCat=rooms.some(r=>r.cat);
     _tagOverlayShow('🔗 ผูกห้องที่มีอยู่แล้วใน Discord', `
-      <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:8px">เลือกห้องที่จะใช้เป็นห้องโพสต์คู่มือของโปรเจกต์นี้ — ปุ่มโพสต์/อัปเดตคู่มือจะลงห้องนี้เสมอ</div>
-      <div style="max-height:330px;overflow-y:auto">
-        ${chs.map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border2);font-size:12.5px">
-          <span style="flex:1;min-width:0"># ${esc(c.name)}</span>
-          <button class="btn btn-sm btn-outline" onclick="prPickExisting('${escJs(projId)}','${escJs(c.id)}','${escJs(c.name)}')">✅ ใช้ห้องนี้</button>
-        </div>`).join('')}
-      </div>`, 520);
+      <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:8px">เลือกห้องที่จะใช้เป็นห้องโพสต์คู่มือของโปรเจกต์นี้ — พิมพ์ค้นหาชื่อห้อง${anyCat?'/หมวดหมู่':''}ได้</div>
+      <input id="pr-linksearch" class="pr-in" placeholder="🔍 ค้นหาห้อง${anyCat?' / หมวดหมู่':''}..." oninput="_prFilterLinkList()" style="margin-bottom:6px">
+      <div id="pr-linkcount" style="font-size:11px;color:var(--text2);margin-bottom:6px">${rooms.length} ห้อง${anyCat?'':' · <span style="color:var(--orange)">Worker ยังไม่ส่งชื่อหมวดหมู่มา (อัปเดต worker.js เป็นเวอร์ชันล่าสุดจะเห็นหมวด)</span>'}</div>
+      <div id="pr-linklist" style="max-height:340px;overflow-y:auto">${_prLinkRoomsHTML(projId)}</div>`, 560);
   }catch(e){ toast('ดึงรายชื่อห้องไม่ได้: '+e.message,'error'); }
   finally{ showLoader(false); }
+}
+function _prLinkRoomsHTML(projId){
+  const rooms=window._prLinkRooms||[];
+  return rooms.map(c=>{
+    const hay=((c.name||'')+' '+(c.cat||'')).toLowerCase();
+    return `<div class="pr2-projrow" data-hay="${esc(hay)}" style="cursor:default">
+      <div style="flex:1;min-width:0">
+        <div class="nm"># ${esc(c.name)}</div>
+        ${c.cat?`<div class="ct">🗂️ ${esc(c.cat)}</div>`:''}
+      </div>
+      <button class="btn btn-sm btn-outline" style="flex:none" onclick="prPickExisting('${escJs(projId)}','${escJs(c.id)}','${escJs(c.name)}')">✅ ใช้ห้องนี้</button>
+    </div>`;
+  }).join('')||'<div style="padding:12px;color:var(--text2);text-align:center;font-size:12px">ไม่มีห้อง</div>';
+}
+// กรองรายการห้องตามคำค้นหา (ชื่อห้อง + ชื่อหมวดหมู่) — ไม่รีเรนเดอร์ กันโฟกัสหลุด
+function _prFilterLinkList(){
+  const q=String(document.getElementById('pr-linksearch')?.value||'').toLowerCase().trim();
+  let n=0;
+  document.querySelectorAll('#pr-linklist .pr2-projrow').forEach(r=>{
+    const show=(!q||(r.dataset.hay||'').includes(q));
+    r.style.display=show?'flex':'none'; if(show) n++;
+  });
+  const cnt=document.getElementById('pr-linkcount'); if(cnt) cnt.textContent=n+' ห้อง';
 }
 async function prPickExisting(projId, chId, chName){
   const _prev=getProjects().find(x=>x.id===projId);
