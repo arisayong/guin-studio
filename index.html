@@ -1648,7 +1648,8 @@ body.sidebar-collapsed .main-content{
   .pr2-tools{display:flex;align-items:center;gap:8px;padding:9px 10px;border-bottom:1px solid var(--border2);flex-wrap:wrap}
   .pr2-tplbox{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:2px 4px 2px 10px;font-size:12px}
   .pr2-tplbox .lb{color:var(--text2);font-size:11px}
-  .pr2-tplbox select{background:transparent;border:0;color:var(--text);font-family:Kanit;font-weight:700;font-size:12px;padding:5px 4px;cursor:pointer;max-width:150px}
+  .pr2-tplbox select{background:var(--card);border:0;color:var(--text);font-family:Kanit;font-weight:700;font-size:12px;padding:5px 4px;cursor:pointer;max-width:150px;color-scheme:dark}
+  .pr2-tplbox select option{background:var(--card);color:var(--text)}
   .pr2-tool{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text2);background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:6px 9px;cursor:pointer;transition:.14s}
   .pr2-tool:hover{color:var(--text);border-color:var(--accent2)}
   .pr2-tool.tpl{color:#c9b8ff;background:rgba(155,123,255,.14);border-color:rgba(155,123,255,.32)}
@@ -7074,8 +7075,11 @@ async function prLinkExisting(projId){
     const chanCat={};
     try{ getProjects().forEach(p=>{ const cn=p.discordCategoryName||''; if(!cn) return; if(p.discordChannelId) chanCat[p.discordChannelId]=cn; if(p.discordTalkId) chanCat[p.discordTalkId]=cn; }); }catch(e){}
     const catOf=c=> c.parentName || c.categoryName || c.category || (c.parentId&&catMap[c.parentId]) || (c.parent_id&&catMap[c.parent_id]) || chanCat[c.id] || '';
-    // เอาเฉพาะห้องข้อความ (ตัดตัวหมวดหมู่เองออก) + แนบชื่อหมวด แล้วเรียงตามหมวด→ชื่อ (สแกนง่าย)
-    const rooms=chs.filter(c=>!_isDcCategory(c)).map(c=>({id:c.id, name:c.name||'', cat:catOf(c)}))
+    const parentOf=c=> String(c.parentId||c.parent_id||'');
+    // เก็บรายชื่อหมวดหมู่ทั้งหมด (id→ชื่อ) ไว้ resolve ตอนวาง ID + ใช้ในตัวเลือกหมวด
+    window._prCategories=[]; { const seen={}; [...chs.filter(_isDcCategory), ...((d.categories)||[])].forEach(c=>{ if(c&&c.id&&!seen[c.id]){ seen[c.id]=1; window._prCategories.push({id:c.id, name:c.name||''}); } }); }
+    // เอาเฉพาะห้องข้อความ (ตัดตัวหมวดหมู่เองออก) + แนบชื่อหมวด+parentId แล้วเรียงตามหมวด→ชื่อ (สแกนง่าย)
+    const rooms=chs.filter(c=>!_isDcCategory(c)).map(c=>({id:c.id, name:c.name||'', cat:catOf(c), parentId:parentOf(c)}))
       .sort((a,b)=> String(a.cat||'￿').localeCompare(String(b.cat||'￿'),'th') || String(a.name).localeCompare(String(b.name),'th'));
     window._prLinkRooms=rooms;
     const anyCat=rooms.some(r=>r.cat);
@@ -7089,16 +7093,21 @@ async function prLinkExisting(projId){
 }
 function _prLinkRoomsHTML(projId){
   const rooms=window._prLinkRooms||[];
-  return rooms.map(c=>{
+  return rooms.map((c,i)=>{
     const hay=((c.name||'')+' '+(c.cat||'')).toLowerCase();
     return `<div class="pr2-projrow" data-hay="${esc(hay)}" style="cursor:default">
       <div style="flex:1;min-width:0">
         <div class="nm"># ${esc(c.name)}</div>
         ${c.cat?`<div class="ct">🗂️ ${esc(c.cat)}</div>`:''}
       </div>
-      <button class="btn btn-sm btn-outline" style="flex:none" onclick="prPickExisting('${escJs(projId)}','${escJs(c.id)}','${escJs(c.name)}')">✅ ใช้ห้องนี้</button>
+      <button class="btn btn-sm btn-outline" style="flex:none" onclick="prPickExistingRow('${escJs(projId)}',${i})">✅ ใช้ห้องนี้</button>
     </div>`;
   }).join('')||'<div style="padding:12px;color:var(--text2);text-align:center;font-size:12px">ไม่มีห้อง</div>';
+}
+// เลือกห้องจากรายการ — ส่งข้อมูลหมวด (ชื่อ+ID) ที่บอทส่งมาด้วย จะได้ตั้งหมวดอัตโนมัติ ไม่ต้องพิมพ์/วางเอง
+async function prPickExistingRow(projId, i){
+  const c=(window._prLinkRooms||[])[i]; if(!c) return;
+  await prPickExisting(projId, c.id, c.name, c.cat||'', c.parentId||'');
 }
 // กรองรายการห้องตามคำค้นหา (ชื่อห้อง + ชื่อหมวดหมู่) — ไม่รีเรนเดอร์ กันโฟกัสหลุด
 function _prFilterLinkList(){
@@ -7110,7 +7119,14 @@ function _prFilterLinkList(){
   });
   const cnt=document.getElementById('pr-linkcount'); if(cnt) cnt.textContent=n+' ห้อง';
 }
-async function prPickExisting(projId, chId, chName){
+// resolve ชื่อหมวดจาก ID (จากรายการที่บอทส่งมา + งานอื่นในระบบ)
+function _prCatNameById(id){
+  id=String(id||'').trim(); if(!id) return '';
+  const fromList=(window._prCategories||[]).find(c=>c.id===id); if(fromList) return fromList.name||'';
+  try{ const p=getProjects().find(x=>x.discordCategoryId===id); if(p) return p.discordCategoryName||''; }catch(e){}
+  return '';
+}
+async function prPickExisting(projId, chId, chName, knownCatName, knownCatId){
   const _prev=getProjects().find(x=>x.id===projId);
   const _changed=_prev&&_prev.discordChannelId&&_prev.discordChannelId!==chId;
   await saveProjectMerge(projId, f=>{
@@ -7121,11 +7137,25 @@ async function prPickExisting(projId, chId, chName){
   try{ logAudit('project.discord', chName, 'ผูกห้อง Discord ที่มีอยู่กับโปรเจกต์'); }catch(e){}
   document.getElementById('tag-overlay')?.remove();
   toast('🔗 ผูกห้อง #'+chName+' แล้ว'+(_changed?' — โพสต์กลับเป็น "ร่าง" กด "📤 โพสต์ลงห้อง" เพื่อลงห้องใหม่':''),'success');
-  // ถามชื่อหมวดต่อเลย — จะได้เปลี่ยนอิโมจิสถานะหน้าชื่อหมวดให้ได้ด้วย
-  const cat=prompt('ห้องนี้อยู่ใต้ "หมวดหมู่" ชื่ออะไรใน Discord?\n\nพิมพ์/วางชื่อหมวดให้ตรงเป๊ะทุกตัวอักษรรวมอิโมจิ (คลิกขวาชื่อหมวด → แก้ไขหมวดหมู่ แล้วก๊อปชื่อมาวาง)\nระบบจะใช้เปลี่ยนอิโมจิสถานะ 🟡🟠🟢🔴 ให้อัตโนมัติ · เว้นว่าง = ข้ามไปก่อน');
-  if(cat&&cat.trim()){
-    await saveProjectMerge(projId, f=>{ f.discordCategoryName=cat.trim(); delete f.discordCategoryId; });
-    toast('🏷️ ผูกหมวด "'+cat.trim()+'" แล้ว — อิโมจิสถานะจะเปลี่ยนอัตโนมัติเมื่อติ๊กสถานะ','success');
+  // 🗂️ หมวดหมู่: บอทส่ง parent มาแล้ว → ตั้งอัตโนมัติ ไม่ต้องพิมพ์/วางเอง
+  const _kName=String(knownCatName||'').trim(), _kId=String(knownCatId||'').trim();
+  if(_kName || _kId){
+    await saveProjectMerge(projId, f=>{
+      if(_kId) f.discordCategoryId=_kId; else delete f.discordCategoryId;
+      f.discordCategoryName=_kName || _prCatNameById(_kId) || f.discordCategoryName || '';
+    });
+    toast('🏷️ ผูกหมวด "'+(_kName||_prCatNameById(_kId)||_kId)+'" อัตโนมัติแล้ว','success');
+  } else {
+    // ไม่รู้หมวด → ถาม (รับ "ID หมวด" หรือชื่อก็ได้ · ID แม่นกว่า)
+    const ans=prompt('งานนี้อยู่ใต้ "หมวดหมู่" ไหนใน Discord?\n\n💡 วิธีที่แม่นสุด: เปิด Developer Mode ในดิส → คลิกขวาชื่อหมวด → "Copy Category ID" แล้ววาง ID ที่นี่\n(หรือพิมพ์/วางชื่อหมวดให้ตรงเป๊ะก็ได้)\n\nระบบใช้เปลี่ยนอิโมจิสถานะ 🟡🟠🟢🔴 · เว้นว่าง = ข้าม');
+    if(ans&&ans.trim()){
+      const v=ans.trim(); const isId=/^\d{15,25}$/.test(v);
+      await saveProjectMerge(projId, f=>{
+        if(isId){ f.discordCategoryId=v; f.discordCategoryName=_prCatNameById(v)||f.discordCategoryName||''; }
+        else { f.discordCategoryName=v; delete f.discordCategoryId; }
+      });
+      toast('🏷️ ผูกหมวด'+(isId?(_prCatNameById(v)?' "'+_prCatNameById(v)+'"':' (ID)'):' "'+v+'"')+' แล้ว','success');
+    }
   }
   // 📌 ห้องนี้เคยโพสต์คู่มือด้วยบอทนี้ไว้แล้ว? ผูกข้อความเดิมเข้ามา จะได้กด "อัปเดตโพสต์เดิม" แก้ในที่เดิมได้ ไม่ต้องโพสต์ซ้ำ
   const link=prompt('ห้องนี้เคยโพสต์ "คู่มือการทำงาน" ด้วยบอทตัวนี้ไว้แล้วใช่ไหม?\n\nถ้าใช่ — เปิด Discord แล้วชี้ที่ข้อความนั้น → กดจุด 3 จุด (…) → "Copy Message Link" แล้ววางที่นี่\nระบบจะผูกข้อความนั้นเข้ามา ให้กด "📣 อัปเดตโพสต์เดิม" แก้ข้อความนั้นได้เลย (ไม่ต้องโพสต์ใหม่)\n\nเว้นว่าง = ข้าม (ค่อยกด "📤 โพสต์ลงห้อง" โพสต์เป็นข้อความใหม่)');
@@ -7153,18 +7183,59 @@ function _prParseMsgId(s){
   const m=s.match(/(\d{15,25})(?!.*\d)/);   // เลขก้อนยาวก้อนสุดท้าย = message id
   return m?m[1]:'';
 }
-// 🏷️ ผูกหมวดหมู่ให้งานที่ระบบยังไม่รู้จักหมวด (เช่น ห้องที่สร้างเองใน Discord) — พิมพ์ชื่อให้ตรงเป๊ะครั้งเดียว
+// 🏷️ ผูกหมวดหมู่ให้งานนี้ — ดึงรายชื่อหมวดจากบอทมาให้ "เลือก" ไม่ต้องพิมพ์ชื่อเป๊ะ ๆ เอง
 async function prBindCategory(projId){
   const p=getProjects().find(x=>x.id===projId); if(!p) return;
-  const guess=p.discordCategoryName||'';
-  const cat=prompt('พิมพ์/วางชื่อ "หมวดหมู่" ของงานนี้ใน Discord ให้ตรงเป๊ะทุกตัวอักษรรวมอิโมจิ\n(วิธีก๊อปชื่อ: คลิกขวาที่ชื่อหมวดใน Discord → แก้ไขหมวดหมู่ → ก๊อปข้อความในช่องชื่อ)\n\nระบบจะใช้ชื่อนี้ตามหาหมวดเพื่อเปลี่ยนอิโมจิสถานะ 🟡🟠🟢🔴', guess);
-  if(!cat||!cat.trim()) return;
-  await saveProjectMerge(projId, f=>{ f.discordCategoryName=cat.trim(); delete f.discordCategoryId; });
-  toast('🏷️ ผูกหมวด "'+cat.trim()+'" แล้ว — กำลังซิงก์อิโมจิให้เลย...','success');
+  showLoader(true);
+  let cats=[];
+  try{
+    const d=await callProjBot({action:'discordChannels'});
+    const chs=d.channels||[]; const seen={};
+    [...chs.filter(_isDcCategory), ...((d.categories)||[])].forEach(c=>{ if(c&&c.id&&!seen[c.id]){ seen[c.id]=1; cats.push({id:c.id, name:c.name||''}); } });
+    window._prCategories=cats;
+  }catch(e){}
+  showLoader(false);
+  if(cats.length){
+    cats.sort((a,b)=>String(a.name).localeCompare(String(b.name),'th'));
+    window._prBindCats=cats;
+    _tagOverlayShow('🏷️ เลือกหมวดหมู่ของงานนี้', `
+      <div style="font-size:11.5px;color:var(--text2);margin-bottom:8px">เลือกหมวดหมู่ใน Discord ที่เป็นของงานนี้ — ระบบใช้เปลี่ยนอิโมจิสถานะ 🟡🟠🟢🔴 อัตโนมัติ (ผูกด้วย ID จำแม่นกว่าชื่อ)</div>
+      <input id="pr-catsearch" class="pr-in" placeholder="🔍 ค้นหาหมวดหมู่..." oninput="_prFilterBindCats()" style="margin-bottom:6px">
+      <div id="pr-catcount" style="font-size:11px;color:var(--text2);margin-bottom:6px">${cats.length} หมวดหมู่</div>
+      <div id="pr-catlist" style="max-height:340px;overflow-y:auto">
+        ${cats.map((c,i)=>`<div class="pr2-projrow" data-hay="${esc((c.name||'').toLowerCase())}" style="cursor:default">
+          <div style="flex:1;min-width:0"><div class="nm">🗂️ ${esc(c.name||'(ไม่มีชื่อ)')}</div></div>
+          <button class="btn btn-sm btn-outline" style="flex:none" onclick="prBindCatPick('${escJs(projId)}',${i})">✅ เลือก</button>
+        </div>`).join('')}
+      </div>`, 520);
+    return;
+  }
+  // fallback: บอทดึงหมวดไม่ได้ → วาง ID (แม่นสุด) หรือพิมพ์ชื่อเอง
+  const guess=p.discordCategoryId||p.discordCategoryName||'';
+  const ans=prompt('วาง "ID หมวดหมู่" (เปิด Developer Mode ในดิส → คลิกขวาหมวด → Copy Category ID)\nหรือพิมพ์ชื่อหมวดให้ตรงเป๊ะก็ได้:', guess);
+  if(!ans||!ans.trim()) return;
+  const v=ans.trim(); const isId=/^\d{15,25}$/.test(v);
+  await saveProjectMerge(projId, f=>{ if(isId){ f.discordCategoryId=v; f.discordCategoryName=_prCatNameById(v)||f.discordCategoryName||''; } else { f.discordCategoryName=v; delete f.discordCategoryId; } });
+  toast('🏷️ ผูกหมวดแล้ว — กำลังซิงก์อิโมจิ...','success');
   renderProjRoom();
   try{ if(!document.getElementById('page-projects').classList.contains('hidden')) renderProjects(); }catch(e){}
-  // ผูกเสร็จลองซิงก์ทันที — ถ้าชื่อไม่ตรง จะเด้งถามให้พิมพ์ใหม่เอง วนจนกว่าจะเจอหรือกดยกเลิก
   await syncProjStatusEmoji(projId, true);
+}
+function prBindCatPick(projId, i){
+  const c=(window._prBindCats||[])[i]; if(!c) return;
+  document.getElementById('tag-overlay')?.remove();
+  saveProjectMerge(projId, f=>{ f.discordCategoryId=c.id; f.discordCategoryName=c.name||''; }).then(()=>{
+    toast('🏷️ ผูกหมวด "'+(c.name||c.id)+'" แล้ว — กำลังซิงก์อิโมจิ...','success');
+    renderProjRoom();
+    try{ if(!document.getElementById('page-projects').classList.contains('hidden')) renderProjects(); }catch(e){}
+    syncProjStatusEmoji(projId, true);
+  });
+}
+function _prFilterBindCats(){
+  const q=String(document.getElementById('pr-catsearch')?.value||'').toLowerCase().trim();
+  let n=0;
+  document.querySelectorAll('#pr-catlist .pr2-projrow').forEach(r=>{ const show=(!q||(r.dataset.hay||'').includes(q)); r.style.display=show?'flex':'none'; if(show) n++; });
+  const cnt=document.getElementById('pr-catcount'); if(cnt) cnt.textContent=n+' หมวดหมู่';
 }
 async function postProjRoomMsg(projId){
   const p=getProjects().find(x=>x.id===projId);
