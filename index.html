@@ -6183,20 +6183,41 @@ async function alcPullAll(){
   if(!rounds.length){ toast('ยังไม่มีรอบลงคิวที่เปิดอยู่ — เปิดรอบที่หน้า 📌 ลงคิว','warn'); return; }
   const keep=_avRoundId;
   showLoader(true);
-  let fetched=0, matched=0, unm=0, empty=0, errs=[];
+  const rows=[]; let empty=0, errs=[];
   try{
     for(const r of rounds){
       _avRoundId=r.id;
-      const st=await pullFromDiscord(true);
-      if(st){ fetched+=st.fetched||0; matched+=st.matched||0; unm+=st.unmatched||0; empty+=st.empty||0; if(st.error) errs.push(st.error); }
+      const st=await pullFromDiscord(true)||{};
+      const lbl=(AV_CATS[r.cat]||{}).label||r.cat;
+      rows.push({lbl, fetched:st.fetched||0, matched:st.matched||0, unmatched:st.unmatched||0,
+        hasChannel:!!(r.channelId||_dcChannelOf(r.cat)), posted:!!r.postedMessageId});
+      empty+=st.empty||0; if(st.error) errs.push(st.error);
     }
-    if(errs.length) toast('ดึงไม่สำเร็จบางรอบ: '+errs[0],'error');
-    else if(!fetched) toast('ไม่พบข้อความใหม่ใน Discord — ถ้าทีมตอบไว้ก่อนโพสล่าสุด ให้ไปหน้า 📌 ลงคิว กด "ดึงคำตอบจาก Discord" ระบบจะเสนอดึงย้อนหลังทั้งห้องให้','warn');
-    else if(!matched && empty)
-      alert('⚠️ ดึงมา '+empty+' ข้อความ แต่เนื้อความว่างเปล่าทั้งหมด\n\nสาเหตุ: บอทยังไม่ได้เปิดสิทธิ์อ่านข้อความ (MESSAGE CONTENT INTENT)\n\nวิธีแก้ (ทำครั้งเดียว):\n1. เข้า discord.com/developers/applications\n2. เลือกบอทของเรา → เมนู "Bot"\n3. เลื่อนหา "Privileged Gateway Intents"\n4. เปิดสวิตช์ "MESSAGE CONTENT INTENT"\n5. กด Save Changes แล้วกลับมากดดึงใหม่');
-    else toast('🔄 ดึงมา '+fetched+' ข้อความ · จับคู่ได้ '+matched+' คน'+(unm?' · ผูกชื่อไม่ได้ '+unm+' คน — ดูกล่องส้มในช่องรายชื่อ':''), unm?'warn':'success');
   }catch(e){ toast('ดึงไม่สำเร็จ: '+e.message,'error'); }
   finally{ _avRoundId=keep; showLoader(false); renderAlloc(); }
+  // 📊 สรุปแบบละเอียด "ต่อหมวด" — เห็นชัดว่าหมวดไหนดึงไม่ครบ/จับคู่ไม่ได้/ยังไม่ตั้งห้อง
+  const tot=rows.reduce((a,x)=>({f:a.f+x.fetched,m:a.m+x.matched,u:a.u+x.unmatched}),{f:0,m:0,u:0});
+  const body=rows.map(x=>{
+    const warn=[]; if(!x.hasChannel) warn.push('ยังไม่ตั้ง ID ห้อง'); if(!x.posted) warn.push('ยังไม่ได้โพสผ่านบอท (ดึงจะไม่ครบ)');
+    const c = x.unmatched>0?'var(--orange)':(x.matched>0?'var(--green)':'var(--text2)');
+    return `<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 11px;border-top:1px solid var(--border2);font-size:12.5px">
+      <div style="font-weight:700">${esc(x.lbl)}${warn.length?'<div style="font-size:10.5px;color:var(--orange);font-weight:400">⚠️ '+warn.join(' · ')+'</div>':''}</div>
+      <div style="text-align:right;white-space:nowrap;color:${c}">ดึง ${x.fetched} · จับคู่ <b>${x.matched}</b>${x.unmatched?' · <span style="color:var(--orange)">ไม่รู้จัก '+x.unmatched+'</span>':''}</div>
+    </div>`;
+  }).join('');
+  _tagOverlayShow('📊 ผลการดึงคำตอบ (แยกตามทีม)', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:6px">
+      รวม: ดึง <b>${tot.f}</b> ข้อความ · จับคู่ได้ <b style="color:var(--green)">${tot.m}</b> คน${tot.u?' · <b style="color:var(--orange)">ผูกชื่อไม่ได้ '+tot.u+' คน</b> (อยู่ในกล่องส้ม เลือกว่าเป็นใคร/➕เพิ่มใหม่)':''}
+    </div>
+    <div style="border:1px solid var(--border2);border-radius:10px;overflow:hidden">${body||'<div style="padding:12px;text-align:center;color:var(--text2)">ไม่มีรอบ</div>'}</div>
+    <div style="font-size:11px;color:var(--text2);line-height:1.7;margin-top:9px">
+      • <b>ดึงน้อย/0</b> = รอบนั้นยังไม่ได้โพสผ่านบอท หรือทีมตอบก่อนโพส → ที่รอบนั้นกด "🧹 ล้าง + ดึงใหม่" (ดึงย้อนหลังทั้งห้อง)<br>
+      • <b>ไม่รู้จัก N</b> = ดึงมาได้แต่ยังไม่มีในทะเบียน → กล่องส้ม "🔗 มีคนตอบแต่ไม่รู้ว่าเป็นใคร" เลือก/➕เพิ่มใหม่<br>
+      • ทีมที่ไม่ขึ้นในนี้เลย = <b>ยังไม่ได้เปิดรอบ</b>ให้ทีมนั้น (ไปเปิดที่หน้า 📌 ลงคิว)
+    </div>
+    ${(errs.length)?'<div style="color:var(--red);font-size:11.5px;margin-top:8px">⚠️ '+esc(errs[0])+'</div>':''}
+    ${(empty&&!tot.m)?'<div style="color:var(--orange);font-size:11.5px;margin-top:8px">⚠️ อ่านเนื้อความไม่ได้ '+empty+' ข้อความ — เปิด MESSAGE CONTENT INTENT ให้บอทก่อน</div>':''}
+    <button class="btn btn-outline" style="width:100%;margin-top:10px" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>`, 500);
 }
 // ✏️ แก้ข้อความในโพสประกาศเดิมบน Discord (ไม่โพสใหม่ให้รก) — ต้องใช้ Worker เวอร์ชันที่มีคำสั่ง discordEdit
 async function updateRoundPost(roundId){
