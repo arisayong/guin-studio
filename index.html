@@ -1653,7 +1653,7 @@ body.sidebar-collapsed .main-content{
   .pr2-tool{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text2);background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:6px 9px;cursor:pointer;transition:.14s}
   .pr2-tool:hover{color:var(--text);border-color:var(--accent2)}
   .pr2-tool.tpl{color:#c9b8ff;background:rgba(155,123,255,.14);border-color:rgba(155,123,255,.32)}
-  .pr2-ta{width:100%;box-sizing:border-box;border:0;background:transparent;color:var(--text);font-family:Kanit;font-size:13px;line-height:1.7;padding:13px 15px;resize:vertical;min-height:240px;outline:none;display:block}
+  .pr2-ta{width:100%;box-sizing:border-box;border:0;background:transparent;color:var(--text);font-family:Kanit;font-size:13px;line-height:1.7;padding:13px 15px;resize:none;overflow:hidden;min-height:200px;outline:none;display:block}
   .pr2-bar{position:sticky;bottom:0;display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--border2);border-radius:13px;padding:11px 13px;flex-wrap:wrap;margin-top:11px;z-index:2}
   .pr2-savebtn{background:rgba(255,158,0,.16)!important;color:var(--orange)!important;border:1px solid rgba(255,158,0,.42)!important;font-weight:800}
   .pr2-savebtn:hover{background:rgba(255,158,0,.26)!important}
@@ -5691,7 +5691,12 @@ function _alcRoundDays(r){
 }
 // รวมคนที่ตอบรับจากทุกรอบที่เปิดอยู่ (คนเดียวตอบหลายรอบได้)
 function _alcPeople(){
-  const rounds=getRounds().filter(r=>r.status==='open');
+  // ⭐ เอาเฉพาะ "รอบล่าสุด" ของแต่ละหมวด — กันข้อมูลรอบเก่า/รอบเทสต์ที่ยังเปิดค้างไว้มาปนกับคำตอบรอบปัจจุบัน
+  const open=getRounds().filter(r=>r.status==='open');
+  const _rk=r=>String(r.createdAt||'')+'|'+String(r.id||'');   // คีย์เรียงเวลา (createdAt ก่อน, id เสริม)
+  const latestByCat={};
+  open.forEach(r=>{ const k=r.cat||''; if(!latestByCat[k] || _rk(r)>_rk(latestByCat[k])) latestByCat[k]=r; });
+  const rounds=Object.values(latestByCat);
   const map={};
   rounds.forEach(r=>{
     const reps=getRoundReplies(r.id)||{};
@@ -6644,6 +6649,8 @@ let _prPostSel='';
 let _prAutosaveTimer=null;
 let _prShowPicker=false;   // เปิดตัวเลือก/ค้นหางาน (โชว์เสมอถ้ายังไม่ได้เลือก)
 let _prProjSearch='';      // คำค้นหางาน/หมวดหมู่/รหัส
+// กล่องแก้โพสต์ยืดสูงตามเนื้อหาอัตโนมัติ — ไม่ต้องเลื่อนในกล่อง (เลื่อนหน้าปกติแทน)
+function _prAutoGrow(el){ if(!el) return; el.style.height='auto'; el.style.height=(el.scrollHeight+2)+'px'; }
 function _prNow(){ return new Date().toISOString(); }
 function _prTimeAgo(iso){
   if(!iso) return 'ยังไม่บันทึก';
@@ -6736,6 +6743,8 @@ function renderProjRoom(){
   if(!p){ el.innerHTML=sel+'<div style="color:var(--text2);font-size:12.5px;padding:14px 2px">เลือกโปรเจกต์ก่อน แล้วหน้าเขียน &amp; เก็บโพสต์จะโผล่ที่นี่ · โปรเจกต์ที่มี 🐧 = สร้างห้องแล้ว</div>'; return; }
   if(!p.discordChannelId){ el.innerHTML=sel+_prCreateBox(p, mgrs); _prComposeCat(); return; }
   el.innerHTML=sel+_prRoomView(p);
+  // ยืดกล่องแก้โพสต์ให้พอดีเนื้อหาทันทีหลังเรนเดอร์
+  const _ta=document.getElementById('pr-post'); if(_ta) _prAutoGrow(_ta);
 }
 // ── ฟอร์มสร้างหมวด+ห้อง (คงตัวเลือกเดิมครบ: อิโมจิ/ประเภท/ใครดูแล/ห้องส่วนตัว) ──
 function _prCreateBox(p, mgrs){
@@ -6832,7 +6841,7 @@ function _prRoomView(p){
           <span class="pr2-tool" style="margin-left:auto" onclick="prInsertMention()" title="แทรกแท็กคน — คนที่ผูก Discord แล้ว ping จริง">👤 แท็กคน</span>
           ${currentUser?.role==='admin'?`<span class="pr2-tool" onclick="openProjPostTplEditor()" title="เพิ่ม/แก้/ลบชุดเทมเพลต">⚙️</span>`:''}
         </div>
-        <textarea id="pr-post" class="pr2-ta" oninput="prAutosave('${esc(p.id)}')">${esc(cur.text||'')}</textarea>
+        <textarea id="pr-post" class="pr2-ta" oninput="_prAutoGrow(this);prAutosave('${esc(p.id)}')">${esc(cur.text||'')}</textarea>
       </div>
       <div class="pr2-bar">
         <div id="pr-saveind" style="font-size:12.3px;color:var(--text2)">💾 เก็บร่างอัตโนมัติ</div>
