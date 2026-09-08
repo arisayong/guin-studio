@@ -17050,6 +17050,7 @@ function renderQueue() {
       <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
         <button class="btn btn-xs btn-cyan" onclick="qApprove('${pid}','${wid}','${slot}')" title="ทีมทำงานเสร็จแล้ว">🔵 อนุมัติ</button>
         <button class="btn btn-xs btn-outline" onclick="openPayAmt('${pid}','${wid}','${slot}')" title="แก้ยอดเงิน">💰</button>
+        <button class="btn btn-xs btn-outline" style="color:var(--green);border-color:rgba(0,223,160,.4)" onclick="qMarkPaidManual('${pid}','${wid}','${slot}')" title="จ่ายเองนอกระบบไปแล้ว → บันทึกว่าจ่ายแล้วเลย (ข้ามขั้นอนุมัติ)">✅ จ่ายแล้ว</button>
       </div>`;
     if (status === 'approved') {
       const confirmSt = w ? getWorkerConfirmStatus(w) : 'none';
@@ -17067,6 +17068,7 @@ function renderQueue() {
           <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
             ${cartBtn}
             <button class="btn btn-xs btn-outline" onclick="openPayAmt('${pid}','${wid}','${slot}')" title="แก้ยอด">💰</button>
+            <button class="btn btn-xs btn-outline" style="color:var(--green);border-color:rgba(0,223,160,.4)" onclick="qMarkPaidManual('${pid}','${wid}','${slot}')" title="จ่ายเองนอกระบบไปแล้ว → บันทึกว่าจ่ายแล้วเลย">✅ จ่ายแล้ว</button>
             <button class="btn btn-xs btn-outline" onclick="qRevert('${pid}','${wid}','${slot}')" title="ย้อนกลับ">↩️</button>
           </div>`;
       }
@@ -17448,6 +17450,23 @@ async function confirmClientUnpaid(projId, toastEl) {
 }
 
 
+/* ✅ บันทึกว่า "จ่ายเองนอกระบบไปแล้ว" — ข้ามขั้นอนุมัติ/ใบยืนยัน ตั้งเป็นจ่ายแล้วทันที */
+async function qMarkPaidManual(projId, workerId, slot){
+  const p=getProjects().find(x=>x.id===projId);
+  const w=p&&(p.workers||[]).find(x=>x.id===workerId && x.slot===slot);
+  const s=getStaffById(workerId);
+  const nm=s?(s.nickname||s.name):workerId;
+  if(!confirm('บันทึกว่า "'+nm+'" จ่ายเงินไปแล้ว?\n\nยอด '+fmtB(w?w.amount||0:0)+' — ใช้ตอนที่จ่ายเองนอกระบบไปแล้ว\nระบบจะเปลี่ยนเป็น "✅ จ่ายแล้ว" ทันที (ข้ามขั้นอนุมัติ/ใบยืนยัน)\n\n*ยกเลิกได้ภายหลังที่ปุ่ม "↩️ ยกเลิก"')) return;
+  const res=await saveProjectMerge(projId,(pp)=>{
+    const w2=(pp.workers||[]).find(x=>x.id===workerId && x.slot===slot);
+    if(w2){ w2.status='paid'; if(!w2.paidAt) w2.paidAt=new Date().toISOString(); if(!w2.note) w2.note='บันทึกว่าจ่ายเอง (นอกระบบ)'; }
+  });
+  if(res && res.ok===false){ toast('บันทึกไม่สำเร็จ: '+(res.error?.message||''),'error'); return; }
+  try{ logAudit('payment.pay', nm, 'บันทึกจ่ายเอง (นอกระบบ) '+fmtB(w?w.amount||0:0)); }catch(e){}
+  try{ updateQueueBadge(); }catch(e){}
+  renderQueue();
+  toast('✅ บันทึกว่า "'+nm+'" จ่ายแล้ว','success');
+}
 /* อนุมัติ — pending → approved แล้ว re-render ทันที */
 async function qApprove(projId, workerId, slot) {
   const result = await saveProjectMerge(projId, (p)=>{
