@@ -4722,9 +4722,26 @@ function _renderBulkDiscordLink(){
     </div>
     ${guessable?`<button class="btn btn-green" style="width:100%;margin-bottom:6px" onclick="blkLinkAllGuessed()">✅ ผูกทั้งหมดตามที่เดา/เลือกไว้ (${guessable} คน)</button>`:''}
     <div style="max-height:380px;overflow-y:auto">${rowHTML||'<div style="color:var(--text2);text-align:center;padding:16px">ไม่มีสมาชิก</div>'}</div>
-    <div style="display:flex;gap:8px;margin-top:10px">
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-outline" style="border-color:rgba(255,158,0,.4);color:var(--orange)" onclick="blkClearAllLinks()" title="ชื่อในดิสเปลี่ยนใหม่หมด/จับคู่ผิดสะสม? ล้างการผูกทั้งหมดแล้วให้จับคู่ใหม่จากชื่อปัจจุบัน">🧹 ล้างการผูกทั้งหมด</button>
       <button class="btn btn-outline" style="flex:1" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button>
     </div>`, 620);
+}
+// 🧹 ล้างการผูก Discord ของทุกคน — ใช้ตอนชื่อในดิสเปลี่ยนใหม่หมด/จับคู่ผิดสะสม แล้วดึงใหม่ให้จับคู่จากชื่อปัจจุบัน
+function blkClearAllLinks(){
+  if(!confirm('ล้างการผูกบัญชี Discord ของ "ทุกคน" ในทะเบียน?\n\nใช้ตอนชื่อในดิสเปลี่ยนใหม่หมด หรือจับคู่ผิดสะสมมานาน — ล้างแล้ว "ดึงคำตอบใหม่" ระบบจะจับคู่ใหม่จากชื่อปัจจุบันทั้งหมด\n\n(ข้อมูลทีมอื่นไม่หาย — ลบแค่ discordId ที่ผูกไว้เท่านั้น)')) return;
+  const d=getStaffData(); let n=0;
+  Object.keys(d||{}).forEach(cat=>{
+    const arr=Array.isArray(d[cat])?d[cat]:Object.values(d[cat]||{});
+    arr.forEach(s=>{ if(s&&(s.discordId||s.discordName)){ delete s.discordId; delete s.discordName; n++; } });
+    d[cat]=arr;
+  });
+  if(n) saveStaffData(d);
+  try{ _allStaffCache=null; }catch(e){}
+  try{ _roleCatCache=null; }catch(e){}
+  try{ logAudit('staff.edit','ทั้งทีม','ล้างการผูก Discord ทั้งหมด '+n+' รายการ'); }catch(e){}
+  toast('🧹 ล้างการผูกแล้ว '+n+' รายการ — ไปกด "🧹 ล้าง + ดึงใหม่" ที่รอบลงคิว ระบบจะจับคู่ใหม่จากชื่อปัจจุบัน','success');
+  try{ _renderBulkDiscordLink(); }catch(e){}
 }
 // 🔓 เลิกผูกรายคน (ใช้ตอนผูกผิด) — ลบ discordId ออกจากทุก record ของคนนั้น
 function blkUnlink(staffId){
@@ -4832,7 +4849,7 @@ async function avClearAndRepull(){
     await saveRounds(list);
   }catch(e){ toast('ล้างไม่สำเร็จ: '+e.message,'error'); showLoader(false); return; }
   showLoader(false);
-  await pullFromDiscord(false, true);   // ดึงสดใหม่ "ทั้งหมด" (allHistory) กันพลาดข้อความที่ตกช่วงวันกรอง
+  await pullFromDiscord();   // ดึงสดใหม่ (เฉพาะหลังโพสต์ประกาศรอบนี้ — ไม่เอาข้อความรอบเก่า)
   toast('🧹 ล้างของเก่า + ดึงคำตอบใหม่แล้ว','success');
 }
 async function pullFromDiscord(silent, allHistory){
@@ -4841,14 +4858,15 @@ async function pullFromDiscord(silent, allHistory){
   if(!chId){ if(!silent){ toast('ยังไม่ได้ตั้ง ID ห้องของทีมนี้','error'); openDiscordSetup(); } return; }
   if(!silent) showLoader(true);
   try{
-    // 🔎 สแกน 100 ข้อความล่าสุดของทั้งห้องเสมอ — ไม่อิงโพสของบอท
-    //    (เดิมดึงเฉพาะที่ใหม่กว่าโพสล่าสุด → พอกด "โพสใหม่" ทับ คำตอบเก่าหายเงียบตลอดกาล)
-    const res=await callAppsScript({action:'discordFetch', channelId:chId, afterId:'', limit:100});
+    // 🔑 ดึงเฉพาะข้อความ "หลังโพสต์ประกาศรอบนี้" (postedMessageId) — ห้องเดียวใช้ซ้ำทุกรอบ
+    //    ข้อความก่อนประกาศ = ของรอบเก่า (คนละเดือน) ต้องไม่เอามาปน · allHistory = เอาทั้งหมด (ดีบักเท่านั้น)
+    const afterId = (!allHistory && r.postedMessageId) ? r.postedMessageId : '';
+    const res=await callAppsScript({action:'discordFetch', channelId:chId, afterId, limit:100});
     let msgs=res.messages||[];
     const fetched=msgs.length;
     let skipped=0;
-    // เอาเฉพาะข้อความหลังเปิดรอบ (เผื่อ 2 ชม.) — กันข้อความเก่าจากรอบก่อน ๆ · allHistory = เอาทั้งหมด
-    if(!allHistory && r.createdAt){
+    // สำรอง: ถ้าไม่มี postedMessageId (โพสเองไม่ผ่านบอท) → กรองด้วยวันเปิดรอบแทน (เผื่อ 2 ชม.)
+    if(!allHistory && !r.postedMessageId && r.createdAt){
       const since=new Date(new Date(r.createdAt).getTime() - 2*3600*1000).toISOString();
       const inRange=msgs.filter(m=>String(m.at||'') >= since);
       skipped=msgs.length-inRange.length;
@@ -5738,12 +5756,9 @@ function _alcRoundDays(r){
 }
 // รวมคนที่ตอบรับจากทุกรอบที่เปิดอยู่ (คนเดียวตอบหลายรอบได้)
 function _alcPeople(){
-  // ⭐ เอาเฉพาะ "รอบล่าสุด" ของแต่ละหมวด — กันข้อมูลรอบเก่า/รอบเทสต์ที่ยังเปิดค้างไว้มาปนกับคำตอบรอบปัจจุบัน
-  const open=getRounds().filter(r=>r.status==='open');
-  const _rk=r=>String(r.createdAt||'')+'|'+String(r.id||'');   // คีย์เรียงเวลา (createdAt ก่อน, id เสริม)
-  const latestByCat={};
-  open.forEach(r=>{ const k=r.cat||''; if(!latestByCat[k] || _rk(r)>_rk(latestByCat[k])) latestByCat[k]=r; });
-  const rounds=Object.values(latestByCat);
+  // รวมคำตอบจาก "ทุกรอบที่เปิดอยู่" — คนที่พิมพ์ตอบต้องขึ้นเสมอ
+  //   (ของเก่าปน = ปิดรอบเก่า หรือกด "🧹 ล้าง + ดึงใหม่" ที่รอบนั้น · ชื่อผิด = "🧹 ล้างการผูกทั้งหมด")
+  const rounds=getRounds().filter(r=>r.status==='open');
   const map={};
   rounds.forEach(r=>{
     const reps=getRoundReplies(r.id)||{};
