@@ -4329,7 +4329,20 @@ function _isoOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2
 // ══════════════════════════════════════════════
 function getDiscordCfg(){ const v=ls('discord_cfg'); return (v&&typeof v==='object')?v:{channels:{}}; }
 async function saveDiscordCfg(v){ ls('discord_cfg',v); await fbSaveKeyed('discord_cfg', v); }
-function _dcChannelOf(cat){ return (getDiscordCfg().channels||{})[cat] || ''; }
+function _dcChannelOf(cat){
+  const chans=getDiscordCfg().channels||{};
+  if(chans[cat]) return chans[cat];
+  // 🔁 หลายทีมใช้ "ห้องเดียวกัน" (มิกซ์+ซับ = ลงคิวมิกซ์-ซับ · บท+QC = ลงคิวบท-qc)
+  //    ถ้าหมวดนี้ยังไม่ได้ตั้ง ID ห้อง แต่หมวดพี่น้องที่ใช้ห้องชื่อเดียวกันตั้งไว้แล้ว → ใช้ห้องร่วมกัน
+  //    (แก้บั๊ก: ตั้ง ID ห้องไว้ที่ซับอย่างเดียว → ดึงคำตอบทีมมิกซ์ไม่ขึ้น เพราะ mix ไม่มี ID)
+  const myRoom=(AV_CATS[cat]||{}).channel;
+  if(myRoom && myRoom!=='-'){
+    for(const k of Object.keys(AV_CATS)){
+      if(k!==cat && (AV_CATS[k]||{}).channel===myRoom && chans[k]) return chans[k];
+    }
+  }
+  return '';
+}
 // เรียกตัวกลาง Discord — ใช้ Cloudflare Worker (Apps Script ใช้ไม่ได้ Discord บล็อก)
 async function callAppsScript(payload){
   const cfg=getDiscordCfg();
@@ -4633,10 +4646,12 @@ async function openBulkDiscordLink(){
 }
 function _renderBulkDiscordLink(){
   const members=window._blkMembers||[];
-  const all=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s&&s.id&&isStaffAssignable(s));
+  // ผูก Discord เป็นงานธุรการ — โชว์ "ทุกคน" ในทะเบียน (รวมพักงาน/เพิ่งเพิ่ม) ไม่กรองแค่ active
+  //   คนที่ยัง active ขึ้นก่อน · แก้บั๊ก: คนเพิ่งเข้าทีม/พักงานหาไม่เจอในช่องเลือก
+  const all=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s&&s.id);
   const seen=new Set();
   const opts=all.filter(s=>{ if(seen.has(s.id))return false; seen.add(s.id); return true; })
-    .sort((a,b)=>String(a.nickname||a.name||'').localeCompare(String(b.nickname||b.name||''),'th'));
+    .sort((a,b)=> ((isStaffAssignable(b)?1:0)-(isStaffAssignable(a)?1:0)) || String(a.nickname||a.name||'').localeCompare(String(b.nickname||b.name||''),'th'));
   const rows=members.map(m=>{
     const disp=m.nick||m.globalName||m.username||'';
     const match=matchStaffByDiscord({authorId:m.id, displayName:disp, username:m.username});
@@ -4671,13 +4686,15 @@ function _renderBulkDiscordLink(){
       </div>`;
     }
     const guessId=r.match.staff?r.match.staff.id:((r.match.options||[])[0]?.id||'');
+    const isNew=r.match.how==='none';   // เดาไม่ได้เลย = น่าจะเป็นคนใหม่ที่ยังไม่มีในทะเบียน
     return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--border2)">
       <div style="flex:1;min-width:150px">
         <div style="font-size:12.5px;font-weight:700">${esc(r.disp)}</div>
-        <div style="font-size:10.5px;color:var(--text2)">@${esc(r.m.username||'')}${r.match.how==='ambiguous'?' · <span style="color:var(--orange)">ชื่อซ้ำ — เดาตัวแรกให้ เช็คก่อนผูก</span>':r.match.staff?' · เดาว่าเป็นคนนี้':''}</div>
+        <div style="font-size:10.5px;color:var(--text2)">@${esc(r.m.username||'')}${r.match.how==='ambiguous'?' · <span style="color:var(--orange)">ชื่อซ้ำ — เดาตัวแรกให้ เช็คก่อนผูก</span>':r.match.staff?' · เดาว่าเป็นคนนี้':(isNew?' · <span style="color:var(--accent2)">ไม่มีในทะเบียน (คนใหม่?)</span>':'')}</div>
       </div>
       ${selHTML(i, guessId)}
       <button class="btn btn-sm" onclick="blkLinkOne(${i})">🔗 ผูก</button>
+      <button class="btn btn-sm btn-outline" style="border-color:rgba(0,180,255,.35);color:var(--accent2)" onclick="blkQuickAdd(${i})" title="ยังไม่มีคนนี้ในทะเบียน — เพิ่มเป็นสมาชิกใหม่ + ผูก Discord ทีเดียว">➕ เพิ่มใหม่</button>
     </div>`;
   }).join('');
   _tagOverlayShow('🔗 ผูกบัญชี Discord ทั้งทีมรวดเดียว', `
@@ -4735,6 +4752,29 @@ function blkLinkAllGuessed(){
   _roleCatCache=null;
   try{ logAudit('staff.edit','ทั้งทีม','ผูกบัญชี Discord รวดเดียว '+n+' คน'); }catch(e){}
   toast('✅ ผูกแล้ว '+n+' คน — ผิดคนไหนกด ✏️ เปลี่ยน หรือ 🔓 เลิกผูก ได้เลย','success');
+  _renderBulkDiscordLink();
+}
+// ➕ เพิ่มสมาชิก Discord ที่ยังไม่มีในทะเบียน เป็นคนใหม่ + ผูกบัญชีทีเดียว (แก้: คนเข้าใหม่ไม่มีให้เลือกผูก)
+const _BLK_CATS=[['dubbing','พากย์'],['adaptation','บท'],['mix','มิกซ์'],['qc','QC'],['subVideo','ซับ/วิดีโอ'],['translation','แปล'],['manager','เมเนเจอร์']];
+async function blkQuickAdd(i){
+  const r=(window._blkRows||[])[i]; if(!r) return;
+  const disp=(r.disp||r.m.username||'').trim();
+  if(!disp){ toast('ไม่พบชื่อจาก Discord','warn'); return; }
+  const menu=_BLK_CATS.map((c,idx)=>(idx+1)+') '+c[1]).join('   ');
+  const ans=prompt('เพิ่ม "'+disp+'" เป็นสมาชิกใหม่ + ผูก Discord\n\nเลือกตำแหน่ง (พิมพ์เลข · หลายตำแหน่งคั่นด้วยจุลภาค เช่น 1,3):\n'+menu, '1');
+  if(ans==null) return;
+  const picks=[...new Set(String(ans).split(/[,\s]+/).map(x=>parseInt(x.trim(),10)).filter(n=>n>=1&&n<=_BLK_CATS.length).map(n=>_BLK_CATS[n-1][0]))];
+  if(!picks.length){ toast('ยังไม่ได้เลือกตำแหน่ง — พิมพ์เลข 1-'+_BLK_CATS.length,'warn'); return; }
+  const nick=(prompt('ชื่อเล่นที่จะโชว์ในระบบ:', disp)||disp).trim()||disp;
+  const id='S'+Date.now();
+  const base={id, name:disp, nickname:nick, gender:'', bank:'', account:'', promptpay:'', email:'', qrUrl:'',
+    categories:picks, discordId:r.m.id, discordName:disp, manualEditAt:new Date().toISOString()};
+  const data=getStaffData();
+  picks.forEach(cat=>{ if(!data[cat]) data[cat]=[]; data[cat].push({...base, category:cat}); });
+  saveStaffData(data);
+  try{ _allStaffCache=null; }catch(e){}
+  try{ logAudit('staff.add', disp, 'เพิ่มสมาชิกใหม่จาก Discord + ผูกบัญชี ('+picks.join(',')+')'); }catch(e){}
+  toast('✅ เพิ่ม "'+nick+'" ('+picks.map(c=>(_BLK_CATS.find(x=>x[0]===c)||[])[1]||c).join(', ')+') + ผูก Discord แล้ว','success');
   _renderBulkDiscordLink();
 }
 // ── โพสประกาศลงห้อง ──
@@ -5301,7 +5341,8 @@ function renderAvailability(){
   const data=getRoundReplies(r.id);
   const q=(document.getElementById('av-search')?.value||'').trim().toLowerCase();
   let list=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s && s.id && isStaffAssignable(s));
-  if(r.cat!=='all') list=list.filter(s=>[].concat(s.categories||[s.category]).filter(Boolean).includes(r.cat));
+  // รวมทั้ง categories (ถ้ามี) และ category ของ bucket — กันคนหมวดรอง (เช่น มิกซ์) หลุดจากตัวกรอง
+  if(r.cat!=='all') list=list.filter(s=>[].concat(s.categories||[], s.category||[]).filter(Boolean).includes(r.cat));
   const seen=new Set();
   list=list.filter(s=>{ if(seen.has(s.id)) return false; seen.add(s.id); return true; });
   if(q) list=list.filter(s=>((s.nickname||'')+' '+(s.name||'')+' '+(s.email||'')).toLowerCase().includes(q));
@@ -5533,7 +5574,8 @@ function avCopyForChat(){
   const c=AV_CATS[r.cat]||{};
   const lines=[`📋 คิวว่าง${c.label||''} · ขอคิวช่วง ${_roundRangeLabel(r)}`];
   let list=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s&&s.id&&isStaffAssignable(s));
-  if(r.cat!=='all') list=list.filter(s=>[].concat(s.categories||[s.category]).filter(Boolean).includes(r.cat));
+  // รวมทั้ง categories (ถ้ามี) และ category ของ bucket — กันคนหมวดรอง (เช่น มิกซ์) หลุดจากตัวกรอง
+  if(r.cat!=='all') list=list.filter(s=>[].concat(s.categories||[], s.category||[]).filter(Boolean).includes(r.cat));
   const seen=new Set(); list=list.filter(s=>{ if(seen.has(s.id))return false; seen.add(s.id); return true; });
   const cancelled=[];
   list.forEach(s=>{
@@ -5603,9 +5645,25 @@ function _alcArr(v){ return Array.isArray(v)?v:(v&&typeof v==='object'?Object.va
 function getAllocDraft(){ const v=ls('allocdraft'); return (v&&typeof v==='object'&&!Array.isArray(v))?v:{}; }
 async function saveAllocDraft(d){ ls('allocdraft', d); try{ await fbSaveKeyed('allocdraft', d); }catch(e){} }
 function _alcDL(iso){ if(!iso) return '—'; const p=String(iso).split('-'); return p.length===3 ? p[2]+'/'+p[1] : String(iso); }
+// รวมทุกหมวดที่ "คนคนนี้" อยู่ในทะเบียน — คน 1 คนมีได้หลาย record (แยกตามหมวด) getStaffById คืนแค่ record แรก
+//   ดูแค่ record เดียวหมวดรอง (เช่น มิกซ์) จะหาย → เลือกกรองหมวดมิกซ์แล้วไม่ขึ้นคน
+function _allCatsOf(staffId){
+  const set=new Set();
+  try{
+    const d=getStaffData()||{};
+    Object.keys(d).forEach(cat=>{
+      const arr=Array.isArray(d[cat])?d[cat]:Object.values(d[cat]||{});
+      if(arr.some(s=>s&&s.id===staffId)) set.add(cat);
+    });
+  }catch(e){}
+  return set;
+}
 function _alcPres(s){
+  const set=new Set();
   const cats=Array.isArray(s.categories)&&s.categories.length ? s.categories : (s.category?[s.category]:[]);
-  const set=new Set(); cats.forEach(c=>{ const p=ALC_CAT2PRE[c]; if(p) set.add(p); });
+  cats.forEach(c=>{ const p=ALC_CAT2PRE[c]; if(p) set.add(p); });
+  // + ทุกหมวดที่คนนี้อยู่ในทะเบียน (กันหมวดรองหาย เช่น คนที่เป็นทั้งพากย์และมิกซ์)
+  if(s&&s.id) _allCatsOf(s.id).forEach(c=>{ const p=ALC_CAT2PRE[c]; if(p) set.add(p); });
   return [...set];
 }
 function _alcRoundDays(r){
@@ -6743,14 +6801,20 @@ function _prRoomManage(projId){
   const p=getProjects().find(x=>x.id===projId); if(!p) return;
   const X=`document.getElementById('tag-overlay')?.remove();`;
   _tagOverlayShow('⋯ จัดการห้อง Discord', `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.7;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;padding:9px 11px;margin-bottom:10px">
+      กำลังผูกกับ: ห้อง <strong style="color:var(--accent2)">#${esc(p.discordChannelName||'-')}</strong> · หมวด <strong>${esc(p.discordCategoryName||'-')}</strong>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin:0 2px 5px">🔀 ผูกผิดห้อง? เปลี่ยนได้ที่นี่</div>
     <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-blue" onclick="${X}prLinkExisting('${esc(p.id)}')">🔀 เปลี่ยนห้องที่ผูก (เลือกจากห้องใน Discord)</button>
+      <button class="btn btn-outline" onclick="${X}prBindCategory('${esc(p.id)}')">🏷️ ${p.discordCategoryName?'แก้ชื่อหมวดหมู่ที่ผูก':'ผูกหมวดหมู่'}</button>
+      <div style="height:1px;background:var(--border2);margin:3px 0"></div>
       ${p.discordTalkId?'':`<button class="btn btn-outline" onclick="${X}prCreateTalk('${esc(p.id)}')">➕ สร้างห้องพูดคุย</button>`}
       <button class="btn btn-outline" onclick="${X}openBulkDiscordLink()">🔗 ผูกทั้งทีมกับ Discord</button>
       <button class="btn btn-outline" onclick="${X}syncProjStatusEmoji('${esc(p.id)}', true)">🎨 อัปเดตอิโมจิสถานะ</button>
-      ${p.discordCategoryName?'':`<button class="btn btn-outline" onclick="${X}prBindCategory('${esc(p.id)}')">🏷️ ผูกหมวดหมู่</button>`}
       <button class="btn btn-outline" onclick="${X}prRecreateRooms('${esc(p.id)}')">🔄 สร้างห้องชุดใหม่</button>
       <button class="btn btn-outline" style="border-color:rgba(255,64,64,.3);color:var(--red)" onclick="${X}prUnlink('${esc(p.id)}')">🔓 เลิกผูกห้อง</button>
-    </div>`, 380);
+    </div>`, 400);
 }
 // เลือกโปรเจกต์ (เก็บร่างของงานเดิมก่อนสลับ)
 async function _prSelectProject(id){
@@ -6954,17 +7018,47 @@ async function prLinkExisting(projId){
   finally{ showLoader(false); }
 }
 async function prPickExisting(projId, chId, chName){
-  await saveProjectMerge(projId, f=>{ f.discordChannelId=chId; f.discordChannelName=chName; });
+  const _prev=getProjects().find(x=>x.id===projId);
+  const _changed=_prev&&_prev.discordChannelId&&_prev.discordChannelId!==chId;
+  await saveProjectMerge(projId, f=>{
+    f.discordChannelId=chId; f.discordChannelName=chName;
+    // ย้ายไปผูกห้องใหม่ = message id เดิมอยู่ห้องเก่า ใช้แก้ไม่ได้ → เคลียร์ให้โพสต์ใหม่เข้าห้องที่ถูก
+    if(_changed){ f.discordMsgId=''; f.discordMsgIds=[]; const arr=_prEnsurePosts(f); arr.forEach(pp=>{ pp.msgIds=[]; pp.postedAt=''; }); }
+  });
   try{ logAudit('project.discord', chName, 'ผูกห้อง Discord ที่มีอยู่กับโปรเจกต์'); }catch(e){}
   document.getElementById('tag-overlay')?.remove();
-  toast('🔗 ผูกห้อง #'+chName+' แล้ว','success');
+  toast('🔗 ผูกห้อง #'+chName+' แล้ว'+(_changed?' — โพสต์กลับเป็น "ร่าง" กด "📤 โพสต์ลงห้อง" เพื่อลงห้องใหม่':''),'success');
   // ถามชื่อหมวดต่อเลย — จะได้เปลี่ยนอิโมจิสถานะหน้าชื่อหมวดให้ได้ด้วย
   const cat=prompt('ห้องนี้อยู่ใต้ "หมวดหมู่" ชื่ออะไรใน Discord?\n\nพิมพ์/วางชื่อหมวดให้ตรงเป๊ะทุกตัวอักษรรวมอิโมจิ (คลิกขวาชื่อหมวด → แก้ไขหมวดหมู่ แล้วก๊อปชื่อมาวาง)\nระบบจะใช้เปลี่ยนอิโมจิสถานะ 🟡🟠🟢🔴 ให้อัตโนมัติ · เว้นว่าง = ข้ามไปก่อน');
   if(cat&&cat.trim()){
     await saveProjectMerge(projId, f=>{ f.discordCategoryName=cat.trim(); delete f.discordCategoryId; });
     toast('🏷️ ผูกหมวด "'+cat.trim()+'" แล้ว — อิโมจิสถานะจะเปลี่ยนอัตโนมัติเมื่อติ๊กสถานะ','success');
   }
+  // 📌 ห้องนี้เคยโพสต์คู่มือด้วยบอทนี้ไว้แล้ว? ผูกข้อความเดิมเข้ามา จะได้กด "อัปเดตโพสต์เดิม" แก้ในที่เดิมได้ ไม่ต้องโพสต์ซ้ำ
+  const link=prompt('ห้องนี้เคยโพสต์ "คู่มือการทำงาน" ด้วยบอทตัวนี้ไว้แล้วใช่ไหม?\n\nถ้าใช่ — เปิด Discord แล้วชี้ที่ข้อความนั้น → กดจุด 3 จุด (…) → "Copy Message Link" แล้ววางที่นี่\nระบบจะผูกข้อความนั้นเข้ามา ให้กด "📣 อัปเดตโพสต์เดิม" แก้ข้อความนั้นได้เลย (ไม่ต้องโพสต์ใหม่)\n\nเว้นว่าง = ข้าม (ค่อยกด "📤 โพสต์ลงห้อง" โพสต์เป็นข้อความใหม่)');
+  const mid=_prParseMsgId(link);
+  if(mid){
+    const _pfill=getProjects().find(x=>x.id===projId);
+    const _tplText=_prFillTpl(_pfill||{}, getProjPostTplFor(_pfill||{}));
+    await saveProjectMerge(projId, f=>{
+      const arr=_prEnsurePosts(f);
+      let pp=arr[0];
+      if(!pp){ pp={id:'post_main', title:'คู่มืองาน', emoji:'📣', text:'', tplId:(f.postTplId||''), msgIds:[], postedAt:'', updatedAt:_prNow()}; arr.push(pp); }
+      // ข้อความเดิมถูกลบไปตอนแก้ฟอร์มงาน (บั๊กเก่า) → เติมจากเทมเพลตให้ ไม่ต้องพิมพ์ใหม่ทั้งหมด
+      if(!pp.text||!String(pp.text).trim()){ pp.text=String(f.postDraft||'').trim()||_tplText; }
+      pp.msgIds=[mid]; pp.postedAt=pp.postedAt||_prNow(); pp.updatedAt=_prNow();
+      f.discordMsgId=mid; f.discordMsgIds=[mid]; if(arr[0]&&arr[0].id===pp.id) f.postDraft=pp.text;
+    });
+    const _p3=getProjects().find(x=>x.id===projId); const _a3=_prPosts(_p3); if(_a3[0]) _prPostSel=_a3[0].id;
+    toast('🔗 ผูกข้อความคู่มือเดิมแล้ว — พิมพ์แก้แล้วกด "📣 อัปเดตโพสต์เดิม" ได้เลย','success');
+  }
   renderProjRoom();
+}
+// ดึง message id จากลิงก์ข้อความ Discord (…/channels/guild/channel/MESSAGE) หรือ id ดิบ (ตัวเลข 15-25 หลัก)
+function _prParseMsgId(s){
+  s=String(s||'').trim();
+  const m=s.match(/(\d{15,25})(?!.*\d)/);   // เลขก้อนยาวก้อนสุดท้าย = message id
+  return m?m[1]:'';
 }
 // 🏷️ ผูกหมวดหมู่ให้งานที่ระบบยังไม่รู้จักหมวด (เช่น ห้องที่สร้างเองใน Discord) — พิมพ์ชื่อให้ตรงเป๊ะครั้งเดียว
 async function prBindCategory(projId){
@@ -15371,6 +15465,13 @@ async function saveProject(){
         }
       });
     }
+    // 🔒 คงข้อมูล "ผูกห้อง Discord / โพสต์ / โฟลเดอร์ Drive" ที่ไม่มีในฟอร์มนี้
+    //    กันบั๊ก: แก้ฟอร์มงาน (เดทไลน์/งบ/คน) แล้วห้อง+โพสต์ที่ผูกไว้หายหมด → ระบบหลอกว่า "ยังไม่ได้สร้างห้อง"
+    ['discordChannelId','discordChannelName','discordCategoryName','discordCategoryId','discordTalkId',
+     'discordMsgId','discordMsgIds','discordPrivate','roomPosts','postDraft','postTplId',
+     'driveFolderId','driveFolderLink','allocDone','income'].forEach(k=>{
+      if(existing && existing[k]!==undefined && proj[k]===undefined) proj[k]=existing[k];
+    });
   }
   // ─ บันทึกผ่าน saveProjectSafe (transaction + version check) ─
   const result = await saveProjectSafe(proj, { baseVersion: _editingBaseVersion });
@@ -22604,6 +22705,16 @@ async function _vcLoadPdfLibs(){
   await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
   await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
 }
+// รอรูป (โลโก้/QR) โหลดครบก่อนเรนเดอร์ — กันไฟล์หน้าเปล่า/รูปหาย · เว้นไว้ไม่เกิน timeout
+function _vcWaitImages(host, timeoutMs){
+  const imgs=[...host.querySelectorAll('img')];
+  if(!imgs.length) return Promise.resolve();
+  return Promise.race([
+    Promise.all(imgs.map(img=> (img.complete && img.naturalWidth>0) ? Promise.resolve()
+      : new Promise(res=>{ img.addEventListener('load',res,{once:true}); img.addEventListener('error',res,{once:true}); }))),
+    new Promise(res=>setTimeout(res, timeoutMs||3500))
+  ]);
+}
 async function _vcHtmlToPdfBlob(html){
   await _vcLoadPdfLibs();
   await _vcEnsureFonts();   // รอฟอนต์ไทยโหลดครบ กันสระ/วรรณยุกต์ตก
@@ -22611,10 +22722,14 @@ async function _vcHtmlToPdfBlob(html){
   host.style.cssText='position:fixed;left:-99999px;top:0;width:640px;background:#fff;z-index:-1';
   document.body.appendChild(host);
   try{
-    host.innerHTML=_vcStripLS(html); await new Promise(r=>setTimeout(r,300));
+    host.innerHTML=_vcStripLS(html);
+    await _vcWaitImages(host, 4000);      // รอโลโก้/QR โหลดจริงก่อน กันหน้าเพี้ยน
+    await new Promise(r=>setTimeout(r,250));
     const elc=host.firstElementChild||host;
     // html2pdf โคลนใบเข้า iframe ที่ตั้งความกว้างเอง → เรนเดอร์เต็มใบ ไม่ยุบ ได้ canvas อัตราส่วนตรง
     const canvas=await html2pdf().set({ html2canvas:{scale:2.4,useCORS:true,backgroundColor:'#ffffff',logging:false} }).from(elc).toCanvas().get('canvas');
+    // 🛡️ กันไฟล์ "หน้ากระดาษเปล่า": ถ้า canvas เล็ก/ยุบผิดปกติ อย่าสร้าง PDF เปล่าส่งเมล — โยน error ให้ status=failed จะได้กดส่งใหม่
+    if(!canvas || canvas.width<80 || canvas.height<80) throw new Error('เรนเดอร์ใบไม่สำเร็จ (ใบยุบ/ว่าง) — กด "ส่งซ้ำ" อีกครั้ง');
     // 📄 1 ใบ = 1 หน้าพอดีเนื้อ (ขนาดหน้าตามใบจริง ไม่บังคับ A4 → ไม่ตัดกลาง/ไม่มีหน้าขาว/ไม่มีขอบ)
     const JsPDF=window.jspdf.jsPDF;
     const wmm=172, hmm=Math.max(1, wmm*(canvas.height/canvas.width));
