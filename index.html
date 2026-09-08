@@ -7070,7 +7070,10 @@ async function prLinkExisting(projId){
     chs.forEach(c=>{ if(_isDcCategory(c)) catMap[c.id]=c.name; });
     // มีหมวด (จาก d.categories หรือ field parentName) → เก็บเพิ่ม
     (d.categories||[]).forEach(c=>{ if(c&&c.id) catMap[c.id]=c.name; });
-    const catOf=c=> c.parentName || c.categoryName || c.category || (c.parentId&&catMap[c.parentId]) || (c.parent_id&&catMap[c.parent_id]) || '';
+    // 🔎 fallback (ได้ทันทีไม่ต้องแก้ Worker): งานในระบบที่เคยผูก channel/talk นี้ไว้ → รู้ชื่อหมวดของมันอยู่แล้ว
+    const chanCat={};
+    try{ getProjects().forEach(p=>{ const cn=p.discordCategoryName||''; if(!cn) return; if(p.discordChannelId) chanCat[p.discordChannelId]=cn; if(p.discordTalkId) chanCat[p.discordTalkId]=cn; }); }catch(e){}
+    const catOf=c=> c.parentName || c.categoryName || c.category || (c.parentId&&catMap[c.parentId]) || (c.parent_id&&catMap[c.parent_id]) || chanCat[c.id] || '';
     // เอาเฉพาะห้องข้อความ (ตัดตัวหมวดหมู่เองออก) + แนบชื่อหมวด แล้วเรียงตามหมวด→ชื่อ (สแกนง่าย)
     const rooms=chs.filter(c=>!_isDcCategory(c)).map(c=>({id:c.id, name:c.name||'', cat:catOf(c)}))
       .sort((a,b)=> String(a.cat||'￿').localeCompare(String(b.cat||'￿'),'th') || String(a.name).localeCompare(String(b.name),'th'));
