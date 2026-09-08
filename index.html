@@ -1640,6 +1640,8 @@ body.sidebar-collapsed .main-content{
   .pr2-bdg{font-size:9.5px;font-weight:800;padding:3px 7px;border-radius:6px;flex:none}
   .pr2-bdg.pd{background:rgba(0,223,160,.14);color:var(--green)}
   .pr2-bdg.dr{background:rgba(255,158,0,.16);color:var(--orange)}
+  .pr2-postedit{flex:none;background:transparent;border:0;color:var(--text2);cursor:pointer;font-size:13px;padding:3px 5px;border-radius:6px;line-height:1}
+  .pr2-postedit:hover{color:var(--accent2);background:rgba(0,180,255,.14)}
   .pr2-new{display:flex;align-items:center;justify-content:center;gap:7px;border:1px dashed var(--accent2);border-radius:11px;padding:10px;font-size:12.5px;font-weight:700;color:var(--accent2);cursor:pointer;background:rgba(0,180,255,.06)}
   .pr2-new:hover{background:rgba(0,180,255,.15)}
   .pr2-editof{display:flex;align-items:center;gap:8px;font-size:12.3px;color:var(--text2);margin-bottom:9px;flex-wrap:wrap}
@@ -4818,6 +4820,22 @@ async function postRoundToDiscord(){
 // ── ดึงคำตอบจากห้อง ──
 //    ใช้ได้ 2 กรณี: (1) บอทโพสให้ → ดึงเฉพาะที่ใหม่กว่าโพสนั้น
 //                   (2) แอดมินโพสเองใน Discord → ดึง 100 ข้อความล่าสุด แล้วกรองตามเวลาที่เปิดรอบ
+// 🧹 ล้างคำตอบเดิมของรอบนี้ทั้งหมด แล้วดึงใหม่จาก Discord — ใช้ตอนรายชื่อจับคู่ผิด/มีของเก่าปน
+async function avClearAndRepull(){
+  const r=getRound(_avRoundId); if(!r){ toast('เลือกรอบก่อน','warn'); return; }
+  if(!confirm('ล้างรายชื่อคำตอบเดิมของรอบนี้ทั้งหมด แล้วดึงใหม่จาก Discord?\n\nใช้ตอน "รายชื่อจับคู่ผิด" — ระบบจะลบคำตอบเดิมของรอบนี้ แล้วดึงสดจากโพสต์ใน Discord ให้ตรงใหม่\n(ถ้ายังมีคนจับคู่ผิดหลังดึง = ชื่อในดิสเคยผูกผิดไว้ ให้กด "🔗 ผูกทั้งทีม" → 🔓 เลิกผูกคนนั้นก่อน)')) return;
+  showLoader(true);
+  try{
+    ls('avail_r_'+r.id, {});
+    try{ await fbSaveKeyed('avail_r_'+r.id, {}); }catch(e){}
+    const list=getRounds(); const rr=list.find(x=>x.id===r.id);
+    if(rr){ rr.unmatched=[]; if(rr.status!=='open') rr.status='open'; }
+    await saveRounds(list);
+  }catch(e){ toast('ล้างไม่สำเร็จ: '+e.message,'error'); showLoader(false); return; }
+  showLoader(false);
+  await pullFromDiscord();   // ดึงสดใหม่ จับคู่ชื่อรอบใหม่
+  toast('🧹 ล้างของเก่า + ดึงคำตอบใหม่แล้ว','success');
+}
 async function pullFromDiscord(silent, allHistory){
   const r=getRound(_avRoundId); if(!r) return;
   const chId=r.channelId || _dcChannelOf(r.cat);
@@ -5394,6 +5412,8 @@ function renderAvailability(){
         ${_dcChannelOf(r.cat) ? `
           <button class="btn btn-sm" style="background:var(--accent2);border:none;color:#fff;font-weight:700" onclick="pullFromDiscord()"
             title="ดึงคำตอบจากห้อง — ใช้ได้ทั้งกรณีบอทโพสให้ และกรณีคุณโพสเองใน Discord">🔄 ดึงคำตอบจาก Discord</button>
+          <button class="btn btn-sm btn-outline" style="border-color:rgba(255,158,0,.4);color:var(--orange)" onclick="avClearAndRepull()"
+            title="รายชื่อจับคู่ผิด/มีของเก่าปน? ล้างคำตอบเดิมของรอบนี้ทั้งหมด แล้วดึงสดจาก Discord ใหม่ให้ตรง">🧹 ล้าง + ดึงใหม่</button>
           ${r.postedMessageId?'':`<button class="btn btn-sm" style="background:#5865F2;border:none;color:#fff;font-weight:700" onclick="postRoundToDiscord()">📤 ให้บอทโพสประกาศ</button>`}`
           : `<button class="btn btn-sm btn-outline" onclick="openDiscordSetup()" title="ตั้ง ID ห้องก่อนจึงจะโพส/ดึงได้">🐧 ตั้งค่าห้อง Discord</button>`}
         ${r.postedMessageId?`<button class="btn btn-sm btn-outline" onclick="resetRoundPost()" title="ยกเลิกการผูกกับโพสเดิม เพื่อโพสใหม่/เปลี่ยนห้อง">↩️ โพสใหม่</button>`:''}
@@ -6812,6 +6832,7 @@ function _prRoomView(p){
             <span class="em">${esc(po.emoji||'📝')}</span>
             <div class="pt"><div class="nm">${esc(po.title||'ไม่มีชื่อ')}</div><div class="mt">${posted?'โพสต์แล้ว':'ร่าง'} · ${esc(_prTimeAgo(po.updatedAt||po.postedAt))}</div></div>
             <span class="pr2-bdg ${posted?'pd':'dr'}">${posted?'โพสต์แล้ว':'ร่าง'}</span>
+            <button class="pr2-postedit" title="แก้ชื่อ/อิโมจิโพสต์" onclick="event.stopPropagation();prRenamePost('${esc(p.id)}','${esc(po.id)}')">✎</button>
           </div>`;
         }).join('')||'<div style="font-size:11.5px;color:var(--text2);text-align:center;padding:8px 4px">ยังไม่มีโพสต์ — กดปุ่มด้านล่างเขียนอันแรก</div>'}
         <div class="pr2-new" onclick="prNewPost('${esc(p.id)}')">＋ เขียนโพสต์ใหม่</div>
