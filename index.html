@@ -6801,8 +6801,30 @@ let _prAutosaveTimer=null;
 let _prShowPicker=false;   // เปิดตัวเลือก/ค้นหางาน (โชว์เสมอถ้ายังไม่ได้เลือก)
 let _prProjSearch='';      // คำค้นหางาน/หมวดหมู่/รหัส
 let _prRenderPending=false;  // มีคำสั่งวาดใหม่ค้างไว้ตอนกำลังพิมพ์ → รอเลิกพิมพ์ก่อนค่อยวาด
+// หา "ตัวที่เลื่อนจริง" ของกล่องนี้ แล้วจำไว้กับ element (ไม่ต้องไล่ใหม่ทุกตัวอักษร)
+function _prScrollBox(el){
+  if(el._prSc) return el._prSc;
+  let n=el.parentElement;
+  while(n && n!==document.body){
+    if(/(auto|scroll|overlay)/.test(getComputedStyle(n).overflowY)){ el._prSc=n; return n; }
+    n=n.parentElement;
+  }
+  el._prSc=document.scrollingElement||document.documentElement;
+  return el._prSc;
+}
 // กล่องแก้โพสต์ยืดสูงตามเนื้อหาอัตโนมัติ — ไม่ต้องเลื่อนในกล่อง (เลื่อนหน้าปกติแทน)
-function _prAutoGrow(el){ if(!el) return; el.style.height='auto'; el.style.height=(el.scrollHeight+2)+'px'; }
+// ⚠️ อาการ "พิมพ์แล้วหน้าเด้งขึ้นบน": จังหวะ height='auto' กล่องสูง 4,000+px ยุบเหลือ 3 บรรทัดชั่วขณะ
+//    เพดานสกรอลล์เลยหดตาม เบราว์เซอร์บีบ scrollTop ลงมาสุด พอคืนความสูงก็ไม่คืนสกรอลล์ให้
+//    (วัดจริง: โพสต์ยาว 200 บรรทัด พิมพ์ 1 ตัว = เด้งขึ้น 3,270px)  → จำตำแหน่งไว้แล้วคืนทันทีในเฟรมเดียวกัน
+function _prAutoGrow(el){
+  if(!el) return;
+  const sc=_prScrollBox(el), top=sc?sc.scrollTop:0;
+  const doc=document.scrollingElement||document.documentElement, dTop=doc?doc.scrollTop:0;
+  el.style.height='auto';
+  el.style.height=(el.scrollHeight+2)+'px';
+  if(sc && sc.scrollTop!==top) sc.scrollTop=top;                    // คืนสกรอลล์ของกล่องที่เลื่อนจริง
+  if(doc && doc!==sc && doc.scrollTop!==dTop) doc.scrollTop=dTop;   // เผื่อหน้าเลื่อนที่ระดับเอกสาร
+}
 // ✏️ กำลังพิมพ์อยู่ในหน้าห้องโปรเจกต์ไหม — ใช้กันไม่ให้วาดหน้าใหม่ทับตอนพิมพ์
 function _prIsEditing(){
   const el=document.activeElement; if(!el) return false;
