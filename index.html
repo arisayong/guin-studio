@@ -4817,8 +4817,15 @@ async function postRoundToDiscord(){
   const r=getRound(_avRoundId); if(!r) return;
   const chId=_dcChannelOf(r.cat);
   if(!chId){ toast('ยังไม่ได้ตั้ง ID ห้องของทีมนี้','error'); openDiscordSetup(); return; }
-  const text=r.announceText||roundAnnounceText(r);
-  if(!confirm(`โพสประกาศลงห้อง Discord ของ${(AV_CATS[r.cat]||{}).label||''}?\n\n${text.slice(0,300)}`)) return;
+  // 🏠 ห้องรวม (บท-qc · มิกซ์-ซับ): ถ้ารอบนี้เปิดขอคิวหลายทีมที่อยู่ห้องเดียวกัน → แท็กให้ครบทุกทีม
+  const roomCats=(Array.isArray(r.targetCats)&&r.targetCats.length?r.targetCats:[r.cat]).filter(k=>_dcChannelOf(k)===chId);
+  const roundMention=_annMention(r.cat), roomMention=_annMentionOfCats(roomCats);
+  let text=r.announceText||roundAnnounceText(r);
+  if(roomMention && roundMention && roomMention!==roundMention && text.includes(roundMention)){
+    text=text.split(roundMention).join(roomMention);
+  }
+  const roomLabel=roomCats.map(k=>(AV_CATS[k]||{}).label||k).join(' + ')||(AV_CATS[r.cat]||{}).label||'';
+  if(!confirm(`โพสประกาศลงห้อง Discord ของ${roomLabel}?\n\n${text.slice(0,300)}`)) return;
   showLoader(true);
   try{
     // 🏷️ แปลง "@ชื่อโรล" ที่ตรงกับโรลจริงในเซิร์ฟเวอร์ → <@&id> เพื่อให้แท็กโรลแล้ว ping ได้จริง
@@ -4999,6 +5006,19 @@ function _annMention(cat){
   const m=(getDiscordCfg().mentions||{})[cat];
   return (m!==undefined && m!==null && String(m).trim()!=='') ? String(m).trim() : ((AV_CATS[cat]||{}).mention||'');
 }
+// 🏠 แท็กของ "ห้องหนึ่งห้อง" — ห้องรวม (บท-qc · มิกซ์-ซับ) ต้องแท็กครบทุกทีมที่ติ๊กไว้ในห้องนั้น
+//    (แก้บั๊ก: ห้องรวมเคยได้แท็กแค่ทีมเดียว เพราะ map ห้อง→ทีม ทับกันเหลือตัวท้าย)
+function _annMentionOfCats(cats){
+  const seen=new Set(), out=[];
+  (cats||[]).forEach(c=>{
+    // ตัดทีละ "@..." ไม่ตัดที่ช่องว่าง — ชื่อโรลมีเว้นวรรคได้ (เช่น @ทีม QC)
+    String(_annMention(c)||'').split(/(?=@)/).forEach(t=>{
+      const tag=t.trim();
+      if(tag && !seen.has(tag)){ seen.add(tag); out.push(tag); }
+    });
+  });
+  return out.join(' ');
+}
 // 🏷️ ดึงรายชื่อโรลจากเซิร์ฟเวอร์ (ผ่านบอทลงคิว) → map ชื่อโรล→id · ใช้แปลง "@ชื่อโรล" ให้ ping ได้จริง
 let _dcRoleCache=null;
 async function _dcRoleMap(force){
@@ -5131,7 +5151,7 @@ function openNewRound(){
       <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:5px">เปิดขอคิวทีมไหนบ้าง (ติ๊กได้หลายทีม)</div>
       <div style="display:flex;gap:7px;flex-wrap:wrap">
         ${Object.entries(AV_CATS).filter(([k,v])=>v.channel&&v.channel!=='-').map(([k,v])=>{
-          const hasCh=!!cfgCh[k];
+          const hasCh=!!_dcChannelOf(k);   // ทีมที่ใช้ห้องร่วมกัน (บท+QC · มิกซ์+ซับ) ติ๊กได้แม้ตั้ง ID ไว้ที่ทีมเดียว
           return `<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:6px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;cursor:${hasCh?'pointer':'not-allowed'};opacity:${hasCh?1:.45}" title="${hasCh?'':'ยังไม่ตั้ง ID ห้องของทีมนี้ — ตั้งที่ปุ่ม 🐧 ตั้งค่า Discord'}">
             <input type="checkbox" class="nr-team" value="${k}" ${hasCh?'checked':'disabled'} onchange="_nrRefreshPreview(true)"> ${v.icon} ${esc(v.label)}${hasCh?'':' ⚠️'}
           </label>`;
@@ -5211,11 +5231,15 @@ function showRoundAnnounce(roundId){
   const cfgCh=getDiscordCfg().channels||{};
   const wantCats=new Set(Array.isArray(r.targetCats)&&r.targetCats.length?r.targetCats:[r.cat]);
   const postsArr=Array.isArray(r.posts)?r.posts:(r.postedMessageId?[{channelId:r.channelId, messageId:r.postedMessageId}]:[]);
-  const chBoxes=Object.entries(AV_CATS).filter(([k])=>cfgCh[k]).map(([k,v])=>{
-    const chId=cfgCh[k];
+  // ห้องที่ทีมของรอบนี้ครอบคลุมอยู่แล้ว — ใช้กันไม่ให้ทีมพี่น้องในห้องรวมถูกติ๊กเองเพราะห้อง "เคยโพสต์"
+  const wantChans=new Set([...wantCats].map(k=>_dcChannelOf(k)).filter(Boolean));
+  // ใช้ _dcChannelOf แทน cfgCh[k] ตรง ๆ → ทีมที่ใช้ห้องร่วมกัน (บท+QC · มิกซ์+ซับ) ติ๊กได้แม้ตั้ง ID ไว้ที่ทีมเดียว
+  const chBoxes=Object.entries(AV_CATS).filter(([k])=>_dcChannelOf(k)).map(([k,v])=>{
+    const chId=_dcChannelOf(k);
     const done=postsArr.some(p=>p.channelId===chId);
+    const on=wantCats.has(k)||(done&&!wantChans.has(chId));
     return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;padding:4px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px">
-      <input type="checkbox" class="ra-ch" value="${esc(chId)}"${(wantCats.has(k)||done)?' checked':''}> ${v.icon} ${esc(v.label)}${done?' <span style="color:var(--green);font-size:10px">เคยโพสต์—จะแก้โพสต์เดิม</span>':''}
+      <input type="checkbox" class="ra-ch" data-cat="${esc(k)}" value="${esc(chId)}"${on?' checked':''}> ${v.icon} ${esc(v.label)}${done?' <span style="color:var(--green);font-size:10px">เคยโพสต์—จะแก้โพสต์เดิม</span>':''}
     </label>`;
   }).join('');
   _tagOverlayShow('📢 ประกาศขอคิว — รีเช็คข้อความแล้วให้บอทโพสต์เลย', `
@@ -5245,24 +5269,30 @@ async function postRoundAnnounceMulti(roundId){
   const list=getRounds(); const r=list.find(x=>x.id===roundId); if(!r) return;
   const raw=String(document.getElementById('ra-text')?.value||'').trim();
   if(!raw){ toast('ข้อความว่าง','error'); return; }
-  const chosen=[...document.querySelectorAll('.ra-ch:checked')].map(x=>x.value);
+  // 🏠 รวมห้องที่ซ้ำกันให้เหลือครั้งเดียว (บท+QC = ห้องเดียว · มิกซ์+ซับ = ห้องเดียว)
+  //    แต่จำ "ทุกทีมที่ติ๊กของห้องนั้น" ไว้ เพื่อแท็กให้ครบทุกทีมในโพสต์เดียว
+  const chCats={}; const chosen=[];
+  [...document.querySelectorAll('.ra-ch:checked')].forEach(x=>{
+    const id=x.value; if(!id) return;
+    if(!chCats[id]){ chCats[id]=[]; chosen.push(id); }
+    const c=x.dataset.cat; if(c && !chCats[id].includes(c)) chCats[id].push(c);
+  });
   if(!chosen.length){ toast('ติ๊กเลือกอย่างน้อย 1 ห้องก่อน','warn'); return; }
   if(!confirm('รีเช็คข้อความเรียบร้อยแล้วใช่ไหม?\n\nบอทจะโพสต์/อัปเดตประกาศลง '+chosen.length+' ห้องพร้อมกัน')) return;
   showLoader(true);
-  // 🔑 แต่ละห้อง = แท็กของทีมประจำห้องนั้น · map ห้อง(channelId) → ทีม(category) จาก cfg.channels
-  const cfgCh=getDiscordCfg().channels||{};
-  const chCat={}; Object.entries(cfgCh).forEach(([cat,id])=>{ if(id) chCat[id]=cat; });
   const roundMention=_annMention(r.cat);   // แท็กของทีมที่เปิดรอบ (ถูกแทนใน textarea แล้ว)
   let roleMap={}; try{ roleMap=await _dcRoleMap(); }catch(e){}
-  let posted=0, edited=0, fail=0, failMsg='';
+  let posted=0, edited=0, fail=0, failMsg='', noSwap=0;
   try{
     r.posts=Array.isArray(r.posts)?r.posts:(r.postedMessageId?[{channelId:r.channelId, messageId:r.postedMessageId}]:[]);
     for(const chId of chosen){
-      // แทนแท็กทีมที่เปิดรอบ ด้วยแท็กทีมของ "ห้องนี้" (ถ้าเป็นคนละทีม)
-      const cat=chCat[chId];
+      // แทนแท็กทีมที่เปิดรอบ ด้วยแท็กของ "ทุกทีมที่ติ๊กในห้องนี้" (ห้องรวม = แท็กครบทุกทีม)
+      const want=_annMentionOfCats(chCats[chId]);
       let perTxt=raw;
-      if(cat && cat!==r.cat && roundMention){
-        perTxt=raw.split(roundMention).join(_annMention(cat));
+      if(want && roundMention && want!==roundMention){
+        // แทนแบบตรงตัว — ถ้าแก้บรรทัดแท็กเองในกล่องจนไม่ตรง จะสลับไม่ได้ ต้องเตือนไว้
+        if(raw.includes(roundMention)) perTxt=raw.split(roundMention).join(want);
+        else noSwap++;
       }
       // แปลง "@ชื่อโรล" → <@&id> ให้ ping ได้จริง
       try{ perTxt=_prApplyRoleMentions(perTxt, roleMap); }catch(e){}
@@ -5280,6 +5310,8 @@ async function postRoundAnnounceMulti(roundId){
     await saveRounds(list);
     try{ logAudit('recruit.round',(AV_CATS[r.cat]||{}).label||r.cat,'โพสต์/อัปเดตประกาศ '+chosen.length+' ห้อง'); }catch(e){}
     toast(`📤 โพสต์ใหม่ ${posted} ห้อง · แก้โพสต์เดิม ${edited} ห้อง${fail?' · ไม่สำเร็จ '+fail+' ('+failMsg+')':''}`, fail?'warn':'success');
+    // ⚠️ แก้บรรทัดแท็กเองจนไม่ตรงกับแท็กของทีมที่เปิดรอบ → ห้องอื่นได้แท็กเดิมติดไปด้วย
+    if(noSwap) toast(`⚠️ ${noSwap} ห้องใช้แท็กเดิมของ "${(AV_CATS[r.cat]||{}).label||r.cat}" — เพราะบรรทัดแท็กในกล่องถูกแก้จนไม่ตรง (${roundMention}) ระบบเลยสลับแท็กให้ไม่ได้ · เช็กแท็กในโพสต์ห้องอื่นด้วย`,'warn');
     if(!fail) document.getElementById('tag-overlay')?.remove();
     renderAvailability();
   }finally{ showLoader(false); }
