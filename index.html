@@ -5080,6 +5080,7 @@ function _raSetGender(g, roundId){
   ls('announcegender', g);
   const r=getRound(roundId); const el=document.getElementById('ra-text');
   if(r && el) el.value=roundAnnounceText(r, g);
+  _raTagPreview(roundId);
 }
 // ⚙️ แก้เทมเพลต + แท็กของแต่ละทีม (แอดมินเท่านั้น — เก็บถาวร ใช้ทุกรอบ)
 function openAnnounceTplEditor(roundId){
@@ -5239,7 +5240,7 @@ function showRoundAnnounce(roundId){
     const done=postsArr.some(p=>p.channelId===chId);
     const on=wantCats.has(k)||(done&&!wantChans.has(chId));
     return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;padding:4px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px">
-      <input type="checkbox" class="ra-ch" data-cat="${esc(k)}" value="${esc(chId)}"${on?' checked':''}> ${v.icon} ${esc(v.label)}${done?' <span style="color:var(--green);font-size:10px">เคยโพสต์—จะแก้โพสต์เดิม</span>':''}
+      <input type="checkbox" class="ra-ch" data-cat="${esc(k)}" value="${esc(chId)}"${on?' checked':''} onchange="_raTagPreview('${r.id}')"> ${v.icon} ${esc(v.label)}${done?' <span style="color:var(--green);font-size:10px">เคยโพสต์—จะแก้โพสต์เดิม</span>':''}
     </label>`;
   }).join('');
   _tagOverlayShow('📢 ประกาศขอคิว — รีเช็คข้อความแล้วให้บอทโพสต์เลย', `
@@ -5250,10 +5251,12 @@ function showRoundAnnounce(roundId){
       <label style="cursor:pointer"><input type="radio" name="ra-g" value="male" ${g==='male'?'checked':''} onchange="_raSetGender('male','${r.id}')"> 👨 ชาย (ครับ)</label>
       <button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="openAnnounceTplEditor('${r.id}')">⚙️ แก้เทมเพลต & แท็ก</button>
     </div>
-    <textarea id="ra-text" rows="10" style="width:100%;padding:11px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:Kanit;font-size:13px;line-height:1.65;resize:vertical;box-sizing:border-box">${esc(txt)}</textarea>
+    <textarea id="ra-text" rows="10" oninput="_raTagPreview('${r.id}')" style="width:100%;padding:11px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:Kanit;font-size:13px;line-height:1.65;resize:vertical;box-sizing:border-box">${esc(txt)}</textarea>
+    <div style="font-size:11px;color:var(--text2);margin-top:5px;line-height:1.5">กล่องนี้คือ "ฉบับกลาง" — โชว์แท็กของทีมหลักทีมเดียว · ตอนโพสต์จริงระบบเปลี่ยนแท็กให้ตรงกับทีมประจำห้องนั้น ๆ ดูได้ที่รายการข้างล่าง</div>
     <div style="margin-top:9px">
       <div style="font-size:11.5px;font-weight:700;margin-bottom:5px">📍 โพสต์ลงห้องไหนบ้าง (ติ๊กได้หลายห้อง — โพสต์พร้อมกันทีเดียว)</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${chBoxes||'<span style="font-size:11.5px;color:var(--orange)">ยังไม่ได้ตั้ง ID ห้องของทีมไหนเลย — กด 🐧 ตั้งค่าห้อง Discord ก่อน</span>'}</div>
+      <div id="ra-tagline" style="margin-top:8px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;font-size:11.5px;line-height:1.75"></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="btn btn-green" style="flex:1" onclick="postRoundAnnounceMulti('${r.id}')" title="โพสต์ลงทุกห้องที่ติ๊ก — ห้องที่เคยโพสต์แล้วจะแก้โพสต์เดิม ไม่โพสต์ซ้ำให้รก">📤 ให้บอทโพสต์/อัปเดตประกาศ</button>
@@ -5263,6 +5266,38 @@ function showRoundAnnounce(roundId){
     <div style="font-size:11px;color:var(--text2);margin-top:10px;line-height:1.6">
       โพสต์ผิด/วันผิด? แก้ข้อความในกล่องแล้วกดปุ่มเดิมซ้ำ — ระบบจะแก้โพสต์เดิมในทุกห้องให้ตรงกัน · การดึงคำตอบยังอ่านจากห้องของทีมที่เปิดรอบเป็นหลัก
     </div>`, 620);
+  _raTagPreview(r.id);
+}
+// ☑️ จัดกลุ่ม "ห้องที่ติ๊ก" → ทีมของห้องนั้น (ห้องรวมมีได้หลายทีม) · ใช้ร่วมกันทั้งพรีวิวและตอนโพสต์จริง
+function _raPickedRooms(){
+  const chCats={}, order=[];
+  [...document.querySelectorAll('.ra-ch:checked')].forEach(x=>{
+    const id=x.value; if(!id) return;
+    if(!chCats[id]){ chCats[id]=[]; order.push(id); }
+    const c=x.dataset.cat; if(c && !chCats[id].includes(c)) chCats[id].push(c);
+  });
+  return { order, chCats };
+}
+// 🏷️ โชว์ให้เห็นกับตาว่า "แต่ละห้องจะได้แท็กอะไร" ก่อนกดโพสต์ — กล่องข้อความโชว์ได้แค่ฉบับเดียว เลยต้องมีรายการนี้
+function _raTagPreview(roundId){
+  const box=document.getElementById('ra-tagline'); if(!box) return;
+  const r=getRound(roundId); if(!r) return;
+  const raw=String(document.getElementById('ra-text')?.value||'');
+  const roundMention=_annMention(r.cat);
+  const {order, chCats}=_raPickedRooms();
+  if(!order.length){ box.innerHTML='<span style="color:var(--orange)">ยังไม่ได้ติ๊กห้อง — ติ๊กอย่างน้อย 1 ห้อง</span>'; return; }
+  let warn=false;
+  const rows=order.map(id=>{
+    const cats=chCats[id];
+    const want=_annMentionOfCats(cats);
+    const roomRaw=(AV_CATS[cats[0]]||{}).channel||'';
+    const room=(roomRaw&&roomRaw!=='-')?('#'+roomRaw):cats.map(c=>(AV_CATS[c]||{}).label||c).join(' + ');
+    let tag=want, note='';
+    if(want && roundMention && want!==roundMention && !raw.includes(roundMention)){ tag=roundMention; note=' ⚠️ สลับแท็กไม่ได้'; warn=true; }
+    return `<div>${esc(room)} <span style="color:var(--text2)">(${esc(cats.map(c=>(AV_CATS[c]||{}).label||c).join(' + '))})</span> → <strong style="color:var(--accent2)">${esc(tag||'—')}</strong><span style="color:var(--orange)">${note}</span></div>`;
+  }).join('');
+  box.innerHTML=`<div style="font-weight:700;color:var(--text2);margin-bottom:3px">🏷️ แท็กที่แต่ละห้องจะได้จริงตอนโพสต์ (${order.length} ห้อง)</div>${rows}`
+    + (warn?`<div style="color:var(--orange);margin-top:4px">บรรทัดแท็กในกล่องถูกแก้จนไม่ตรงกับ "${esc(roundMention)}" — ระบบหาไม่เจอเลยสลับให้ไม่ได้ ห้องอื่นจะได้แท็กเดิมติดไปด้วย</div>`:'');
 }
 // 📤 โพสต์/อัปเดตประกาศหลายห้องพร้อมกัน — ห้องที่เคยโพสต์ = แก้โพสต์เดิม, ห้องใหม่ = โพสต์ใหม่
 async function postRoundAnnounceMulti(roundId){
@@ -5270,13 +5305,8 @@ async function postRoundAnnounceMulti(roundId){
   const raw=String(document.getElementById('ra-text')?.value||'').trim();
   if(!raw){ toast('ข้อความว่าง','error'); return; }
   // 🏠 รวมห้องที่ซ้ำกันให้เหลือครั้งเดียว (บท+QC = ห้องเดียว · มิกซ์+ซับ = ห้องเดียว)
-  //    แต่จำ "ทุกทีมที่ติ๊กของห้องนั้น" ไว้ เพื่อแท็กให้ครบทุกทีมในโพสต์เดียว
-  const chCats={}; const chosen=[];
-  [...document.querySelectorAll('.ra-ch:checked')].forEach(x=>{
-    const id=x.value; if(!id) return;
-    if(!chCats[id]){ chCats[id]=[]; chosen.push(id); }
-    const c=x.dataset.cat; if(c && !chCats[id].includes(c)) chCats[id].push(c);
-  });
+  //    แต่จำ "ทุกทีมที่ติ๊กของห้องนั้น" ไว้ เพื่อแท็กให้ครบทุกทีมในโพสต์เดียว — ชุดเดียวกับที่โชว์ในพรีวิว
+  const {order:chosen, chCats}=_raPickedRooms();
   if(!chosen.length){ toast('ติ๊กเลือกอย่างน้อย 1 ห้องก่อน','warn'); return; }
   if(!confirm('รีเช็คข้อความเรียบร้อยแล้วใช่ไหม?\n\nบอทจะโพสต์/อัปเดตประกาศลง '+chosen.length+' ห้องพร้อมกัน')) return;
   showLoader(true);
@@ -6770,8 +6800,24 @@ let _prPostSel='';
 let _prAutosaveTimer=null;
 let _prShowPicker=false;   // เปิดตัวเลือก/ค้นหางาน (โชว์เสมอถ้ายังไม่ได้เลือก)
 let _prProjSearch='';      // คำค้นหางาน/หมวดหมู่/รหัส
+let _prRenderPending=false;  // มีคำสั่งวาดใหม่ค้างไว้ตอนกำลังพิมพ์ → รอเลิกพิมพ์ก่อนค่อยวาด
 // กล่องแก้โพสต์ยืดสูงตามเนื้อหาอัตโนมัติ — ไม่ต้องเลื่อนในกล่อง (เลื่อนหน้าปกติแทน)
 function _prAutoGrow(el){ if(!el) return; el.style.height='auto'; el.style.height=(el.scrollHeight+2)+'px'; }
+// ✏️ กำลังพิมพ์อยู่ในหน้าห้องโปรเจกต์ไหม — ใช้กันไม่ให้วาดหน้าใหม่ทับตอนพิมพ์
+function _prIsEditing(){
+  const el=document.activeElement; if(!el) return false;
+  const tag=(el.tagName||'').toUpperCase();
+  if(tag!=='TEXTAREA' && tag!=='INPUT' && el.isContentEditable!==true) return false;
+  const pg=document.getElementById('page-projroom');
+  return !!(pg && !pg.classList.contains('hidden') && pg.contains(el));
+}
+// วาดใหม่ที่ค้างไว้ — เลิกพิมพ์แล้วค่อยวาด และเซฟข้อความในกล่องก่อนเสมอ กันที่ยังไม่บันทึกหาย
+async function _prRenderIfPending(){
+  if(!_prRenderPending || _prIsEditing()) return;
+  _prRenderPending=false;
+  try{ if(_prSel) await _prFlush(_prSel); }catch(e){}
+  try{ renderProjRoom(); }catch(e){}
+}
 function _prNow(){ return new Date().toISOString(); }
 function _prTimeAgo(iso){
   if(!iso) return 'ยังไม่บันทึก';
@@ -6963,7 +7009,7 @@ function _prRoomView(p){
           <span class="pr2-tool" style="margin-left:auto" onclick="prInsertMention()" title="แทรกแท็กคน — คนที่ผูก Discord แล้ว ping จริง">👤 แท็กคน</span>
           ${currentUser?.role==='admin'?`<span class="pr2-tool" onclick="openProjPostTplEditor()" title="เพิ่ม/แก้/ลบชุดเทมเพลต">⚙️</span>`:''}
         </div>
-        <textarea id="pr-post" class="pr2-ta" oninput="_prAutoGrow(this);prAutosave('${esc(p.id)}')">${esc(cur.text||'')}</textarea>
+        <textarea id="pr-post" class="pr2-ta" oninput="_prAutoGrow(this);prAutosave('${esc(p.id)}')" onblur="setTimeout(_prRenderIfPending,120)">${esc(cur.text||'')}</textarea>
       </div>
       <div class="pr2-bar">
         <div id="pr-saveind" style="font-size:12.3px;color:var(--text2)">💾 เก็บร่างอัตโนมัติ</div>
@@ -25936,7 +25982,12 @@ function startFirebaseSync() {
       if(pgAl&&!pgAl.classList.contains('hidden')) try{renderAlloc();}catch(e){}
       // 🐧/📂 หน้าห้องโปรเจกต์ + จัดไฟล์งาน — มีโปรเจกต์ใหม่/แก้ไข → รีเฟรชตัวเลือก
       const pgPr = document.getElementById('page-projroom');
-      if(pgPr&&!pgPr.classList.contains('hidden')) try{renderProjRoom();}catch(e){}
+      if(pgPr&&!pgPr.classList.contains('hidden')){
+        // ✏️ กำลังพิมพ์อยู่ → ห้ามวาดใหม่ (กล่องถูกสร้างใหม่ เคอร์เซอร์หลุด หน้าเด้งขึ้นบน พิมพ์ไม่ต่อเนื่อง)
+        //    เซฟอัตโนมัติของเราเองก็เด้ง projTS กลับมาเข้าทางนี้ทุก 1.2 วิ — เลยค้างไว้ก่อน วาดตอนเลิกพิมพ์
+        if(typeof _prIsEditing==='function' && _prIsEditing()) _prRenderPending=true;
+        else try{renderProjRoom();}catch(e){}
+      }
       const pgDr = document.getElementById('page-drive');
       if(pgDr&&!pgDr.classList.contains('hidden')) try{renderDrivePage();}catch(e){}
       // 🔑 Refresh queue page เมื่อมี project update → admin จะเห็น staff confirm/reject ทันที
