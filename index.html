@@ -1065,7 +1065,7 @@ body.sidebar-collapsed .main-content{
     <span class="guin-logo"></span>
     <div class="top-bar-brand-text">
      <div class="top-bar-brand-name">GUIN HOME</div>
-     <div class="top-bar-brand-sub">Payment System v4</div>
+     <div class="top-bar-brand-sub" id="app-ver">Payment System v4</div>
     </div>
    </div>
   </div>
@@ -3145,7 +3145,22 @@ body.sidebar-collapsed .main-content{
 </style>
 
 <script>
-
+// ══════════════════════════════════════════════
+// 🔖 เวอร์ชันของเว็บ — ใช้เช็กว่า "ตัวที่เปิดอยู่" เป็นตัวใหม่ที่เพิ่งอัปขึ้น GitHub หรือยัง
+//    แก้เลขนี้ทุกครั้งที่อัปไฟล์ · แก้เล็ก +0.1 · แก้ใหญ่/เพิ่มระบบ +1
+//    เลขโชว์ที่หัวเว็บมุมซ้ายบน — ถ้าเลขยังไม่เปลี่ยน = ยังไม่ได้อัป หรือเบราว์เซอร์ยังใช้ของเก่า (Ctrl+Shift+R)
+// ══════════════════════════════════════════════
+const APP_VERSION='4.1';
+const APP_BUILD='21 ก.ย. 2569 20:10';
+const APP_CHANGES='แก้อาการพิมพ์แล้วหน้าเด้ง (หน้าห้องโปรเจกต์) · ห้องรวมแท็กครบทุกทีม + โชว์แท็กรายห้องก่อนโพสต์';
+(function _showAppVer(){
+  const el=document.getElementById('app-ver'); if(!el) return;
+  el.textContent='Payment System v'+APP_VERSION;
+  el.title='เวอร์ชัน '+APP_VERSION+' · อัปเมื่อ '+APP_BUILD+'\n'+APP_CHANGES+'\n\n(กดเพื่อดูรายละเอียด)';
+  el.style.cursor='pointer';
+  el.onclick=()=>{ try{ alert('🔖 เวอร์ชัน '+APP_VERSION+'\nอัปเมื่อ '+APP_BUILD+'\n\nรอบนี้แก้อะไร:\n'+APP_CHANGES+'\n\nถ้าเลขนี้ไม่ตรงกับที่เพิ่งอัป ให้กด Ctrl+Shift+R เพื่อล้างแคชเบราว์เซอร์'); }catch(e){} };
+  try{ console.log('%c GUIN HOME v'+APP_VERSION+' ','background:#5865F2;color:#fff;font-weight:700', APP_BUILD); }catch(e){}
+})();
 
 // Thai date picker combo — text input + hidden native picker
 function mkDatePicker(id, isoVal, onchangeCode) {
