@@ -3162,9 +3162,9 @@ body.sidebar-collapsed .main-content{
 //    แก้เลขนี้ทุกครั้งที่อัปไฟล์ · แก้เล็ก +0.1 · แก้ใหญ่/เพิ่มระบบ +1
 //    เลขโชว์ที่หัวเว็บมุมซ้ายบน — ถ้าเลขยังไม่เปลี่ยน = ยังไม่ได้อัป หรือเบราว์เซอร์ยังใช้ของเก่า (Ctrl+Shift+R)
 // ══════════════════════════════════════════════
-const APP_VERSION='4.4';
+const APP_VERSION='4.5';
 const APP_BUILD='23 ก.ย. 2569';
-const APP_CHANGES='ฟอร์มแก้ไขสมาชิก: เพิ่มช่องโซเชียล + ลิงก์เดโม่ (แก้เองได้) · แก้บั๊กกดบันทึกแล้วข้อมูลที่ไม่มีช่องในฟอร์มหาย (Discord/แท็ก/โซเชียล) · หน้าโปรไฟล์โชว์โซเชียล+ผลงาน';
+const APP_CHANGES='เพิ่มช่องแก้โซเชียล + ลิงก์เดโม่ ในฟอร์มแก้ไขทั้ง 2 แบบ (ในหน้าโปรไฟล์ + ป็อปอัพเพิ่มสมาชิก) · แก้บั๊กกดบันทึกแล้วข้อมูลที่ไม่มีช่องในฟอร์มหาย';
 (function _showAppVer(){
   const el=document.getElementById('app-ver'); if(!el) return;
   let liveAt='';
@@ -30036,6 +30036,12 @@ function renderStaffDetail(){
           ${field('เลขบัญชี','sd-edit-account',s.account,'')}
           ${field('อีเมล','sd-edit-email',s.email,'name@email.com')}
           ${field('ลิงก์รูป QR','sd-edit-qr',s.qrUrl,'https://...')}
+          ${field('📱 ช่องทางโซเชียล','sd-edit-social',s.social,'ลิงก์เฟซ/ไลน์/IG หรือชื่อบัญชี')}
+        </div>
+        <div class="form-group" style="margin:0 0 12px">
+          <label class="form-label">🎬 ลิงก์ผลงาน / เดโม่ <span style="color:var(--text2);font-weight:400">(ใส่ได้หลายลิงก์ — บรรทัดละ 1 ลิงก์)</span></label>
+          <textarea class="form-input" id="sd-edit-demo" rows="3" placeholder="https://youtube.com/...&#10;https://drive.google.com/..." style="resize:vertical;font-family:Kanit;line-height:1.6">${esc((Array.isArray(s.demoLinks)&&s.demoLinks.length)?s.demoLinks.join('\n'):(s.demoNote||''))}</textarea>
+          <div style="font-size:10px;color:var(--text2);margin-top:4px">💡 ปุ่ม "📋 ดึงโซเชียล/เดโม่" ในหน้าทะเบียนทีมเติมให้อัตโนมัติจากชีทสมัครทีม — แก้ทับเองได้ตลอด</div>
         </div>
         <div class="form-group" style="margin:0 0 12px"><label class="form-label">หมวดงาน (เลือกได้หลายอัน)</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:5px">${catBoxes}</div></div>
         <div style="display:grid;grid-template-columns:1fr;gap:12px">${roleBlock}</div>
@@ -30139,9 +30145,17 @@ async function saveStaffDetailInline(){
   if(_oldEmLc && _newEm && _oldEmLc!==_newEm.toLowerCase() && !_pe.some(x=>String(x).toLowerCase()===_oldEmLc)){
     _pe.push(existing.email);
   }
+  // 📱🎬 โซเชียล + เดโม่ — กล่องเดโม่ใส่หลายบรรทัดได้ ดึงเฉพาะ URL มาเก็บเป็นลิสต์
+  //    พิมพ์เป็นข้อความล้วน (ไม่มีลิงก์) เก็บเป็นโน้ตแทน จะได้ไม่หาย
+  const _social=v('sd-edit-social');
+  const _demoRaw=(document.getElementById('sd-edit-demo')?.value||'').trim();
+  const _demoLinks=(typeof _extractUrls==='function')?_extractUrls(_demoRaw):[];
   const merged={...existing, id, name, nickname:nick,
     gender:v('sd-edit-gender'), bank:v('sd-edit-bank'), account:v('sd-edit-account'),
     promptpay:v('sd-edit-promptpay'), email:_newEm, qrUrl:v('sd-edit-qr'),
+    social:_social,
+    demoLinks:_demoLinks,
+    demoNote:(!_demoLinks.length && _demoRaw)?_demoRaw:'',
     prevEmails:_pe.slice(-5),
     manualEditAt:new Date().toISOString(),
     categories:cats };
