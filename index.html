@@ -3151,15 +3151,29 @@ body.sidebar-collapsed .main-content{
 //    แก้เลขนี้ทุกครั้งที่อัปไฟล์ · แก้เล็ก +0.1 · แก้ใหญ่/เพิ่มระบบ +1
 //    เลขโชว์ที่หัวเว็บมุมซ้ายบน — ถ้าเลขยังไม่เปลี่ยน = ยังไม่ได้อัป หรือเบราว์เซอร์ยังใช้ของเก่า (Ctrl+Shift+R)
 // ══════════════════════════════════════════════
-const APP_VERSION='4.1';
-const APP_BUILD='21 ก.ย. 2569 23:15';
-const APP_CHANGES='แก้อาการพิมพ์แล้วหน้าเด้ง (หน้าห้องโปรเจกต์) · ห้องรวมแท็กครบทุกทีม + โชว์แท็กรายห้องก่อนโพสต์';
+const APP_VERSION='4.3';
+const APP_BUILD='23 ก.ย. 2569';
+const APP_CHANGES='ดึงโซเชียล/เดโม่: บอกวิธีแก้สิทธิ์ Google Sheets + โชว์รหัส Deploy ที่เว็บเรียกจริง · หัวเว็บโชว์เวลาอัปไฟล์จากเซิร์ฟเวอร์อัตโนมัติ';
 (function _showAppVer(){
   const el=document.getElementById('app-ver'); if(!el) return;
-  el.textContent='Payment System v'+APP_VERSION;
-  el.title='เวอร์ชัน '+APP_VERSION+' · อัปเมื่อ '+APP_BUILD+'\n'+APP_CHANGES+'\n\n(กดเพื่อดูรายละเอียด)';
-  el.style.cursor='pointer';
-  el.onclick=()=>{ try{ alert('🔖 เวอร์ชัน '+APP_VERSION+'\nอัปเมื่อ '+APP_BUILD+'\n\nรอบนี้แก้อะไร:\n'+APP_CHANGES+'\n\nถ้าเลขนี้ไม่ตรงกับที่เพิ่งอัป ให้กด Ctrl+Shift+R เพื่อล้างแคชเบราว์เซอร์'); }catch(e){} };
+  let liveAt='';
+  const paint=()=>{
+    el.textContent='Payment System v'+APP_VERSION+(liveAt?' · '+liveAt:'');
+    el.title='เวอร์ชัน '+APP_VERSION+(liveAt?'\nไฟล์บนเซิร์ฟเวอร์อัปเมื่อ '+liveAt:'')+'\n\n'+APP_CHANGES+'\n\n(กดเพื่อดูรายละเอียด)';
+  };
+  el.style.cursor='pointer'; el.style.letterSpacing='.5px'; el.style.whiteSpace='nowrap';
+  el.onclick=()=>{ try{ alert('🔖 เวอร์ชัน '+APP_VERSION+' ('+APP_BUILD+')\n'+(liveAt?'ไฟล์บนเซิร์ฟเวอร์อัปเมื่อ: '+liveAt+'\n':'')+'\nรอบนี้แก้อะไร:\n'+APP_CHANGES+'\n\nถ้าเวลาอัปไม่ตรงกับที่เพิ่งอัปไฟล์ ให้กด Ctrl+Shift+R เพื่อล้างแคชเบราว์เซอร์'); }catch(e){} };
+  paint();
+  // ⏱️ ถามเซิร์ฟเวอร์ว่าไฟล์นี้ถูกอัปเมื่อไหร่ — ค่านี้เปลี่ยนเองทุกครั้งที่อัปไฟล์ใหม่
+  //    ไม่ต้องพึ่งการแก้เลขเวอร์ชันด้วยมือ ถ้าลืมบวกเลข เวลาก็ยังฟ้องว่าเป็นตัวใหม่
+  try{
+    fetch(location.href,{method:'HEAD',cache:'no-store'}).then(r=>{
+      const lm=r.headers.get('Last-Modified'); if(!lm) return;
+      const d=new Date(lm); if(isNaN(d.getTime())) return;
+      liveAt=d.toLocaleString('th-TH',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).replace(' ',' ');
+      paint();
+    }).catch(()=>{});
+  }catch(e){}
   try{ console.log('%c GUIN HOME v'+APP_VERSION+' ','background:#5865F2;color:#fff;font-weight:700', APP_BUILD); }catch(e){}
 })();
 
@@ -4719,6 +4733,25 @@ async function pullSocialDemoFromSheet(reset){
   }catch(e){
     const msg=String(e.message||'');
     if(msg.includes('ไม่รู้จักคำสั่ง')){ toast('Apps Script "Guin Drive" ยังเป็นเวอร์ชันเก่า — วางโค้ด .gs ล่าสุดแล้ว Deploy เวอร์ชันใหม่ก่อน (จะขอสิทธิ์ Google Sheets เพิ่ม กดอนุญาตได้เลย)','warn'); return; }
+    // 🔑 เคสที่เจอบ่อยสุด: ลิงก์ชีทไม่ได้ผิด แต่สคริปต์ Guin Drive ยังไม่ได้รับสิทธิ์อ่าน Google Sheets
+    //    เดิมเด้งถามว่า "เปลี่ยนลิงก์ไหม" → คนใช้ไปนั่งเปลี่ยนลิงก์วนอยู่นั่น ทั้งที่ต้องไปกดอนุญาตใน Apps Script
+    if(/ไม่ได้รับอนุญาต|ไม่มีสิทธิ์|authoriz|permission|auth\/spreadsheets|openById|PERMISSION_DENIED/i.test(msg)){
+      alert('⚠️ ลิงก์ชีทไม่ได้ผิด — แต่สคริปต์ "Guin Drive" ยังไม่ได้รับสิทธิ์อ่าน Google Sheets\n\n'
+        +'วิธีแก้ (ทำครั้งเดียวจบ ~2 นาที):\n'
+        +'1. เปิด script.google.com → เลือกโปรเจกต์ "Guin Drive"\n'
+        +'2. ที่ช่องเลือกฟังก์ชันด้านบน เลือกอะไรก็ได้ แล้วกด ▶ เรียกใช้\n'
+        +'3. จะมีหน้าต่างขออนุญาตขึ้นมา → เลือกบัญชี → กด "ขั้นสูง" → "ไปที่ Guin Drive (ไม่ปลอดภัย)" → อนุญาต\n'
+        +'   ⚠️ ต้องเห็นบรรทัด "ดูและจัดการสเปรดชีตของคุณใน Google ไดรฟ์" ในรายการสิทธิ์ด้วย\n'
+        +'4. กลับมากด "ทำให้ใช้งานได้" → "จัดการการทำให้ใช้งานได้" → ✏️ แก้ไข → เวอร์ชัน: "ใหม่" → ทำให้ใช้งานได้\n'
+        +'5. กลับมาที่เว็บ กดปุ่ม "📋 ดึงโซเชียล/เดโม่" อีกครั้ง\n\n'
+        +'(ถ้าจะเปลี่ยนลิงก์ชีทจริง ๆ: กด Shift ค้างไว้แล้วคลิกปุ่มนั้น)\n\n'
+        +'── ตรวจว่าคุยกับสคริปต์ตัวเดียวกันหรือเปล่า ──\n'
+        +'เว็บกำลังเรียก "รหัสการทำให้ใช้งานได้" นี้:\n'+_drDeployId()+'\n'
+        +'ต้องตรงกับที่เห็นในหน้า "จัดการการทำให้ใช้งานได้" ของ Apps Script\n'
+        +'ถ้าไม่ตรง = คุณ Deploy อีกตัว แต่เว็บยังเรียกตัวเก่า → ก๊อป URL ใหม่มาใส่ที่ 🔧 ตั้งค่า Drive\n\n'
+        +'ข้อความเต็มจาก Google:\n'+msg);
+      return;
+    }
     if(confirm('อ่านชีทไม่สำเร็จ: '+msg+'\n\nเปลี่ยนลิงก์ชีทใหม่ไหม?')) pullSocialDemoFromSheet(true);
   }finally{ showLoader(false); }
 }
@@ -7780,6 +7813,12 @@ async function saveDriveCfg(c){ ls('drivecfg', c); try{ await fbSaveKeyed('drive
 //    แต่ละบัญชีมี Apps Script + รายการโฟลเดอร์หลักของตัวเอง — ไม่ปนกัน
 function _drIsMgrAcct(){ return currentUser?.role==='manager' && !!(getDriveCfg().mgrGasUrl||'').trim(); }
 function _drActive(cfg){ return _drIsMgrAcct() ? {url:(cfg.mgrGasUrl||''), secret:(cfg.mgrSecret||'')} : {url:(cfg.gasUrl||''), secret:(cfg.secret||'')}; }
+// 🆔 "รหัสการทำให้ใช้งานได้" ที่เว็บเรียกอยู่จริง — เอาไว้เทียบกับหน้า จัดการการทำให้ใช้งานได้ ใน Apps Script
+//    (เจอบ่อย: Deploy ตัวใหม่ แต่เว็บยังชี้ URL ตัวเก่า เลยเหมือนแก้แล้วไม่หาย)
+function _drDeployId(){
+  const u=String((_drActive(getDriveCfg())||{}).url||'');
+  return (u.match(/\/macros\/s\/([^/]+)\//)||[])[1] || (u?u:'(ยังไม่ได้ตั้ง URL)');
+}
 function _drDefKey(){ return _drIsMgrAcct()?'mgrDefaultParentId':'defaultParentId'; }
 function _drParentsKey(){ return _drIsMgrAcct()?'mgrParents':'parents'; }
 async function callDrive(payload){
