@@ -1999,6 +1999,7 @@ body.sidebar-collapsed .main-content{
      <select id="staff-tag-filter" class="form-input form-select" style="width:auto;max-width:180px;padding:7px 26px 7px 10px;font-size:12.5px" onchange="renderStaffGrid()" title="กรองรายชื่อตาม Tag ประจำตัว"><option value="">🏷️ ทุก Tag</option></select>
      <button class="btn btn-outline" onclick="openTagManager()" title="สร้าง/ลบหัวข้อ Tag หมายเหตุประจำตัว">🏷️ จัดการ Tag</button>
      <button class="btn btn-outline" onclick="openBulkDiscordLink()" title="ดึงสมาชิกทั้งเซิร์ฟเวอร์ Discord มาจับคู่กับทะเบียนทีม ผูกครั้งเดียวจำตลอด — ใครผูกแล้วมีป้าย 🔗 บนการ์ด">🔗 ผูก Discord ทั้งทีม</button>
+     <button class="btn btn-outline" onclick="pullSocialDemoFromSheet(event.shiftKey)" title="ดึง ช่องทางโซเชียล + ลิงก์ตัวอย่างผลงาน จากชีทฟอร์มสมัครทีม มาใส่ให้ทุกคนอัตโนมัติ (กด Shift ค้างแล้วคลิก = เปลี่ยนลิงก์ชีท)">📋 ดึงโซเชียล/เดโม่</button>
      <button class="btn btn-blue" onclick="openAddStaff()">➕ เพิ่มสมาชิก</button>
     </div>
    </div>
@@ -4664,6 +4665,82 @@ async function linkDiscordUser(staffId, discordId, discordName){
 // ══ 🔗 ผูกบัญชี Discord ทั้งทีมรวดเดียว ══
 //    ดึงสมาชิกทั้งเซิร์ฟเวอร์ (worker action: discordMembers — ต้องเปิด SERVER MEMBERS INTENT)
 //    → จับคู่กับทะเบียนด้วยตรรกะเดียวกับตอนดึงคำตอบ → เดาให้ กดยืนยันรายคนหรือทั้งหมด
+// ══ 📋 ดึง "ช่องทางโซเชียล" + "ลิงก์ตัวอย่างผลงาน" จากชีทสมัครทีม ══
+//    ใช้ Apps Script ตัวจัดไฟล์ไดรฟ์ (action: readRecruit) → จับคู่ชื่อกับทะเบียน → เก็บใน s.social / s.demoLinks
+function _extractUrls(s){ return [...String(s||'').matchAll(/https?:\/\/[^\s,"'<>]+/g)].map(m=>m[0].replace(/[).]+$/,'')); }
+async function pullSocialDemoFromSheet(reset){
+  if(currentUser?.role!=='admin'){ toast('เฉพาะแอดมิน','error'); return; }
+  let link=reset?'':(ls('recruitsheet')||'');
+  if(!link){
+    link=prompt('วางลิงก์ Google Sheet ของฟอร์มสมัครทีม\n(ชีทที่มีคอลัมน์ "ช่องทางการติดต่อในโซเชียล" และ "ตัวอย่างผลงาน หรือ Resume")\n\nระบบจะจำลิงก์ไว้ ครั้งหน้ากดปุ่มเดียวจบ');
+    if(!link||!link.trim()) return;
+    ls('recruitsheet', link.trim());
+    try{ await fbSaveKeyed('recruitsheet', link.trim()); }catch(e){}
+  }
+  showLoader(true);
+  try{
+    const d=await callDrive({action:'readRecruit', sheetId:_drIdFromLink(link)});
+    const rows=(d.rows||[]).map(r=>({r, nickT:_dcTokens(r.nickname), nameT:_dcTokens(r.name)}));
+    if(!rows.length){ toast('อ่านชีทได้แต่ไม่พบแถวข้อมูล — เช็คว่าเป็นชีทฟอร์มสมัครทีม','warn'); return; }
+    const data=getStaffData();
+    let matched=0, socialN=0, demoN=0;
+    const seen=new Set();
+    getAllStaff().forEach(s=>{
+      if(!s.id||seen.has(s.id)) return; seen.add(s.id);
+      const nt=_dcTokens(s.nickname), fnT=_dcTokens(s.name);
+      // จับคู่: คำในชื่อเล่นตรงกัน → ถ้าซ้ำหลายแถว ใช้ชื่อจริงช่วยชี้ · ไม่เจอเลยลองชื่อจริงตรงทั้งชุด
+      let cands=nt.length?rows.filter(x=>x.nickT.some(t=>nt.includes(t))):[];
+      let hit=null;
+      if(cands.length===1) hit=cands[0];
+      else if(cands.length>1){ const nn=cands.filter(x=>x.nameT.some(t=>fnT.includes(t))); if(nn.length>=1) hit=nn[0]; }
+      else if(fnT.length){ const byName=rows.filter(x=>x.nameT.length&&x.nameT.join(' ')===fnT.join(' ')); if(byName.length===1) hit=byName[0]; }
+      if(!hit) return;
+      const social=(hit.r.social||'').trim();
+      const demoTxt=(hit.r.demo||'').trim();
+      const links=_extractUrls(demoTxt).slice(0,10);
+      Object.keys(data).forEach(cat=>{
+        const arr=Array.isArray(data[cat])?data[cat]:Object.values(data[cat]||{});
+        arr.filter(Boolean).forEach(x=>{
+          if(x.id!==s.id) return;
+          if(social) x.social=social;
+          if(links.length) x.demoLinks=links;
+          else if(demoTxt && demoTxt!=='-') x.demoNote=demoTxt;
+        });
+        data[cat]=arr;
+      });
+      matched++; if(social) socialN++; if(links.length) demoN++;
+    });
+    saveStaffData(data);
+    _allStaffCache=null; try{ _roleCatCache=null; }catch(e){}
+    try{ logAudit('staff.edit','ทั้งทีม','ดึงโซเชียล/เดโม่จากชีท — จับคู่ '+matched+' คน'); }catch(e){}
+    toast('📋 จับคู่ได้ '+matched+' คน · โซเชียล '+socialN+' · ลิงก์เดโม่ '+demoN+' คน','success');
+    try{ renderStaff(); }catch(e){}
+    try{ renderAlloc(); }catch(e){}
+  }catch(e){
+    const msg=String(e.message||'');
+    if(msg.includes('ไม่รู้จักคำสั่ง')){ toast('Apps Script "Guin Drive" ยังเป็นเวอร์ชันเก่า — วางโค้ด .gs ล่าสุดแล้ว Deploy เวอร์ชันใหม่ก่อน (จะขอสิทธิ์ Google Sheets เพิ่ม กดอนุญาตได้เลย)','warn'); return; }
+    if(confirm('อ่านชีทไม่สำเร็จ: '+msg+'\n\nเปลี่ยนลิงก์ชีทใหม่ไหม?')) pullSocialDemoFromSheet(true);
+  }finally{ showLoader(false); }
+}
+// 🎬 ป็อปอัพเลือกลิงก์เดโม่ (คนที่มีหลายลิงก์)
+function openDemoPicker(staffId){
+  const s=getStaffById(staffId); if(!s) return;
+  const links=s.demoLinks||[];
+  _tagOverlayShow('🎬 ตัวอย่างผลงาน — '+esc(s.nickname||s.name||''), `
+    ${links.map((u,i)=>`<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--border2)">
+      <span style="flex:1;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${i+1}. ${esc(u)}</span>
+      <button class="btn btn-sm btn-blue" onclick="window.open('${escJs(u)}','_blank')">▶️ เปิด</button>
+    </div>`).join('')}
+    ${s.demoNote?`<div style="font-size:11.5px;color:var(--text2);margin-top:8px">📝 ${esc(s.demoNote)}</div>`:''}
+    <div style="display:flex;margin-top:10px"><button class="btn btn-outline" style="flex:1" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button></div>`, 480);
+}
+// ปุ่ม/อิโมจิเดโม่ บนแถวคนในหน้าจัดสรร
+function _alcDemoBtn(s){
+  const links=(s&&s.demoLinks)||[];
+  if(!links.length) return '<span style="font-size:10px;opacity:.4;cursor:default" title="ไม่ทราบลิงก์ตัวอย่างผลงาน — กด 📋 ดึงจากชีท ที่หน้าจัดการทีม">🎬❔</span>';
+  if(links.length===1) return '<span class="alc-chip alc-c-day" style="padding:1px 7px;cursor:pointer" onclick="event.stopPropagation();window.open(\''+escJs(links[0])+'\',\'_blank\')" title="เปิดตัวอย่างผลงาน/เดโม่">🎬 เดโม่</span>';
+  return '<span class="alc-chip alc-c-day" style="padding:1px 7px;cursor:pointer" onclick="event.stopPropagation();openDemoPicker(\''+esc(s.id)+'\')" title="มีตัวอย่างผลงาน '+links.length+' ลิงก์ — กดเลือก">🎬 ×'+links.length+'</span>';
+}
 async function openBulkDiscordLink(){
   showLoader(true);
   try{
@@ -5900,6 +5977,7 @@ function _alcPersonRow(o, busy){
     +(_alcPres(s).includes('dub')&&(s.gender==='ชาย'||s.gender==='หญิง')
       ?'<span class="alc-chip '+(s.gender==='หญิง'?'alc-c-in':'alc-c-day')+'" style="padding:1px 6px" title="เพศ (จากทะเบียนทีม)">'+(s.gender==='หญิง'?'♀ ญ':'♂ ช')+'</span>':'')
     +'<span class="alc-roles">'+_alcPres(s).map(p2=>'<span class="alc-rl">'+((ALC_ROLE[p2]||'').split(' ')[0])+'</span>').join('')+'</span>'
+    +_alcDemoBtn(s)
     +(busy
       ? '<span class="alc-chip alc-c-warn">🙅 แจ้งไม่ว่าง</span><span class="alc-tgl" onclick="alcSetAvail(\''+esc(o.sid)+'\',true)" title="ถ้าจริง ๆ แล้วเขาว่าง กดปุ่มนี้ — จะย้ายกลับมาให้ลากเข้างานได้">↩️ ว่างแล้ว</span>'
       : _alcAvailChip(rep)+' '+_alcJobChip(o.sid)+' '+loadChipHTML(o.sid)+(drafted?' '+_alcDraftChips(o.sid):'')
@@ -7004,6 +7082,7 @@ function _prRoomView(p){
       </div>
       <div class="pr2-mini">
         <button class="btn btn-blue btn-sm" onclick="prPullTeam('${esc(p.id)}')" title="เปิดสิทธิ์ให้ทีมที่ผูก Discord แล้วเห็นหมวด+ห้อง">👥 ดึงทีม${team.length?' '+linked+'/'+team.length:''}</button>
+        <button class="btn btn-outline btn-sm" onclick="openSwapWorker('${esc(p.id)}')" title="เปลี่ยนคนทำงาน — เปลี่ยนทั้งในโปรเจกต์ (คงราคาเดิม) และสลับสิทธิ์ห้องดิส (เอาคนเก่าออก ดึงคนใหม่เข้า) จบในคลิกเดียว">🔄 สลับคนทำงาน</button>
         <button class="btn btn-outline btn-sm" onclick="_prRoomManage('${esc(p.id)}')" title="ตัวเลือกจัดการห้องเพิ่มเติม">⋯ จัดการห้อง</button>
       </div>
     </div>
@@ -7582,6 +7661,82 @@ function prPickMention(staffId){
   ta.value=ta.value.slice(0,pos.s)+tag+' '+ta.value.slice(pos.e);
   ta.focus();
   ta.selectionStart=ta.selectionEnd=pos.s+tag.length+1;
+}
+// ══ 🔄 สลับคนทำงาน — เปลี่ยนคนในโปรเจกต์ + สลับสิทธิ์ห้องดิส (เอาคนเก่าออก ดึงคนใหม่เข้า) จบในกล่องเดียว ══
+const _SWAP_ROLE_TH={dub:'🎤 พากย์',adp:'✍️ บท',mix:'🎧 มิกซ์',qc:'✅ QC',sub:'🎬 ซับ',trn:'🌐 แปล',mgr:'🗂️ เมเนเจอร์'};
+function openSwapWorker(projId){
+  const p=getProjects().find(x=>x.id===projId); if(!p) return;
+  const cur=(p.workers||[]).filter(w=>w&&w.id);
+  if(!cur.length){ toast('งานนี้ยังไม่มีคนในทีม — จัดคนที่หน้า 🎯 จัดสรรคน ก่อน','warn'); return; }
+  const seen=new Set();
+  const opts=getAllStaff().filter(s=>s&&s.id&&isStaffAssignable(s)&&!seen.has(s.id)&&seen.add(s.id))
+    .sort((a,b)=>String(a.nickname||a.name||'').localeCompare(String(b.nickname||b.name||''),'th'));
+  const hasRoom=!!p.discordChannelId;
+  _tagOverlayShow('🔄 สลับคนทำงาน — '+esc(projDisp(p)), `
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.7;margin-bottom:10px">
+      เลือกคนเดิม → เลือกคนใหม่ → ระบบเปลี่ยนให้ทั้งในโปรเจกต์ (คงราคา/หน้าที่เดิม) ${hasRoom?'และ<strong>สลับสิทธิ์ห้องดิสให้ด้วย</strong> (เอาคนเก่าออก ดึงคนใหม่เข้า)':'· งานนี้ยังไม่มีห้องดิส จึงเปลี่ยนเฉพาะในเว็บ'}
+    </div>
+    <div class="pr-lbl">คนเดิมที่จะถอดออก</div>
+    <select id="sw-old" class="pr-in">
+      ${cur.map((w,i)=>{const s=getStaffById(w.id);const pre=(w.slot||'').split('-')[0];
+        return `<option value="${i}">${esc(s?(s.nickname||s.name):w.id)} · ${_SWAP_ROLE_TH[pre]||pre} · ${fmtB(w.amount||0)}${w.status==='paid'?' (จ่ายแล้ว!)':''}</option>`;}).join('')}
+    </select>
+    <div class="pr-lbl">คนใหม่ที่จะเข้าแทน (ได้ราคา/หน้าที่เดิม แก้ทีหลังได้)</div>
+    <select id="sw-new" class="pr-in">
+      <option value="">— เลือกคนใหม่ —</option>
+      ${opts.map(s=>`<option value="${esc(s.id)}">${esc(s.nickname||s.name)}${s.name&&s.nickname?' · '+esc(s.name):''}${s.discordId?' 🔗':''}</option>`).join('')}
+    </select>
+    ${hasRoom?`<label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;margin-top:8px">
+      <input type="checkbox" id="sw-discord" checked> <span>สลับสิทธิ์ห้องดิสด้วย (เอาคนเก่าออกจากห้อง + ดึงคนใหม่เข้า)</span>
+    </label>`:''}
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-green" style="flex:1" onclick="doSwapWorker('${esc(p.id)}')">🔄 ยืนยันสลับคน</button>
+      <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ยกเลิก</button>
+    </div>
+    <div style="font-size:10.5px;color:var(--text2);margin-top:8px;line-height:1.6">คนใหม่จะเริ่มที่สถานะ "รอจ่าย" และต้องยืนยันยอดใหม่ · คนเก่าที่มีป้าย (จ่ายแล้ว!) ระบบจะถามย้ำก่อน</div>`, 480);
+}
+async function doSwapWorker(projId){
+  const p=getProjects().find(x=>x.id===projId); if(!p) return;
+  const cur=(p.workers||[]).filter(w=>w&&w.id);
+  const oi=parseInt(document.getElementById('sw-old')?.value); const w=cur[oi];
+  const newId=document.getElementById('sw-new')?.value;
+  const doDiscord=!!document.getElementById('sw-discord')?.checked;
+  if(!w||!newId){ toast('เลือกคนเดิมและคนใหม่ให้ครบก่อน','warn'); return; }
+  if(w.id===newId){ toast('คนเดิมกับคนใหม่เป็นคนเดียวกัน','warn'); return; }
+  const oldS=getStaffById(w.id), newS=getStaffById(newId);
+  const pre=(w.slot||'').split('-')[0];
+  if(w.status==='paid' && !confirm('⚠️ คนเดิม ('+(oldS?(oldS.nickname||oldS.name):'')+') ถูกบันทึกว่า "จ่ายเงินแล้ว" ในงานนี้\n\nสลับคนแล้วรายการจ่ายเดิมจะย้ายไปเป็นชื่อคนใหม่ (สถานะถูกรีเซ็ตเป็นรอจ่าย)\nยืนยันจะสลับต่อไหม?')) return;
+  if(!confirm('สลับ '+(oldS?(oldS.nickname||oldS.name):w.id)+' → '+(newS?(newS.nickname||newS.name):newId)+'\nหน้าที่ '+(_SWAP_ROLE_TH[pre]||pre)+' · ราคาเดิม '+fmtB(w.amount||0)+(doDiscord&&p.discordChannelId?'\n+ สลับสิทธิ์ห้องดิสให้ด้วย':'')+'\n\nยืนยัน?')) return;
+  showLoader(true);
+  try{
+    const oldId=w.id, slot=w.slot;
+    const res=await saveProjectMerge(projId, f=>{
+      (f.workers||[]).forEach(x=>{
+        if(!x||x.id!==oldId||x.slot!==slot) return;
+        x.id=newId;
+        x.status='pending'; delete x.paidAt; delete x.voucherNo;
+        x.confirmStatus='none'; delete x.confirmSentAt; delete x.confirmAmount; delete x.confirmRespondedAt; delete x.confirmRejectReason;
+        x.note=(x.note?x.note+' · ':'')+'สลับแทน '+(oldS?(oldS.nickname||oldS.name):oldId);
+      });
+    });
+    if(res&&res.ok===false){ toast('บันทึกไม่สำเร็จ','error'); return; }
+    let dcMsg='';
+    if(doDiscord&&p.discordChannelId){
+      const rooms=[p.discordChannelId,p.discordTalkId].filter(Boolean);
+      let out=0,inn=0,fail=0,failMsg='';
+      for(const ch of rooms){
+        if(oldS&&oldS.discordId){ try{ await callProjBot({action:'discordRemoveMember',channelId:ch,userId:oldS.discordId}); out++; }catch(e){ fail++; failMsg=String(e.message||''); } }
+        if(newS&&newS.discordId){ try{ await callProjBot({action:'discordAllowMember',channelId:ch,userId:newS.discordId}); inn++; }catch(e){ fail++; failMsg=String(e.message||''); } }
+      }
+      dcMsg=' · ดิส: เอาออก '+out+' เข้า '+inn+(fail?' · พลาด '+fail+(failMsg.includes('ไม่รู้จักคำสั่ง')?' (ต้อง Deploy worker ใหม่ก่อนถึงเอาคนออกได้)':''):'');
+      if(!newS||!newS.discordId) dcMsg+=' · ⚠️ คนใหม่ยังไม่ผูก Discord ดึงเข้าห้องไม่ได้';
+    }
+    try{ logAudit('project.edit', p.name, 'สลับคน '+(oldS?(oldS.nickname||oldS.name):'')+' → '+(newS?(newS.nickname||newS.name):'')+' ('+(_SWAP_ROLE_TH[pre]||pre)+')'); }catch(e){}
+    document.getElementById('tag-overlay')?.remove();
+    toast('🔄 สลับคนเรียบร้อย'+dcMsg,'success');
+    try{ renderProjRoom(); }catch(e){}
+    try{ if(!document.getElementById('page-projects').classList.contains('hidden')) renderProjects(); }catch(e){}
+  }finally{ showLoader(false); }
 }
 async function prPullTeam(projId){
   const p=getProjects().find(x=>x.id===projId); if(!p) return;
@@ -14470,6 +14625,7 @@ function renderProjList(){
           +'<div style="display:flex;gap:3px">'
           +'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();openEditProject(\''+pid+'\')" title="แก้ไข">✏️</button>'
           +'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();copyProject(\''+pid+'\')" title="คัดลอก">📋</button>'
+          +'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();openSwapWorker(\''+pid+'\')" title="สลับคนทำงาน — เปลี่ยนคนในโปรเจกต์ + สลับสิทธิ์ห้องดิสในคลิกเดียว">🔄</button>'
           +(p.discordCategoryName
             ?'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();syncProjStatusEmoji(\''+pid+'\', true)" title="ซิงก์อิโมจิสถานะหน้าชื่อหมวดห้องดิส (🟡🟠🟢🔴) — ปกติเปลี่ยนเองตอนติ๊กสถานะ">🎨</button>'
             :'<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();prBindCategory(\''+pid+'\')" title="ผูกหมวดหมู่ห้องดิสของงานนี้ (พิมพ์ชื่อหมวดตรงเป๊ะครั้งเดียว) — ผูกแล้วอิโมจิสถานะ 🟡🟠🟢🔴 จะเปลี่ยนให้อัตโนมัติ">🏷️</button>')
@@ -29722,6 +29878,7 @@ function teamMemberCardHTML(s, col, viewer){
         </div>
         ${s.promptpay?`<div style="font-size:11px;color:var(--text2)">${esc(s.promptpay)}</div>`:''}
         ${(rank===''&&s.email)?`<div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(s.email)}">📧 ${esc(s.email)}</div>`:''}
+        ${s.social?(()=>{const u=_extractUrls(s.social)[0];return `<div style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(s.social)}">${u?`<a href="${esc(u)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--accent2)">📱 ${esc(s.social)}</a>`:`<span style="color:var(--text2)">📱 ${esc(s.social)}</span>`}</div>`;})():''}
         ${staffTagChipsHTML(s)}
       </div>
       ${viewer==='admin'?'<span style="color:var(--text2);font-size:14px;flex-shrink:0">›</span>':''}
