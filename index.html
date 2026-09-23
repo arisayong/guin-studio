@@ -3092,6 +3092,17 @@ body.sidebar-collapsed .main-content{
      💡 Google Drive share link จะถูกแปลงเป็นลิงก์รูปตรง ๆ ให้อัตโนมัติ — แค่วาง URL แล้วระบบจัดการเอง
     </div>
    </div>
+   <div class="form-group">
+    <label class="form-label">📱 ช่องทางติดต่อโซเชียล <span style="color:var(--text2)">(เฟซ/ไลน์/IG — วางลิงก์หรือพิมพ์ชื่อบัญชีก็ได้)</span></label>
+    <input class="form-input" id="st-social" placeholder="https://www.facebook.com/... หรือ @line_id">
+   </div>
+   <div class="form-group">
+    <label class="form-label">🎬 ลิงก์ผลงาน / เดโม่ <span style="color:var(--text2)">(ใส่ได้หลายลิงก์ — บรรทัดละ 1 ลิงก์)</span></label>
+    <textarea class="form-input" id="st-demo" rows="3" placeholder="https://youtube.com/...&#10;https://drive.google.com/..." style="resize:vertical;font-family:Kanit;line-height:1.6"></textarea>
+    <div style="font-size:10px;color:var(--text2);margin-top:4px;line-height:1.5">
+     💡 ปุ่ม "📋 ดึงโซเชียล/เดโม่" ในหน้าทะเบียนทีมจะเติมช่องนี้ให้อัตโนมัติจากชีทสมัครทีม — แก้เองทับได้ตลอด
+    </div>
+   </div>
    <div id="st-role-toggle" style="display:none"></div>
   </div>
   <!-- Warning section - แสดงเฉพาะตอนแก้ไข -->
@@ -3151,9 +3162,9 @@ body.sidebar-collapsed .main-content{
 //    แก้เลขนี้ทุกครั้งที่อัปไฟล์ · แก้เล็ก +0.1 · แก้ใหญ่/เพิ่มระบบ +1
 //    เลขโชว์ที่หัวเว็บมุมซ้ายบน — ถ้าเลขยังไม่เปลี่ยน = ยังไม่ได้อัป หรือเบราว์เซอร์ยังใช้ของเก่า (Ctrl+Shift+R)
 // ══════════════════════════════════════════════
-const APP_VERSION='4.3';
+const APP_VERSION='4.4';
 const APP_BUILD='23 ก.ย. 2569';
-const APP_CHANGES='ดึงโซเชียล/เดโม่: บอกวิธีแก้สิทธิ์ Google Sheets + โชว์รหัส Deploy ที่เว็บเรียกจริง · หัวเว็บโชว์เวลาอัปไฟล์จากเซิร์ฟเวอร์อัตโนมัติ';
+const APP_CHANGES='ฟอร์มแก้ไขสมาชิก: เพิ่มช่องโซเชียล + ลิงก์เดโม่ (แก้เองได้) · แก้บั๊กกดบันทึกแล้วข้อมูลที่ไม่มีช่องในฟอร์มหาย (Discord/แท็ก/โซเชียล) · หน้าโปรไฟล์โชว์โซเชียล+ผลงาน';
 (function _showAppVer(){
   const el=document.getElementById('app-ver'); if(!el) return;
   let liveAt='';
@@ -20456,7 +20467,7 @@ function toggleStaffBody(id){
 function openAddStaff(){
   editingStaffId=null;editingStaffCat=null;_iwStaffId='';_iaStaffId='';document.getElementById('addstaff-title').textContent='➕ เพิ่มสมาชิกใหม่';const _ws=document.getElementById('st-warn-section');if(_ws)_ws.classList.add('hidden');const _wa=document.getElementById('st-appr-section');if(_wa)_wa.classList.add('hidden');
   const _db=document.getElementById('st-delete-btn'); if(_db) _db.style.display='none';
-  ['st-name','st-nick','st-bank','st-account','st-promptpay','st-email','st-qr-url'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['st-name','st-nick','st-bank','st-account','st-promptpay','st-email','st-qr-url','st-social','st-demo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   _previewStQr('');
   document.getElementById('st-gender').selectedIndex=0;
   setStaffCatsChecked(['dubbing']); // default = Dubbing
@@ -20513,6 +20524,10 @@ function openEditStaff(id,cat){
   document.getElementById('st-bank').value=s.bank||'';document.getElementById('st-account').value=s.account||'';
   document.getElementById('st-promptpay').value=s.promptpay||'';document.getElementById('st-email').value=s.email||'';
   const qrEl = document.getElementById('st-qr-url'); if(qrEl){ qrEl.value = s.qrUrl || ''; _previewStQr(qrEl.value); }
+  // 📱🎬 โซเชียล + ลิงก์เดโม่ — เดโม่โชว์บรรทัดละลิงก์ ถ้าไม่มีลิงก์แต่มีข้อความโน้ตก็เอาโน้ตมาโชว์
+  const socEl=document.getElementById('st-social'); if(socEl) socEl.value=s.social||'';
+  const demoEl=document.getElementById('st-demo');
+  if(demoEl) demoEl.value=(Array.isArray(s.demoLinks)&&s.demoLinks.length)?s.demoLinks.join('\n'):(s.demoNote||'');
   const catSel=document.getElementById('st-cat-wrap');setStaffCatsChecked(s.categories||[cat]);
   const genderSel=document.getElementById('st-gender');[...genderSel.options].forEach((o,i)=>{if(o.text===s.gender)genderSel.selectedIndex=i});
   // Load appreciations
@@ -20578,10 +20593,21 @@ function saveStaff(){
   if(_oldEmLc && _newEmail && _oldEmLc!==_newEmail.toLowerCase() && !_prevEmails.some(x=>String(x).toLowerCase()===_oldEmLc)){
     _prevEmails.push(_oldRec.email);
   }
-  const baseStaff={id:editingStaffId||('S'+Date.now()),name,nickname:nick,gender:document.getElementById('st-gender').value,
+  // 📱🎬 โซเชียล + ลิงก์เดโม่ — ในกล่องเดโม่ใส่ได้หลายบรรทัด ดึงเฉพาะ URL ออกมาเก็บเป็นลิสต์
+  //    ถ้าพิมพ์เป็นข้อความล้วน (ไม่มีลิงก์) เก็บเป็นโน้ตแทน จะได้ไม่หาย
+  const _social=(document.getElementById('st-social')?.value||'').trim();
+  const _demoRaw=(document.getElementById('st-demo')?.value||'').trim();
+  const _demoLinks=(typeof _extractUrls==='function')?_extractUrls(_demoRaw):[];
+  // ⚠️ ต้อง spread ของเดิมไว้ก่อน — ไม่งั้นฟิลด์ที่ฟอร์มนี้ไม่มีช่อง (Discord ที่ผูกไว้, แท็ก, ที่อยู่,
+  //    เลขผู้เสียภาษี ฯลฯ) จะหายทุกครั้งที่กดบันทึก เพราะเรคคอร์ดถูกสร้างใหม่ทับของเดิม
+  const baseStaff={...(_oldRec||{}),
+    id:editingStaffId||('S'+Date.now()),name,nickname:nick,gender:document.getElementById('st-gender').value,
     bank:document.getElementById('st-bank').value.trim(),account:document.getElementById('st-account').value.trim(),
     promptpay:document.getElementById('st-promptpay').value.trim(),email:_newEmail,
     qrUrl:(document.getElementById('st-qr-url')?.value||'').trim(),
+    social:_social,
+    demoLinks:_demoLinks,
+    demoNote:(!_demoLinks.length && _demoRaw)?_demoRaw:'',
     prevEmails:_prevEmails.slice(-5),
     manualEditAt:new Date().toISOString(),
     categories:cats};
@@ -30046,6 +30072,20 @@ function renderStaffDetail(){
           ${infoRow('💸','พร้อมเพย์',s.promptpay)||'<div style="padding:10px 16px;color:var(--text2);font-size:12px">— ไม่มีพร้อมเพย์ —</div>'}
           ${infoRow('🏦','ธนาคาร',s.bank?(s.bank+' '+(s.account||'')):'')}
           ${infoRow('📧','อีเมล',s.email)}
+          ${(()=>{ // 📱 โซเชียล — ถ้าเป็นลิงก์ทำให้กดได้เลย
+            if(!s.social) return '';
+            const u=(typeof _extractUrls==='function'?_extractUrls(s.social):[])[0];
+            const body=u?`<a href="${esc(u)}" target="_blank" rel="noopener" style="color:var(--accent2);word-break:break-all">${esc(s.social)}</a>`:esc(s.social);
+            return `<div style="display:flex;gap:10px;padding:10px 16px;border-top:1px solid var(--border2);font-size:12.5px"><span style="width:80px;color:var(--text2);font-size:12px;flex-shrink:0">📱 โซเชียล</span><span style="flex:1">${body}</span></div>`;
+          })()}
+          ${(()=>{ // 🎬 ลิงก์ผลงาน/เดโม่ — มีหลายลิงก์ก็ไล่เรียงให้ครบ
+            const ls=Array.isArray(s.demoLinks)?s.demoLinks:[];
+            if(!ls.length && !s.demoNote) return '';
+            const body=ls.length
+              ? ls.map((u,i)=>`<a href="${esc(u)}" target="_blank" rel="noopener" style="color:var(--accent2);word-break:break-all">ลิงก์ ${i+1}</a>`).join(' · ')
+              : `<span style="color:var(--text2)">${esc(s.demoNote)}</span>`;
+            return `<div style="display:flex;gap:10px;padding:10px 16px;border-top:1px solid var(--border2);font-size:12.5px"><span style="width:80px;color:var(--text2);font-size:12px;flex-shrink:0">🎬 ผลงาน</span><span style="flex:1">${body}</span></div>`;
+          })()}
           ${s.qrUrl?`<div style="display:flex;align-items:center;gap:10px;padding:12px 16px"><span style="width:80px;color:var(--text2);font-size:12px;flex-shrink:0">📱 QR</span>${(typeof _qrImgHtml==='function')?_qrImgHtml(s.qrUrl,'thumb',{staffName:s.nickname||s.name,clickToView:true}):''}</div>`:''}
           <div style="display:flex;gap:8px;padding:14px 16px;flex-wrap:wrap;border-top:1px solid var(--border2)">
             <button class="btn btn-outline btn-sm" style="border-color:rgba(255,64,64,.35);color:#FF6060" onclick="teamWarn('${s.id}')">✉️ ออกใบเตือน</button>
