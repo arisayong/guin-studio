@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20260928-21"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20260928-22"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -3660,9 +3660,9 @@ function renderNotifPage(){
              : (n.type==='payment' && currentUser?.role==='admin') ? "nav('queue')"
              : (n.projId && /^[A-Za-z0-9_-]+$/.test(String(n.projId))) ? `if(typeof openProjDetail==='function')openProjDetail('${n.projId}')` : '';
     return `<div onclick="markOneNotifRead('${escJs(n.id)}');${go}" style="cursor:pointer;padding:13px 16px;border-bottom:1px solid var(--border2);display:flex;gap:12px;align-items:flex-start;${n.read?'':'background:rgba(0,180,255,.06)'}">
-      <div style="width:36px;height:36px;border-radius:10px;background:${meta.bgColor};color:${meta.color};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">${meta.icon}</div>
+      <div style="width:36px;height:36px;border-radius:10px;background:${meta.bgColor};color:${meta.color};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">${esc(_emoSplit(n.title)[0])||meta.icon}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13.5px;font-weight:700;color:var(--text)">${esc(n.title||'')}${n.read?'':' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent2);vertical-align:middle;margin-left:4px"></span>'}</div>
+        <div style="font-size:13.5px;font-weight:700;color:var(--text)">${esc(_emoSplit(n.title)[1])}${n.read?'':' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent2);vertical-align:middle;margin-left:4px"></span>'}</div>
         ${n.text?`<div style="font-size:12px;color:var(--text2);line-height:1.55;margin-top:2px">${esc(n.text)}</div>`:''}
         <div style="font-size:10.5px;color:var(--text2);opacity:.75;margin-top:4px">${_notifTimeAgo(n.createdAt)}</div>
       </div></div>`;
@@ -3699,7 +3699,8 @@ function _renderNotifList(){
   const top30 = sorted.slice(0, 30);
   list.innerHTML = top30.map(n => {
     const meta = NOTIF_TYPES[n.type] || NOTIF_TYPES.payment;
-    const titleEsc = String(n.title||'').replace(/</g,'&lt;');
+    const [_nIc,_nTitle] = _emoSplit(n.title);
+    const titleEsc = String(_nTitle).replace(/</g,'&lt;');
     const textEsc = String(n.text||'').replace(/</g,'&lt;');
     const unreadStyle = n.read ? '' : 'background:rgba(0,180,255,.06)';
     const unreadDot = n.read ? '' : '<span style="width:6px;height:6px;border-radius:50%;background:var(--accent2);margin-top:7px;flex-shrink:0;align-self:flex-start"></span>';
@@ -3719,7 +3720,7 @@ function _renderNotifList(){
     }
     return `<div ${clickHandler} style="padding:11px 14px;border-bottom:1px solid var(--border2);display:flex;gap:10px;${unreadStyle}">
       ${unreadDot}
-      <div style="width:32px;height:32px;border-radius:8px;background:${meta.bgColor};color:${meta.color};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${meta.icon}</div>
+      <div style="width:32px;height:32px;border-radius:8px;background:${meta.bgColor};color:${meta.color};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${String(_nIc).replace(/</g,'&lt;')||meta.icon}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">${titleEsc}</div>
         ${textEsc ? `<div style="font-size:11.5px;color:var(--text2);line-height:1.5">${textEsc}</div>` : ''}
@@ -9975,10 +9976,20 @@ try { history.replaceState({_bk: 0, key:'_root'}, ''); } catch(e){}
   });
   obs.observe(document.body, { childList: true });
 })();
+// 🧼 แยกอิโมจิที่ขึ้นต้นข้อความออก → แสดงเป็นไอคอนช่องเดียว (กันอิโมจิซ้อน 2 ตัว เช่น ✅ ✅ บันทึกแล้ว)
+function _emoSplit(s){ s=String(s==null?'':s);
+  const m=s.match(/^\s*((?:\p{Extended_Pictographic}[️‍\u{1F3FB}-\u{1F3FF}\p{Extended_Pictographic}]*\s*)+)/u);
+  if(!m) return ['', s];
+  const rest=s.slice(m[0].length); if(!rest.trim()) return ['', s];
+  const first=(m[1].trim().match(/^\p{Extended_Pictographic}(?:[️\u{1F3FB}-\u{1F3FF}]|‍\p{Extended_Pictographic})*/u)||[''])[0];
+  return [first, rest];
+}
 function toast(msg,type='info'){
   const wrap=document.getElementById('toastWrap');const el=document.createElement('div');
   el.className=`toast ${type}`;const ic={success:'✅',error:'❌',info:'ℹ️',warn:'⚠️'};
-  el.innerHTML=`<span>${ic[type]||'ℹ️'}</span><span>${msg}</span>`;wrap.appendChild(el);
+  let [_le,_txt]=_emoSplit(msg);
+  _txt=String(_txt).replace(/\s*(?:✅|❌|⚠️?|ℹ️?)\s*$/u,'') || _txt;   // ติ๊กซ้ำท้ายข้อความ → เอาออก (มีไอคอนหน้าแล้ว)
+  el.innerHTML=`<span>${_le||ic[type]||'ℹ️'}</span><span>${_txt}</span>`;wrap.appendChild(el);
   setTimeout(()=>{el.style.opacity='0';el.style.transform='translateX(20px)';setTimeout(()=>el.remove(),300)},3500);
 }
 // Fix: ปิด modal เฉพาะตอน click จริง (mousedown + mouseup บน overlay ทั้งคู่)
@@ -32273,7 +32284,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20260928-21"></script><script src="scene/nd-profile.js?v=20260928-21"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20260928-22"></script><script src="scene/nd-profile.js?v=20260928-22"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32283,7 +32294,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20260928-21';
+var UPD_BUILD = '20260928-22';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
