@@ -75,7 +75,7 @@ function buildNav(){
     + item('availability','queueAvail','ลงคิว') + item('assign','assign','มอบหมายงาน')
     + grp('projmgr','nd-projmgr','projmgr','จัดการโปรเจกต์',pm)
     + item('projects','projects','โปรเจกต์') + item('track','track','ติดตามงาน') + item('mgr-calc','calc','คำนวนราคา')
-    + sec('ของฉัน') + item('mgr-home','mine','ภาพรวมของฉัน') + item('confirm-amount','confirm','ยืนยันยอด',badge('ca-badge-mgr'))
+    + sec('ของฉัน') + item('confirm-amount','confirm','ยืนยันยอด',badge('ca-badge-mgr'))
     + item('mgr-team','team','จัดการทีม')
     + item('nd-docs','docs','เอกสารของฉัน') + sec('อื่น ๆ') + item('nd-notifs','bell','การแจ้งเตือน') + item('nd-settings','settings','ตั้งค่า');
   const side=document.querySelector('aside.sidebar'); if(!side) return;
@@ -268,7 +268,7 @@ const POP={
   manager:{
     track:{t:'ติดตามงาน',go:'track',b:()=>`<p>โปรเจกต์ที่ดูแล</p><div class="big">${safe(()=>getMgrProjects().length,'—')} โปรเจกต์</div>`},
     work:{t:'มอบหมายงาน',go:'assign',b:()=>'<p>สร้างงาน<br>ตั้งเดทไลน์ราย Role</p>'},
-    history:{t:'ภาพรวมของฉัน',go:'mgr-home',b:()=>'<p>งานที่ทำและรายได้ของฉัน</p>'},
+    history:{t:'เอกสารของฉัน',go:'nd-docs',b:()=>'<p>ใบสำคัญจ่าย · 50 ทวิ<br>ของฉัน</p>'},   // เดิม = ภาพรวมของฉัน (เอาออกแล้ว)
     money:{t:'ยืนยันยอด',go:'confirm-amount',b:()=>'<p>ยืนยันยอดค่าตอบแทน<br>ของฉัน</p>'},
     folder:{t:'จัดการโปรเจกต์',go:'nd-projmgr',b:()=>'<p>จัดสรรคน · จัดไฟล์งาน<br>ห้องโปรเจกต์</p>'},
     pin:{t:'ลงคิว',go:'availability',b:()=>'<p>เปิดรอบลงคิว<br>ดูวันว่างของทีม</p>'},
@@ -554,7 +554,7 @@ function renderHelp(){
 // 📨 เมเนเจอร์: คำขอที่ส่งให้แอดมิน (ยกเลิกได้ระหว่างรอ)
 const REQ_LB={warning:'✉️ ขอออกใบเตือน',rename:'✏️ ขอเปลี่ยนชื่อโปรเจกต์'};
 function renderMyReqs(){
-  const pg=$('page-mgr-home'); const cu=CU(); if(!pg||!cu||role()!=='manager') return;
+  const pg=$('page-mgr-team'); const cu=CU(); if(!pg||!cu||role()!=='manager') return;   // ย้ายจากภาพรวมของฉัน → หน้าจัดการทีม
   let box=$('nd-myreq'); if(!box){ box=document.createElement('div'); box.id='nd-myreq'; const h=pg.querySelector('.page-header'); pg.insertBefore(box, h?h.nextSibling:pg.firstChild); }
   const mine=safe(()=>getMgrRequests(),[]).filter(r=>r&&r.managerId===cu.uid&&REQ_LB[r.type]).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0,6);
   const st={pending:['⏳ รออนุมัติ','var(--orange)'],approved:['✅ อนุมัติแล้ว','var(--green)'],rejected:['✕ ไม่อนุมัติ','var(--red)'],cancelled:['↩ ยกเลิกแล้ว','var(--text2)']};
@@ -632,7 +632,7 @@ function setupExtraPages(){
   const np=$('notif-panel'); if(np && !$('nd-nf-all')){ const a=document.createElement('div'); a.id='nd-nf-all';
     a.style.cssText='padding:10px;text-align:center;border-top:1px solid var(--border2);background:var(--bg2);font-size:12.5px;font-weight:700;color:var(--accent2);cursor:pointer';
     a.textContent='ดูแจ้งเตือนทั้งหมด →'; a.onclick=()=>{ try{ closeNotifPanel(); }catch(e){} nav('nd-notifs'); }; np.appendChild(a); }
-  const mh=$('page-mgr-home'); if(mh) new MutationObserver(()=>{ if(!mh.classList.contains('hidden')){ renderMyReqs(); safe(()=>loadMgrRequests(),null)?.then?.(renderMyReqs); } }).observe(mh,{attributes:true,attributeFilter:['class']});
+  const mh=$('page-mgr-team'); if(mh) new MutationObserver(()=>{ if(!mh.classList.contains('hidden')){ renderMyReqs(); safe(()=>loadMgrRequests(),null)?.then?.(renderMyReqs); } }).observe(mh,{attributes:true,attributeFilter:['class']});
 }
 // 🗂️ ขั้น 4: ห่อเนื้อหาใต้หัวเพจของทุกหน้าย่อยเป็นแผ่นการ์ดใหญ่ (.nd-sheet) — ย้ายกล่องเดิมเข้าไปทั้งกล่อง id เดิมอยู่ครบ ระบบเดิมวาดได้ตามปกติ
 const NO_SHEET=/^page-(home|nd-|staff-detail$|my-history$|payment-history$)/;
