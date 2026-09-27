@@ -13374,7 +13374,12 @@ async function fixMismatchByUpdateTeam(staffId, newEmail, displayName){
       const idx = arr.findIndex(s => s && s.id === staffId);
       if(idx >= 0){
         oldEmail = arr[idx].email || '(ว่าง)';
+        const _pe = Array.isArray(arr[idx].prevEmails) ? arr[idx].prevEmails.slice() : [];
+        const _old = String(arr[idx].email||'').trim();
+        if(_old && _old.toLowerCase()!==String(newEmail).toLowerCase() && !_pe.some(x=>String(x).toLowerCase()===_old.toLowerCase())) _pe.push(_old);
         arr[idx].email = newEmail;
+        arr[idx].prevEmails = _pe.slice(-5);
+        arr[idx].manualEditAt = new Date().toISOString();
         staffData[cat] = arr;
         found = true;
       }
@@ -29809,6 +29814,7 @@ async function syncFromSheet(opts){
       await new Promise(r=>setTimeout(r, 1200));
       mergedN = await autoDedupStaffByEmail();
     }catch(e){ console.warn('auto-dedup after sync:', e); }
+    try{ if(_privSplitOn) await saveStaffData(getStaffData()); }catch(e){ console.warn('re-split after sync:', e); }
 
     // === หา "คนใหม่จริง ๆ" จากอีเมลที่เพิ่งโผล่ (แม่นกว่า data.added ที่อาจนับ re-add ทั้งหมด) ===
     const _afterEmails = _emailSetNow();
@@ -31837,7 +31843,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20260928-1';
+var UPD_BUILD = '20260928-2';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
