@@ -536,21 +536,99 @@ const FAQ={
     ['ปิดวิดีโอพื้นหลัง / เปลี่ยนธีม','เมนูโปรไฟล์ → ⚙️ ตั้งค่า — ค่าที่ตั้งจะจำไว้กับบัญชี เข้าเครื่องไหนก็ได้ค่าเดิม'],
   ],
   manager:[
-    ['ขอออกใบเตือนสมาชิก','หน้า "จัดการทีม" → ✉️ — ระบบจะส่งเป็นคำขอให้แอดมินอนุมัติก่อน ใบเตือนจึงจะออกจริง ดูสถานะคำขอได้ที่ "ภาพรวมของฉัน"'],
+    ['ขอออกใบเตือนสมาชิก','หน้า "จัดการทีม" → ✉️ — ระบบจะส่งเป็นคำขอให้แอดมินอนุมัติก่อน ใบเตือนจึงจะออกจริง ดูสถานะคำขอได้ที่ด้านบนของหน้า "จัดการทีม"'],
     ['ทำไมไม่เห็นชื่อลูกค้า?','ตามนโยบายสตูดิโอ เมเนเจอร์ดูยอดและกำไรของงานที่ตัวเองดูแลหรือลงทำได้ แต่ไม่เห็นชื่อลูกค้า'],
     ['งานที่ขึ้นว่า "ดูอย่างเดียว"','เป็นงานที่คุณลงทำแต่ไม่ได้เป็นคนดูแล — ดูรายละเอียดได้ แต่แก้/ลบ/เปลี่ยนสถานะไม่ได้'],
   ],
 };
+// ❓ หน้าช่วยเหลือ — แอดมินแก้เองได้ (คำถาม/คำตอบ/ใครเห็น + ข้อความติดต่อแอดมิน) · เก็บที่ docAssets/helpPage
+//    ทุกคนในทีมอ่านได้ · แอดมินเขียนได้ (Rules เดิมของ docAssets) · ยังไม่เคยแก้ = ใช้ชุดเริ่มต้นด้านบน
+const HELP_WHO={all:'ทุกคน',staff:'ทีมงาน',manager:'เมเนเจอร์'};
+const HELP_CONTACT0='ถ้ายังหาคำตอบไม่เจอ ทักแอดมินในดิสคอร์ดของสตูดิโอได้เลย';
+let _help=null, _helpEdit=null, _helpLoading=false;
+function helpDefault(){
+  let n=0; const id=()=>'f'+(++n);
+  return { faq:[...FAQ.manager.map(([q,a])=>({id:id(),q,a,who:'manager'})), ...FAQ.staff.map(([q,a])=>({id:id(),q,a,who:'all'}))], contact:HELP_CONTACT0 };
+}
+function helpNorm(v){
+  const d=helpDefault(); if(!v||typeof v!=='object') return d;
+  const faq=(Array.isArray(v.faq)?v.faq:Object.values(v.faq||{})).filter(x=>x&&(x.q||x.a))
+    .map((x,i)=>({id:String(x.id||('f'+i)), q:String(x.q||''), a:String(x.a||''), who:HELP_WHO[x.who]?x.who:'all'}));
+  return { faq, contact:typeof v.contact==='string'?v.contact:d.contact, at:v.at||'', by:v.by||'' };
+}
+// ข้อความหลายบรรทัด + ลิงก์ https กดได้ (escape ก่อนเสมอ)
+function helpText(s){
+  return esc(s).replace(/https?:\/\/[^\s<>"']+/g, u=>`<a href="${u}" target="_blank" rel="noopener" style="color:var(--accent2)">${u}</a>`).replace(/\n/g,'<br>');
+}
+async function helpLoad(force){
+  if(_help && !force) return _help;
+  const db=(typeof _fbDatabase!=='undefined')?_fbDatabase:null;
+  try{ const sn=db?await db.ref('docAssets/helpPage').get():null; _help=helpNorm(sn&&sn.exists()?sn.val():null); }
+  catch(e){ _help=_help||helpDefault(); }
+  return _help;
+}
 function renderHelp(){
   const b=$('nd-help-body'); if(!b) return; const r=role();
-  const qs=[...(r==='manager'?FAQ.manager:[]), ...FAQ.staff];
+  if(!_help){ b.innerHTML='<div class="nd-set-card"><div class="nd-set-row"><small>⏳ กำลังโหลด...</small></div></div>';
+    if(!_helpLoading){ _helpLoading=true; helpLoad().then(()=>{ _helpLoading=false; renderHelp(); }); } return; }
+  if(_helpEdit && r==='admin') return renderHelpEdit(b);
+  const qs=_help.faq.filter(x=>r==='admin' || x.who==='all' || x.who===(r==='manager'?'manager':'staff') || (r==='manager' && x.who==='staff'));
+  // เมเนเจอร์เห็นคำถามของเมเนเจอร์ก่อน
+  if(r==='manager') qs.sort((a,b2)=>(a.who==='manager'?0:1)-(b2.who==='manager'?0:1));
+  const tag=x=>r==='admin'&&x.who!=='all'?` <span style="font-size:10.5px;font-weight:600;color:var(--text2);border:1px solid var(--border2);border-radius:8px;padding:1px 7px;margin-left:4px">${HELP_WHO[x.who]}เท่านั้น</span>`:'';
   b.innerHTML=`<div class="nd-set-card"><div class="nd-set-h">🧭 เริ่มต้นใช้งาน</div>
       <div class="nd-set-row"><div><b>ทัวร์แนะนำการใช้งาน</b><small>พาดูเมนูหลักทีละขั้น</small></div><button class="btn btn-blue btn-sm" type="button" onclick="try{showFirstTimeTour()}catch(e){}">▶ เริ่มทัวร์</button></div>
       ${r==='admin'?'<div class="nd-set-row"><div><b>ช็อตคัทแป้นพิมพ์</b><small>ปุ่มลัดสำหรับใช้งานเร็วขึ้น</small></div><button class="btn btn-outline btn-sm" type="button" onclick="try{showKeyboardHelp()}catch(e){}">⌨️ ดูช็อตคัท</button></div>':''}</div>
+    ${r==='admin'?`<div class="nd-set-card"><div class="nd-set-row"><div><b>✏️ แก้หน้าช่วยเหลือ</b><small>เพิ่ม/แก้/ลบ คำถาม-คำตอบ · เลือกว่าใครเห็น · แก้ข้อความติดต่อแอดมิน${_help.at?' · แก้ล่าสุด '+esc(String(_help.at).slice(0,10)):''}</small></div><button class="btn btn-blue btn-sm" type="button" onclick="ndHelpEdit()">✏️ แก้ไขหน้านี้</button></div></div>`:''}
     <div class="nd-set-card"><div class="nd-set-h">❓ คำถามที่พบบ่อย</div>
-      ${qs.map(([q,a])=>`<details class="nd-faq"><summary>${esc(q)}</summary><div>${esc(a)}</div></details>`).join('')}</div>
-    <div class="nd-set-card"><div class="nd-set-h">💬 ติดต่อแอดมิน</div><div class="nd-set-row"><div><small>ถ้ายังหาคำตอบไม่เจอ ทักแอดมินในดิสคอร์ดของสตูดิโอได้เลย</small></div></div></div>`;
+      ${qs.length?qs.map(x=>`<details class="nd-faq"><summary>${esc(x.q)}${tag(x)}</summary><div>${helpText(x.a)}</div></details>`).join(''):'<div class="nd-set-row"><small>ยังไม่มีคำถาม</small></div>'}</div>
+    <div class="nd-set-card"><div class="nd-set-h">💬 ติดต่อแอดมิน</div><div class="nd-set-row"><div><small style="line-height:1.7">${helpText(_help.contact||HELP_CONTACT0)}</small></div></div></div>`;
 }
+function renderHelpEdit(b){
+  const E=_helpEdit;
+  const opt=w=>Object.entries(HELP_WHO).map(([k,l])=>`<option value="${k}"${w===k?' selected':''}>👁 ${l}</option>`).join('');
+  const inp='width:100%;padding:8px 10px;border-radius:8px;background:var(--bg2);border:1px solid var(--border2);color:var(--text);font-family:inherit;font-size:13px';
+  b.innerHTML=`<div class="nd-set-card"><div class="nd-set-h">✏️ แก้หน้าช่วยเหลือ <span>${E.faq.length} คำถาม</span></div>
+      ${E.faq.map((x,i)=>`<div class="nd-set-row" style="display:block;border-top:1px solid var(--border2)">
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+          <b style="min-width:26px;color:var(--text2)">${i+1}.</b>
+          <select data-i="${i}" data-f="who" style="${inp};width:auto">${opt(x.who)}</select>
+          <span style="margin-left:auto;display:flex;gap:4px">
+            <button class="btn btn-outline btn-sm" type="button" title="เลื่อนขึ้น" onclick="ndHelpMove(${i},-1)" ${i?'':'disabled'}>↑</button>
+            <button class="btn btn-outline btn-sm" type="button" title="เลื่อนลง" onclick="ndHelpMove(${i},1)" ${i<E.faq.length-1?'':'disabled'}>↓</button>
+            <button class="btn btn-red btn-sm" type="button" title="ลบคำถามนี้" onclick="ndHelpDel(${i})">🗑</button></span></div>
+        <input data-i="${i}" data-f="q" value="${esc(x.q)}" placeholder="คำถาม" maxlength="200" style="${inp};font-weight:700;margin-bottom:6px">
+        <textarea data-i="${i}" data-f="a" rows="3" placeholder="คำตอบ (ขึ้นบรรทัดใหม่ได้ · ใส่ลิงก์ https:// แล้วกดได้)" maxlength="3000" style="${inp};resize:vertical">${esc(x.a)}</textarea>
+      </div>`).join('')}
+      <div class="nd-set-row"><button class="btn btn-outline btn-sm" type="button" onclick="ndHelpAdd()">➕ เพิ่มคำถาม</button></div></div>
+    <div class="nd-set-card"><div class="nd-set-h">💬 ติดต่อแอดมิน</div>
+      <div class="nd-set-row" style="display:block"><textarea id="nd-help-contact" rows="3" maxlength="1000" placeholder="เช่น ทักแอดมินในดิสคอร์ด หรือใส่ลิงก์" style="${inp};resize:vertical">${esc(E.contact)}</textarea></div></div>
+    <div class="nd-set-card"><div class="nd-set-row"><div><small>ยังไม่บันทึกจนกว่าจะกด 💾 · "คืนค่าเริ่มต้น" = กลับไปใช้ชุดคำถามเดิมของระบบ</small></div>
+      <span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-outline btn-sm" type="button" onclick="ndHelpReset()">↺ คืนค่าเริ่มต้น</button>
+      <button class="btn btn-outline btn-sm" type="button" onclick="ndHelpCancel()">ยกเลิก</button>
+      <button class="btn btn-blue btn-sm" type="button" id="nd-help-save" onclick="ndHelpSave()">💾 บันทึก</button></span></div></div>`;
+  b.querySelectorAll('[data-f]').forEach(el=>el.addEventListener('input',()=>{ const x=E.faq[+el.dataset.i]; if(x) x[el.dataset.f]=el.value; }));
+  b.querySelectorAll('select[data-f]').forEach(el=>el.addEventListener('change',()=>{ const x=E.faq[+el.dataset.i]; if(x) x.who=el.value; }));
+  const c=$('nd-help-contact'); if(c) c.addEventListener('input',()=>{ E.contact=c.value; });
+}
+window.ndHelpEdit=async function(){ if(role()!=='admin') return; await helpLoad(true); _helpEdit=JSON.parse(JSON.stringify({faq:_help.faq, contact:_help.contact})); renderHelp(); };
+window.ndHelpAdd=function(){ if(!_helpEdit) return; _helpEdit.faq.push({id:'f'+Date.now().toString(36), q:'', a:'', who:'all'}); renderHelp();
+  setTimeout(()=>{ const q=document.querySelectorAll('#nd-help-body input[data-f="q"]'); const l=q[q.length-1]; if(l){ l.focus(); l.scrollIntoView({block:'center'}); } },30); };
+window.ndHelpDel=function(i){ if(!_helpEdit) return; const x=_helpEdit.faq[i]; if(x && (x.q||x.a) && !confirm('ลบคำถาม "'+(x.q||'(ไม่มีหัวข้อ)')+'"?')) return; _helpEdit.faq.splice(i,1); renderHelp(); };
+window.ndHelpMove=function(i,d){ if(!_helpEdit) return; const a=_helpEdit.faq, j=i+d; if(j<0||j>=a.length) return; [a[i],a[j]]=[a[j],a[i]]; renderHelp(); };
+window.ndHelpCancel=function(){ _helpEdit=null; renderHelp(); };
+window.ndHelpReset=function(){ if(!_helpEdit || !confirm('คืนค่าเริ่มต้น?\n\nคำถามที่แก้/เพิ่มไว้จะหายจากหน้าแก้ไข (ยังไม่บันทึกจนกว่าจะกด 💾)')) return; const d=helpDefault(); _helpEdit.faq=d.faq; _helpEdit.contact=d.contact; renderHelp(); };
+window.ndHelpSave=async function(){
+  const db=(typeof _fbDatabase!=='undefined')?_fbDatabase:null; if(!_helpEdit||!db||role()!=='admin') return;
+  const clean=v=>(typeof cleanStr==='function')?cleanStr(v,3000):String(v||'').replace(/[<>]/g,'').slice(0,3000);
+  const faq=_helpEdit.faq.map(x=>({id:String(x.id), q:clean(x.q).slice(0,200).trim(), a:clean(x.a).trim(), who:HELP_WHO[x.who]?x.who:'all'})).filter(x=>x.q||x.a);
+  if(faq.some(x=>!x.q)){ toast('มีคำถามที่ยังไม่ได้ใส่หัวข้อ','error'); return; }
+  const data={ faq, contact:clean(_helpEdit.contact).slice(0,1000).trim(), at:new Date().toISOString(), by:String((CU()&&(CU().nickname||CU().email))||'') };
+  const btn=$('nd-help-save'); if(btn){ btn.disabled=true; btn.textContent='⏳ กำลังบันทึก...'; }
+  try{ await db.ref('docAssets/helpPage').set(data); _help=helpNorm(data); _helpEdit=null; toast('💾 บันทึกหน้าช่วยเหลือแล้ว','success');
+    try{ logAudit('settings','ช่วยเหลือ','แก้หน้าช่วยเหลือ ('+faq.length+' คำถาม)'); }catch(e){} renderHelp(); }
+  catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); if(btn){ btn.disabled=false; btn.textContent='💾 บันทึก'; } }
+};
 // 📨 เมเนเจอร์: คำขอที่ส่งให้แอดมิน (ยกเลิกได้ระหว่างรอ)
 const REQ_LB={warning:'✉️ ขอออกใบเตือน',rename:'✏️ ขอเปลี่ยนชื่อโปรเจกต์'};
 function renderMyReqs(){

@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20260928-23"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20260928-25"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -9633,6 +9633,12 @@ async function saveBriefLibrary(){
 //    เขียนแบบ append-only — Firebase Rules ล็อกไม่ให้แก้/ลบ แม้แต่แอดมิน
 // ══════════════════════════════════════════════
 const AUDIT_ACTIONS = {
+  'staff.link':       {icon:'🔗', label:'ผูกบัญชีกับรายชื่อทีม'},
+  'staff.unlink':     {icon:'🧹', label:'เอาบัญชีที่ไม่ได้ผูกออก'},
+  'staff.selfsync':   {icon:'🙋', label:'นำข้อมูลที่สมาชิกแก้เองเข้าทะเบียน'},
+  'staff.sheetguard': {icon:'🏆', label:'คงค่าที่แก้ในเว็บ (ชีทพยายามทับ)'},
+  'security':         {icon:'🔒', label:'ความปลอดภัย'},
+  'settings':         {icon:'⚙️', label:'ตั้งค่า / หน้าช่วยเหลือ'},
   'project.create':   {icon:'📁', label:'สร้างโปรเจกต์'},
   'project.edit':     {icon:'✏️', label:'แก้ไขโปรเจกต์'},
   'project.delete':   {icon:'🗑️', label:'ลบโปรเจกต์'},
@@ -26996,7 +27002,15 @@ function startFirebaseSync() {
     // 🔄 อัปเดต cache ผู้ใช้ทั้งหมด (ใช้กับ role/Manager dropdown) แบบ realtime
     try{
       if(snap.exists()){
+        // 🖼️ มีคนเปลี่ยนรูปโปรไฟล์ → วาดหน้าจัดการทีมที่เปิดอยู่ใหม่ ให้เห็นรูปใหม่ทันที
+        const _phSig=o=>Object.entries(o||{}).map(([k,u])=>k+':'+((u&&u.photoAt)||'')+':'+String((u&&u.photoURL)||'').length).join('|');
+        const _phChanged=_phSig(ls('mgr_users_cache'))!==_phSig(snap.val());
         ls('mgr_users_cache', snap.val()||{});
+        if(_phChanged){ clearTimeout(window._phRedrawT); window._phRedrawT=setTimeout(()=>{
+          const _ps=document.getElementById('page-staff'), _pm=document.getElementById('page-mgr-team');
+          if(_ps && !_ps.classList.contains('hidden')) try{ renderStaff(); }catch(e){}
+          if(_pm && !_pm.classList.contains('hidden')) try{ renderMgrTeam(); }catch(e){}
+        }, 400); }
         // ถ้าเปิดฟอร์มโปรเจกต์อยู่ → รีเฟรช dropdown "มอบหมาย Manager" ให้เห็น manager ใหม่ทันที
         const mgrSel=document.getElementById('pj-manager');
         const projModal=document.getElementById('modal-project');
@@ -30673,7 +30687,7 @@ function teamMemberCardHTML(s, col, viewer){
   }
   return `<div ${clickAttr} style="display:flex;flex-direction:column;padding:12px 14px;background:${isSusp?'rgba(255,158,0,.06)':'var(--bg2)'};border:1px solid ${isSusp?'rgba(255,158,0,.35)':'rgba(255,255,255,.12)'};border-radius:11px;box-shadow:0 1px 3px rgba(0,0,0,.25);${viewer==='admin'?'cursor:pointer;transition:border-color .12s,transform .12s':''}" ${viewer==='admin'?`onmouseover="this.style.borderColor='${col}88';this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='rgba(255,255,255,.12)';this.style.transform=''"`:''}>
     <div style="display:flex;align-items:center;gap:10px">
-      <span style="width:32px;height:32px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${esc((s.nickname||s.name||'?')[0])}</span>
+      <span style="width:32px;height:32px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;${_avBg(s)}">${esc((s.nickname||s.name||'?')[0])}</span>
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;color:var(--text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.nickname||s.name)}${staffRoleEmojiHTML(s.id)}${s.discordId?` <span style="font-size:10px;cursor:default" title="ผูกบัญชี Discord แล้ว: ${esc(s.discordName||s.discordId)}">🔗</span>`:''} <span style="font-size:11px;color:var(--text2);font-weight:400">${esc(s.name||'')}</span>
           ${staffStatusBadgeHTML(s)}
@@ -30804,7 +30818,7 @@ function renderStaffDetail(){
     b1.innerHTML=`<div style="max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:14px">
       <div class="table-wrap" style="padding:0;overflow:hidden">
         <div style="background:linear-gradient(135deg,rgba(21,101,255,.14),rgba(21,101,255,.02));padding:20px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-          <div style="width:60px;height:60px;border-radius:50%;background:rgba(21,101,255,.2);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:26px;flex-shrink:0">${(s.nickname||s.name||'?')[0]}</div>
+          <div style="width:60px;height:60px;border-radius:50%;background:rgba(21,101,255,.2);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:26px;flex-shrink:0;${_avBg(s)}">${esc((s.nickname||s.name||'?')[0])}</div>
           <div style="flex:1;min-width:0">
             <div style="font-size:20px;font-weight:800">${esc(s.name||'')}</div>
             <div style="font-size:13px;color:var(--text2);margin-top:2px">${s.nickname?'('+esc(s.nickname)+')':''} ${esc(s.gender||'')}</div>
@@ -32284,7 +32298,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20260928-23"></script><script src="scene/nd-profile.js?v=20260928-23"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20260928-25"></script><script src="scene/nd-profile.js?v=20260928-25"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32294,7 +32308,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20260928-23';
+var UPD_BUILD = '20260928-25';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
