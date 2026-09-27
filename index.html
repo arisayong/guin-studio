@@ -31918,7 +31918,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20260928-3';
+var UPD_BUILD = '20260928-4';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
@@ -31966,6 +31966,26 @@ var UPD_BUILD = '20260928-3';
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
   window.addEventListener('online', check);
   setTimeout(check, 15000);
+})();
+</script>
+<script>
+/* 🔒 แนบ "บัตรล็อกอิน" Firebase ไปกับทุกคำสั่งที่ส่งออกไปภายนอก (บอท Discord / สคริปต์ Drive / ส่งเมล / ซิงค์ชีท)
+   ตัวรับตรวจกับ Google ได้ว่าเป็นแอดมิน/เมเนเจอร์ที่ล็อกอินจริง — รหัสลับหลุดไปก็ใช้แทนไม่ได้ (เมื่อเปิด AUTH_MODE=token) */
+(function(){
+  var _f = window.fetch;
+  window.fetch = async function(input, init){
+    try{
+      if(init && String(init.method||'').toUpperCase()==='POST' && typeof init.body==='string' && init.body.indexOf('"secret"')>=0
+         && !/firebaseio\.com|googleapis\.com|gstatic\.com/.test(String(input && input.url || input))){
+        var u = window.firebase && firebase.auth && firebase.auth().currentUser;
+        if(u){
+          var b = JSON.parse(init.body);
+          if(b && typeof b==='object' && !Array.isArray(b) && !b.idToken){ b.idToken = await u.getIdToken(); init = Object.assign({}, init, {body: JSON.stringify(b)}); }
+        }
+      }
+    }catch(e){}
+    return _f.call(this, input, init);
+  };
 })();
 </script>
 </body>
