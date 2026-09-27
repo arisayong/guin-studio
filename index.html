@@ -3748,28 +3748,9 @@ const auth = {
     }
   },
   signInWithEmailAndPassword: async (email, pass) => {
-    if (_fbAuth) {
-      try {
-        return await _fbAuth.signInWithEmailAndPassword(email, pass);
-      } catch(e) {
-        // Firebase auth failed — check local admin fallback
-        const LOCAL_ADMIN = {email:'penguinstudiovoice@gmail.com', pass:'guin1234'};
-        if (email === LOCAL_ADMIN.email && pass === LOCAL_ADMIN.pass) {
-          const u = {uid:'uid-admin-local', email, role:'admin', name:'Guin Admin', nickname:'แอดมิน'};
-          if (window._authCb) window._authCb(u);
-          return {user: u};
-        }
-        throw e;
-      }
-    }
-    // no Firebase — local fallback only
-    const LOCAL_ADMIN = {email:'penguinstudiovoice@gmail.com', pass:'guin1234'};
-    if (email === LOCAL_ADMIN.email && pass === LOCAL_ADMIN.pass) {
-      const u = {uid:'uid-admin-local', email, role:'admin', name:'Guin Admin', nickname:'แอดมิน'};
-      if (window._authCb) window._authCb(u);
-      return {user: u};
-    }
-    throw new Error('auth/wrong-password');
+    // 🔒 ล็อกอินผ่าน Firebase เท่านั้น (เอารหัสแอดมินสำรองที่เขียนไว้ในโค้ดออกแล้ว — ใครเปิดดูโค้ดก็เห็น)
+    if (_fbAuth) return await _fbAuth.signInWithEmailAndPassword(email, pass);
+    throw new Error('ระบบล็อกอินยังไม่พร้อม — เช็คอินเทอร์เน็ตแล้วรีเฟรชหน้า');
   },
   signOut: async () => {
     if (_fbAuth) return _fbAuth.signOut();
@@ -23158,20 +23139,28 @@ async function _mailerSend(payload){
   return d;
 }
 // เนื้ออีเมล (HTML) สรุปยอด — ไฟล์ PDF ไปเป็นไฟล์แนบ
+//   รูปแบบที่เจ้าของเลือก: ตารางรายการ (งาน · หน้าที่ | ยอด) แล้วตามด้วย ยอดรวม / วันที่ / บัญชี / เลขที่ใบสำคัญ
 function _mailerBody(s, works, totalAmt, date, vNo){
   const first=((s.name||'').trim().split(/\s+/)[0])||s.nickname||'';
   const SL={dub:'พากย์',adp:'บท',mix:'มิกซ์',qc:'QC',sub:'ซับ',trn:'แปล',mgr:'เมเนเจอร์'};
+  const td='padding:8px 10px;border-bottom:1px solid #eee';
   const lines=works.map(({w,p})=>{
     const lbl=SL[(w.slot||'').split('-')[0]]||(w.slot||'');
-    return `<tr><td style="padding:7px 10px;border-bottom:1px solid #eee">${esc(p.name||'')} · ${lbl}</td><td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">${fmtB(w.amount||0)}</td></tr>`;
+    return `<tr><td style="${td}">${esc(p.name||'')} · ${lbl}</td><td style="${td};text-align:right;white-space:nowrap">${fmtB(w.amount||0)}</td></tr>`;
   }).join('');
+  // วันที่แบบ วว/ดด/ปปปป
+  const dd=(()=>{ const m=String(date||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[3]}/${m[2]}/${m[1]}`:esc(date||''); })();
+  const row=(k,v)=>`<tr><td style="padding:2px 14px 2px 0;color:#555;white-space:nowrap">${k}</td><td style="padding:2px 0">${v}</td></tr>`;
   return `<div style="font-family:Kanit,Arial,sans-serif;color:#222;max-width:600px;font-size:15px;line-height:1.7">
     <p>เรียน คุณ${esc(first)}</p>
-    <p>สตูดิโอได้โอนค่าตอบแทนให้คุณตามรายการต่อไปนี้ · แนบ<strong>ใบสำคัญจ่าย (PDF)</strong>มาด้วยแล้วค่ะ</p>
-    <table style="width:100%;border-collapse:collapse;font-size:14px;margin:6px 0"><tbody>${lines}
-      <tr><td style="padding:9px 10px;font-weight:700;border-top:2px solid #0d0d2b">ยอดรวมทั้งสิ้น</td><td style="padding:9px 10px;text-align:right;font-weight:700;color:#1565FF;border-top:2px solid #0d0d2b">${fmtB(totalAmt)}</td></tr>
+    <p>สตูดิโอได้โอนเงินค่าตอบแทนให้คุณตามรายการต่อไปนี้</p>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin:6px 0 14px;border-top:1px solid #eee"><tbody>${lines}</tbody></table>
+    <table style="border-collapse:collapse;font-size:14px;margin-bottom:14px"><tbody>
+      ${row('ยอดรวมทั้งสิ้น:',`<strong style="color:#1565FF">${fmtB(totalAmt)}</strong>`)}
+      ${row('วันที่:',dd)}
+      ${row('บัญชี:',`${esc(s.bank||'')} ${esc(s.account||'')}`.trim()||'—')}
+      ${row('เลขที่ใบสำคัญ:',`<strong>${esc(vNo)}</strong>`)}
     </tbody></table>
-    <p style="font-size:13px;color:#555">เลขที่ใบสำคัญ: <strong>${esc(vNo)}</strong> · วันที่ ${esc(date)}<br>เข้าบัญชี: ${esc(s.bank||'')} ${esc(s.account||'')}</p>
     <p>ขอบคุณค่ะ<br><strong>Guin Home Studio</strong></p>
   </div>`;
 }
@@ -23337,27 +23326,130 @@ function _vcWaitImages(host, timeoutMs){
     new Promise(res=>setTimeout(res, timeoutMs||3500))
   ]);
 }
+// 🖼️ แปลงรูปเป็น data URL ก่อนเรนเดอร์ — กัน QR/โลโก้ "หาย" ใน PDF
+//   (ลิงก์ Google Drive ไม่อนุญาตให้วาดข้ามโดเมน → html2canvas ข้ามรูปทิ้ง กล่อง QR เลยว่าง)
+//   ลองหลายทาง: ลิงก์เดิม → lh3.googleusercontent (CDN ของ Drive ที่อนุญาต CORS) → ไม่ได้จริง ๆ คืน ''
+const _vcImgCache=new Map();
+function _vcDriveId(u){
+  const s=String(u||''); let m=s.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/)||s.match(/[?&]id=([^&]+)/)||s.match(/googleusercontent\.com\/d\/([^=\/?]+)/);
+  return m?m[1]:'';
+}
+function _vcImgCandidates(src){
+  const out=[], id=_vcDriveId(src);
+  if(id){ out.push(`https://lh3.googleusercontent.com/d/${id}=w1000`, `https://drive.google.com/thumbnail?id=${id}&sz=w1000`); }
+  if(src && !out.includes(src)) out.push(src);
+  return out;
+}
+function _vcLoadCorsImg(url, timeoutMs){
+  return new Promise(res=>{
+    const im=new Image(); im.crossOrigin='anonymous'; let done=false;
+    const fin=v=>{ if(!done){ done=true; res(v); } };
+    im.onload=()=>{ try{
+        const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight;
+        c.getContext('2d').drawImage(im,0,0); fin(c.toDataURL('image/png'));   // ถ้าโดเมนไม่อนุญาต จะ throw ตรงนี้ → ลองทางถัดไป
+      }catch(e){ fin(''); } };
+    im.onerror=()=>fin('');
+    setTimeout(()=>fin(''), timeoutMs||6000);
+    im.src=url+(url.includes('?')?'&':'?')+'_cb=pdf';   // กันเบราว์เซอร์ใช้ภาพแคชที่โหลดแบบไม่มี CORS
+  });
+}
+async function _vcImgToDataUrl(src){
+  if(!src || src.startsWith('data:')) return src||'';
+  if(_vcImgCache.has(src)) return _vcImgCache.get(src);
+  let got='';
+  for(const u of _vcImgCandidates(src)){ got=await _vcLoadCorsImg(u); if(got) break; }
+  if(got) _vcImgCache.set(src,got);
+  return got;
+}
+async function _vcInlineImages(root){
+  const imgs=[...root.querySelectorAll('img')];
+  await Promise.all(imgs.map(async img=>{
+    const raw=img.getAttribute('src')||'';
+    img.removeAttribute('onerror');
+    const data=await _vcImgToDataUrl(raw);
+    if(data){ img.src=data; return; }
+    // โหลดรูปไม่ได้จริง ๆ — QR: ขึ้นข้อความแทนกล่องว่าง · รูปอื่น: ซ่อน
+    if(img.getAttribute('alt')==='QR Code'){
+      const box=document.createElement('div');
+      box.style.cssText='width:96px;height:96px;flex-shrink:0;border:1px dashed #9ca3af;border-radius:6px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;line-height:1.4;color:#6b7280;padding:6px;box-sizing:border-box';
+      box.textContent='โอนตามเลขบัญชี / พร้อมเพย์';
+      const link=img.nextElementSibling; if(link && link.tagName==='A') link.remove();
+      img.replaceWith(box);
+    } else img.style.display='none';
+  }));
+}
+// 🛡️ เช็คว่า canvas มีเนื้อหาจริง (ไม่ใช่หน้าขาวล้วน) — สุ่มพิกเซลแบบย่อขนาด
+function _vcCanvasHasInk(canvas){
+  try{
+    const w=120, h=Math.max(1,Math.round(120*canvas.height/canvas.width));
+    const c=document.createElement('canvas'); c.width=w; c.height=h;
+    const g=c.getContext('2d'); g.drawImage(canvas,0,0,w,h);
+    const d=g.getImageData(0,0,w,h).data; let ink=0;
+    for(let i=0;i<d.length;i+=4){ if((d[i]+d[i+1]+d[i+2])/3<225) ink++; }
+    return ink/(w*h) > 0.03;   // ใบจริงมีแถบหัวสีกรมท่า + ตาราง → หมึก > 3% เสมอ
+  }catch(e){ return true; }
+}
+// 📄 สร้าง PDF ใบสำคัญจ่าย — A4 ขอบแคบ · คมชัด · ไม่ตกหน้า · ไม่ส่งหน้าขาว
+//   • เรนเดอร์ละเอียด 3 เท่า เก็บเป็น PNG (ตัวหนังสือคม ไม่แตกแบบ JPEG)
+//   • ใบยาวไม่เกิน ~1.4 หน้า → ย่อให้พอดี 1 หน้า A4 · ยาวกว่านั้น → ตัดหน้าตรงรอยต่อแถว ไม่ตัดกลางตัวหนังสือ
+//   • ตรวจว่ามีเนื้อหาจริงก่อนคืนไฟล์ ถ้าได้หน้าขาว ลองใหม่ 1 ครั้ง แล้วค่อยโยน error (สถานะ = ล้มเหลว กดส่งซ้ำได้ — ไม่ส่งไฟล์เปล่าให้ทีม)
 async function _vcHtmlToPdfBlob(html){
   await _vcLoadPdfLibs();
   await _vcEnsureFonts();   // รอฟอนต์ไทยโหลดครบ กันสระ/วรรณยุกต์ตก
+  const W=720;              // เรนเดอร์ใบกว้าง 720px (ปกติ 620) → สัดส่วนใกล้ A4 ใบเต็มหน้า ขอบไม่ห่าง
   const host=document.createElement('div');
-  host.style.cssText='position:fixed;left:-99999px;top:0;width:640px;background:#fff;z-index:-1';
+  host.style.cssText=`position:fixed;left:-99999px;top:0;width:${W}px;background:#fff;z-index:-1`;
   document.body.appendChild(host);
   try{
     host.innerHTML=_vcStripLS(html);
-    await _vcWaitImages(host, 4000);      // รอโลโก้/QR โหลดจริงก่อน กันหน้าเพี้ยน
-    await new Promise(r=>setTimeout(r,250));
     const elc=host.firstElementChild||host;
-    // html2pdf โคลนใบเข้า iframe ที่ตั้งความกว้างเอง → เรนเดอร์เต็มใบ ไม่ยุบ ได้ canvas อัตราส่วนตรง
-    const canvas=await html2pdf().set({ html2canvas:{scale:2.4,useCORS:true,backgroundColor:'#ffffff',logging:false} }).from(elc).toCanvas().get('canvas');
-    // 🛡️ กันไฟล์ "หน้ากระดาษเปล่า": ถ้า canvas เล็ก/ยุบผิดปกติ อย่าสร้าง PDF เปล่าส่งเมล — โยน error ให้ status=failed จะได้กดส่งใหม่
-    if(!canvas || canvas.width<80 || canvas.height<80) throw new Error('เรนเดอร์ใบไม่สำเร็จ (ใบยุบ/ว่าง) — กด "ส่งซ้ำ" อีกครั้ง');
-    // 📄 1 ใบ = 1 หน้าพอดีเนื้อ (ขนาดหน้าตามใบจริง ไม่บังคับ A4 → ไม่ตัดกลาง/ไม่มีหน้าขาว/ไม่มีขอบ)
+    elc.style.maxWidth=W+'px'; elc.style.width=W+'px'; elc.style.margin='0'; elc.style.borderRadius='0';
+    await _vcInlineImages(elc);           // โลโก้/QR/ลายเซ็น → data URL (กัน QR หาย)
+    await _vcWaitImages(host, 5000);
+    await new Promise(r=>setTimeout(r,300));
+    // จุดตัดหน้าที่ปลอดภัย (ขอบล่างของแต่ละแถว/บล็อก) หน่วย px ของใบ
+    const top0=elc.getBoundingClientRect().top;
+    const cuts=[...elc.querySelectorAll('tr, #printable-voucher > div')].map(n=>n.getBoundingClientRect().bottom-top0).sort((a,b)=>a-b);
+    const cssH=elc.offsetHeight;
+    const render=async scale=> html2pdf().set({ html2canvas:{ scale, useCORS:true, allowTaint:false, backgroundColor:'#ffffff', logging:false, scrollX:0, scrollY:0 } }).from(elc).toCanvas().get('canvas');
+    let canvas=await render(3);
+    if(!canvas || canvas.width<80 || canvas.height<80 || !_vcCanvasHasInk(canvas)){
+      await new Promise(r=>setTimeout(r,900));
+      canvas=await render(2);
+      if(!canvas || canvas.width<80 || canvas.height<80 || !_vcCanvasHasInk(canvas))
+        throw new Error('เรนเดอร์ใบไม่สำเร็จ (ได้หน้าว่าง) — ไม่ได้ส่งไฟล์เปล่า · กด "ส่งซ้ำ" อีกครั้ง');
+    }
+    // ✂️ html2pdf วาดบนพื้นกว้างเท่าหน้ากระดาษของมันเอง (~794px) → ใบ 620px มีพื้นขาวเกินทางขวา = ขอบดูห่างเกิน · ตัดให้เหลือแค่ตัวใบ
+    { const k=canvas.height/cssH, cw=Math.min(canvas.width, Math.round(W*k));
+      if(cw<canvas.width){ const cc=document.createElement('canvas'); cc.width=cw; cc.height=canvas.height;
+        const g=cc.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,cw,cc.height); g.drawImage(canvas,0,0); canvas=cc; } }
     const JsPDF=window.jspdf.jsPDF;
-    const wmm=172, hmm=Math.max(1, wmm*(canvas.height/canvas.width));
-    const pdf=new JsPDF({unit:'mm', format:[wmm,hmm], orientation:'portrait', compress:true});
-    pdf.addImage(canvas.toDataURL('image/jpeg',0.95), 'JPEG', 0, 0, wmm, hmm, undefined, 'FAST');
-    return pdf.output('blob');
+    const PW=210, PH=297, M=6, AW=PW-2*M, AH=PH-2*M;       // A4 ขอบ 6 มม.
+    const pdf=new JsPDF({unit:'mm', format:'a4', orientation:'portrait', compress:true});
+    const pxPerCss=canvas.height/cssH, fullH=AW*(canvas.height/canvas.width);
+    const img=c=>c.toDataURL('image/png');
+    if(fullH<=AH){
+      pdf.addImage(img(canvas),'PNG',M,M,AW,fullH,undefined,'FAST');
+    } else if(fullH<=AH*1.4){
+      const k=AH/fullH, w=AW*k;                              // ย่อทั้งใบให้พอดี 1 หน้า (กึ่งกลาง)
+      pdf.addImage(img(canvas),'PNG',(PW-w)/2,M,w,AH,undefined,'FAST');
+    } else {
+      const pageCss=AH*(W/AW);                               // ความสูงใบ (px) ที่ลง 1 หน้า
+      let y=0, first=true;
+      while(y<cssH-1){
+        let end=Math.min(cssH, y+pageCss);
+        if(end<cssH){ const ok=cuts.filter(c=>c>y+40 && c<=end); if(ok.length) end=ok[ok.length-1]; }
+        const sy=Math.round(y*pxPerCss), sh=Math.round((end-y)*pxPerCss);
+        const part=document.createElement('canvas'); part.width=canvas.width; part.height=sh;
+        const g=part.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,part.width,sh); g.drawImage(canvas,0,sy,canvas.width,sh,0,0,canvas.width,sh);
+        if(!first) pdf.addPage('a4','portrait');
+        pdf.addImage(img(part),'PNG',M,M,AW,AW*(sh/canvas.width),undefined,'FAST');
+        first=false; y=end;
+      }
+    }
+    const blob=pdf.output('blob');
+    if(!blob || blob.size<20000) throw new Error('ไฟล์ PDF เล็กผิดปกติ — ไม่ได้ส่ง · กด "ส่งซ้ำ" อีกครั้ง');
+    return blob;
   } finally { host.remove(); }
 }
 function _vcSetVoucherEmailStatus(docNo, status, err){
