@@ -288,7 +288,8 @@ function renderRoleReqCard(users){
     ${unl.map(([uid,u])=>{ const c=u.claimStaffId?safe(()=>getStaffById(u.claimStaffId),null):null;
       const opts=[...new Map(safe(()=>getAllStaff(),[]).filter(x=>x&&x.id).map(x=>[x.id,x])).values()].sort((a,b)=>String(a.nickname||a.name).localeCompare(String(b.nickname||b.name),'th'))
         .map(x=>`<option value="${esc(x.id)}"${c&&c.id===x.id?' selected':''}>${esc(x.nickname||x.name)}${x.name&&x.nickname?' ('+esc(x.name)+')':''}</option>`).join('');
-      return `<div class="ndp-rq" style="flex-wrap:wrap"><b>${esc(u.email||uid)}</b><span class="muted">${esc(u.nickname||'')}${c?' · ขอผูกกับ "'+esc(c.nickname||c.name)+'"':''}${u.createdAt?' · สมัคร '+esc(String(u.createdAt).slice(0,10)):''}</span>
+      const ph=safe(()=>_avSafe(u.photoURL),'');
+      return `<div class="ndp-rq" style="flex-wrap:wrap">${ph?`<span style="width:34px;height:34px;border-radius:50%;flex-shrink:0;background:#2a2f3a url('${ph}') center/cover no-repeat"></span>`:''}<b>${esc(u.email||uid)}</b><span class="muted">${esc(u.nickname||'')}${c?' · ขอผูกกับ "'+esc(c.nickname||c.name)+'"':''}${u.createdAt?' · สมัคร '+esc(String(u.createdAt).slice(0,10)):''}</span>
         <span style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select class="form-control" id="ndp-lk-${esc(uid)}" style="width:auto;min-width:150px;padding:4px 8px;font-size:12px"><option value="">— เลือกคนในทีม —</option>${opts}</select>
           <button class="btn btn-blue btn-sm" onclick="ndLinkStaffPick('${esc(uid)}')">🔗 ผูก</button>
           <button class="btn btn-outline btn-sm" title="ลบบัญชีนี้ออกจากรายการผู้ใช้ของเว็บ" onclick="ndUnlinkedRemove('${esc(uid)}')">🗑 เอาออก</button></span></div>`; }).join('')}</div></div>`:'';

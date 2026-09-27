@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20260928-18"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20260928-19"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -2279,6 +2279,17 @@ body.sidebar-collapsed .main-content{
     <div id="vc-finance-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px"></div>
     <div class="section-card" style="margin-bottom:14px">
      <div class="section-title">💸 ออกใบสำคัญจ่าย</div>
+     <!-- ✍️ ลายเซ็น/โลโก้ท้ายใบสำคัญจ่าย (ใช้รูปเดียวกับใบเสนอราคา/ใบแจ้งหนี้ · สต๊าฟเห็นในใบของตัวเองด้วย) -->
+     <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;margin-bottom:14px;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--text2);white-space:nowrap;font-weight:600">✍️ ลายเซ็น / โลโก้ท้ายใบ:</span>
+      <div id="vc-sig-preview" style="height:36px;display:flex;align-items:center;background:#fff;border-radius:6px;padding:0 6px"></div>
+      <span style="font-size:11px;color:var(--text2)">แนะนำรูป PNG พื้นใส · ใบจะเป็นพื้นขาว</span>
+      <label style="cursor:pointer;margin-left:auto">
+       <input type="file" accept="image/*" style="display:none" onchange="uploadAdminSig(event);this.value=''">
+       <span class="btn btn-xs btn-outline" id="vc-sig-upload-label">📎 ใส่รูป</span>
+      </label>
+      <button id="vc-sig-clear-btn" style="display:none" class="btn btn-xs btn-red" onclick="if(confirm('ลบลายเซ็น/โลโก้ท้ายใบ?\n\nใบที่ออกต่อจากนี้ (และใบของสต๊าฟ) จะกลับไปใช้โลโก้เริ่มต้น'))clearAdminSig()">✕ ลบ</button>
+     </div>
      <!-- 🔀 Mode toggle: ตามคน (default) / ตามโปรเจกต์ -->
      <div class="tabs" style="margin:0 0 14px">
       <div class="tab active" id="vc-mode-byperson" onclick="setVcMode('byperson')" style="font-size:13px;padding:8px 14px">👤 ตามคน (รวมหลายงาน)</div>
@@ -3133,10 +3144,7 @@ body.sidebar-collapsed .main-content{
  </div>
 </div>
 
-<div class="undo-bar" id="undo-bar" style="display:none">
- <button id="undo-btn" class="btn btn-outline btn-sm" onclick="undo()" title="Undo" style="opacity:.4;padding:4px 8px;font-size:14px">↩️</button>
- <button id="redo-btn" class="btn btn-outline btn-sm" onclick="redo()" title="Redo" style="opacity:.4;padding:4px 8px;font-size:14px">↪️</button>
-</div>
+<!-- ↩️↪️ ปุ่มย้อนกลับ/ทำซ้ำเอาออกแล้ว (28 ก.ย. 2569) — พิมพ์ผิดใช้ Ctrl+Z ของช่องพิมพ์ -->
 
 <!-- 📦 Floating Cart FAB — แสดงเฉพาะ admin บนหน้าคิวจ่ายเงิน เมื่อมีของในกล่อง -->
 <div id="cart-fab" style="display:none;position:fixed;bottom:90px;right:20px;z-index:135;cursor:pointer" onclick="openConfirmCart()" title="เปิดกล่องรอส่งใบยืนยัน">
@@ -10202,6 +10210,22 @@ function selectRegStaff(id, nickname, fullName){
 function autoFillRegRole(){} // legacy - unused
 
 // ── Profile Modal ──
+// 🖼️ รูปสมาชิกในทีม — แอดมิน/เมเนเจอร์เห็นรูปที่เจ้าตัวตั้งเองในโปรไฟล์ (users/<uid>/photoURL) → หาบัญชีได้ง่าย
+//    แอดมินตั้งรูปให้ในทะเบียน (adminPhoto) ก็ใช้ได้ · เลือกรูปที่เปลี่ยนล่าสุด
+let _avMap=null;
+window.addEventListener('guindatachange', e=>{ const k=e.detail&&e.detail.key; if(k==='mgr_users_cache'||k==='staff_v3') _avMap=null; });
+function _avSafe(u){ u=String(u||''); return (/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(u) || /^https:\/\/[^\s'"()<>\\]+$/.test(u)) ? u : ''; }
+function staffPhotoOf(s){
+  if(!s) return '';
+  if(!_avMap){ _avMap={}; const uc=ls('mgr_users_cache')||{};
+    Object.values(uc).forEach(u=>{ if(!u||!u.photoURL) return; const v=[String(u.photoAt||''), u.photoURL];
+      if(u.staffId) _avMap['id:'+u.staffId]=v; if(u.email) _avMap['em:'+String(u.email).toLowerCase()]=v; }); }
+  const a=[]; const x=_avMap['id:'+s.id]||(s.email?_avMap['em:'+String(s.email).toLowerCase()]:null); if(x) a.push(x);
+  if(s.adminPhoto) a.push([String(s.adminPhotoAt||''), s.adminPhoto]);
+  a.sort((p,q)=>q[0].localeCompare(p[0]));
+  for(const [,u] of a){ const ok=_avSafe(u); if(ok) return ok; } return '';
+}
+function _avBg(s){ const u=staffPhotoOf(s); return u?"background:#2a2f3a url('"+u+"') center/cover no-repeat;color:transparent;":''; }
 // Helper: render avatar in a given element (by id) using photoURL or fallback letter
 function renderAvatarInto(elId, photoURL, letter){
   const el = document.getElementById(elId); if(!el) return;
@@ -20813,7 +20837,7 @@ function renderStaffGrid(){
         const resetBtn=s.email?'<button onclick="adminResetStaffPassword(\''+s.email.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',\''+(s.nickname||s.name).replace(/'/g,"\\'")+'\''+')" style="padding:3px 10px;background:none;border:1px solid rgba(0,180,255,.4);border-radius:6px;color:var(--cyan);font-family:Kanit;font-size:11px;cursor:pointer">🔑 รีเซ็ต</button>':'';
         const warnHtml = getWarnBadgeHtml(s.id);
         html+='<div style="background:var(--bg2);border:1px solid '+color+'33;border-radius:10px;padding:14px;display:flex;gap:12px;position:relative">'+warnHtml;
-        html+='<div style="width:40px;height:40px;border-radius:50%;background:'+color+'22;color:'+color+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex-shrink:0">'+av+'</div>';
+        html+='<div style="width:40px;height:40px;border-radius:50%;background:'+color+'22;color:'+color+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex-shrink:0;'+_avBg(s)+'">'+av+'</div>';
         html+='<div style="flex:1;min-width:0">';
         html+='<div style="font-weight:700;font-size:14px">'+s.name+'</div>';
         html+='<div style="font-size:11px;color:var(--text2);margin-bottom:4px">'+(s.nickname?'('+s.nickname+') · ':'')+s.gender+'</div>';
@@ -20869,7 +20893,7 @@ function renderStaffGrid(){
       admins.forEach(s=>{
         const av=(s.nickname||s.name||'?')[0];
         html+='<div style="background:var(--bg2);border:1px solid '+acol+'33;border-radius:10px;padding:14px;display:flex;gap:12px">';
-        html+='<div style="width:40px;height:40px;border-radius:50%;background:'+acol+'22;color:'+acol+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex-shrink:0">'+av+'</div>';
+        html+='<div style="width:40px;height:40px;border-radius:50%;background:'+acol+'22;color:'+acol+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex-shrink:0;'+_avBg(s)+'">'+av+'</div>';
         html+='<div style="flex:1;min-width:0">';
         html+='<div style="font-weight:700;font-size:14px">'+s.name+' <span style="font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid '+acol+'55;color:'+acol+';background:'+acol+'11;font-weight:700">👑 Admin</span></div>';
         if(s.nickname)html+='<div style="font-size:11px;color:var(--text2)">('+s.nickname+')</div>';
@@ -20896,7 +20920,7 @@ function renderStaffGrid(){
         let leftAt=''; try{ leftAt=info.at?new Date(info.at).toLocaleDateString('th-TH'):''; }catch(e){}
         html+='<div style="display:flex;flex-direction:column;padding:12px 14px;background:rgba(130,130,130,.06);border:1px dashed rgba(150,150,150,.4);border-radius:11px;filter:grayscale(.7);opacity:.8">'
           +'<div style="display:flex;align-items:center;gap:10px">'
-          +'<span style="width:32px;height:32px;border-radius:50%;background:rgba(150,150,150,.2);color:'+gcol+';display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">'+av+'</span>'
+          +'<span style="width:32px;height:32px;border-radius:50%;background:rgba(150,150,150,.2);color:'+gcol+';display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;'+_avBg(s)+'">'+av+'</span>'
           +'<div style="flex:1;min-width:0">'
           +'<div style="font-weight:700;color:var(--text2);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(s.nickname||s.name)+' <span style="font-size:11px;color:var(--text2);font-weight:400">'+(s.name||'')+'</span></div>'
           +(cats?'<div style="font-size:10px;color:var(--text2)">'+cats+'</div>':'')
@@ -22830,7 +22854,7 @@ function buildQuotationHTML(data) {
     </div>
     <div style="padding:0 30px 26px">
       <div style="width:260px;margin-left:auto;text-align:center">
-        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="height:96px;max-width:220px;object-fit:contain;display:block;margin:0 auto 8px">
+        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="${adminSig?'':'filter:brightness(0);opacity:.8;'}height:96px;max-width:220px;object-fit:contain;display:block;margin:0 auto 8px">
         <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
         <div style="font-size:13px;font-weight:700;color:#111827">ผู้เสนอราคา / Guin Home Studio</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(date)}</div>
@@ -24423,7 +24447,7 @@ function buildMultiVoucherHTML(opts){
     ${bankCardHTML}
     <div style="padding:0 30px 26px">
       <div style="width:260px;margin-left:auto;text-align:center">
-        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="height:96px;max-width:220px;object-fit:contain;display:block;margin:0 auto 8px">
+        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="${adminSig?'':'filter:brightness(0);opacity:.8;'}height:96px;max-width:220px;object-fit:contain;display:block;margin:0 auto 8px">
         <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
         <div style="font-size:13px;font-weight:700;color:#111827">ผู้ออกใบสำคัญจ่าย / Guin Home Studio</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(opts.date)}</div>
@@ -25030,7 +25054,7 @@ function buildVoucherHTML(projId, workerId, slot, vNo, issueDate, note) {
     </div>
     <div style="padding:0 30px 26px">
       <div style="width:220px;margin-left:auto;text-align:center">
-        <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:40px;object-fit:contain;opacity:0.75;height:56px;display:block;margin:0 auto 6px">
+        <img src="${ls('admin_signature')||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="${ls('admin_signature')?'':'filter:brightness(0);opacity:.75;'}height:56px;max-width:200px;object-fit:contain;display:block;margin:0 auto 6px">
         <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
         <div style="font-size:12px;font-weight:600;color:#374151">ผู้จ่ายเงิน / Guin Home Studio</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(issueDate)}</div>
@@ -25780,7 +25804,7 @@ function buildBillingVoucherHTML(staffId) {
     </div>
     <div style="padding:0 30px 26px">
       <div style="width:240px;margin-left:auto">
-        <img src="https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png" style="height:40px;object-fit:contain;opacity:0.75;height:56px;display:block;margin:0 auto 6px">
+        <img src="${ls('admin_signature')||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="${ls('admin_signature')?'':'filter:brightness(0);opacity:.75;'}height:56px;max-width:200px;object-fit:contain;display:block;margin:0 auto 6px">
         <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
         <div style="font-size:12px;font-weight:600;color:#374151">ผู้จ่ายเงิน / Guin Home Studio</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:3px">${issueDate}</div>
@@ -26114,6 +26138,12 @@ function renderAdminSigWidget() {
   const invClearBtn = document.getElementById('inv-sig-clear-btn');
   if (invPreview) invPreview.innerHTML = imgHtml;
   if (invClearBtn) invClearBtn.style.display = sig ? '' : 'none';
+
+  // Voucher (ใบสำคัญจ่าย) — รูปเดียวกัน
+  const vcPreview = document.getElementById('vc-sig-preview');
+  if (vcPreview) vcPreview.innerHTML = sig ? `<img src="${sig}" style="height:32px;max-width:120px;object-fit:contain">` : '<span style="font-size:11px;color:#6b7280">ยังไม่มี · ใช้โลโก้เริ่มต้น</span>';
+  const vcClear = document.getElementById('vc-sig-clear-btn'); if (vcClear) vcClear.style.display = sig ? '' : 'none';
+  const vcLbl = document.getElementById('vc-sig-upload-label'); if (vcLbl) vcLbl.textContent = sig ? '🔄 เปลี่ยนรูป' : '📎 ใส่รูป';
 }
 
 
@@ -29028,7 +29058,7 @@ function buildInvoiceHTML(data){
     ${buildPaymentSectionHTML(data.payAccountIds)}
     <div style="padding:0 30px 26px">
       <div style="width:260px;margin-left:auto;text-align:center">
-        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="height:96px;max-width:220px;object-fit:contain;display:block;margin:0 auto 8px">
+        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="${adminSig?'':'filter:brightness(0);opacity:.8;'}height:96px;max-width:220px;object-fit:contain;display:block;margin:0 auto 8px">
         <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
         <div style="font-size:13px;font-weight:700;color:#111827">ผู้ออกใบแจ้งหนี้ / Guin Home Studio</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(date)}</div>
@@ -29180,7 +29210,7 @@ function buildReceiptDocHTML(d){
     ${d.note?'<div style="padding:0 30px 10px;font-size:11px;color:#6b7280"><strong>หมายเหตุ:</strong> '+d.note+'</div>':''}
     <div style="padding:0 30px 26px">
       <div style="width:260px;margin-left:auto;text-align:center">
-        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="height:96px;max-width:220px;object-fit:contain;display:block;margin:0 auto 8px">
+        <img src="${adminSig||'https://res.cloudinary.com/dttappsmw/image/upload/v1775871891/PNG3_fevdmu.png'}" style="${adminSig?'':'filter:brightness(0);opacity:.8;'}height:96px;max-width:220px;object-fit:contain;display:block;margin:0 auto 8px">
         <div style="height:1px;background:#d1d5db;margin-bottom:8px"></div>
         <div style="font-size:13px;font-weight:700;color:#111827">ผู้รับเงิน / Guin Home Studio</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:3px">${thaiDate(d.date)}</div>
@@ -31306,7 +31336,7 @@ function renderMgrTeam() {
         <div style="padding:12px 18px;background:rgba(255,255,255,.025);font-weight:700;color:${acol}">👑 Admin <span style="font-size:12px;font-weight:400;color:var(--text2)">(${admins.length} คน)</span></div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:8px;padding:12px 16px">${admins.map(s=>`
           <div style="display:flex;align-items:center;gap:10px;padding:9px 13px;background:rgba(0,0,0,.2);border:1px solid ${acol}22;border-radius:10px">
-            <span style="width:30px;height:30px;border-radius:50%;background:${acol}22;color:${acol};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${(s.nickname||s.name||'?')[0]}</span>
+            <span style="width:30px;height:30px;border-radius:50%;background:${acol}22;color:${acol};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;${_avBg(s)}">${(s.nickname||s.name||'?')[0]}</span>
             <div style="flex:1;min-width:0"><div style="font-weight:700;color:var(--text);font-size:13px">${esc(s.nickname||s.name)} <span style="font-size:11px;color:var(--text2);font-weight:400">${esc(s.name||'')}</span></div>${s.email?`<div style="font-size:11px;color:var(--text2)">📧 ${esc(s.email)}</div>`:''}</div>
             <span style="font-size:10px;padding:1px 8px;border-radius:8px;background:${acol}18;color:${acol};font-weight:700">👑 Admin</span>
           </div>`).join('')}</div>
@@ -32197,7 +32227,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20260928-18"></script><script src="scene/nd-profile.js?v=20260928-18"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20260928-19"></script><script src="scene/nd-profile.js?v=20260928-19"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32207,7 +32237,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20260928-18';
+var UPD_BUILD = '20260928-19';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
