@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20260928-19"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20260928-20"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -4892,9 +4892,13 @@ async function pullSocialDemoFromSheet(reset){
         const arr=Array.isArray(data[cat])?data[cat]:Object.values(data[cat]||{});
         arr.filter(Boolean).forEach(x=>{
           if(x.id!==s.id) return;
-          if(social) x.social=social;
-          if(links.length) x.demoLinks=links;
-          else if(demoTxt && demoTxt!=='-') x.demoNote=demoTxt;
+          // 🏆 เว็บชนะ: คนที่เคยแก้ในเว็บ → ชีทเติมได้เฉพาะช่องที่ยังว่าง
+          const web=_webEdited(x), demoEmpty=_isBlankVal(x.demoLinks) && _isBlankVal(x.demoNote);
+          if(social && (!web || _isBlankVal(x.social))) x.social=social;
+          if(!web || demoEmpty){
+            if(links.length) x.demoLinks=links;
+            else if(demoTxt && demoTxt!=='-') x.demoNote=demoTxt;
+          }
         });
         data[cat]=arr;
       });
@@ -30110,6 +30114,38 @@ async function clearSyncConfig(){
   toast('🗑️ ล้างค่าแล้ว','info');
 }
 
+// 🏆 เว็บชนะเสมอ: ข้อมูลสมาชิกที่เคยแก้ในเว็บ (แอดมินแก้ / สมาชิกแก้เองในโปรไฟล์) ห้ามถูกชีท/เอกสารที่เชื่อมไว้ทับ
+//    ชีทยังเติมช่องที่ว่างอยู่ + เพิ่มคนใหม่ได้ · คนที่ไม่เคยแก้ในเว็บเลย → รับค่าจากชีทตามปกติ
+function _webEdited(x){ return !!(x && (x.manualEditAt || x.selfSyncedAt)); }
+function _isBlankVal(v){ return v==null || (typeof v==='string' && (!v.trim() || v.trim()==='-')) || (Array.isArray(v) && !v.length) || (typeof v==='object' && !Array.isArray(v) && !Object.keys(v).length); }
+function _snapWebEdited(){
+  const m={};
+  Object.entries(getStaffData()).forEach(([cat,arr])=>arr.forEach(x=>{
+    if(!x || !x.id || !_webEdited(x)) return;
+    if(!m[x.id]) m[x.id]={ rec:JSON.parse(JSON.stringify(x)), cats:[] };
+    if(!m[x.id].cats.includes(cat)) m[x.id].cats.push(cat);
+  }));
+  return m;
+}
+function _restoreWebWins(snap){
+  const data=getStaffData(), fixed=[];
+  Object.entries(snap||{}).forEach(([id,{rec,cats}])=>{
+    let cur=null; const curCats=[];
+    Object.entries(data).forEach(([c,arr])=>arr.forEach(x=>{ if(x && x.id===id){ if(!cur) cur=x; curCats.push(c); } }));
+    if(!cur) return;   // หายจากทะเบียน (ถูกรวมร่างกับชื่อซ้ำ/ลบ) — ไม่ยุ่ง
+    const merged={...cur}; let ch=false;
+    Object.entries(rec).forEach(([k,v])=>{
+      if(k==='category' || _isBlankVal(v)) return;               // ช่องที่เว็บว่างไว้ → ให้ชีทเติมได้
+      if(JSON.stringify(cur[k])!==JSON.stringify(v)){ merged[k]=v; ch=true; }
+    });
+    const sameCats=curCats.length===cats.length && cats.every(c=>curCats.includes(c));
+    if(!ch && sameCats) return;
+    Object.keys(data).forEach(c=>{ data[c]=data[c].filter(x=>!(x && x.id===id)); });
+    cats.forEach(c=>{ if(!data[c]) data[c]=[]; data[c].push({...merged, category:c}); });
+    fixed.push(merged.nickname||merged.name||id);
+  });
+  return { data, fixed };
+}
 async function syncFromSheet(opts){
   const silent = !!(opts && opts.silent);   // auto-sync → เงียบ (ไม่ขึ้น toast รบกวน)
   if(currentUser?.role !== 'admin'){
@@ -30130,6 +30166,7 @@ async function syncFromSheet(opts){
   // เก็บชุดอีเมลก่อนซิงค์ — ใช้หา "คนใหม่จริง ๆ" (ไม่เชื่อ data.added ของ Apps Script ที่อาจ re-add ทั้งหมด)
   const _emailSetNow = ()=>{ const set=new Set(); const d=getStaffData(); Object.values(d||{}).forEach(arr=>(Array.isArray(arr)?arr:Object.values(arr||{})).forEach(s=>{ const em=(String(s&&s.email||'').toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/)||[])[0]; if(em) set.add(em); })); return set; };
   const _beforeEmails = _emailSetNow();
+  const _webSnap = _snapWebEdited();   // 🏆 จำค่าที่แก้ในเว็บไว้ก่อน — ชีทเขียนทับแล้วจะคืนค่าให้
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -30149,9 +30186,17 @@ async function syncFromSheet(opts){
     let mergedN = 0;
     try{
       await new Promise(r=>setTimeout(r, 1200));
+      // อ่านทะเบียนล่าสุดจาก Firebase ตรง ๆ (ไม่รอ listener) — ให้เห็นสิ่งที่ชีทเพิ่งเขียนแน่ ๆ
+      try{ const sn=await _fbDatabase.ref('staff').get(); if(sn.exists()) ls('staff_v3', sn.val()); _allStaffCache=null; }catch(e){}
       mergedN = await autoDedupStaffByEmail();
     }catch(e){ console.warn('auto-dedup after sync:', e); }
-    try{ if(_privSplitOn) await saveStaffData(getStaffData()); }catch(e){ console.warn('re-split after sync:', e); }
+    let _webFixed=[];
+    try{
+      const r=_restoreWebWins(_webSnap); _webFixed=r.fixed;
+      if(_webFixed.length || _privSplitOn){ await saveStaffData(_webFixed.length?r.data:getStaffData()); _allStaffCache=null; }
+      if(_webFixed.length){ console.log('🏆 เว็บชนะชีท — คืนค่าที่แก้ในเว็บ:', _webFixed);
+        try{ logAudit('staff.sheetguard','ระบบ','ซิงค์ชีทพยายามทับข้อมูลที่แก้ในเว็บ → คืนค่าเว็บ '+_webFixed.length+' คน: '+_webFixed.slice(0,20).join(', ')); }catch(e){} }
+    }catch(e){ console.warn('web-wins restore after sync:', e); }
 
     // === หา "คนใหม่จริง ๆ" จากอีเมลที่เพิ่งโผล่ (แม่นกว่า data.added ที่อาจนับ re-add ทั้งหมด) ===
     const _afterEmails = _emailSetNow();
@@ -30162,6 +30207,7 @@ async function syncFromSheet(opts){
     if(!silent){
       let msg = _newPeople>0 ? `✅ ซิงค์เสร็จ · 🎉 สมาชิกใหม่ ${_newPeople} คน` : `✅ ซิงค์เสร็จ · ไม่มีสมาชิกใหม่`;
       if(mergedN>0) msg += ` · 🧹 รวมชื่อซ้ำ ${mergedN}`;
+      if(_webFixed.length) msg += ` · 🏆 คงค่าที่แก้ในเว็บ ${_webFixed.length} คน`;
       if(data.excluded) msg += ` · 🚫 บล็อก ${data.excluded}`;
       toast(msg, 'success');
     } else if(_newPeople>0){
@@ -32227,7 +32273,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20260928-19"></script><script src="scene/nd-profile.js?v=20260928-19"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20260928-20"></script><script src="scene/nd-profile.js?v=20260928-20"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32237,7 +32283,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20260928-19';
+var UPD_BUILD = '20260928-20';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
