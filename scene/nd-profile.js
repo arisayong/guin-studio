@@ -286,8 +286,12 @@ function renderRoleReqCard(users){
   const unlHTML=unl.length?`<div class="ndp-card" style="margin-bottom:14px"><div class="ndp-ch"><h3>🔗 บัญชีที่ยังไม่ได้ผูกกับรายชื่อทีม</h3><span class="ndp-pill">${unl.length} บัญชี</span></div>
     <div class="ndp-cb"><div class="muted" style="margin-bottom:8px">บัญชีเหล่านี้ล็อกอินได้แต่ยังเห็นข้อมูลทีมไม่ได้ · ถ้าเป็นคนในทีม: ใส่อีเมลนี้ในข้อมูลสมาชิก ระบบจะผูกให้เอง หรือกด "ผูก" · ถ้าไม่รู้จัก: ลบบัญชีได้ที่ Firebase → Authentication</div>
     ${unl.map(([uid,u])=>{ const c=u.claimStaffId?safe(()=>getStaffById(u.claimStaffId),null):null;
-      return `<div class="ndp-rq"><b>${esc(u.email||uid)}</b><span class="muted">${esc(u.nickname||'')}${c?' · ขอผูกกับ "'+esc(c.nickname||c.name)+'"':''}${u.createdAt?' · สมัคร '+esc(String(u.createdAt).slice(0,10)):''}</span>
-        ${c?`<span style="margin-left:auto"><button class="btn btn-blue btn-sm" onclick="ndLinkStaff('${esc(uid)}','${esc(c.id)}')">🔗 ผูกกับ ${esc(c.nickname||c.name)}</button></span>`:''}</div>`; }).join('')}</div></div>`:'';
+      const opts=[...new Map(safe(()=>getAllStaff(),[]).filter(x=>x&&x.id).map(x=>[x.id,x])).values()].sort((a,b)=>String(a.nickname||a.name).localeCompare(String(b.nickname||b.name),'th'))
+        .map(x=>`<option value="${esc(x.id)}"${c&&c.id===x.id?' selected':''}>${esc(x.nickname||x.name)}${x.name&&x.nickname?' ('+esc(x.name)+')':''}</option>`).join('');
+      return `<div class="ndp-rq" style="flex-wrap:wrap"><b>${esc(u.email||uid)}</b><span class="muted">${esc(u.nickname||'')}${c?' · ขอผูกกับ "'+esc(c.nickname||c.name)+'"':''}${u.createdAt?' · สมัคร '+esc(String(u.createdAt).slice(0,10)):''}</span>
+        <span style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select class="form-control" id="ndp-lk-${esc(uid)}" style="width:auto;min-width:150px;padding:4px 8px;font-size:12px"><option value="">— เลือกคนในทีม —</option>${opts}</select>
+          <button class="btn btn-blue btn-sm" onclick="ndLinkStaffPick('${esc(uid)}')">🔗 ผูก</button>
+          <button class="btn btn-outline btn-sm" title="ลบบัญชีนี้ออกจากรายการผู้ใช้ของเว็บ" onclick="ndUnlinkedRemove('${esc(uid)}')">🗑 เอาออก</button></span></div>`; }).join('')}</div></div>`:'';
   box.innerHTML=unlHTML+(reqs.length?`<div class="ndp-card" style="margin-bottom:14px"><div class="ndp-ch"><h3>🙋 คำขอเปลี่ยนโรลจากทีมงาน</h3><span class="ndp-pill">${reqs.length} รายการ</span></div>
     ${reqs.map(([uid,u])=>{ const s=safe(()=>getStaffById(u.staffId),null)||{}; const nm=u.nickname||s.nickname||s.name||u.email||uid;
       return `<div class="ndp-rq"><b>${esc(nm)}</b>${(u.roleReq.add||[]).map(c=>`<span class="ndp-rchip on" style="--c:${catColor(c)}">+ ${esc(catLabel(c))}</span>`).join('')}${(u.roleReq.del||[]).map(c=>`<span class="ndp-rchip on pend" style="--c:${catColor(c)}">− ${esc(catLabel(c))}</span>`).join('')}
@@ -340,6 +344,21 @@ function init(){
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })();
 /* 🔗 แอดมินกดผูกบัญชีกับรายชื่อทีมเอง (กรณีอีเมลไม่ตรงกับทะเบียน) */
+window.ndLinkStaffPick=function(uid){
+  const sel=document.getElementById('ndp-lk-'+uid); const id=sel&&sel.value;
+  if(!id){ toast('เลือกคนในทีมก่อน','info'); if(sel) sel.focus(); return; }
+  ndLinkStaff(uid, id);
+};
+// 🗑 เอาบัญชีที่ไม่ใช้ออกจากรายการ (ลบ users/<uid>) — ตัวบัญชีล็อกอินยังอยู่ ต้องลบต่อที่ Firebase → Authentication
+window.ndUnlinkedRemove=async function(uid){
+  const db=(typeof _fbDatabase!=='undefined')?_fbDatabase:null; if(!db) return;
+  const uc=ls('mgr_users_cache')||{}; const u=uc[uid]||{};
+  if(!confirm('เอาบัญชี "'+(u.email||u.nickname||uid)+'" ออกจากรายการ?\n\n• ลบข้อมูลผู้ใช้ของบัญชีนี้ในเว็บ (users/'+uid+')\n• ตัวบัญชีล็อกอินยังอยู่ — ถ้าไม่ใช้แล้วให้ลบต่อที่ Firebase → Authentication (ค้นด้วย UID นี้)\n• ถ้าบัญชีนี้ล็อกอินอีก จะกลับมาอยู่ในรายการนี้ใหม่')) return;
+  try{ await db.ref('users/'+uid).remove(); delete uc[uid]; ls('mgr_users_cache',uc);
+    try{ logAudit('staff.unlink','ระบบ','เอาบัญชีที่ไม่ได้ผูกออก: '+(u.email||u.nickname||uid)); }catch(e){}
+    toast('เอาออกจากรายการแล้ว','success'); renderRoleReqCard(uc);
+  }catch(e){ toast('เอาออกไม่สำเร็จ: '+e.message,'error'); }
+};
 window.ndLinkStaff=async function(uid, staffId){
   const db=(typeof _fbDatabase!=='undefined')?_fbDatabase:null; if(!db) return;
   const s=(typeof getStaffById==='function')?getStaffById(staffId):null;
@@ -348,6 +367,6 @@ window.ndLinkStaff=async function(uid, staffId){
     const uc=ls('mgr_users_cache')||{}; if(uc[uid]){ uc[uid].staffId=staffId; delete uc[uid].claimStaffId; ls('mgr_users_cache',uc); }
     try{ logAudit('staff.link', s?(s.nickname||s.name):staffId, 'แอดมินผูกบัญชีกับรายชื่อทีม'); }catch(e){}
     toast('🔗 ผูกบัญชีแล้ว','success');
-    try{ const row=document.activeElement&&document.activeElement.closest('.ndp-rq'); if(row) row.remove(); }catch(e){}
+    try{ renderRoleReqCard(uc); }catch(e){}
   }catch(e){ toast('ผูกไม่สำเร็จ: '+e.message,'error'); }
 };
