@@ -7165,7 +7165,7 @@ function _renderProjRoomInner(target){
   if(role!=='admin'&&role!=='manager'){ el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin และ Manager เท่านั้น</div>'; return; }
   let list=getProjects().filter(p=>p&&p.projStatus!=='cancelled'&&p.projStatus!=='done'&&p.projStatus!=='paid');
   // เมเนเจอร์เห็นงานของเมเนเจอร์ทุกคน (ช่วยกันดู/แก้โพสต์ได้) — ยกเว้นงานที่แอดมินถือเอง
-  if(role==='manager') list=list.filter(p=>p.managerId);
+  if(role==='manager') list=list.filter(p=>p.managerId===currentUser.uid);   // 🔒 แก้ได้เฉพาะงานที่ตัวเองดูแล
   list.sort((a,b)=>String(a.deadline||'9999').localeCompare(String(b.deadline||'9999')));
   if(_prSel && !list.some(p=>p.id===_prSel)) _prSel='';
   const p=list.find(x=>x.id===_prSel);
@@ -18126,7 +18126,80 @@ function askRevertWaiting(projId, workerId, slot){
 
 // Helper: หา worker + เก็บ confirm fields
 // 🔧 ใช้ saveProjectMerge เพื่อ fetch ล่าสุดจาก Firebase ก่อนแก้ → กัน race condition ตอน bulk confirm
+// ══════════════════════════════════════════════
+// 🔒 คำตอบยืนยันยอดของสต๊าฟ → confirmResp/<staffId>/<projId__slot>
+//    สต๊าฟแก้โปรเจกต์ตรงไม่ได้แล้ว (Rules) — เขียนได้แค่ "คำตอบของตัวเอง"
+//    แอดมิน / เมเนเจอร์เจ้าของงาน นำคำตอบเข้าโปรเจกต์ให้อัตโนมัติ (ตรวจว่าเป็นเจ้าของช่องจริง + ใบยังรอตอบ)
+//    ระหว่างรอ สต๊าฟเห็นคำตอบของตัวเองทันที แม้โหลดหน้าใหม่
+// ══════════════════════════════════════════════
+function _canEditProj(projId){
+  const r=currentUser?.role; if(r==='admin') return true;
+  if(r==='manager'){ const p=projectsCache.find(x=>x.id===projId); return !!(p && p.managerId===currentUser.uid); }
+  return false;
+}
+function _respKey(projId, slot){ return String(projId+'__'+slot).replace(/[.#$\[\]\/]/g,'_'); }
+let _myResp = {};
+function _applyRespToCache(r){
+  if(!r) return false;
+  const p=projectsCache.find(x=>x.id===r.projId); const w=p&&(p.workers||[]).find(x=>x.id===r.workerId&&x.slot===r.slot);
+  if(!w || getWorkerConfirmStatus(w)!=='sent') return false;
+  w.confirmStatus=r.status==='rejected'?'rejected':'confirmed'; w.confirmRespondedAt=r.at;
+  w.confirmRejectReason = w.confirmStatus==='rejected' ? String(r.reason||'') : null;
+  if(w.confirmStatus==='rejected' && r.ask!=null) w.confirmAskAmount=Number(r.ask)||0;
+  return true;
+}
+async function _submitConfirmResp(projId, workerId, slot, updates){
+  const sid=currentUser?.staffId;
+  if(!_fbDatabase || !sid || sid!==workerId){ toast('ยืนยันได้เฉพาะยอดของตัวเอง','error'); return false; }
+  const resp={ staffId:sid, projId, workerId, slot, status:updates.confirmStatus==='rejected'?'rejected':'confirmed', at:updates.confirmRespondedAt||new Date().toISOString() };
+  if(updates.confirmRejectReason) resp.reason=String(updates.confirmRejectReason).slice(0,500);
+  if(updates.confirmAskAmount!=null) resp.ask=Number(updates.confirmAskAmount)||0;
+  try{ await _fbDatabase.ref('confirmResp/'+sid+'/'+_respKey(projId,slot)).set(resp); }
+  catch(e){ toast('บันทึกไม่สำเร็จ: '+(e&&e.message||''),'error'); return false; }
+  _myResp[_respKey(projId,slot)]=resp; _applyRespToCache(resp);
+  return true;
+}
+async function _loadMyConfirmResp(){
+  if(!_fbDatabase || !currentUser?.staffId) return;
+  try{ const sn=await _fbDatabase.ref('confirmResp/'+currentUser.staffId).get(); _myResp=sn.exists()?(sn.val()||{}):{}; Object.values(_myResp).forEach(_applyRespToCache); }catch(e){}
+}
+let _respApplying=false, _respAgain=false, _respListening=false;
+function _listenConfirmResp(){
+  const r=currentUser?.role; if(_respListening || !_fbDatabase || (r!=='admin' && r!=='manager')) return;
+  _respListening=true;
+  _fbDatabase.ref('confirmResp').on('value', sn=>_applyConfirmResps(sn.exists()?sn.val():{}), e=>console.warn('confirmResp:', e.message));
+}
+async function _applyConfirmResps(all){
+  if(_respApplying){ _respAgain=all; return; }
+  _respApplying=true; let changed=false;
+  try{
+    for(const [sid,items] of Object.entries(all||{})){
+      for(const [key,r] of Object.entries(items||{})){
+        const ref=_fbDatabase.ref('confirmResp/'+sid+'/'+key);
+        if(!r || r.staffId!==sid || r.workerId!==sid){ if(currentUser?.role==='admin') await ref.remove().catch(()=>{}); continue; }
+        if(!_canEditProj(r.projId)) continue;   // งานของเมเนเจอร์คนอื่น — ให้เจ้าของงาน/แอดมินนำเข้า
+        const p=projectsCache.find(x=>x.id===r.projId); const w=p&&(p.workers||[]).find(x=>x.id===r.workerId&&x.slot===r.slot);
+        const stale = !w || getWorkerConfirmStatus(w)!=='sent' || (w.confirmSentAt && String(r.at)<String(w.confirmSentAt));
+        if(stale){ await ref.remove().catch(()=>{}); continue; }   // ใบถูกยกเลิก/ส่งใหม่/ตอบไปแล้ว
+        const res=await saveProjectMerge(r.projId, pp=>{
+          const ww=(pp.workers||[]).find(x=>x.id===r.workerId&&x.slot===r.slot);
+          if(!ww || getWorkerConfirmStatus(ww)!=='sent') return;
+          ww.confirmStatus=r.status==='rejected'?'rejected':'confirmed';
+          ww.confirmRespondedAt=r.at;
+          ww.confirmRejectReason= ww.confirmStatus==='rejected' ? String(r.reason||'').slice(0,500) : null;
+          if(ww.confirmStatus==='rejected' && r.ask!=null) ww.confirmAskAmount=Number(r.ask)||0;
+        });
+        if(res && res.ok){ await ref.remove().catch(()=>{}); changed=true; }
+      }
+    }
+  }catch(e){ console.warn('apply confirmResp:', e); }
+  finally{ _respApplying=false; }
+  if(changed){ try{ updateQueueBadge(); }catch(e){} try{ const pq=document.getElementById('page-queue'); if(pq&&!pq.classList.contains('hidden')) renderQueue(); }catch(e){} }
+  if(_respAgain){ const a=_respAgain; _respAgain=false; _applyConfirmResps(a); }
+}
+
 async function _updateWorkerConfirm(projId, workerId, slot, updates){
+  if(!_canEditProj(projId)) return _submitConfirmResp(projId, workerId, slot, updates);   // 🔒 สต๊าฟ: เขียนแค่คำตอบของตัวเอง
   let workerFound = true;
   const result = await saveProjectMerge(projId, (p)=>{
     const w = (p.workers||[]).find(x => x.id === workerId && x.slot === slot);
@@ -26471,7 +26544,8 @@ function startFirebaseSync() {
       if(pgA && !pgA.classList.contains('hidden')) renderAlloc();
     }catch(e){}
   });
-  try{ _loadStaffPrivate(); }catch(e){}   // 🔒 แอดมิน = ทั้งหมด · สมาชิก = ของตัวเอง
+  try{ _loadStaffPrivate(); }catch(e){}
+  try{ _listenConfirmResp(); _loadMyConfirmResp().then(()=>{ try{ _refreshConfirmUI(); }catch(e){} }); }catch(e){}   // 🔒 คำตอบยืนยันยอด   // 🔒 แอดมิน = ทั้งหมด · สมาชิก = ของตัวเอง
   // Sync staff data in real-time
   _fbDatabase.ref('staff').on('value', snap => {
     try {
@@ -26573,6 +26647,7 @@ function startFirebaseSync() {
       // ─ ตรวจหาการเปลี่ยนแปลงจากแอดมินคนอื่น → แจ้งเตือน ─
       try{ _detectRemoteChanges(projectsCache, newProjects); }catch(e){}
       projectsCache = newProjects;
+      try{ Object.values(_myResp||{}).forEach(_applyRespToCache); }catch(e){}
       ls('projects_cache', projectsCache);
       try{updateQueueBadge();}catch(e){}
       const pg = document.getElementById('page-projects');
@@ -31843,7 +31918,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20260928-2';
+var UPD_BUILD = '20260928-3';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
