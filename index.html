@@ -3666,12 +3666,12 @@ function _renderNotifList(){
     //                  ถ้าเป็น admin + payment → เปิดหน้าคิวจ่ายเงิน (เพื่อดูสถานะ confirm)
     // ทุกการคลิก → mark notification นี้เป็น read
     let clickHandler = '';
-    const markCmd = `markOneNotifRead('${n.id}');`;
+    const markCmd = `markOneNotifRead('${escJs(n.id)}');`;
     if(n.type === 'payment' && currentUser?.role !== 'admin' && currentUser?.staffId){
       clickHandler = `onclick="${markCmd}closeNotifPanel();openStaffConfirmInbox()" style="cursor:pointer"`;
     } else if(n.type === 'payment' && currentUser?.role === 'admin'){
       clickHandler = `onclick="${markCmd}closeNotifPanel();nav('queue')" style="cursor:pointer"`;
-    } else if(n.projId){
+    } else if(n.projId && /^[A-Za-z0-9_-]+$/.test(String(n.projId))){
       clickHandler = `onclick="${markCmd}closeNotifPanel();if(typeof openProjDetail===\\'function\\')openProjDetail(\\'${n.projId}\\')" style="cursor:pointer"`;
     } else {
       clickHandler = `onclick="${markCmd}" style="cursor:pointer"`;
@@ -3820,8 +3820,26 @@ function esc(s){
 function escJs(s){
   return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'\\x3C');
 }
+// 🧼 ทำความสะอาดข้อความที่สมาชิกกรอกเอง (กันฝังโค้ด): ตัด < > " ` \ และตัวควบคุม (เก็บขึ้นบรรทัดใหม่ไว้) · จำกัดความยาว
+function cleanStr(s,max){ return String(s==null?'':s).replace(/[<>"`\\\u0000-\u0009\u000b-\u001f\u007f]/g,'').slice(0,max||300); }
+function cleanNum(s){ return String(s==null?'':s).replace(/[^0-9\- ]/g,'').slice(0,40); }
+// ลิงก์ที่ยอมให้แสดง/ใส่ในรูป = https:// เท่านั้น (กัน javascript: และการแหกเครื่องหมายคำพูด)
+function safeUrl(u){ u=String(u==null?'':u).trim(); return /^https:\/\/[^\s"'<>`\\]+$/i.test(u)?u:''; }
+// ข้อมูลสมาชิกก่อนนำไปแสดงผลทุกหน้า (ใบสำคัญจ่าย/คิวจ่าย/รายละเอียด ฯลฯ) — กรองครั้งเดียวตรงนี้
+const _STAFF_TXT=['name','nickname','lastName','bank','accName','social','gender','note','discordName','credit','nameEn','nickEn'];
+function _cleanStaffRec(s){
+  if(!s || typeof s!=='object') return s;
+  const o={...s};
+  _STAFF_TXT.forEach(k=>{ if(typeof o[k]==='string') o[k]=cleanStr(o[k],200); });
+  if(o.account!=null) o.account=cleanNum(o.account);
+  if(o.promptpay!=null) o.promptpay=cleanNum(o.promptpay);
+  if(o.qrUrl) o.qrUrl=safeUrl(o.qrUrl);
+  if(typeof o.email==='string') o.email=cleanStr(o.email,120);
+  return o;
+}
 function ls(k,v){
   if(v===undefined){try{return JSON.parse(localStorage.getItem('guin3_'+k))}catch{return null}}
+  if(k==='staff_v3' && _staffPriv) v=_staffMergePriv(v);   // 🔒 รวมข้อมูลส่วนตัว (แอดมิน/เจ้าตัว) กลับเข้าทะเบียนในเครื่อง
   localStorage.setItem('guin3_'+k,JSON.stringify(v));
   window.dispatchEvent(new CustomEvent('guindatachange',{detail:{key:k}}));
 }
@@ -4018,14 +4036,21 @@ async function fbLoadKeyed(fbKey) {
   return ls(fbKey);
 }
 
-function saveStaffData(d){
+function saveStaffData(d, _forceSplit){
   ls('staff_v3',d); // local cache
   if(_fbDatabase){
     // Save per-category to avoid overwriting other admins' changes
     const updates = {};
+    // 🔒 แยกข้อมูลส่วนตัวไป staffPrivate/<id> (เขียนสำเนาไว้เสมอ · ตัดออกจากทะเบียนเมื่อเปิดโหมดแยกแล้ว)
+    // ⚠️ เขียน staffPrivate เฉพาะหลังแอดมินกด "ย้ายข้อมูลส่วนตัว" (ตอนนั้น Rules ชุดปิดช่องโหว่ต้องขึ้นแล้ว) — ก่อนหน้านั้นไม่แตะที่เก็บใหม่เลย
+    const _sp = (currentUser?.role==='admin' && (_privSplitOn||_forceSplit)) ? _staffSplitData(d) : null;
     ['dubbing','adaptation','mix','qc','subVideo','translation','manager'].forEach(cat=>{
-      updates['staff/'+cat] = d[cat]||[];
+      updates['staff/'+cat] = (_sp && (_privSplitOn||_forceSplit)) ? (_sp.clean[cat]||[]) : (d[cat]||[]);
     });
+    if(_sp){
+      Object.entries(_sp.priv).forEach(([id,p])=>{ updates['staffPrivate/'+id]=p; });
+      _staffPriv = {...(_staffPriv||{}), ..._sp.priv};
+    }
     // Mirror to public/staff_list — flat array for registration page (no auth needed to read)
     // Only expose minimal fields (id, name, nickname, category, email)
     // ⚠️ QR/bank/phone ห้ามใส่ — public path นี้ใครก็อ่านได้ แม้ยังไม่ login
@@ -4044,7 +4069,7 @@ function saveStaffData(d){
       });
     });
     updates['public/staff_list'] = publicList;
-    _fbDatabase.ref().update(updates).catch(e=>console.warn('Staff save error:',e));
+    return _fbDatabase.ref().update(updates).catch(e=>console.warn('Staff save error:',e));
   }
 }
 // ⚡ แคชทะเบียนทีม — getAllStaff ถูกเรียกซ้ำหลายสิบครั้งต่อการวาดหน้าเดียว (การ์ดละครั้ง)
@@ -4058,12 +4083,98 @@ function getAllStaff(){
   let a=[];
   Object.entries(d).forEach(([cat,val])=>{
     const arr=Array.isArray(val)?val:Object.values(val||{});
-    arr.filter(Boolean).forEach(s=>a.push({...s,category:cat}));
+    arr.filter(Boolean).forEach(s=>a.push(_cleanStaffRec({...s,category:cat})));
   });
   _allStaffCache=a;
   return a;
 }
 function getStaffById(id){return getAllStaff().find(s=>s.id===id)}
+
+// ══════════════════════════════════════════════
+// 🔒 ข้อมูลส่วนตัวของทีม (บัญชีรับเงิน · เลขผู้เสียภาษี · ที่อยู่ · วันเกิด) → staffPrivate/<staffId>
+//    ทะเบียนทีม staff/ ทุกคนที่ล็อกอินอ่านได้ → หลังย้ายแล้วเหลือแค่ชื่อ/โรล/ช่องทางติดต่อ
+//    staffPrivate/<id> อ่านได้เฉพาะแอดมิน + เจ้าตัว · ในเครื่องแอดมินรวมกลับให้ครบ (ใบสำคัญจ่าย/คิวจ่าย/K-BIZ ใช้ได้เหมือนเดิม)
+//    เริ่มตัดออกจากทะเบียนเมื่อแอดมินกด "ย้ายข้อมูลส่วนตัว" แล้วเท่านั้น (admin_config/privSplit) — ก่อนนั้นทำงานเหมือนเดิมทุกอย่าง
+// ══════════════════════════════════════════════
+var _staffPriv = null;      // { staffId: {bank, account, ..., profile:{taxId, addr, ...}} }
+var _privSplitOn = false;   // true = ทะเบียนทีมบน Firebase ไม่เก็บข้อมูลส่วนตัวแล้ว
+const _PRIV_TOP=['bank','account','accName','promptpay','qrUrl','payType','taxId','addr','moo','sub','dist','prov','zip','birth','adminPhoto','adminPhotoAt'];
+const _PRIV_PF=['bank','account','accName','promptpay','qrUrl','payType','taxId','addr','moo','sub','dist','prov','zip','birth'];
+const _privHas=v=>v!==undefined && v!==null && v!=='';
+function _staffSplitOne(s){
+  if(!s || typeof s!=='object') return [s, null];
+  const c={...s}, p={}; let any=false;
+  _PRIV_TOP.forEach(k=>{ if(_privHas(c[k])){ p[k]=c[k]; any=true; } delete c[k]; });
+  if(c.profile && typeof c.profile==='object'){
+    const cp={...c.profile}, pp={};
+    _PRIV_PF.forEach(k=>{ if(_privHas(cp[k])){ pp[k]=cp[k]; any=true; } delete cp[k]; });
+    c.profile=cp; if(Object.keys(pp).length) p.profile=pp;
+  }
+  return [c, any?p:null];
+}
+function _staffSplitData(d){
+  const clean={}, priv={};
+  Object.entries(d||{}).forEach(([cat,arr])=>{
+    const list=Array.isArray(arr)?arr:Object.values(arr||{});
+    clean[cat]=list.filter(Boolean).map(s=>{ const [c,p]=_staffSplitOne(s); if(p && s.id) priv[s.id]={...(priv[s.id]||{}), ...p, profile:{...((priv[s.id]||{}).profile||{}), ...(p.profile||{})}}; return c; });
+  });
+  return {clean, priv};
+}
+// รวมข้อมูลส่วนตัวกลับเข้าทะเบียนในเครื่อง (ค่าที่ทะเบียนมีอยู่แล้วชนะ — กันข้อมูลใหม่กว่าถูกทับด้วยของเก่า)
+function _staffMergePriv(d){
+  if(!_staffPriv || !d || typeof d!=='object') return d;
+  const out={};
+  Object.entries(d).forEach(([cat,arr])=>{
+    const list=Array.isArray(arr)?arr:Object.values(arr||{});
+    out[cat]=list.map(s=>{
+      if(!s || !s.id || !_staffPriv[s.id]) return s;
+      const p=_staffPriv[s.id], m={...s};
+      Object.entries(p).forEach(([k,v])=>{ if(k!=='profile' && !_privHas(m[k])) m[k]=v; });
+      if(p.profile){ const cur=m.profile||{}; const pf={...cur}; Object.entries(p.profile).forEach(([k,v])=>{ if(!_privHas(pf[k])) pf[k]=v; }); m.profile=pf; }
+      return m;
+    });
+  });
+  return out;
+}
+// 🔗 แอดมิน: บัญชีที่ยังไม่ผูก (สมัครเอง) → ผูกกับรายชื่อทีมให้เมื่ออีเมลตรงกับที่แอดมินบันทึกไว้เท่านั้น
+async function _autoLinkStaffIds(){
+  if(currentUser?.role!=='admin' || !_fbDatabase) return;
+  try{
+    const sn=await _fbDatabase.ref('users').get(); if(!sn.exists()) return;
+    const byEmail={};
+    getAllStaff().forEach(s=>{
+      const ems=String(s.email||'').match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi)||[];
+      (Array.isArray(s.prevEmails)?s.prevEmails:[]).forEach(e=>ems.push(String(e)));
+      ems.forEach(e=>{ const k=e.toLowerCase(); if(!byEmail[k]) byEmail[k]=s.id; });
+    });
+    let n=0;
+    for(const [uid,u] of Object.entries(sn.val()||{})){
+      if(!u || u.staffId || u.role==='admin') continue;
+      const id=byEmail[String(u.email||'').toLowerCase()]; if(!id) continue;
+      try{ await _fbDatabase.ref('users/'+uid+'/staffId').set(id); n++; }catch(e){}
+    }
+    if(n){ try{ logAudit('staff.link','ระบบ','ผูกบัญชีกับรายชื่อทีมอัตโนมัติ '+n+' บัญชี'); }catch(e){} }
+  }catch(e){}
+}
+function _staffPrivApply(val){
+  _staffPriv = val || {};
+  const cur = ls('staff_v3'); if(cur) ls('staff_v3', cur);   // ls() รวมให้เอง + ล้างแคชรายชื่อ
+}
+let _staffPrivListening=false;
+async function _loadStaffPrivate(){
+  if(!_fbDatabase || !currentUser) return;
+  try{
+    if(currentUser.role==='admin'){
+      try{ const f=await _fbDatabase.ref('admin_config/privSplit').get(); _privSplitOn = !!(f.exists() && f.val()); }catch(e){}
+      setTimeout(()=>{ try{ _autoLinkStaffIds(); }catch(e){} }, 6000);
+      if(_staffPrivListening) return; _staffPrivListening=true;
+      _fbDatabase.ref('staffPrivate').on('value', sn=>_staffPrivApply(sn.exists()?sn.val():{}), e=>console.warn('staffPrivate:', e.message));
+    } else if(currentUser.staffId){
+      const sn=await _fbDatabase.ref('staffPrivate/'+currentUser.staffId).get();   // เฉพาะของตัวเอง
+      if(sn.exists()) _staffPrivApply({[currentUser.staffId]: sn.val()});
+    }
+  }catch(e){ /* ยังไม่ได้เพิ่มสิทธิ์ใน Firebase — ใช้ข้อมูลเดิมไปก่อน */ }
+}
 
 // ══════════════════════════════════════════════
 // 👥 สถานะทีมงานแบบรวม + ระบบ Tag (เฟส 1 — บรีฟ 2026-08 ข้อ 5)
@@ -6996,8 +7107,60 @@ function _prEnsurePosts(f){
   }
   return f.roomPosts;
 }
+// 🛡️ วาดหน้าห้องโปรเจกต์ใหม่โดยไม่ให้ "หน้าเด้งขึ้นบน" และไม่ให้ Ctrl+Z หาย
+//   เดิม: ทุกครั้งที่ออกจากกล่อง (สลับไปก๊อปจากดิส/กดปุ่ม) หน้าจะวาดใหม่ทั้งหมด → กล่องถูกสร้างใหม่ (ประวัติ undo หาย)
+//         และจังหวะ innerHTML หน้าสั้นลงชั่วขณะ → เบราว์เซอร์ดันสกรอลล์ขึ้นบน
+//   ใหม่: ถ้ายังเป็นโพสต์เดิม + ข้อความเท่าเดิม → วาดลงกล่องชั่วคราว แล้ว "อัปเดตเฉพาะส่วนที่เปลี่ยน" โดยไม่แตะกล่องพิมพ์
+//         (เบราว์เซอร์ล้างประวัติ Ctrl+Z ทันทีที่กล่องถูกถอด/ย้าย — ต้องไม่ย้ายเลย) + คืนตำแหน่งสกรอลล์
+// 🙈 เมเนเจอร์ห้ามเห็นชื่อลูกค้าทุกกรณี (กติกาเจ้าของ 27 ก.ย.) — ใช้ตอน "แสดง/ค้นหา" เท่านั้น ห้ามใช้ตอนบันทึก
+function _cliShow(p){ return (currentUser?.role==='manager') ? '' : String((p&&p.client)||''); }
 function renderProjRoom(){
-  const el=document.getElementById('pr-body'); if(!el) return;
+  const body=document.getElementById('pr-body'); if(!body) return _renderProjRoomInner();
+  const doc=document.scrollingElement||document.documentElement, y=doc?doc.scrollTop:0;
+  const mc=document.getElementById('main-content'), my=mc?mc.scrollTop:0;
+  const key=_prSel+'|'+_prPostSel;
+  const oldTa=document.getElementById('pr-post');
+  const same=!!(oldTa && oldTa._prKey===key && body.contains(oldTa));
+  body.style.minHeight=body.offsetHeight+'px';   // กันหน้าหดชั่วขณะตอนเปลี่ยนเนื้อหา
+  try{
+    let patched=false;
+    if(same){
+      const tmp=document.createElement('div');
+      _renderProjRoomInner(tmp);
+      const nt=tmp.querySelector('#pr-post');
+      if(nt && _prSel+'|'+_prPostSel===key && nt.value===oldTa.value){ _prMorphKids(body, tmp); patched=true; }
+    }
+    if(!patched) _renderProjRoomInner();
+  } finally {
+    const cur=document.getElementById('pr-post'); if(cur){ cur._prKey=_prSel+'|'+_prPostSel; _prAutoGrow(cur); }
+    body.style.minHeight='';
+    if(_prSel+'|'+_prPostSel===key){
+      if(doc && doc.scrollTop!==y) doc.scrollTop=y;
+      if(mc && mc.scrollTop!==my) mc.scrollTop=my;
+    }
+  }
+}
+// อัปเดต DOM เดิมให้ตรงกับของใหม่ทีละโหนด (ไม่ถอดโหนดที่เหมือนเดิม) · กล่อง #pr-post ไม่ถูกแตะเนื้อหา
+function _prMorphKids(a, b){
+  const ac=[...a.childNodes], bc=[...b.childNodes];
+  for(let i=0;i<bc.length;i++){ if(i<ac.length) _prMorph(ac[i], bc[i]); else a.appendChild(bc[i]); }
+  for(let i=bc.length;i<ac.length;i++) ac[i].remove();
+}
+function _prMorph(a, b){
+  if(a.nodeType!==b.nodeType || a.nodeName!==b.nodeName || (a.nodeType===1 && (a.id||'')!==(b.id||''))){ a.replaceWith(b); return; }
+  if(a.nodeType!==1){ if(a.nodeValue!==b.nodeValue) a.nodeValue=b.nodeValue; return; }
+  const isTa=a.id==='pr-post';
+  for(const at of [...a.attributes]) if(!b.hasAttribute(at.name) && !(isTa && at.name==='style')) a.removeAttribute(at.name);
+  for(const at of [...b.attributes]){ if(isTa && at.name==='style') continue; if(a.getAttribute(at.name)!==at.value) a.setAttribute(at.name, at.value); }
+  if(isTa) return;                                   // ข้อความ/undo/เคอร์เซอร์ของกล่องพิมพ์อยู่ครบ
+  const tag=a.tagName;
+  if(tag==='TEXTAREA'){ if(document.activeElement!==a && a.value!==b.value) a.value=b.value; return; }
+  if(tag==='INPUT'){ if(document.activeElement!==a){ if(a.value!==b.value) a.value=b.value; a.checked=b.checked; } return; }
+  _prMorphKids(a, b);
+  if(tag==='SELECT' && document.activeElement!==a) a.value=b.value;
+}
+function _renderProjRoomInner(target){
+  const el=target||document.getElementById('pr-body'); if(!el) return;
   const role=currentUser?.role;
   if(role!=='admin'&&role!=='manager'){ el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2)">🔒 หน้านี้สำหรับ Admin และ Manager เท่านั้น</div>'; return; }
   let list=getProjects().filter(p=>p&&p.projStatus!=='cancelled'&&p.projStatus!=='done'&&p.projStatus!=='paid');
@@ -9596,7 +9759,7 @@ async function saveUserProfile(uid,data){ await fbSaveUserProfile(uid,data); }
 // HELPERS
 // ══════════════════════════════════════════════
 function fmtDate(d){if(!d)return'—';if(typeof d==='string'&&/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d))return d;try{return new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'})}catch{return String(d)}}
-function fmtB(n){return'฿'+(n||0).toLocaleString()}
+function fmtB(n){return'฿'+(Number(n)||0).toLocaleString()}
 function openModal(id){
   if(id==='modal-admin-inbox')renderAdminInbox();
   document.getElementById(id).classList.remove('hidden');
@@ -9805,6 +9968,11 @@ function getProjectFinance(p){
   if(usingLegacy){
     scheduled = billed;
     if(legacyPaid) received = billed;
+  } else if(legacyPaid){
+    // 🐞 แก้บั๊ก: กด "รับเงินจากลูกค้าแล้ว" (หน้าคิวจ่าย) แต่โปรเจกต์มีงวดที่ยังไม่ได้ติ๊ก → เดิมนับเป็น "ยังไม่ได้รับ"
+    //    ทำให้ยอดเก็บเงินแล้ว/เงินสดติดลบผิดจริง · ปุ่มนี้หมายถึงลูกค้าจ่ายครบทั้งโปรเจกต์ → นับรับครบ ไม่มีค้าง/เลยกำหนด
+    received = Math.max(received, billed || scheduled);
+    overdue = 0;
   }
   // รายจ่ายทีม — หัก % ต่อหมวดเหมือนที่แสดงในฟอร์มโปรเจกต์
   const tax = p.tax || {};
@@ -10852,6 +11020,7 @@ async function recheckEmailVerified(){
 }
 
 function verifyLogout(){
+  _wipeLocalData();
   if(_fbAuth) _fbAuth.signOut().then(()=>window.location.reload());
   else window.location.reload();
 }
@@ -10924,7 +11093,7 @@ auth.onAuthStateChanged(async(fbUser)=>{
     // Known admin emails - always admin regardless of saved profile
     const KNOWN_ADMINS = ['penguinstudiovoice@gmail.com','haruyami231@gmail.com'];
     const emailLower = (fbUser.email||'').toLowerCase().trim();
-    const isKnownAdmin = KNOWN_ADMINS.some(e => emailLower.includes(e.toLowerCase().replace('@gmail.com','')) || e.toLowerCase() === emailLower);
+    const isKnownAdmin = KNOWN_ADMINS.some(e => e.toLowerCase() === emailLower);
     const profile = {
       email: fbUser.email,
       name: fbUser.displayName || fbUser.email,
@@ -11051,7 +11220,7 @@ async function doLogin(){
   showLoader(false);
 }
 async function doRegister(){
-  const nick = document.getElementById('reg-nickname').value.trim();
+  const nick = cleanStr(document.getElementById('reg-nickname').value.trim(), 60);
   const email = document.getElementById('reg-email')?.value.trim()||'';
   const pass = document.getElementById('reg-pass')?.value||'';
   const gender = document.getElementById('reg-gender')?.value||'';
@@ -11069,7 +11238,7 @@ async function doRegister(){
     if(_fbDatabase){
       await _fbDatabase.ref('users/'+cred.user.uid).set({
         email, nickname:nick, gender,
-        staffId, roles, role:'staff',
+        claimStaffId:staffId, roles, role:'staff',   // 🔒 ขอผูกเท่านั้น — แอดมินผูกให้เมื่ออีเมลตรงกับทะเบียนทีม
         createdAt:new Date().toISOString()
       });
     }
@@ -11079,7 +11248,12 @@ async function doRegister(){
     toast('❌ สมัครไม่สำเร็จ: '+e.message,'error');
   }finally{showLoader(false);}
 }
-function doLogout(){auth.signOut();currentUser=null;projectsCache=[];}
+// 🧹 ล้างข้อมูลที่แคชไว้ในเครื่อง (ทะเบียนทีม/โปรเจกต์/รหัสบอท ฯลฯ) — เครื่องที่ใช้ร่วมกันจะไม่เหลือข้อมูลคนอื่น
+function _wipeLocalData(){
+  try{ const ks=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.indexOf('guin3_')===0 && !/draft/i.test(k)) ks.push(k); } ks.forEach(k=>localStorage.removeItem(k)); }catch(e){}
+  try{ sessionStorage.clear(); }catch(e){}
+}
+function doLogout(){ _wipeLocalData(); auth.signOut(); currentUser=null; projectsCache=[]; }
 async function enterApp(){
   try {
   showLoader(true);
@@ -11143,7 +11317,7 @@ async function enterApp(){
         // Admin only — migrate from localStorage if available
         const localStaff = ls('staff_v3');
         if(localStaff && Object.keys(localStaff).length){
-          await _fbDatabase.ref('staff').set(localStaff);
+          saveStaffData(localStaff);
           console.log('📤 Migrated staff from localStorage to Firebase');
         }
       } else {
@@ -17071,6 +17245,7 @@ function renderQueue() {
   }
   try {
   try{ _maybeAutoConfirm(); }catch(e){} // ⏱️ ยืนยันอัตโนมัติใบที่ค้างเกิน 3 วัน (throttled)
+  try{ _renderPaidRestoreBanner(); }catch(e){} // 🩹 เตือนรายการที่หลุดกลับเข้าคิว + งานที่ยังไม่บันทึกรับเงินลูกค้า
   initQueueMonthFilter();
   const el = document.getElementById('queue-list'); if (!el) return;
   const projs = getProjects();
@@ -17693,10 +17868,107 @@ function toggleQueueGroup(id) {
   else _expandedQueueGroups.delete(id);
 }
 
+// 🩹 คนที่ "เคยออกใบสำคัญจ่ายแล้ว" แต่ตอนนี้สถานะไม่ใช่จ่ายแล้ว (เคยโดนระบบเก่าดึงกลับตอนปลดติ๊กลูกค้าจ่าย)
+function _paidRestoreCandidates(){
+  const projs=getProjects(), byId=new Map(projs.map(p=>[p.id,p])), seen=new Map();
+  (getDocsStore('vouchers')||[]).forEach(v=>{
+    if(!v || !v.staffId || !v.docNo || /ตัวอย่าง|PREVIEW/i.test(v.docNo)) return;
+    const items=(Array.isArray(v.items)&&v.items.length)?v.items:(v.projId?[{projId:v.projId,slot:v.slot||v.workerSlot,amount:v.amount}]:[]);
+    items.forEach(it=>{
+      const p=byId.get(it.projId); if(!p || !it.slot || p.projStatus==='cancelled') return;
+      const w=(p.workers||[]).find(x=>x.id===v.staffId && x.slot===it.slot);
+      if(!w || w.status==='paid') return;
+      const k=p.id+'|'+v.staffId+'|'+it.slot, prev=seen.get(k);
+      if(!prev || String(v.createdAt||'')>String(prev.v.createdAt||'')) seen.set(k,{p,w,v,it});
+    });
+  });
+  return [...seen.values()];
+}
+// 🧾 งานที่ยังไม่ได้บันทึกว่าลูกค้าจ่าย (ยอดเก็บเงินแล้วจึงต่ำกว่าจริง)
+function _clientUnpaidList(){
+  return getProjects().filter(p=>p.projStatus!=='cancelled' && (p.budget||0)>0).map(p=>{
+    const f=getProjectFinance(p), ws=(p.workers||[]).filter(w=>(w.amount||0)>0), nPaid=ws.filter(w=>w.status==='paid').length;
+    return {p,f,nW:ws.length,nPaid,teamDone:ws.length>0&&nPaid===ws.length};
+  }).filter(x=>x.f.received < x.f.billed);
+}
+function _renderPaidRestoreBanner(){
+  const list=document.getElementById('queue-list'); if(!list) return;
+  let b=document.getElementById('queue-restore-banner');
+  if(!b){ b=document.createElement('div'); b.id='queue-restore-banner'; list.parentNode.insertBefore(b,list); }
+  if(currentUser?.role!=='admin'){ b.innerHTML=''; return; }
+  const c=_paidRestoreCandidates(), u=_clientUnpaidList().filter(x=>x.teamDone);
+  const box=(col,ic,t,sub,btn,fn)=>`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;margin-bottom:10px;border-radius:12px;background:${col}1a;border:1px solid ${col}77">
+      <span style="font-size:20px">${ic}</span><div style="flex:1;min-width:220px"><div style="font-weight:800;color:${col}">${t}</div><div style="font-size:12px;color:var(--text2)">${sub}</div></div>
+      <button class="btn btn-blue btn-sm" onclick="${fn}">${btn}</button></div>`;
+  b.innerHTML=(c.length?box('#FF9E00','🩹',`พบ ${c.length} รายการที่เคยออกใบสำคัญจ่ายแล้ว แต่กลับมาอยู่ในคิว`,'เกิดจากระบบเก่า (ปลดติ๊ก "ลูกค้าจ่ายแล้ว" แล้วสถานะจ่ายของทีมถูกดึงกลับ) · ตรวจแล้วกดกู้คืน','ตรวจ & กู้คืน','openPaidRestore()'):'')
+    +(u.length?box('#00B4FF','🧾',`${u.length} งานจ่ายทีมครบแล้ว แต่ยังไม่ได้บันทึกว่าลูกค้าจ่าย`,'ยอด "เก็บเงินแล้ว" บนหน้าแรกเลยต่ำกว่าจริง · ตรวจแล้วบันทึกทีละหลายงานได้','บันทึกรับเงินลูกค้า','openClientPaidBulk()'):'');
+}
+function openPaidRestore(){
+  const c=_paidRestoreCandidates();
+  if(!c.length){ toast('ไม่มีรายการที่ต้องกู้คืน ✅','success'); _renderPaidRestoreBanner(); return; }
+  window._prCands=c;
+  const rows=c.map((x,i)=>{ const s=getStaffById(x.v.staffId)||{};
+    return `<label style="display:flex;gap:10px;align-items:flex-start;padding:9px 4px;border-bottom:1px solid var(--border2);cursor:pointer">
+      <input type="checkbox" class="pr-chk" data-i="${i}" checked style="margin-top:3px">
+      <div style="flex:1;min-width:0"><div style="font-weight:700">${esc(projDisp(x.p))} · ${esc(s.nickname||s.name||x.v.staffNickname||x.v.staffName||'')} <span style="color:var(--text2);font-weight:400">(${esc(x.it.slot)})</span></div>
+        <div style="font-size:11.5px;color:var(--text2)">ใบสำคัญ ${esc(x.v.docNo)} · ${esc(x.v.date||'')} · ${fmtB(x.it.amount||x.w.amount||0)} · ตอนนี้: ${esc(x.w.status||'-')}</div></div></label>`; }).join('');
+  _tagOverlayShow('🩹 กู้สถานะ "จ่ายแล้ว" จากใบสำคัญจ่าย', `<div style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.6">รายการนี้มีใบสำคัญจ่ายออกไปแล้ว (โอนเงินแล้ว) แต่สถานะหลุดกลับเป็นยังไม่จ่าย · กู้คืน = ตั้งเป็น "จ่ายแล้ว" พร้อมเลขใบสำคัญและวันที่เดิม</div>
+    <div>${rows}</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn btn-outline btn-sm" onclick="document.getElementById('tag-overlay')?.remove()">ยกเลิก</button>
+    <button class="btn btn-blue btn-sm" onclick="applyPaidRestore()">✅ กู้คืนที่เลือก</button></div>`, 620);
+}
+async function applyPaidRestore(){
+  const c=window._prCands||[], pick=[...document.querySelectorAll('.pr-chk:checked')].map(e=>c[+e.dataset.i]).filter(Boolean);
+  if(!pick.length){ toast('ยังไม่ได้เลือกรายการ','warn'); return; }
+  const byProj=new Map(); pick.forEach(x=>{ (byProj.get(x.p.id)||byProj.set(x.p.id,[]).get(x.p.id)).push(x); });
+  let ok=0, fail=0;
+  for(const [pid,xs] of byProj){
+    try{ const r=await saveProjectMerge(pid,(fresh)=>{ xs.forEach(x=>{ const w=(fresh.workers||[]).find(y=>y.id===x.v.staffId && y.slot===x.it.slot);
+        if(w && w.status!=='paid'){ w.status='paid'; w.voucherNo=x.v.docNo; w.paidAt=x.v.createdAt||new Date().toISOString(); } }); });
+      if(r && r.ok===false) fail+=xs.length; else ok+=xs.length; }catch(e){ fail+=xs.length; }
+  }
+  try{ logAudit('payment.restore','ระบบ','กู้สถานะจ่ายแล้วจากใบสำคัญ '+ok+' รายการ'); }catch(e){}
+  document.getElementById('tag-overlay')?.remove();
+  toast(`🩹 กู้คืนแล้ว ${ok} รายการ${fail?' · ไม่สำเร็จ '+fail:''}`, fail?'warn':'success');
+  try{ renderQueue(); }catch(e){} try{ updateQueueBadge(); }catch(e){}
+}
+function openClientPaidBulk(){
+  const u=_clientUnpaidList().sort((a,b)=>(b.teamDone-a.teamDone)||String(a.p.deadline||'').localeCompare(String(b.p.deadline||'')));
+  if(!u.length){ toast('ทุกงานบันทึกรับเงินลูกค้าครบแล้ว ✅','success'); return; }
+  window._cpCands=u;
+  const rows=u.map((x,i)=>`<label style="display:flex;gap:10px;align-items:flex-start;padding:9px 4px;border-bottom:1px solid var(--border2);cursor:pointer">
+      <input type="checkbox" class="cp-chk" data-i="${i}" ${x.teamDone?'checked':''} style="margin-top:3px">
+      <div style="flex:1;min-width:0"><div style="font-weight:700">${esc(projDisp(x.p))} <span style="color:var(--text2);font-weight:400">· ${esc(x.p.client||'')}</span></div>
+        <div style="font-size:11.5px;color:var(--text2)">บิล ${fmtB(x.f.billed)} · บันทึกรับแล้ว ${fmtB(x.f.received)} · ทีม: ${x.teamDone?'<span style="color:var(--green)">จ่ายครบ '+x.nPaid+'/'+x.nW+'</span>':'จ่ายแล้ว '+x.nPaid+'/'+x.nW}</div></div></label>`).join('');
+  _tagOverlayShow('🧾 บันทึกว่าลูกค้าจ่ายแล้ว (ทีละหลายงาน)', `<div style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.6">ติ๊กงานที่ลูกค้าโอนเงินครบแล้ว · ติ๊กไว้ให้ก่อนเฉพาะงานที่จ่ายทีมครบแล้ว — ตรวจอีกรอบก่อนกดบันทึก</div>
+    <div>${rows}</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn btn-outline btn-sm" onclick="document.getElementById('tag-overlay')?.remove()">ยกเลิก</button>
+    <button class="btn btn-blue btn-sm" onclick="applyClientPaidBulk()">✅ บันทึกว่าลูกค้าจ่ายแล้ว</button></div>`, 640);
+}
+function applyClientPaidBulk(){
+  const u=window._cpCands||[], pick=[...document.querySelectorAll('.cp-chk:checked')].map(e=>u[+e.dataset.i]).filter(Boolean);
+  if(!pick.length){ toast('ยังไม่ได้เลือกงาน','warn'); return; }
+  pick.forEach(x=>{
+    const pid=x.p.id, last=(x.p.workers||[]).map(w=>w.paidAt).filter(Boolean).sort().pop();
+    const d=(last?new Date(last):new Date()).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'});
+    ls('client_paid_'+pid, true); ls('client_paid_date_'+pid, d);
+    if(_fbDatabase){ _fbDatabase.ref('misc/cpaid_'+pid).set(true).catch(()=>{}); _fbDatabase.ref('misc/cpaid_date_'+pid).set(d).catch(()=>{}); }
+  });
+  try{ logAudit('client.paid.bulk','ระบบ','บันทึกลูกค้าจ่ายแล้ว '+pick.length+' งาน'); }catch(e){}
+  document.getElementById('tag-overlay')?.remove();
+  toast('🧾 บันทึกว่าลูกค้าจ่ายแล้ว '+pick.length+' งาน','success');
+  try{ renderQueue(); }catch(e){} try{ if(window._currentPage==='dashboard') renderDash(); }catch(e){}
+}
 function toggleClientPaid(projId) {
   const current = ls('client_paid_'+projId);
   if (current) {
-    // Toggle off — confirm
+    // Toggle off — ถามด้วยหน้าต่างยืนยันที่อ่านชัด · ไม่แตะสถานะจ่ายของทีม (จ่ายแล้วคือจ่ายแล้ว)
+    const _pp=getProjects().find(x=>x.id===projId), _nPaid=((_pp&&_pp.workers)||[]).filter(w=>w.status==='paid').length;
+    if(confirm('เปลี่ยนงาน "'+(_pp?projDisp(_pp):projId)+'" เป็น "ลูกค้ายังไม่จ่าย"?\n\n'
+      +'• ใช้เฉพาะกรณีกดผิด หรือลูกค้ายังไม่ได้โอนจริง\n'
+      +(_nPaid?'• ทีมที่จ่ายไปแล้ว '+_nPaid+' คน ยังเป็น "จ่ายแล้ว" เหมือนเดิม (ไม่ถูกดึงกลับเข้าคิว)':'')))
+      confirmClientUnpaid(projId);
+    return;
     const wrap = document.getElementById('toastWrap');
     const el = document.createElement('div');
     el.className = 'toast warn';
@@ -17728,26 +18000,9 @@ async function confirmClientUnpaid(projId, toastEl) {
     _fbDatabase.ref('misc/cpaid_'+projId).remove().catch(()=>{});
     _fbDatabase.ref('misc/cpaid_date_'+projId).remove().catch(()=>{});
   }
-  // ─ สำคัญ: rollback worker.status ของทุกคนที่ถูก mark 'paid' กลับเป็น 'approved' ─
-  // เพื่อให้สตาฟไม่เห็น badge "ได้รับแล้ว" ค้างอยู่
-  try{
-    const result = await saveProjectMerge(projId, (fresh)=>{
-      let reset = 0;
-      (fresh.workers||[]).forEach(w=>{
-        if(w.status === 'paid'){
-          w.status = 'approved';
-          delete w.paidAt;
-          delete w.voucherNo;
-          reset++;
-        }
-      });
-      fresh._resetCount = reset;
-    });
-    const n = result.project?._resetCount || 0;
-    toast('↩️ เปลี่ยนเป็น "ยังไม่ได้รับ" แล้ว' + (n > 0 ? ` · รีเซ็ต ${n} รายการ` : ''), 'info');
-  }catch(e){
-    toast('↩️ เปลี่ยนเป็น "ยังไม่ได้รับ" แล้ว', 'info');
-  }
+  // 🛡️ เดิม: ดึงสถานะ "จ่ายแล้ว" ของทีมทุกคนกลับเป็นอนุมัติ + ลบเลขใบสำคัญ/วันที่จ่าย → งานที่จ่ายนานแล้วเด้งกลับเข้าคิว
+  //    ยกเลิกพฤติกรรมนี้: เงินที่โอนให้ทีมไปแล้วเป็นเรื่องจริง ไม่ขึ้นกับสถานะรับเงินจากลูกค้า
+  toast('↩️ เปลี่ยนเป็น "ลูกค้ายังไม่จ่าย" แล้ว · สถานะจ่ายของทีมไม่เปลี่ยน', 'info');
   renderQueue();
 }
 
@@ -19091,17 +19346,8 @@ function _renderStaffConfirmList(items){
     // === Breakdown box — ให้ Staff ตรวจรายละเอียดได้ตรงจุด ===
     const myStaff = getStaffById(w.id);
     const finalAmount = w.confirmAmount || w.amount || 0;
-    const rate = w.ratePerUnit || 0;
-    const unit = w.unit || 'เหมา';
-    const dur = p.duration || 0;
+    // (เจ้าของ 27 ก.ย.) ไม่โชว์สูตร "เรต × จำนวน" แล้ว — งานคิดได้หลายแบบ (นาที/บรรทัด/ตอน) โชว์ผิดทำให้สับสน · รายละเอียดแจ้งในดิสอยู่แล้ว
     let breakdownLines = [];
-    if(unit === 'นาที' && dur > 0 && rate > 0){
-      breakdownLines.push(`<div style="display:flex;justify-content:space-between"><span>${dur} นาที × ${fmtB(rate)}/นาที</span><span style="font-weight:700">${fmtB(rate*dur)}</span></div>`);
-    } else if(unit === 'เหมา' && rate > 0){
-      breakdownLines.push(`<div style="display:flex;justify-content:space-between"><span>เหมาจ่าย</span><span style="font-weight:700">${fmtB(rate)}</span></div>`);
-    } else if(rate > 0){
-      breakdownLines.push(`<div style="display:flex;justify-content:space-between"><span>${fmtB(rate)} × ${dur||1} ${unit}</span><span style="font-weight:700">${fmtB(rate*(dur||1))}</span></div>`);
-    }
     // หมายเหตุ (เช่น หัก 200฿)
     if(w.comment && w.comment.trim()){
       breakdownLines.push(`<div style="margin-top:4px;padding-top:4px;border-top:1px dashed rgba(255,255,255,.08);color:var(--orange)"><span style="font-size:10px">📝 หมายเหตุ:</span> ${(w.comment||'').replace(/</g,'&lt;')}</div>`);
@@ -26220,6 +26466,7 @@ function startFirebaseSync() {
       if(pgA && !pgA.classList.contains('hidden')) renderAlloc();
     }catch(e){}
   });
+  try{ _loadStaffPrivate(); }catch(e){}   // 🔒 แอดมิน = ทั้งหมด · สมาชิก = ของตัวเอง
   // Sync staff data in real-time
   _fbDatabase.ref('staff').on('value', snap => {
     try {
@@ -30882,47 +31129,47 @@ function renderAdminInbox(){
     switch(r.type){
       case 'warning':
         head='✉️ ขอออกใบเตือน';
-        detail=`<div style="font-size:12px;color:var(--text2)">ขอออกใบเตือน: <strong style="color:#FF7070">${getStaffById(r.staffId)?.nickname||r.staffId}</strong>${r.projName?' · โปรเจกต์: '+r.projName:''}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">ประเภท: ${r.warnType}</div>`;
+        detail=`<div style="font-size:12px;color:var(--text2)">ขอออกใบเตือน: <strong style="color:#FF7070">${esc(getStaffById(r.staffId)?.nickname||r.staffId)}</strong>${r.projName?' · โปรเจกต์: '+r.projName:''}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">ประเภท: ${esc(r.warnType)}</div>`;
         break;
       case 'warning-issued':
         head='✉️ Manager ออกใบเตือนแล้ว';
-        detail=`<div style="font-size:12px;color:var(--text2)">ออกใบเตือนถึง: <strong style="color:#FF7070">${r.staffName||r.staffId}</strong>${r.projName?' · โปรเจกต์: '+r.projName:''}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">ประเภท: ${r.warnType||'-'}</div>`;
+        detail=`<div style="font-size:12px;color:var(--text2)">ออกใบเตือนถึง: <strong style="color:#FF7070">${esc(r.staffName||r.staffId)}</strong>${r.projName?' · โปรเจกต์: '+r.projName:''}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">ประเภท: ${esc(r.warnType||'-')}</div>`;
         break;
       case 'suspend':
         head='⏸️ Manager พักงานสมาชิก';
-        detail=`<div style="font-size:12px;color:var(--text2)">พักงาน: <strong style="color:#FF9E00">${r.staffName||r.staffId}</strong></div>`;
+        detail=`<div style="font-size:12px;color:var(--text2)">พักงาน: <strong style="color:#FF9E00">${esc(r.staffName||r.staffId)}</strong></div>`;
         break;
       case 'unsuspend':
         head='▶️ Manager คืนงานสมาชิก';
-        detail=`<div style="font-size:12px;color:var(--text2)">คืนงาน: <strong style="color:#00DFA0">${r.staffName||r.staffId}</strong></div>`;
+        detail=`<div style="font-size:12px;color:var(--text2)">คืนงาน: <strong style="color:#00DFA0">${esc(r.staffName||r.staffId)}</strong></div>`;
         break;
       case 'project-created':
         head='📁 Manager สร้างโปรเจกต์';
-        detail=`<div style="font-size:12px;color:var(--text2)">โปรเจกต์ใหม่: <strong style="color:var(--accent2)">${r.projName||r.projId}</strong></div>`;
+        detail=`<div style="font-size:12px;color:var(--text2)">โปรเจกต์ใหม่: <strong style="color:var(--accent2)">${esc(r.projName||r.projId)}</strong></div>`;
         break;
       case 'project-updated':
         head='✏️ Manager แก้ไขโปรเจกต์';
-        detail=`<div style="font-size:12px;color:var(--text2)">แก้ไข: <strong style="color:var(--accent2)">${r.projName||r.projId}</strong></div>`;
+        detail=`<div style="font-size:12px;color:var(--text2)">แก้ไข: <strong style="color:var(--accent2)">${esc(r.projName||r.projId)}</strong></div>`;
         break;
       case 'project-deleted':
         head='🗑️ Manager ลบโปรเจกต์';
-        detail=`<div style="font-size:12px;color:var(--text2)">ลบ: <strong style="color:#FF7070">${r.projName||r.projId}</strong></div>`;
+        detail=`<div style="font-size:12px;color:var(--text2)">ลบ: <strong style="color:#FF7070">${esc(r.projName||r.projId)}</strong></div>`;
         break;
       default:
         head='✏️ ขอเปลี่ยนชื่อ';
-        detail=`<div style="font-size:12px;color:var(--text2)">ขอเปลี่ยนชื่อ: <strong>${r.curName}</strong> → <strong style="color:var(--accent2)">${r.newName}</strong></div>`;
+        detail=`<div style="font-size:12px;color:var(--text2)">ขอเปลี่ยนชื่อ: <strong>${esc(r.curName)}</strong> → <strong style="color:var(--accent2)">${esc(r.newName)}</strong></div>`;
     }
     return `<div style="border-bottom:1px solid rgba(255,255,255,.06);padding:14px 0">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
         <span style="font-size:13px;font-weight:700;color:var(--text)">${head}</span>
         ${badge}
-        <span style="font-size:11px;color:var(--text2);margin-left:auto">${r.managerName||'Manager'} · ${fmtWarnDate(r.createdAt?.split('T')[0]||'')}</span>
+        <span style="font-size:11px;color:var(--text2);margin-left:auto">${esc(r.managerName||'Manager')} · ${fmtWarnDate(r.createdAt?.split('T')[0]||'')}</span>
       </div>
       ${detail}
-      ${r.note?`<div style="font-size:12px;color:var(--text2);margin-top:4px;font-style:italic">หมายเหตุ: ${r.note}</div>`:''}
+      ${r.note?`<div style="font-size:12px;color:var(--text2);margin-top:4px;font-style:italic">หมายเหตุ: ${esc(r.note)}</div>`:''}
       ${isPend?`<div style="display:flex;gap:8px;margin-top:10px">
-        <button class="btn btn-sm btn-green" onclick="adminApproveReq('${r.id}')">✅ อนุมัติ</button>
-        <button class="btn btn-sm btn-red" onclick="adminRejectReq('${r.id}')">✕ ปฏิเสธ</button>
+        <button class="btn btn-sm btn-green" onclick="adminApproveReq('${escJs(r.id)}')">✅ อนุมัติ</button>
+        <button class="btn btn-sm btn-red" onclick="adminRejectReq('${escJs(r.id)}')">✕ ปฏิเสธ</button>
       </div>`:''}
     </div>`;
   }).join('');
@@ -31581,5 +31828,64 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
+<script>
+/* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
+   ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
+            → ข้อมูลไม่ขึ้นจนกว่าจะล็อกอินใหม่
+   ใหม่: เช็คไฟล์ version.json (เล็กมาก) ทุก 3 นาที + ทุกครั้งที่กลับมาที่แท็บ
+         เจอเวอร์ชันใหม่ → แท็บที่ไม่ได้ดูอยู่ = รีเฟรชทันที · กำลังใช้อยู่ = แจ้งแถบด้านล่าง นับถอยหลัง 20 วิ
+         (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
+   ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
+   ═══════════════════════════════════════════════════════════════════ */
+var UPD_BUILD = '20260928-1';
+(function(){
+  if(location.protocol==='file:') return;
+  var shown=false, timer=null, left=20;
+  function busy(){
+    var a=document.activeElement, t=a&&a.tagName;
+    if((t==='INPUT'||t==='TEXTAREA'||t==='SELECT'||(a&&a.isContentEditable)) && document.hasFocus()) return true;
+    if(document.querySelector('.modal-overlay:not(.hidden)')) return true;
+    if(document.getElementById('ndp-savebar')&&document.getElementById('ndp-savebar').classList.contains('show')) return true;
+    return false;
+  }
+  function go(b){
+    try{ sessionStorage.setItem('guin_reload_for', b); }catch(e){}
+    var u=location.pathname+'?v='+encodeURIComponent(b)+location.hash;   // URL ใหม่ = เบราว์เซอร์ต้องโหลดไฟล์ล่าสุด ไม่ใช้ของที่จำไว้
+    location.replace(u);
+  }
+  function bar(b){
+    if(shown) return; shown=true;
+    var host=document.createElement('div'); host.id='app-update-host';
+    host.innerHTML='<div style="position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:100000;background:#1d7fb5;color:#fff;border-radius:14px;padding:11px 14px;box-shadow:0 10px 30px rgba(0,0,0,.35);font:600 13.5px Kanit,sans-serif;display:flex;gap:10px;align-items:center;max-width:calc(100vw - 24px);flex-wrap:wrap">'
+      +'<span>🔄 มีเว็บเวอร์ชันใหม่ <span id="app-upd-msg"></span></span>'
+      +'<button id="app-upd-go" style="background:#fff;color:#1d7fb5;border:0;border-radius:9px;padding:6px 12px;font:700 13px Kanit,sans-serif;cursor:pointer">รีเฟรชเลย</button>'
+      +'<button id="app-upd-later" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:9px;padding:6px 10px;font:600 12.5px Kanit,sans-serif;cursor:pointer">ไว้ก่อน</button></div>';
+    document.body.appendChild(host);
+    document.getElementById('app-upd-go').onclick=function(){ go(b); };
+    document.getElementById('app-upd-later').onclick=function(){ clearInterval(timer); host.remove(); shown=false; snoozeUntil=Date.now()+10*60*1000; };
+    var msg=document.getElementById('app-upd-msg');
+    timer=setInterval(function(){
+      if(busy()){ msg.textContent='— กดรีเฟรชเมื่อพิมพ์/บันทึกเสร็จ'; left=20; return; }
+      left--; msg.textContent='— จะรีเฟรชเองใน '+left+' วินาที';
+      if(left<=0){ clearInterval(timer); go(b); }
+    },1000);
+  }
+  var snoozeUntil=0, checking=false;
+  function check(){
+    if(checking || Date.now()<snoozeUntil) return; checking=true;
+    fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+      checking=false;
+      var b=j&&String(j.build||''); if(!b || b<=UPD_BUILD) return;   // เฉพาะเลขที่ "ใหม่กว่า" เท่านั้น (กันวนรีเฟรช)
+      var tried=null; try{ tried=sessionStorage.getItem('guin_reload_for'); }catch(e){}
+      if(tried===b && document.readyState==='complete' && performance.now()<60000) return;   // เพิ่งรีเฟรชไปแล้วแต่ยังได้ไฟล์เก่า — รอรอบหน้า
+      if(document.hidden && !busy()) go(b); else bar(b);
+    }).catch(function(){ checking=false; });
+  }
+  setInterval(check, 3*60*1000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
+  window.addEventListener('online', check);
+  setTimeout(check, 15000);
+})();
+</script>
 </body>
 </html>
