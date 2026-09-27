@@ -86,8 +86,10 @@ function buildNav(){
   side.insertBefore(tg, side.firstChild);
   // รายการเมนูอยู่ในกล่องเลื่อนของตัวเอง · ส่วนท้าย (แจ้งเตือน/ธีม/โปรไฟล์) ติดด้านล่างเสมอ ไม่ตกขอบจอ
   const scroll=document.createElement('div'); scroll.className='nd-scroll';
-  [tg, a, s, m].forEach(el=>scroll.appendChild(el));
+  [a, s, m].forEach(el=>scroll.appendChild(el));
   side.insertBefore(scroll, side.firstChild);
+  // ปุ่มย่อเมนูอยู่นอกกล่องเลื่อน — เมนูยาว (เมเนเจอร์) เลื่อนลงแล้วปุ่มยังอยู่บนสุดเสมอ
+  tg.style.flexShrink='0'; side.insertBefore(tg, scroll);
   // ย้ายปุ่มจากแถบบนมาไว้ท้ายเมนู (id เดิม → JS เดิมอัปเดต badge/ซ่อน-แสดงได้เหมือนเดิม)
   const foot=document.createElement('div'); foot.className='nd-foot'; side.appendChild(foot);
   const LB={'top-safe-btn':'Safe Mode','top-notif-btn':'เปิดแจ้งเตือนเดสก์ท็อป','top-sync-btn':'ซิงค์รายชื่อจากชีท','top-inbox-btn':'คำขอจากเมเนเจอร์','top-bell-btn':'แจ้งเตือน'};
@@ -403,11 +405,17 @@ function fillPanels(){
     st.innerHTML=clone('mgr-home-stats');
     jt.textContent='โปรเจกต์ที่ดูแล';
     const mp=safe(()=>getMgrProjects(),[]);
-    const list=mp.filter(p=>p.projStatus!=='cancelled').sort((a,b)=>String(a.deadline||'9').localeCompare(String(b.deadline||'9')));
-    jn.textContent=list.length+' โปรเจกต์';
-    jl.innerHTML=list.length?list.map(p=>{ const d=p.deadline?Math.ceil((new Date(p.deadline)-new Date(new Date().toDateString()))/864e5):null;
-      const col=d===null?'':d<0?'#e0506e':d<=3?'#e67e00':'';
-      return `<li onclick="nav('track')" style="${col?'border-left-color:'+col:''}"><span class="n">${esc(safe(()=>projDisp(p),p.name||''))}</span><span class="d" style="color:${col||'inherit'}">${d===null?'—':d<0?'เลย '+(-d)+' วัน':d===0?'ส่งวันนี้':'อีก '+d+' วัน'}</span></li>`; }).join('')
+    // ✅ เสร็จแล้ว = สถานะโปรเจกต์ เสร็จ/จ่ายแล้ว หรือทุกขั้นในติดตามงานเป็น "ส่งแล้ว" → ไม่นับว่าเลยกำหนด · เรียงไว้ท้าย
+    const cards=safe(()=>getTrkCards(),[])||[];
+    const fin=p=>{ if(p.projStatus==='done'||p.projStatus==='paid') return true;
+      const c=cards.find(x=>x&&x.projId===p.id), ph=Object.values((c&&c.phases)||{}); return ph.length>0 && ph.every(x=>x&&x.status==='done'); };
+    const list=mp.filter(p=>p.projStatus!=='cancelled').map(p=>({p,f:fin(p)}))
+      .sort((a,b)=>(a.f-b.f) || String(a.p.deadline||'9').localeCompare(String(b.p.deadline||'9')));
+    const nOpen=list.filter(x=>!x.f).length;
+    jn.textContent=nOpen+' โปรเจกต์'+(list.length>nOpen?' · เสร็จ '+(list.length-nOpen):'');
+    jl.innerHTML=list.length?list.map(({p,f})=>{ const d=p.deadline?Math.ceil((new Date(p.deadline)-new Date(new Date().toDateString()))/864e5):null;
+      const col=f?'#1fb57a':d===null?'':d<0?'#e0506e':d<=3?'#e67e00':'';
+      return `<li onclick="nav('track')" style="${col?'border-left-color:'+col:''}${f?';opacity:.75':''}"><span class="n">${esc(safe(()=>projDisp(p),p.name||''))}</span><span class="d" style="color:${col||'inherit'}">${f?'✅ เสร็จแล้ว':d===null?'—':d<0?'เลย '+(-d)+' วัน':d===0?'ส่งวันนี้':'อีก '+d+' วัน'}</span></li>`; }).join('')
       :'<div class="nd-empty">ยังไม่มีโปรเจกต์ที่ดูแล</div>';
   } else {
     safe(()=>renderMyDash());

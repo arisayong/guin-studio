@@ -208,8 +208,7 @@ async function saveSelf(v){
   const pf={...v, _at:nowIso()}; delete pf.email;   // อีเมลใช้ล็อกอิน — แก้ผ่านแอดมิน
   await db.ref('private/'+cu.uid+'/profile').set(pf);   // 🔒 ข้อมูลส่วนตัว — เจ้าตัว + แอดมินเท่านั้น
   try{ await db.ref('users/'+cu.uid+'/profile').remove(); }catch(e){}
-  await db.ref('users/'+cu.uid+'/nickname').set(v.nickname);
-  cu.nickname=v.nickname;
+  if(v.nickname!==cu.nickname){ try{ await db.ref('users/'+cu.uid+'/nickname').set(v.nickname); cu.nickname=v.nickname; }catch(e){ console.warn('nickname:', e.message); } }
   if(ST.pendingPhoto){ if(ST.pendingPhoto==='__REMOVE__'){ await db.ref('users/'+cu.uid+'/photoURL').remove(); cu.photoURL=''; }
     else { await db.ref('users/'+cu.uid+'/photoURL').set(ST.pendingPhoto); cu.photoURL=ST.pendingPhoto; }
     await db.ref('users/'+cu.uid+'/photoAt').set(nowIso());
@@ -276,13 +275,14 @@ async function adminSync(){
   if(data && changed.length){ saveStaffData(data); try{ logAudit('staff.selfsync','ระบบ','นำข้อมูลที่สมาชิกแก้เองเข้าทะเบียน: '+changed.join(', ')); }catch(e){} }
   renderRoleReqCard(users);
 }
+const _unlDone=new Set();   // ผูก/เอาออกแล้วในรอบนี้ → ซ่อนทันที ไม่ต้องรอข้อมูลจาก Firebase
 function renderRoleReqCard(users){
   const pg=$('page-staff'); if(!pg) return;
   let box=$('ndp-rolereq'); if(!box){ box=document.createElement('div'); box.id='ndp-rolereq'; const h=pg.querySelector('.page-header'); pg.insertBefore(box, h?h.nextSibling:pg.firstChild); }
   const allU=users||ls('mgr_users_cache')||{};
   const reqs=Object.entries(allU).filter(([uid,u])=>u&&u.roleReq&&(((u.roleReq.add||[]).length)||((u.roleReq.del||[]).length)));
   // 🔗 บัญชีที่สมัครแล้วแต่ยังไม่ได้ผูกกับรายชื่อทีม → เห็นข้อมูลทีมไม่ได้จนกว่าแอดมินจะผูก
-  const unl=Object.entries(allU).filter(([uid,u])=>u && !u.staffId && u.role!=='admin' && u.role!=='manager');
+  const unl=Object.entries(allU).filter(([uid,u])=>u && !u.staffId && u.role!=='admin' && u.role!=='manager' && !_unlDone.has(uid));
   const unlHTML=unl.length?`<div class="ndp-card" style="margin-bottom:14px"><div class="ndp-ch"><h3>🔗 บัญชีที่ยังไม่ได้ผูกกับรายชื่อทีม</h3><span class="ndp-pill">${unl.length} บัญชี</span></div>
     <div class="ndp-cb"><div class="muted" style="margin-bottom:8px">บัญชีเหล่านี้ล็อกอินได้แต่ยังเห็นข้อมูลทีมไม่ได้ · ถ้าเป็นคนในทีม: ใส่อีเมลนี้ในข้อมูลสมาชิก ระบบจะผูกให้เอง หรือกด "ผูก" · ถ้าไม่รู้จัก: ลบบัญชีได้ที่ Firebase → Authentication</div>
     ${unl.map(([uid,u])=>{ const c=u.claimStaffId?safe(()=>getStaffById(u.claimStaffId),null):null;
@@ -354,7 +354,7 @@ window.ndUnlinkedRemove=async function(uid){
   const db=(typeof _fbDatabase!=='undefined')?_fbDatabase:null; if(!db) return;
   const uc=ls('mgr_users_cache')||{}; const u=uc[uid]||{};
   if(!confirm('เอาบัญชี "'+(u.email||u.nickname||uid)+'" ออกจากรายการ?\n\n• ลบข้อมูลผู้ใช้ของบัญชีนี้ในเว็บ (users/'+uid+')\n• ตัวบัญชีล็อกอินยังอยู่ — ถ้าไม่ใช้แล้วให้ลบต่อที่ Firebase → Authentication (ค้นด้วย UID นี้)\n• ถ้าบัญชีนี้ล็อกอินอีก จะกลับมาอยู่ในรายการนี้ใหม่')) return;
-  try{ await db.ref('users/'+uid).remove(); delete uc[uid]; ls('mgr_users_cache',uc);
+  try{ await db.ref('users/'+uid).remove(); _unlDone.add(uid); delete uc[uid]; try{ ls('mgr_users_cache',uc); }catch(e){}
     try{ logAudit('staff.unlink','ระบบ','เอาบัญชีที่ไม่ได้ผูกออก: '+(u.email||u.nickname||uid)); }catch(e){}
     toast('เอาออกจากรายการแล้ว','success'); renderRoleReqCard(uc);
   }catch(e){ toast('เอาออกไม่สำเร็จ: '+e.message,'error'); }
@@ -364,9 +364,9 @@ window.ndLinkStaff=async function(uid, staffId){
   const s=(typeof getStaffById==='function')?getStaffById(staffId):null;
   if(!confirm('ผูกบัญชีนี้กับ "'+(s?(s.nickname||s.name):staffId)+'"?\n\nบัญชีนี้จะเห็นงาน/ยอดเงิน/ข้อมูลส่วนตัวของคนนี้ — เช็คให้แน่ใจว่าเป็นคนเดียวกัน')) return;
   try{ await db.ref('users/'+uid+'/staffId').set(staffId); await db.ref('users/'+uid+'/claimStaffId').remove();
-    const uc=ls('mgr_users_cache')||{}; if(uc[uid]){ uc[uid].staffId=staffId; delete uc[uid].claimStaffId; ls('mgr_users_cache',uc); }
+    const uc=ls('mgr_users_cache')||{}; if(uc[uid]){ uc[uid].staffId=staffId; delete uc[uid].claimStaffId; try{ ls('mgr_users_cache',uc); }catch(e){} }
     try{ logAudit('staff.link', s?(s.nickname||s.name):staffId, 'แอดมินผูกบัญชีกับรายชื่อทีม'); }catch(e){}
     toast('🔗 ผูกบัญชีแล้ว','success');
-    try{ renderRoleReqCard(uc); }catch(e){}
+    _unlDone.add(uid); try{ renderRoleReqCard(uc); }catch(e){ console.warn('renderRoleReqCard',e); }
   }catch(e){ toast('ผูกไม่สำเร็จ: '+e.message,'error'); }
 };
