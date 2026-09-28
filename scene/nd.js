@@ -181,6 +181,9 @@ function wireFolders(){
     if(!n || !document.body.classList.contains('sidebar-collapsed') || innerWidth<=768){ tip.classList.remove('show'); return; }
     const r=n.getBoundingClientRect(); tip.textContent=n.dataset.tip; tip.style.left=(r.right+10)+'px'; tip.style.top=(r.top+r.height/2)+'px'; tip.classList.add('show'); });
 }
+/* 🖼️ รูปในฉากโหลดไม่ขึ้น (เช่น เปิดเว็บตอนกำลังอัปไฟล์ขึ้น GitHub) → ลองโหลดใหม่เอง 3 ครั้ง (2 / 6 / 15 วิ) */
+window.ndImgRetry=function(img){ const n=+(img.dataset.retry||0); if(n>=3) return; img.dataset.retry=n+1;
+  setTimeout(()=>{ const base=img.src.replace(/([?&])r=\d+/,'').replace(/[?&]$/,''); img.src=base+(base.includes('?')?'&':'?')+'r='+Date.now(); },[2000,6000,15000][n]); };
 /* 🔴 โฟลเดอร์ที่พับอยู่ → รวมตัวเลขแจ้งเตือนของเมนูข้างในมาโชว์ที่ไอคอนโฟลเดอร์ (ย่อเมนูแล้วก็ยังเห็น) */
 function syncGrpBadges(){
   document.querySelectorAll('.nd-grp').forEach(g=>{
@@ -307,7 +310,7 @@ let sceneRole='';
 function buildScene(){
   const pg=$('page-home'); if(!pg) return;
   const r=role(); if(sceneRole===r) return; sceneRole=r;
-  const objs=OBJ[r].map(([k,x,y,w])=>`<div class="nd-obj" tabindex="0" data-k="${k}" style="left:${x}px;top:${y}px;width:${w}px"><img src="${S}${r}/${k}.png?v=${encodeURIComponent(window.UPD_BUILD||"")}" alt="">${k==='notify'?'<span class="nd-badge" id="nd-noti-badge"></span>':''}</div>`).join('');
+  const objs=OBJ[r].map(([k,x,y,w])=>`<div class="nd-obj" tabindex="0" data-k="${k}" style="left:${x}px;top:${y}px;width:${w}px"><img src="${S}${r}/${k}.png?v=${encodeURIComponent(window.UPD_BUILD||"")}" alt="" onerror="ndImgRetry(this)">${k==='notify'?'<span class="nd-badge" id="nd-noti-badge"></span>':''}</div>`).join('');
   pg.innerHTML=`<div class="nd-vp" id="nd-vp"><div class="nd-box" id="nd-box"><div class="nd-stage" id="nd-stage">
       <img class="poster" alt=""><video muted loop playsinline preload="none"></video>${objs}
       <div class="nd-panel nd-hello"><div class="t" id="nd-hi"></div><div class="s" id="nd-today"></div></div>

@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20260928-27"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20260928-30"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -1919,6 +1919,9 @@ body.sidebar-collapsed .main-content{
      <div id="profit-client-legend" style="display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:11px"></div>
     </div>
    </div>
+
+   <!-- === 🧾 สรุปรายเดือนตามเดือนภาษี === -->
+   <div id="profit-taxmonth" style="margin-bottom:14px"></div>
 
    <!-- === Project Table === -->
    <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;overflow:hidden">
@@ -4213,7 +4216,7 @@ async function _autoLinkStaffIds(){
     });
     let n=0;
     for(const [uid,u] of Object.entries(sn.val()||{})){
-      if(!u || u.staffId || u.role==='admin') continue;
+      if(!u || u.staffId || u.role==='admin' || u.noAutoLink) continue;   // แอดมินยกเลิกผูกบัญชีนี้เอง → ไม่ผูกกลับอัตโนมัติ
       const id=byEmail[String(u.email||'').toLowerCase()]; if(!id) continue;
       try{ await _fbDatabase.ref('users/'+uid+'/staffId').set(id); n++; }catch(e){}
     }
@@ -15434,6 +15437,7 @@ function pjIncomeAdd(){
   renderFormIncome();
 }
 function pjIncomeDel(i){ formIncome.splice(i,1); renderFormIncome(); }
+function pjIncomeWht3(i){ const r=formIncome[i]; if(!r) return; r.wht=Math.round((parseFloat(r.amount)||0)*0.03*100)/100; renderFormIncome(); }
 function pjIncomeSet(i,field,val){
   if(!formIncome[i]) return;
   if(field==='paid'){ formIncome[i].paidAt = val ? (new Date().toISOString().split('T')[0]) : ''; renderFormIncome(); return; }
@@ -15465,6 +15469,7 @@ function renderFormIncome(){
         <input type="checkbox" ${paid?'checked':''} onchange="pjIncomeSet(${i},'paid',this.checked)"> ${paid?'✅ รับเงินแล้ว':'รับเงินแล้ว'}
       </label>
       ${paid?inp(i,'paidAt','date',r.paidAt,'','width:140px'):''}
+      ${paid?`<span style="font-size:11px;color:var(--text2);white-space:nowrap" title="ภาษีที่ลูกค้าหัก ณ ที่จ่ายไว้ (เงินเข้าจริง = ยอดงวด − ยอดนี้) · ขอหนังสือ 50 ทวิ จากลูกค้าเก็บไว้ใช้ตอนยื่นภาษี">ลูกค้าหัก ณ ที่จ่าย</span>${inp(i,'wht','number',r.wht,'0','width:84px;text-align:right')}<button type="button" class="btn btn-sm btn-outline" style="padding:3px 7px;font-size:11px" title="ตั้ง 3% ของยอดงวด (ค่าบริการ)" onclick="pjIncomeWht3(${i})">3%</button>`:''}
       <button type="button" class="btn btn-sm btn-outline" style="padding:3px 9px;font-size:11px;border-color:rgba(255,64,64,.35);color:var(--red)" onclick="pjIncomeDel(${i})">🗑️</button>
     </div>`;
   }).join('') : '<div style="font-size:12px;color:var(--text2);padding:8px 0">ยังไม่มีงวด — ถ้าไม่ระบุ ระบบจะถือว่ายังไม่ได้รับเงินจากลูกค้า</div>';
@@ -16278,7 +16283,8 @@ async function saveProject(){
     income: formIncome.filter(r=>(parseFloat(r.amount)||0)>0 || (r.label||'').trim()).map(r=>({
       id:r.id||('IN'+Date.now()+Math.random().toString(36).slice(2,6)),
       label:(r.label||'').trim(), amount:parseFloat(r.amount)||0,
-      dueDate:r.dueDate||'', paidAt:r.paidAt||'', method:r.method||'', note:r.note||''
+      dueDate:r.dueDate||'', paidAt:r.paidAt||'', method:r.method||'', note:r.note||'',
+      wht: r.paidAt ? Math.max(0, Math.min(parseFloat(r.amount)||0, parseFloat(r.wht)||0)) : 0   // 🧾 ลูกค้าหัก ณ ที่จ่าย
     })),
     clientCode:(document.getElementById('pj-clientcode')?.value||'').trim().toUpperCase(),
     seq:parseInt(document.getElementById('pj-seq')?.value)||0,
@@ -20528,8 +20534,119 @@ function _profUpdateSelection(){
   document.getElementById('profit-sel-profit').style.color = totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
 }
 
+// ══════════════════════════════════════════════
+// 🧾 สรุปรายเดือนตามเดือนภาษี (ไทย) — ลูกค้า · รับเงิน · หัก ณ ที่จ่าย · จ่ายทีม · กำไรจริง
+//   เดือน = เดือนที่เงินเข้า/ออกจริง (รับจากลูกค้า = วันที่ติ๊กรับเงินของงวด · จ่ายทีม = วันที่จ่ายจริง · ค่าใช้จ่ายบริษัท = วันที่บันทึก)
+//   ภาษีที่เราหักจากทีม → ยื่น ภ.ง.ด.3 ภายในวันที่ 7 ของเดือนถัดไป (ยื่นออนไลน์ได้ถึงวันที่ 15)
+//   ภาษีที่ลูกค้าหักจากเรา → เป็นเครดิตภาษี ใช้ตอนยื่นภาษีเงินได้ (ขอหนังสือ 50 ทวิ จากลูกค้าเก็บไว้)
+//   กำไรจริง = รายรับ (ยอดตามบิล) − ค่าจ้างทีม (ยอดเต็มก่อนหักภาษี) − ค่าใช้จ่ายบริษัท
+// ══════════════════════════════════════════════
+const _TX_TM=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+window._txOpen = window._txOpen || new Set();
+function _txCollect(year){
+  const months={};
+  const M=m=>months[m]||(months[m]={m, clients:{}, inc:0, cwht:0, team:0, twht:0, comp:0});
+  const C=(mo,cl)=>mo.clients[cl]||(mo.clients[cl]={name:cl, inc:0, cwht:0, team:0, twht:0, jobs:new Set()});
+  const inYear=d=>!!d && d.slice(0,4)===String(year);
+  (getProjects()||[]).forEach(p=>{
+    if(!p || p.projStatus==='cancelled') return;
+    const cl=String(p.client||'').trim()||'(ไม่ระบุลูกค้า)', jn=p.name||p.id;
+    const rows=Array.isArray(p.income)?p.income:[];
+    if(rows.length){
+      rows.forEach(e=>{ const d=String(e.paidAt||'').slice(0,10); if(!inYear(d)) return;
+        const amt=parseFloat(e.amount)||0, w=Math.min(amt, parseFloat(e.wht)||0), mo=M(d.slice(0,7)), c=C(mo,cl);
+        mo.inc+=amt; mo.cwht+=w; c.inc+=amt; c.cwht+=w; c.jobs.add(jn); });
+    } else if(ls('client_paid_'+p.id)){
+      // โปรเจกต์ที่บันทึกรับเงินแบบเดิม (ไม่มีงวด) → ใช้วันที่กดรับเงิน
+      const d=(typeof _thaiDateToIso==='function'?_thaiDateToIso(ls('client_paid_date_'+p.id)):'') || p.deadline || p.date || '';
+      if(inYear(d)){ const f=getProjectFinance(p), mo=M(d.slice(0,7)), c=C(mo,cl); mo.inc+=f.received; c.inc+=f.received; c.jobs.add(jn); }
+    }
+    const tax=p.tax||{};
+    (p.workers||[]).forEach(w=>{ if(!w || w.status!=='paid') return;
+      const d=String(w.paidAt||'').split('T')[0] || p.deadline || ''; if(!inYear(d)) return;
+      const t=parseFloat(tax[(w.slot||'').split('-')[0]])||0, gross=parseFloat(w.amount)||0, net=Math.round(gross*(1-t/100));
+      const mo=M(d.slice(0,7)), c=C(mo,cl); mo.team+=gross; mo.twht+=gross-net; c.team+=gross; c.twht+=gross-net; c.jobs.add(jn); });
+  });
+  getCompanyExpenses().forEach(e=>{ const d=String(e.date||'').slice(0,10); if(inYear(d)) M(d.slice(0,7)).comp+=parseFloat(e.amount)||0; });
+  return months;
+}
+function _txYears(){
+  const ys=new Set([new Date().getFullYear()]);
+  (getProjects()||[]).forEach(p=>{ (p.income||[]).forEach(e=>{ if(e&&e.paidAt) ys.add(+String(e.paidAt).slice(0,4)); });
+    (p.workers||[]).forEach(w=>{ if(w&&w.paidAt) ys.add(+String(w.paidAt).slice(0,4)); }); });
+  return [...ys].filter(y=>y>2000).sort((a,b)=>b-a);
+}
+function renderTaxMonthly(){
+  const el=document.getElementById('profit-taxmonth'); if(!el) return;
+  const years=_txYears(); if(!window._txYear || !years.includes(window._txYear)) window._txYear=years[0];
+  const Y=window._txYear, mm=_txCollect(Y);
+  const nowKey=new Date().toISOString().slice(0,7);
+  const keys=[]; for(let i=1;i<=12;i++){ const k=Y+'-'+String(i).padStart(2,'0'); if(mm[k] || k<=nowKey) keys.push(k); }
+  const b=v=>v?fmtB(Math.round(v)):'<span style="color:var(--text2)">—</span>';
+  const prof=o=>o.inc-o.team-(o.comp||0);
+  const due=k=>{ const [y,m]=k.split('-').map(Number); const nm=m===12?1:m+1, ny=m===12?y+1:y; return '7 '+_TX_TM[nm-1]+' '+(ny+543); };
+  const th='padding:8px 10px;font-size:11px;color:var(--text2);font-weight:700;text-align:right;white-space:nowrap;border-bottom:1px solid var(--border2)';
+  const td='padding:8px 10px;font-size:12.5px;text-align:right;white-space:nowrap';
+  const T={inc:0,cwht:0,team:0,twht:0,comp:0};
+  const body=keys.map(k=>{
+    const o=mm[k]||{inc:0,cwht:0,team:0,twht:0,comp:0,clients:{}}; Object.keys(T).forEach(x=>T[x]+=o[x]||0);
+    const [y,m]=k.split('-').map(Number), open=window._txOpen.has(k), cls=Object.values(o.clients).sort((a,c)=>c.inc-a.inc||c.team-a.team);
+    const pr=prof(o), has=o.inc||o.team||o.comp;
+    let h=`<tr style="cursor:${cls.length?'pointer':'default'};border-top:1px solid rgba(255,255,255,.06)${open?';background:rgba(21,101,255,.07)':''}" ${cls.length?`onclick="_txToggle('${k}')"`:''}>
+      <td style="${td};text-align:left;font-weight:700">${cls.length?(open?'▾ ':'▸ '):'&nbsp;&nbsp;'}${_TX_TM[m-1]} ${y+543}${cls.length?` <span style="font-size:10.5px;color:var(--text2);font-weight:400">${cls.length} ลูกค้า</span>`:''}</td>
+      <td style="${td}">${b(o.inc)}</td><td style="${td};color:var(--orange)">${b(o.cwht)}</td><td style="${td};color:var(--green)">${b(o.inc-o.cwht)}</td>
+      <td style="${td}">${b(o.team)}</td>
+      <td style="${td};color:var(--purple)">${b(o.twht)}${o.twht?`<div style="font-size:10px;color:var(--text2)">ยื่น ภ.ง.ด.3 ภายใน ${due(k)}</div>`:''}</td>
+      <td style="${td}">${b(o.comp)}</td>
+      <td style="${td};font-weight:800;color:${!has?'var(--text2)':pr>=0?'var(--green)':'var(--red)'}">${has?fmtB(Math.round(pr)):'—'}</td></tr>`;
+    if(open) h+=cls.map(c=>{ const cp=c.inc-c.team; return `<tr style="background:rgba(255,255,255,.02)">
+      <td style="${td};text-align:left;padding-left:30px;font-size:12px" title="${esc([...c.jobs].join(', '))}">${esc(c.name)} <span style="font-size:10.5px;color:var(--text2)">${c.jobs.size} งาน</span></td>
+      <td style="${td};font-size:12px">${b(c.inc)}</td><td style="${td};font-size:12px;color:var(--orange)">${b(c.cwht)}</td><td style="${td};font-size:12px;color:var(--green)">${b(c.inc-c.cwht)}</td>
+      <td style="${td};font-size:12px">${b(c.team)}</td><td style="${td};font-size:12px;color:var(--purple)">${b(c.twht)}</td>
+      <td style="${td};font-size:12px;color:var(--text2)">—</td>
+      <td style="${td};font-size:12px;font-weight:700;color:${cp>=0?'var(--green)':'var(--red)'}">${fmtB(Math.round(cp))}</td></tr>`; }).join('')
+      + (o.comp?`<tr style="background:rgba(255,255,255,.02)"><td style="${td};text-align:left;padding-left:30px;font-size:12px;color:var(--text2)" colspan="6">🏢 ค่าใช้จ่ายบริษัทเดือนนี้ (ไม่แยกลูกค้า)</td><td style="${td};font-size:12px">${b(o.comp)}</td><td style="${td};font-size:12px;color:var(--red)">−${fmtB(Math.round(o.comp))}</td></tr>`:'');
+    return h;
+  }).join('');
+  const tp=prof(T);
+  el.innerHTML=`<div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;overflow:hidden">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:700">🧾 สรุปรายเดือนตามเดือนภาษี</div>
+      <span style="font-size:11px;color:var(--text2)">กดเดือนเพื่อดูแยกตามลูกค้า</span>
+      <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+        <select onchange="window._txYear=+this.value;window._txOpen=new Set();renderTaxMonthly()" style="height:28px;padding:0 8px;font-size:12px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);border-radius:7px">
+          ${years.map(y=>`<option value="${y}"${y===Y?' selected':''}>ปี ${y+543}</option>`).join('')}</select>
+        <button class="btn btn-outline btn-sm" type="button" onclick="_txExportCsv()">⬇️ CSV</button></span></div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:900px">
+      <thead><tr><th style="${th};text-align:left">เดือน · ลูกค้า</th><th style="${th}">รายรับ (ตามบิล)</th><th style="${th}">ลูกค้าหัก ณ ที่จ่าย</th><th style="${th}">เงินเข้าจริง</th>
+        <th style="${th}">ค่าจ้างทีม</th><th style="${th}">เราหักภาษีทีม</th><th style="${th}">ค่าใช้จ่ายบริษัท</th><th style="${th}">กำไรจริง</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr style="border-top:2px solid var(--border2);background:rgba(255,255,255,.03)"><td style="${td};text-align:left;font-weight:800">รวมปี ${Y+543}</td>
+        <td style="${td};font-weight:800">${b(T.inc)}</td><td style="${td};font-weight:800;color:var(--orange)">${b(T.cwht)}</td><td style="${td};font-weight:800;color:var(--green)">${b(T.inc-T.cwht)}</td>
+        <td style="${td};font-weight:800">${b(T.team)}</td><td style="${td};font-weight:800;color:var(--purple)">${b(T.twht)}</td><td style="${td};font-weight:800">${b(T.comp)}</td>
+        <td style="${td};font-weight:900;color:${tp>=0?'var(--green)':'var(--red)'}">${fmtB(Math.round(tp))}</td></tr></tfoot></table></div>
+    <div style="padding:10px 16px;font-size:11px;color:var(--text2);line-height:1.7;border-top:1px solid var(--border2)">
+      • <b>เดือน</b> = เดือนที่เงินเข้า/ออกจริง · รายรับนับจากงวดที่ติ๊ก "รับเงินแล้ว" · ค่าจ้างทีมนับจากวันที่จ่ายจริง<br>
+      • <b style="color:var(--orange)">ลูกค้าหัก ณ ที่จ่าย</b> = กรอกในงวดรับเงินของโปรเจกต์ (ปุ่ม 3%) → เป็นเครดิตภาษีของสตูดิโอ ขอหนังสือ 50 ทวิ จากลูกค้าเก็บไว้<br>
+      • <b style="color:var(--purple)">เราหักภาษีทีม</b> = ภาษีหัก ณ ที่จ่ายจากค่าจ้างทีม → นำส่งด้วย ภ.ง.ด.3 ภายในวันที่ 7 ของเดือนถัดไป (ยื่นออนไลน์ได้ถึงวันที่ 15)<br>
+      • <b>กำไรจริง</b> = รายรับ − ค่าจ้างทีม (ยอดเต็มก่อนหักภาษี) − ค่าใช้จ่ายบริษัท · ตัวเลขนี้ใช้ดูภาพรวม ยื่นภาษีจริงควรให้นักบัญชีตรวจอีกครั้ง</div></div>`;
+}
+function _txToggle(k){ if(window._txOpen.has(k)) window._txOpen.delete(k); else window._txOpen.add(k); renderTaxMonthly(); }
+function _txExportCsv(){
+  const Y=window._txYear||new Date().getFullYear(), mm=_txCollect(Y);
+  const q=v=>{ v=String(v==null?'':v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const L=[['เดือน','ลูกค้า','รายรับ (ตามบิล)','ลูกค้าหัก ณ ที่จ่าย','เงินเข้าจริง','ค่าจ้างทีม','เราหักภาษีทีม (ภ.ง.ด.3)','ค่าใช้จ่ายบริษัท','กำไรจริง']];
+  Object.keys(mm).sort().forEach(k=>{ const o=mm[k], [y,m]=k.split('-').map(Number), ml=_TX_TM[m-1]+' '+(y+543);
+    Object.values(o.clients).sort((a,c)=>c.inc-a.inc).forEach(c=>L.push([ml,c.name,c.inc,c.cwht,c.inc-c.cwht,c.team,c.twht,'',c.inc-c.team]));
+    if(o.comp) L.push([ml,'(ค่าใช้จ่ายบริษัท)','','','','','',o.comp,-o.comp]);
+    L.push([ml,'รวมเดือน',o.inc,o.cwht,o.inc-o.cwht,o.team,o.twht,o.comp,o.inc-o.team-o.comp]); });
+  const csv='﻿'+L.map(r=>r.map(x=>typeof x==='number'?Math.round(x*100)/100:q(x)).join(',')).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='สรุปรายเดือนภาษี-'+(Y+543)+'.csv';
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
+}
 function renderProfit(){
   try{ renderPaymentHistory(); }catch(e){}   // 📜 ประวัติการจ่ายเงินรวมอยู่ท้ายหน้านี้
+  if(currentUser?.role==='admin'){ try{ renderTaxMonthly(); }catch(e){ console.warn('renderTaxMonthly',e); } }
   // 🔒 Admin guard: หน้านี้มี budget + กำไร — ทีมงาน/manager ห้ามเห็น
   if(currentUser?.role !== 'admin'){
     const pg = document.getElementById('page-profit');
@@ -30902,7 +31019,10 @@ function _sdProfileFormHTML(pf){
 }
 function _sdReadProfile(root){ const o={}; (root||document).querySelectorAll('.sd-pf').forEach(el=>{ const v=(el.value||'').trim(); if(v) o[el.dataset.k]=v; }); o._at=new Date().toISOString(); return o; }
 // บัญชีล็อกอินที่ผูกกับสต๊าฟคนนี้ (จากแคชรายชื่อผู้ใช้ของแอดมิน)
-function _sdAccountOf(s){ const uc=ls('mgr_users_cache')||{}; const e=Object.entries(uc).find(([uid,u])=>u && (u.staffId===s.id || (s.email && u.email && u.email.toLowerCase()===String(s.email).toLowerCase()))); return e?{uid:e[0],...e[1]}:null; }
+function _sdAccountOf(s){ const uc=ls('mgr_users_cache')||{}; const E=Object.entries(uc);
+  // ผูกด้วยรหัสก่อน · อีเมลตรงกันใช้ได้เฉพาะบัญชีที่ยังไม่ผูกใคร และแอดมินไม่ได้กดยกเลิกผูก (noAutoLink)
+  const e=E.find(([uid,u])=>u && u.staffId===s.id) || E.find(([uid,u])=>u && !u.staffId && !u.noAutoLink && s.email && u.email && u.email.toLowerCase()===String(s.email).toLowerCase());
+  return e?{uid:e[0],...e[1]}:null; }
 // ข้อมูลโปรไฟล์ล่าสุด: staff.profile (แอดมินแก้) กับ users/<uid>/profile (สต๊าฟแก้เอง) — ใช้อันที่แก้ล่าสุด
 function _sdProfileOf(s){ const a=s?.profile||null, acct=_sdAccountOf(s||{}), b=acct?.profile||null;
   if(a&&b) return String(b._at||'')>String(a._at||'')?b:a; return a||b||{}; }
@@ -32298,7 +32418,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20260928-27"></script><script src="scene/nd-profile.js?v=20260928-27"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20260928-30"></script><script src="scene/nd-profile.js?v=20260928-30"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32308,7 +32428,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20260928-27';
+var UPD_BUILD = '20260928-30';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;

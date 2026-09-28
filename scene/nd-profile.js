@@ -48,8 +48,9 @@ function valuesOf(s, up){
   v.discord=(s&&(s.discordName||s.discordId))?((s.discordName?s.discordName+' · ':'')+(s.discordId||'')):'';
   return v;
 }
-function accountOf(s){ if(!s) return null; const uc=safe(()=>ls('mgr_users_cache'),{})||{};
-  const e=Object.entries(uc).find(([uid,u])=>u && (u.staffId===s.id || (s.email && u.email && String(u.email).toLowerCase()===String(s.email).toLowerCase())));
+function accountOf(s){ if(!s) return null; const uc=safe(()=>ls('mgr_users_cache'),{})||{}; const E=Object.entries(uc);
+  // ผูกด้วยรหัสก่อน · อีเมลตรงกันใช้ได้เฉพาะบัญชีที่ยังไม่ผูกใคร และแอดมินไม่ได้กดยกเลิกผูก
+  const e=E.find(([uid,u])=>u && u.staffId===s.id) || E.find(([uid,u])=>u && !u.staffId && !u.noAutoLink && s.email && u.email && String(u.email).toLowerCase()===String(s.email).toLowerCase());
   return e?{uid:e[0],...e[1]}:null; }
 function photoForAdmin(s,acct){ const a=[]; if(acct&&acct.photoURL) a.push([acct.photoAt||'',acct.photoURL]); if(s&&s.adminPhoto) a.push([s.adminPhotoAt||'',s.adminPhoto]);
   a.sort((x,y)=>String(y[0]).localeCompare(String(x[0]))); return a.length?a[0][1]:''; }
@@ -66,13 +67,58 @@ function fieldHTML([k,l,o]){ o=o||{}; const v=esc(ST.vals[k]||''); const ro=o.ro
   else if(o.area) inp=`<textarea data-f="${k}" rows="3" placeholder="${esc(o.ph||'')}" ${ro?'readonly':''}>${v}</textarea>`;
   else inp=`<input data-f="${k}" value="${v}" ${o.type?`type="${o.type}"`:''} placeholder="${esc(o.ph||'')}" ${ro?'readonly':''}>`;
   return `<div class="ndp-f ${o.full?'full':''}">${lbl}${inp}${o.hint?`<span class="hint">${esc(o.hint)}</span>`:''}</div>`; }
+// 🔗 แอดมิน: บัญชีล็อกอินที่ผูกกับสมาชิกคนนี้ — เปลี่ยนเป็นบัญชีอื่น / ยกเลิกผูก (กรณีผูกผิดคน)
+function linkCardHTML(){
+  if(ST.mode!=='admin' || !ST.staff) return '';
+  const acc=ST.acct, uc=safe(()=>ls('mgr_users_cache'),{})||{};
+  const nameOf=id=>{ const x=safe(()=>getStaffById(id),null); return x?(x.nickname||x.name):id; };
+  const lbl=(uid,u)=>`${u.email||uid}${u.nickname?' · '+u.nickname:''}${u.staffId&&u.staffId!==ST.staff.id?' (ผูกกับ '+nameOf(u.staffId)+' อยู่)':''}`;
+  const opts=Object.entries(uc).filter(([uid,u])=>u && u.role!=='admin' && (!acc || uid!==acc.uid))
+    .sort((a,b)=>(!!a[1].staffId-!!b[1].staffId) || String(a[1].email||a[0]).localeCompare(String(b[1].email||b[0])))
+    .map(([uid,u])=>`<option value="${esc(uid)}">${esc(lbl(uid,u))}</option>`).join('');
+  const how=acc?(acc.staffId===ST.staff.id?'ผูกด้วยรหัสสมาชิก':'จับคู่จากอีเมลที่ตรงกัน'):'';
+  return `<div class="ndp-card"><div class="ndp-ch"><h3>🔗 บัญชีล็อกอินที่ผูก</h3><span class="muted">ผูกผิดคน → เปลี่ยน/ยกเลิกได้ที่นี่</span></div><div class="ndp-cb">
+    ${acc?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><b>${esc(acc.email||acc.uid)}</b><span class="muted">${esc(acc.nickname||'')}${how?' · '+how:''}</span>
+      <button class="btn btn-outline btn-sm" type="button" style="margin-left:auto" onclick="ndUnlinkAcct('${esc(acc.uid)}')">✂️ ยกเลิกผูก</button></div>`
+      :'<div class="muted" style="margin-bottom:10px">ยังไม่มีบัญชีล็อกอินที่ผูกกับสมาชิกคนนี้</div>'}
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select id="ndp-relink" style="flex:1;min-width:220px"><option value="">— เลือกบัญชี${acc?'ใหม่':''} —</option>${opts}</select>
+      <button class="btn btn-blue btn-sm" type="button" onclick="ndRelinkAcct()">🔗 ${acc?'เปลี่ยนเป็นบัญชีนี้':'ผูกบัญชีนี้'}</button></div>
+    <div class="muted" style="margin-top:8px;font-size:11.5px">บัญชีที่ผูกจะเห็นงาน ยอดเงิน และข้อมูลส่วนตัวของสมาชิกคนนี้ · บัญชีที่ถูกยกเลิกผูกจะไม่ถูกผูกกลับอัตโนมัติจากอีเมล</div></div></div>`;
+}
+window.ndUnlinkAcct=async function(uid){
+  const db=FB(); if(!db||!ST||!ST.staff) return; const uc=ls('mgr_users_cache')||{}; const u=uc[uid]||{};
+  if(!confirm('ยกเลิกผูกบัญชี "'+(u.email||uid)+'" ออกจาก "'+(ST.staff.nickname||ST.staff.name)+'"?\n\nบัญชีนี้จะเห็นข้อมูลทีมไม่ได้จนกว่าจะผูกใหม่ · จะไปอยู่ในการ์ด "บัญชีที่ยังไม่ได้ผูก"')) return;
+  try{ if(u.staffId===ST.staff.id) await db.ref('users/'+uid+'/staffId').remove();
+    await db.ref('users/'+uid+'/noAutoLink').set(true);
+    if(uc[uid]){ delete uc[uid].staffId; uc[uid].noAutoLink=true; try{ ls('mgr_users_cache',uc); }catch(e){} }
+    try{ logAudit('staff.link', ST.staff.nickname||ST.staff.name, 'ยกเลิกผูกบัญชี '+(u.email||uid)); }catch(e){}
+    toast('✂️ ยกเลิกผูกแล้ว','success'); open('admin', ST.staff.id);
+  }catch(e){ toast('ยกเลิกผูกไม่สำเร็จ: '+e.message,'error'); }
+};
+window.ndRelinkAcct=async function(){
+  const db=FB(); if(!db||!ST||!ST.staff) return; const sel=$('ndp-relink'), uid=sel&&sel.value;
+  if(!uid){ toast('เลือกบัญชีก่อน','info'); return; }
+  const uc=ls('mgr_users_cache')||{}, u=uc[uid]||{}, old=ST.acct, nm=ST.staff.nickname||ST.staff.name;
+  const other=u.staffId&&u.staffId!==ST.staff.id?safe(()=>getStaffById(u.staffId),null):null;
+  if(!confirm('ผูกบัญชี "'+(u.email||uid)+'" กับ "'+nm+'"?'+(old?'\n\n• บัญชีเดิม "'+(old.email||old.uid)+'" จะถูกยกเลิกผูก':'')+(other?'\n• บัญชีนี้ผูกกับ "'+(other.nickname||other.name)+'" อยู่ — จะย้ายมาเป็นของ "'+nm+'" แทน':'')+'\n\nบัญชีนี้จะเห็นงาน/ยอดเงิน/ข้อมูลส่วนตัวของ "'+nm+'"')) return;
+  try{
+    if(old && old.uid!==uid){ if(old.staffId===ST.staff.id) await db.ref('users/'+old.uid+'/staffId').remove(); await db.ref('users/'+old.uid+'/noAutoLink').set(true);
+      if(uc[old.uid]){ delete uc[old.uid].staffId; uc[old.uid].noAutoLink=true; } }
+    await db.ref('users/'+uid+'/staffId').set(ST.staff.id);
+    try{ await db.ref('users/'+uid+'/noAutoLink').remove(); await db.ref('users/'+uid+'/claimStaffId').remove(); }catch(e){}
+    if(uc[uid]){ uc[uid].staffId=ST.staff.id; delete uc[uid].noAutoLink; delete uc[uid].claimStaffId; }
+    try{ ls('mgr_users_cache',uc); }catch(e){}
+    try{ logAudit('staff.link', nm, (old?'เปลี่ยนบัญชีที่ผูกจาก '+(old.email||old.uid)+' → ':'ผูกบัญชี ')+(u.email||uid)); }catch(e){}
+    toast('🔗 ผูกบัญชีใหม่แล้ว','success'); open('admin', ST.staff.id);
+  }catch(e){ toast('ผูกไม่สำเร็จ: '+e.message,'error'); }
+};
 function rolesHTML(){
   if(ST.mode==='admin'){
     const acc=ST.acct, isMgr=acc&&acc.role==='manager';
     return `<div class="ndp-card"><div class="ndp-ch"><h3>โรล / ตำแหน่งงาน</h3><span class="muted">แอดมินเปลี่ยนได้ทันที</span></div><div class="ndp-cb">
       <div class="ndp-roles">${CAT_KEYS.map(c=>`<label class="ndp-rchip ${ST.roles.includes(c)?'on':''}" style="--c:${catColor(c)}"><input type="checkbox" data-role="${c}" ${ST.roles.includes(c)?'checked':''}> ${esc(catLabel(c))}</label>`).join('')}</div>
       ${acc?`<div class="ndp-f" style="margin-top:12px;max-width:320px"><label>บทบาทในระบบ</label><select id="ndp-sysrole"><option value="staff" ${!isMgr?'selected':''}>🎙️ Staff (ทีมงาน)</option><option value="manager" ${isMgr?'selected':''}>🗂️ Manager</option></select></div>`:''}
-      ${reqNoteHTML()}</div></div>`;
+      ${reqNoteHTML()}</div></div>${linkCardHTML()}`;
   }
   const cur=ST.roles, add=ST.pendAdd, del=ST.pendDel;
   if(!ST.edit) return `<div class="ndp-card"><div class="ndp-ch"><h3>โรล / ตำแหน่งงาน</h3></div><div class="ndp-cb">
@@ -181,6 +227,10 @@ async function open(mode, staffId){
   ST={mode, staff, acct, uid:mode==='self'?cu.uid:(acct&&acct.uid), vals, roles, pendAdd:mode==='self'?(rq.add||[]).slice():[], pendDel:mode==='self'?(rq.del||[]).slice():[],
       photo:mode==='self'?(cu.photoURL||''):photoForAdmin(staff,acct), pendingPhoto:null, dirty:false, edit:mode==='admin'};
   const host=mode==='admin'?$('sd-body-1'):$('ndp-self-body');
+  // หน้าโปรไฟล์ของฉัน กับหน้าข้อมูลสมาชิก (แอดมิน) ใช้ปุ่มบันทึก/ช่องกรอก id เดียวกัน → ล้างอีกหน้าทิ้งก่อน
+  // ไม่งั้นแถบบันทึกไปโผล่ในหน้าที่ซ่อนอยู่ (แอดมินเปิดโปรไฟล์ตัวเองก่อน แล้วเปิดการ์ดสมาชิก = ไม่มีปุ่มบันทึก)
+  const other=mode==='admin'?$('ndp-self-body'):$('sd-body-1');
+  if(other && other!==host && other.querySelector('#ndp-savebar')) other.innerHTML='';
   if(host) render(host);
 }
 
