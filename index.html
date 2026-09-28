@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20260928-30"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20260928-31"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -20535,40 +20535,46 @@ function _profUpdateSelection(){
 }
 
 // ══════════════════════════════════════════════
-// 🧾 สรุปรายเดือนตามเดือนภาษี (ไทย) — ลูกค้า · รับเงิน · หัก ณ ที่จ่าย · จ่ายทีม · กำไรจริง
-//   เดือน = เดือนที่เงินเข้า/ออกจริง (รับจากลูกค้า = วันที่ติ๊กรับเงินของงวด · จ่ายทีม = วันที่จ่ายจริง · ค่าใช้จ่ายบริษัท = วันที่บันทึก)
+// 🧾 สรุปภาษี — 2 มุมมอง: รายเดือน (เดือนภาษีไทย) · รายลูกค้า (รวมทั้งปี/ทั้งหมด แยกดูรายโปรเจกต์ได้)
+//   เดือน = เดือนที่เงินเข้า/ออกจริง (รับจากลูกค้า = วันที่ติ๊กรับเงินของงวด · จ่ายทีม = วันที่จ่ายจริง)
 //   ภาษีที่เราหักจากทีม → ยื่น ภ.ง.ด.3 ภายในวันที่ 7 ของเดือนถัดไป (ยื่นออนไลน์ได้ถึงวันที่ 15)
-//   ภาษีที่ลูกค้าหักจากเรา → เป็นเครดิตภาษี ใช้ตอนยื่นภาษีเงินได้ (ขอหนังสือ 50 ทวิ จากลูกค้าเก็บไว้)
-//   กำไรจริง = รายรับ (ยอดตามบิล) − ค่าจ้างทีม (ยอดเต็มก่อนหักภาษี) − ค่าใช้จ่ายบริษัท
+//   ภาษีที่ลูกค้าหักจากเรา → เครดิตภาษี (ขอหนังสือ 50 ทวิ จากลูกค้าเก็บไว้)
+//   กำไรจริง = รายรับ (ยอดตามบิล) − ค่าจ้างทีม (ยอดเต็มก่อนหักภาษี) · ไม่รวมค่าใช้จ่ายบริษัท (เจ้าของสั่ง 2026-09-28)
 // ══════════════════════════════════════════════
 const _TX_TM=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 window._txOpen = window._txOpen || new Set();
+window._txView = window._txView || 'month';
+// year = ปี ค.ศ. หรือ 'all' → { months:{'YYYY-MM':{...,clients}}, clients:{name:{...,projs}} }
 function _txCollect(year){
-  const months={};
-  const M=m=>months[m]||(months[m]={m, clients:{}, inc:0, cwht:0, team:0, twht:0, comp:0});
-  const C=(mo,cl)=>mo.clients[cl]||(mo.clients[cl]={name:cl, inc:0, cwht:0, team:0, twht:0, jobs:new Set()});
-  const inYear=d=>!!d && d.slice(0,4)===String(year);
+  const months={}, clients={};
+  const Z=()=>({inc:0, cwht:0, team:0, twht:0});
+  const add=(o,f,v)=>{ o[f]+=v; };
+  const M=m=>months[m]||(months[m]={m, clients:{}, ...Z()});
+  const MC=(mo,cl)=>mo.clients[cl]||(mo.clients[cl]={name:cl, jobs:new Set(), ...Z()});
+  const CL=cl=>clients[cl]||(clients[cl]={name:cl, projs:{}, ...Z()});
+  const CP=(c,p)=>c.projs[p.id]||(c.projs[p.id]={name:p.name||p.id, ...Z()});
+  const inY=d=>!!d && (year==='all' || d.slice(0,4)===String(year));
+  const put=(d,p,cl,f,v)=>{ if(!v) return; const mo=M(d.slice(0,7)), mc=MC(mo,cl), c=CL(cl), cp=CP(c,p);
+    [mo,mc,c,cp].forEach(o=>add(o,f,v)); mc.jobs.add(p.name||p.id); };
   (getProjects()||[]).forEach(p=>{
     if(!p || p.projStatus==='cancelled') return;
-    const cl=String(p.client||'').trim()||'(ไม่ระบุลูกค้า)', jn=p.name||p.id;
+    const cl=String(p.client||'').trim()||'(ไม่ระบุลูกค้า)';
     const rows=Array.isArray(p.income)?p.income:[];
     if(rows.length){
-      rows.forEach(e=>{ const d=String(e.paidAt||'').slice(0,10); if(!inYear(d)) return;
-        const amt=parseFloat(e.amount)||0, w=Math.min(amt, parseFloat(e.wht)||0), mo=M(d.slice(0,7)), c=C(mo,cl);
-        mo.inc+=amt; mo.cwht+=w; c.inc+=amt; c.cwht+=w; c.jobs.add(jn); });
+      rows.forEach(e=>{ const d=String(e.paidAt||'').slice(0,10); if(!inY(d)) return;
+        const amt=parseFloat(e.amount)||0; put(d,p,cl,'inc',amt); put(d,p,cl,'cwht',Math.min(amt, parseFloat(e.wht)||0)); });
     } else if(ls('client_paid_'+p.id)){
       // โปรเจกต์ที่บันทึกรับเงินแบบเดิม (ไม่มีงวด) → ใช้วันที่กดรับเงิน
       const d=(typeof _thaiDateToIso==='function'?_thaiDateToIso(ls('client_paid_date_'+p.id)):'') || p.deadline || p.date || '';
-      if(inYear(d)){ const f=getProjectFinance(p), mo=M(d.slice(0,7)), c=C(mo,cl); mo.inc+=f.received; c.inc+=f.received; c.jobs.add(jn); }
+      if(inY(d)) put(d,p,cl,'inc',getProjectFinance(p).received);
     }
     const tax=p.tax||{};
     (p.workers||[]).forEach(w=>{ if(!w || w.status!=='paid') return;
-      const d=String(w.paidAt||'').split('T')[0] || p.deadline || ''; if(!inYear(d)) return;
+      const d=String(w.paidAt||'').split('T')[0] || p.deadline || ''; if(!inY(d)) return;
       const t=parseFloat(tax[(w.slot||'').split('-')[0]])||0, gross=parseFloat(w.amount)||0, net=Math.round(gross*(1-t/100));
-      const mo=M(d.slice(0,7)), c=C(mo,cl); mo.team+=gross; mo.twht+=gross-net; c.team+=gross; c.twht+=gross-net; c.jobs.add(jn); });
+      put(d,p,cl,'team',gross); put(d,p,cl,'twht',gross-net); });
   });
-  getCompanyExpenses().forEach(e=>{ const d=String(e.date||'').slice(0,10); if(inYear(d)) M(d.slice(0,7)).comp+=parseFloat(e.amount)||0; });
-  return months;
+  return { months, clients };
 }
 function _txYears(){
   const ys=new Set([new Date().getFullYear()]);
@@ -20578,70 +20584,86 @@ function _txYears(){
 }
 function renderTaxMonthly(){
   const el=document.getElementById('profit-taxmonth'); if(!el) return;
-  const years=_txYears(); if(!window._txYear || !years.includes(window._txYear)) window._txYear=years[0];
-  const Y=window._txYear, mm=_txCollect(Y);
-  const nowKey=new Date().toISOString().slice(0,7);
-  const keys=[]; for(let i=1;i<=12;i++){ const k=Y+'-'+String(i).padStart(2,'0'); if(mm[k] || k<=nowKey) keys.push(k); }
+  const years=_txYears(), V=window._txView;
+  if(V==='month' && window._txYear==='all') window._txYear=years[0];
+  if(window._txYear!=='all' && !years.includes(window._txYear)) window._txYear=years[0];
+  const Y=window._txYear, data=_txCollect(Y);
   const b=v=>v?fmtB(Math.round(v)):'<span style="color:var(--text2)">—</span>';
-  const prof=o=>o.inc-o.team-(o.comp||0);
+  const pc=v=>v>=0?'var(--green)':'var(--red)';
   const due=k=>{ const [y,m]=k.split('-').map(Number); const nm=m===12?1:m+1, ny=m===12?y+1:y; return '7 '+_TX_TM[nm-1]+' '+(ny+543); };
   const th='padding:8px 10px;font-size:11px;color:var(--text2);font-weight:700;text-align:right;white-space:nowrap;border-bottom:1px solid var(--border2)';
   const td='padding:8px 10px;font-size:12.5px;text-align:right;white-space:nowrap';
-  const T={inc:0,cwht:0,team:0,twht:0,comp:0};
-  const body=keys.map(k=>{
-    const o=mm[k]||{inc:0,cwht:0,team:0,twht:0,comp:0,clients:{}}; Object.keys(T).forEach(x=>T[x]+=o[x]||0);
-    const [y,m]=k.split('-').map(Number), open=window._txOpen.has(k), cls=Object.values(o.clients).sort((a,c)=>c.inc-a.inc||c.team-a.team);
-    const pr=prof(o), has=o.inc||o.team||o.comp;
-    let h=`<tr style="cursor:${cls.length?'pointer':'default'};border-top:1px solid rgba(255,255,255,.06)${open?';background:rgba(21,101,255,.07)':''}" ${cls.length?`onclick="_txToggle('${k}')"`:''}>
-      <td style="${td};text-align:left;font-weight:700">${cls.length?(open?'▾ ':'▸ '):'&nbsp;&nbsp;'}${_TX_TM[m-1]} ${y+543}${cls.length?` <span style="font-size:10.5px;color:var(--text2);font-weight:400">${cls.length} ลูกค้า</span>`:''}</td>
-      <td style="${td}">${b(o.inc)}</td><td style="${td};color:var(--orange)">${b(o.cwht)}</td><td style="${td};color:var(--green)">${b(o.inc-o.cwht)}</td>
-      <td style="${td}">${b(o.team)}</td>
-      <td style="${td};color:var(--purple)">${b(o.twht)}${o.twht?`<div style="font-size:10px;color:var(--text2)">ยื่น ภ.ง.ด.3 ภายใน ${due(k)}</div>`:''}</td>
-      <td style="${td}">${b(o.comp)}</td>
-      <td style="${td};font-weight:800;color:${!has?'var(--text2)':pr>=0?'var(--green)':'var(--red)'}">${has?fmtB(Math.round(pr)):'—'}</td></tr>`;
-    if(open) h+=cls.map(c=>{ const cp=c.inc-c.team; return `<tr style="background:rgba(255,255,255,.02)">
-      <td style="${td};text-align:left;padding-left:30px;font-size:12px" title="${esc([...c.jobs].join(', '))}">${esc(c.name)} <span style="font-size:10.5px;color:var(--text2)">${c.jobs.size} งาน</span></td>
-      <td style="${td};font-size:12px">${b(c.inc)}</td><td style="${td};font-size:12px;color:var(--orange)">${b(c.cwht)}</td><td style="${td};font-size:12px;color:var(--green)">${b(c.inc-c.cwht)}</td>
-      <td style="${td};font-size:12px">${b(c.team)}</td><td style="${td};font-size:12px;color:var(--purple)">${b(c.twht)}</td>
-      <td style="${td};font-size:12px;color:var(--text2)">—</td>
-      <td style="${td};font-size:12px;font-weight:700;color:${cp>=0?'var(--green)':'var(--red)'}">${fmtB(Math.round(cp))}</td></tr>`; }).join('')
-      + (o.comp?`<tr style="background:rgba(255,255,255,.02)"><td style="${td};text-align:left;padding-left:30px;font-size:12px;color:var(--text2)" colspan="6">🏢 ค่าใช้จ่ายบริษัทเดือนนี้ (ไม่แยกลูกค้า)</td><td style="${td};font-size:12px">${b(o.comp)}</td><td style="${td};font-size:12px;color:var(--red)">−${fmtB(Math.round(o.comp))}</td></tr>`:'');
-    return h;
-  }).join('');
-  const tp=prof(T);
+  const cells=(o,sub)=>{ const fs=sub?';font-size:12px':'', pr=o.inc-o.team, has=o.inc||o.team;
+    return `<td style="${td}${fs}">${b(o.inc)}</td><td style="${td}${fs};color:var(--orange)">${b(o.cwht)}</td><td style="${td}${fs};color:var(--green)">${b(o.inc-o.cwht)}</td>
+      <td style="${td}${fs}">${b(o.team)}</td><td style="${td}${fs};color:var(--purple)">${b(o.twht)}${sub||!o._due||!o.twht?'':`<div style="font-size:10px;color:var(--text2)">ยื่น ภ.ง.ด.3 ภายใน ${o._due}</div>`}</td>
+      <td style="${td}${fs};font-weight:${sub?700:800};color:${has?pc(pr):'var(--text2)'}">${has?fmtB(Math.round(pr)):'—'}</td>`; };
+  const T={inc:0,cwht:0,team:0,twht:0}, sum=o=>Object.keys(T).forEach(x=>T[x]+=o[x]||0);
+  let body='', firstCol='เดือน · ลูกค้า';
+  if(V==='month'){
+    const nowKey=new Date().toISOString().slice(0,7), keys=[];
+    for(let i=1;i<=12;i++){ const k=Y+'-'+String(i).padStart(2,'0'); if(data.months[k] || k<=nowKey) keys.push(k); }
+    body=keys.map(k=>{
+      const o=data.months[k]||{inc:0,cwht:0,team:0,twht:0,clients:{}}; sum(o); o._due=due(k);
+      const [y,m]=k.split('-').map(Number), open=window._txOpen.has('m'+k), cls=Object.values(o.clients).sort((a,c)=>c.inc-a.inc||c.team-a.team);
+      let h=`<tr style="cursor:${cls.length?'pointer':'default'};border-top:1px solid rgba(255,255,255,.06)${open?';background:rgba(21,101,255,.07)':''}" ${cls.length?`onclick="_txToggle('m${k}')"`:''}>
+        <td style="${td};text-align:left;font-weight:700">${cls.length?(open?'▾ ':'▸ '):'&nbsp;&nbsp;'}${_TX_TM[m-1]} ${y+543}${cls.length?` <span style="font-size:10.5px;color:var(--text2);font-weight:400">${cls.length} ลูกค้า</span>`:''}</td>${cells(o)}</tr>`;
+      if(open) h+=cls.map(c=>`<tr style="background:rgba(255,255,255,.02)"><td style="${td};text-align:left;padding-left:30px;font-size:12px" title="${esc([...c.jobs].join(', '))}">${esc(c.name)} <span style="font-size:10.5px;color:var(--text2)">${c.jobs.size} งาน</span></td>${cells(c,1)}</tr>`).join('');
+      return h;
+    }).join('');
+  } else {
+    firstCol='ลูกค้า · โปรเจกต์';
+    const cls=Object.values(data.clients).sort((a,c)=>c.inc-a.inc||c.team-a.team);
+    body=cls.map(c=>{ sum(c);
+      const k='c'+c.name, open=window._txOpen.has(k), ps=Object.values(c.projs).sort((a,x)=>x.inc-a.inc||x.team-a.team);
+      let h=`<tr style="cursor:pointer;border-top:1px solid rgba(255,255,255,.06)${open?';background:rgba(21,101,255,.07)':''}" onclick="_txToggle(${esc(JSON.stringify(k))})">
+        <td style="${td};text-align:left;font-weight:700">${open?'▾ ':'▸ '}${esc(c.name)} <span style="font-size:10.5px;color:var(--text2);font-weight:400">${ps.length} โปรเจกต์</span></td>${cells(c)}</tr>`;
+      if(open) h+=ps.map(p=>`<tr style="background:rgba(255,255,255,.02)"><td style="${td};text-align:left;padding-left:30px;font-size:12px;max-width:320px;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</td>${cells(p,1)}</tr>`).join('');
+      return h;
+    }).join('') || `<tr><td colspan="7" style="${td};text-align:center;color:var(--text2);padding:22px">ยังไม่มีรายการในช่วงนี้</td></tr>`;
+  }
+  const tp=T.inc-T.team, yl=Y==='all'?'ทั้งหมด':'ปี '+(Y+543);
+  const tab=(v,l)=>`<button class="btn btn-sm ${V===v?'btn-blue':'btn-outline'}" type="button" onclick="window._txView='${v}';window._txOpen=new Set();renderTaxMonthly()">${l}</button>`;
   el.innerHTML=`<div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;overflow:hidden">
     <div style="padding:12px 16px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <div style="font-size:13px;font-weight:700">🧾 สรุปรายเดือนตามเดือนภาษี</div>
-      <span style="font-size:11px;color:var(--text2)">กดเดือนเพื่อดูแยกตามลูกค้า</span>
+      <div style="font-size:13px;font-weight:700">🧾 สรุปภาษี</div>
+      <span style="display:flex;gap:4px">${tab('month','📅 รายเดือน')}${tab('client','👥 รายลูกค้า')}</span>
+      <span style="font-size:11px;color:var(--text2)">${V==='month'?'กดเดือนเพื่อดูแยกตามลูกค้า':'กดชื่อลูกค้าเพื่อดูแยกตามโปรเจกต์'}</span>
       <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
-        <select onchange="window._txYear=+this.value;window._txOpen=new Set();renderTaxMonthly()" style="height:28px;padding:0 8px;font-size:12px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);border-radius:7px">
-          ${years.map(y=>`<option value="${y}"${y===Y?' selected':''}>ปี ${y+543}</option>`).join('')}</select>
+        <select onchange="window._txYear=this.value==='all'?'all':+this.value;window._txOpen=new Set();renderTaxMonthly()" style="height:28px;padding:0 8px;font-size:12px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);border-radius:7px">
+          ${years.map(y=>`<option value="${y}"${y===Y?' selected':''}>ปี ${y+543}</option>`).join('')}${V==='client'?`<option value="all"${Y==='all'?' selected':''}>ทั้งหมดทุกปี</option>`:''}</select>
         <button class="btn btn-outline btn-sm" type="button" onclick="_txExportCsv()">⬇️ CSV</button></span></div>
-    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:900px">
-      <thead><tr><th style="${th};text-align:left">เดือน · ลูกค้า</th><th style="${th}">รายรับ (ตามบิล)</th><th style="${th}">ลูกค้าหัก ณ ที่จ่าย</th><th style="${th}">เงินเข้าจริง</th>
-        <th style="${th}">ค่าจ้างทีม</th><th style="${th}">เราหักภาษีทีม</th><th style="${th}">ค่าใช้จ่ายบริษัท</th><th style="${th}">กำไรจริง</th></tr></thead>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:820px">
+      <thead><tr><th style="${th};text-align:left">${firstCol}</th><th style="${th}">รายรับ (ตามบิล)</th><th style="${th}">ลูกค้าหัก ณ ที่จ่าย</th><th style="${th}">เงินเข้าจริง</th>
+        <th style="${th}">ค่าจ้างทีม</th><th style="${th}">เราหักภาษีทีม</th><th style="${th}">กำไรจริง</th></tr></thead>
       <tbody>${body}</tbody>
-      <tfoot><tr style="border-top:2px solid var(--border2);background:rgba(255,255,255,.03)"><td style="${td};text-align:left;font-weight:800">รวมปี ${Y+543}</td>
+      <tfoot><tr style="border-top:2px solid var(--border2);background:rgba(255,255,255,.03)"><td style="${td};text-align:left;font-weight:800">รวม${yl}</td>
         <td style="${td};font-weight:800">${b(T.inc)}</td><td style="${td};font-weight:800;color:var(--orange)">${b(T.cwht)}</td><td style="${td};font-weight:800;color:var(--green)">${b(T.inc-T.cwht)}</td>
-        <td style="${td};font-weight:800">${b(T.team)}</td><td style="${td};font-weight:800;color:var(--purple)">${b(T.twht)}</td><td style="${td};font-weight:800">${b(T.comp)}</td>
-        <td style="${td};font-weight:900;color:${tp>=0?'var(--green)':'var(--red)'}">${fmtB(Math.round(tp))}</td></tr></tfoot></table></div>
+        <td style="${td};font-weight:800">${b(T.team)}</td><td style="${td};font-weight:800;color:var(--purple)">${b(T.twht)}</td>
+        <td style="${td};font-weight:900;color:${pc(tp)}">${fmtB(Math.round(tp))}</td></tr></tfoot></table></div>
     <div style="padding:10px 16px;font-size:11px;color:var(--text2);line-height:1.7;border-top:1px solid var(--border2)">
-      • <b>เดือน</b> = เดือนที่เงินเข้า/ออกจริง · รายรับนับจากงวดที่ติ๊ก "รับเงินแล้ว" · ค่าจ้างทีมนับจากวันที่จ่ายจริง<br>
-      • <b style="color:var(--orange)">ลูกค้าหัก ณ ที่จ่าย</b> = กรอกในงวดรับเงินของโปรเจกต์ (ปุ่ม 3%) → เป็นเครดิตภาษีของสตูดิโอ ขอหนังสือ 50 ทวิ จากลูกค้าเก็บไว้<br>
-      • <b style="color:var(--purple)">เราหักภาษีทีม</b> = ภาษีหัก ณ ที่จ่ายจากค่าจ้างทีม → นำส่งด้วย ภ.ง.ด.3 ภายในวันที่ 7 ของเดือนถัดไป (ยื่นออนไลน์ได้ถึงวันที่ 15)<br>
-      • <b>กำไรจริง</b> = รายรับ − ค่าจ้างทีม (ยอดเต็มก่อนหักภาษี) − ค่าใช้จ่ายบริษัท · ตัวเลขนี้ใช้ดูภาพรวม ยื่นภาษีจริงควรให้นักบัญชีตรวจอีกครั้ง</div></div>`;
+      • นับตาม<b>วันที่เงินเข้า/ออกจริง</b> · รายรับ = งวดที่ติ๊ก "รับเงินแล้ว" · ค่าจ้างทีม = ที่จ่ายแล้ว (ยอดเต็มก่อนหักภาษี)<br>
+      • <b>กำไรจริง</b> = รายรับ − ค่าจ้างทีม · ${V==='month'?'รายเดือนอาจติดลบได้ถ้าจ่ายทีมคนละเดือนกับที่ลูกค้าจ่าย — ดูมุมมอง "รายลูกค้า" จะเห็นกำไรต่อเจ้าชัดกว่า':'ดู "ทั้งหมดทุกปี" จะได้กำไรต่อเจ้าที่ไม่ขาดช่วงข้ามปี'}<br>
+      • <b style="color:var(--orange)">ลูกค้าหัก ณ ที่จ่าย</b> = กรอกในงวดรับเงินของโปรเจกต์ (ปุ่ม 3%) · <b style="color:var(--purple)">เราหักภาษีทีม</b> = นำส่ง ภ.ง.ด.3 ภายในวันที่ 7 ของเดือนถัดไป · ยื่นภาษีจริงควรให้นักบัญชีตรวจอีกครั้ง</div></div>`;
 }
 function _txToggle(k){ if(window._txOpen.has(k)) window._txOpen.delete(k); else window._txOpen.add(k); renderTaxMonthly(); }
 function _txExportCsv(){
-  const Y=window._txYear||new Date().getFullYear(), mm=_txCollect(Y);
+  const Y=window._txYear||new Date().getFullYear(), V=window._txView, d=_txCollect(Y);
   const q=v=>{ v=String(v==null?'':v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
-  const L=[['เดือน','ลูกค้า','รายรับ (ตามบิล)','ลูกค้าหัก ณ ที่จ่าย','เงินเข้าจริง','ค่าจ้างทีม','เราหักภาษีทีม (ภ.ง.ด.3)','ค่าใช้จ่ายบริษัท','กำไรจริง']];
-  Object.keys(mm).sort().forEach(k=>{ const o=mm[k], [y,m]=k.split('-').map(Number), ml=_TX_TM[m-1]+' '+(y+543);
-    Object.values(o.clients).sort((a,c)=>c.inc-a.inc).forEach(c=>L.push([ml,c.name,c.inc,c.cwht,c.inc-c.cwht,c.team,c.twht,'',c.inc-c.team]));
-    if(o.comp) L.push([ml,'(ค่าใช้จ่ายบริษัท)','','','','','',o.comp,-o.comp]);
-    L.push([ml,'รวมเดือน',o.inc,o.cwht,o.inc-o.cwht,o.team,o.twht,o.comp,o.inc-o.team-o.comp]); });
+  const H=['รายรับ (ตามบิล)','ลูกค้าหัก ณ ที่จ่าย','เงินเข้าจริง','ค่าจ้างทีม','เราหักภาษีทีม (ภ.ง.ด.3)','กำไรจริง'];
+  const N=o=>[o.inc,o.cwht,o.inc-o.cwht,o.team,o.twht,o.inc-o.team];
+  const L=[];
+  if(V==='month'){ L.push(['เดือน','ลูกค้า',...H]);
+    Object.keys(d.months).sort().forEach(k=>{ const o=d.months[k], [y,m]=k.split('-').map(Number), ml=_TX_TM[m-1]+' '+(y+543);
+      Object.values(o.clients).sort((a,c)=>c.inc-a.inc).forEach(c=>L.push([ml,c.name,...N(c)]));
+      L.push([ml,'รวมเดือน',...N(o)]); });
+  } else { L.push(['ลูกค้า','โปรเจกต์',...H]);
+    Object.values(d.clients).sort((a,c)=>c.inc-a.inc).forEach(c=>{
+      Object.values(c.projs).sort((a,x)=>x.inc-a.inc).forEach(p=>L.push([c.name,p.name,...N(p)]));
+      L.push([c.name,'รวมลูกค้า',...N(c)]); });
+  }
   const csv='﻿'+L.map(r=>r.map(x=>typeof x==='number'?Math.round(x*100)/100:q(x)).join(',')).join('\n');
-  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='สรุปรายเดือนภาษี-'+(Y+543)+'.csv';
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='สรุปภาษี-'+(V==='month'?'รายเดือน':'รายลูกค้า')+'-'+(Y==='all'?'ทั้งหมด':(Y+543))+'.csv';
   document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
 }
 function renderProfit(){
@@ -32418,7 +32440,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20260928-30"></script><script src="scene/nd-profile.js?v=20260928-30"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20260928-31"></script><script src="scene/nd-profile.js?v=20260928-31"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32428,7 +32450,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20260928-30';
+var UPD_BUILD = '20260928-31';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
