@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20260928-31"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20260929-02"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -5129,10 +5129,7 @@ async function postRoundToDiscord(){
   // 🏠 ห้องรวม (บท-qc · มิกซ์-ซับ): ถ้ารอบนี้เปิดขอคิวหลายทีมที่อยู่ห้องเดียวกัน → แท็กให้ครบทุกทีม
   const roomCats=(Array.isArray(r.targetCats)&&r.targetCats.length?r.targetCats:[r.cat]).filter(k=>_dcChannelOf(k)===chId);
   const roundMention=_annMention(r.cat), roomMention=_annMentionOfCats(roomCats);
-  let text=r.announceText||roundAnnounceText(r);
-  if(roomMention && roundMention && roomMention!==roundMention && text.includes(roundMention)){
-    text=text.split(roundMention).join(roomMention);
-  }
+  let text=_raRoomText(r, r.announceText||roundAnnounceText(r), roomCats.length?roomCats:[r.cat]);
   const roomLabel=roomCats.map(k=>(AV_CATS[k]||{}).label||k).join(' + ')||(AV_CATS[r.cat]||{}).label||'';
   if(!confirm(`โพสประกาศลงห้อง Discord ของ${roomLabel}?\n\n${text.slice(0,300)}`)) return;
   showLoader(true);
@@ -5388,7 +5385,7 @@ function roundAnnounceText(r, gender){
 function _raSetGender(g, roundId){
   ls('announcegender', g);
   const r=getRound(roundId); const el=document.getElementById('ra-text');
-  if(r && el) el.value=roundAnnounceText(r, g);
+  if(r && el) el.value=_raTok(r, roundAnnounceText(r, g));
   _raTagPreview(roundId);
 }
 // ⚙️ แก้เทมเพลต + แท็กของแต่ละทีม (แอดมินเท่านั้น — เก็บถาวร ใช้ทุกรอบ)
@@ -5485,7 +5482,7 @@ function openNewRound(){
       <button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="openAnnounceTplEditor('NR')">⚙️ แก้เทมเพลต & แท็ก</button>
     </div>
     <textarea id="nr-preview" rows="7" oninput="this.dataset.dirty='1'" style="width:100%;padding:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:12.5px;line-height:1.6;resize:vertical;box-sizing:border-box"></textarea>
-    <div style="font-size:10.5px;color:var(--text2);margin:5px 0 10px;line-height:1.6">ระบบเติมวันที่/แท็กให้เองเมื่อเปลี่ยนทีมหรือช่วงวัน · พิมพ์แก้ในกล่องได้เลย ข้อความที่แก้จะถูกใช้เป็นประกาศของรอบนี้</div>
+    <div style="font-size:10.5px;color:var(--text2);margin:5px 0 10px;line-height:1.6"><b>{แท็ก}</b> = ตอนโพสต์ระบบใส่แท็กของแต่ละห้องให้เอง (ทุกทีมที่ติ๊ก) · ระบบเติมวันที่ให้เองเมื่อเปลี่ยนทีมหรือช่วงวัน · พิมพ์แก้ในกล่องได้เลย ข้อความที่แก้จะถูกใช้เป็นประกาศของรอบนี้</div>
     <button class="btn" style="width:100%" onclick="createRound()">✅ เปิดรอบและใช้ข้อความประกาศนี้</button>`, 640);
   _nrRefreshPreview(true);
 }
@@ -5503,7 +5500,7 @@ function _nrRefreshPreview(force){
   const el=document.getElementById('nr-preview'); if(!el) return;
   if(el.dataset.dirty==='1' && !force) return;
   const gg=document.querySelector('input[name=nr-g]:checked')?.value||getAnnounceGender();
-  el.value=roundAnnounceText(_nrPreviewRound(), gg);
+  const pr=_nrPreviewRound(); el.value=_raTok(pr, roundAnnounceText(pr, gg));
   el.dataset.dirty='0';
 }
 async function createRound(){
@@ -5525,7 +5522,7 @@ async function createRound(){
   // ถ้าพิมพ์แก้ข้อความประกาศเองในป็อบอัพ → เก็บไว้เป็นประกาศเฉพาะรอบนี้
   const pv=document.getElementById('nr-preview');
   const pvTxt=String(pv?pv.value:'').trim();
-  if(pvTxt && pvTxt!==roundAnnounceText(r)) r.announceText=pvTxt;
+  if(pvTxt && pvTxt!==_raTok(r, roundAnnounceText(r))) r.announceText=pvTxt;
   const list=getRounds(); list.unshift(r); await saveRounds(list);
   _avRoundId=r.id;
   logAudit('recruit.round', (AV_CATS[r.cat]||{}).label||r.cat, 'ขอคิว '+_roundRangeLabel(r));
@@ -5536,7 +5533,7 @@ async function createRound(){
 function showRoundAnnounce(roundId){
   const r=getRound(roundId); if(!r) return;
   const g=getAnnounceGender();
-  const txt=r.announceText||roundAnnounceText(r, g);
+  const txt=_raTok(r, r.announceText||roundAnnounceText(r, g));
   // ☑️ เลือกห้องที่จะโพสต์ได้หลายห้องพร้อมกัน — ห้องของทุกทีมที่ติ๊กตอนเปิดรอบ ถูกติ๊กมาให้ก่อน
   const cfgCh=getDiscordCfg().channels||{};
   const wantCats=new Set(Array.isArray(r.targetCats)&&r.targetCats.length?r.targetCats:[r.cat]);
@@ -5561,7 +5558,7 @@ function showRoundAnnounce(roundId){
       <button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="openAnnounceTplEditor('${r.id}')">⚙️ แก้เทมเพลต & แท็ก</button>
     </div>
     <textarea id="ra-text" rows="10" oninput="_raTagPreview('${r.id}')" style="width:100%;padding:11px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:Kanit;font-size:13px;line-height:1.65;resize:vertical;box-sizing:border-box">${esc(txt)}</textarea>
-    <div style="font-size:11px;color:var(--text2);margin-top:5px;line-height:1.5">กล่องนี้คือ "ฉบับกลาง" — โชว์แท็กของทีมหลักทีมเดียว · ตอนโพสต์จริงระบบเปลี่ยนแท็กให้ตรงกับทีมประจำห้องนั้น ๆ ดูได้ที่รายการข้างล่าง</div>
+    <div style="font-size:11px;color:var(--text2);margin-top:5px;line-height:1.5">✏️ แก้ข้อความที่นี่ที่เดียว ใช้กับทุกห้อง · <b style="color:var(--accent2)">{แท็ก}</b> = ระบบใส่แท็กของแต่ละห้องให้เอง (อย่าลบ) · ดูข้อความจริงของแต่ละห้องได้ข้างล่าง</div>
     <div style="margin-top:9px">
       <div style="font-size:11.5px;font-weight:700;margin-bottom:5px">📍 โพสต์ลงห้องไหนบ้าง (ติ๊กได้หลายห้อง — โพสต์พร้อมกันทีเดียว)</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${chBoxes||'<span style="font-size:11.5px;color:var(--orange)">ยังไม่ได้ตั้ง ID ห้องของทีมไหนเลย — กด 🐧 ตั้งค่าห้อง Discord ก่อน</span>'}</div>
@@ -5577,6 +5574,19 @@ function showRoundAnnounce(roundId){
     </div>`, 620);
   _raTagPreview(r.id);
 }
+// 🏷️ ในกล่องแก้ข้อความ ให้บรรทัดแท็กเป็น {แท็ก} (ไม่ใช่แท็กของทีมแรก) — กันคนทำงานเข้าใจผิดว่าจะแท็กแค่ทีมเดียว
+//    ตอนโพสต์ {แท็ก} = แท็กของทุกทีมในห้องนั้น · ข้อความเก่าที่ยังมีแท็กทีมหลัก → สลับให้แบบเดิม
+const RA_TAG='{แท็ก}';
+function _raTok(r, txt){ const m=_annMention(r.cat); txt=String(txt||''); return m? txt.split(m).join(RA_TAG) : txt; }
+function _raRoomText(r, raw, cats){
+  const want=_annMentionOfCats(cats)||'', m=_annMention(r.cat);
+  let t=String(raw||'');
+  if(t.includes(RA_TAG)) return t.split(RA_TAG).join(want).replace(/[ \t]+\n/g,'\n');
+  if(want && m && want!==m && t.includes(m)) t=t.split(m).join(want);
+  return t;
+}
+function _raCanTag(r, raw, cats){ const want=_annMentionOfCats(cats), m=_annMention(r.cat); raw=String(raw||'');
+  return !want || raw.includes(RA_TAG) || raw.includes(want) || (m && raw.includes(m)); }
 // ☑️ จัดกลุ่ม "ห้องที่ติ๊ก" → ทีมของห้องนั้น (ห้องรวมมีได้หลายทีม) · ใช้ร่วมกันทั้งพรีวิวและตอนโพสต์จริง
 function _raPickedRooms(){
   const chCats={}, order=[];
@@ -5592,21 +5602,19 @@ function _raTagPreview(roundId){
   const box=document.getElementById('ra-tagline'); if(!box) return;
   const r=getRound(roundId); if(!r) return;
   const raw=String(document.getElementById('ra-text')?.value||'');
-  const roundMention=_annMention(r.cat);
   const {order, chCats}=_raPickedRooms();
   if(!order.length){ box.innerHTML='<span style="color:var(--orange)">ยังไม่ได้ติ๊กห้อง — ติ๊กอย่างน้อย 1 ห้อง</span>'; return; }
-  let warn=false;
-  const rows=order.map(id=>{
-    const cats=chCats[id];
-    const want=_annMentionOfCats(cats);
-    const roomRaw=(AV_CATS[cats[0]]||{}).channel||'';
-    const room=(roomRaw&&roomRaw!=='-')?('#'+roomRaw):cats.map(c=>(AV_CATS[c]||{}).label||c).join(' + ');
-    let tag=want, note='';
-    if(want && roundMention && want!==roundMention && !raw.includes(roundMention)){ tag=roundMention; note=' ⚠️ สลับแท็กไม่ได้'; warn=true; }
-    return `<div>${esc(room)} <span style="color:var(--text2)">(${esc(cats.map(c=>(AV_CATS[c]||{}).label||c).join(' + '))})</span> → <strong style="color:var(--accent2)">${esc(tag||'—')}</strong><span style="color:var(--orange)">${note}</span></div>`;
-  }).join('');
-  box.innerHTML=`<div style="font-weight:700;color:var(--text2);margin-bottom:3px">🏷️ แท็กที่แต่ละห้องจะได้จริงตอนโพสต์ (${order.length} ห้อง)</div>${rows}`
-    + (warn?`<div style="color:var(--orange);margin-top:4px">บรรทัดแท็กในกล่องถูกแก้จนไม่ตรงกับ "${esc(roundMention)}" — ระบบหาไม่เจอเลยสลับให้ไม่ได้ ห้องอื่นจะได้แท็กเดิมติดไปด้วย</div>`:'');
+  if(!order.includes(window._raPvRoom)) window._raPvRoom=order[0];
+  const nameOf=id=>{ const cats=chCats[id], roomRaw=(AV_CATS[cats[0]]||{}).channel||'';
+    return (roomRaw&&roomRaw!=='-')?('#'+roomRaw):cats.map(c=>(AV_CATS[c]||{}).label||c).join(' + '); };
+  const bad=order.filter(id=>!_raCanTag(r, raw, chCats[id]));
+  const cur=window._raPvRoom, cats=chCats[cur];
+  const btns=order.map(id=>`<button type="button" class="btn btn-sm ${id===cur?'btn-blue':'btn-outline'}" style="padding:3px 10px;font-size:11.5px" onclick="window._raPvRoom='${esc(id)}';_raTagPreview('${esc(roundId)}')">${esc(nameOf(id))}${bad.includes(id)?' ⚠️':''}</button>`).join('');
+  box.innerHTML=`<div style="font-weight:700;margin-bottom:6px">👁 ดูข้อความจริงที่บอทจะโพสต์ในแต่ละห้อง (${order.length} ห้อง) — กดชื่อห้อง</div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px">${btns}</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">ห้อง ${esc(nameOf(cur))} · ทีม ${esc(cats.map(c=>(AV_CATS[c]||{}).label||c).join(' + '))} · แท็ก <strong style="color:var(--accent2)">${esc(_annMentionOfCats(cats)||'— (ยังไม่ได้ตั้งแท็กของทีมนี้)')}</strong></div>
+    <div style="white-space:pre-wrap;padding:9px 11px;background:var(--card);border:1px dashed var(--border2);border-radius:8px;font-size:12.5px;line-height:1.6;max-height:220px;overflow:auto">${esc(_raRoomText(r, raw, cats))}</div>`
+    + (bad.length?`<div style="color:var(--orange);margin-top:6px">⚠️ ในกล่องข้อความไม่มี <b>{แท็ก}</b> — ห้องที่มี ⚠️ จะไม่ถูกแท็กทีม · ใส่ {แท็ก} กลับไปตรงที่อยากให้แท็กขึ้น</div>`:'');
 }
 // 📤 โพสต์/อัปเดตประกาศหลายห้องพร้อมกัน — ห้องที่เคยโพสต์ = แก้โพสต์เดิม, ห้องใหม่ = โพสต์ใหม่
 async function postRoundAnnounceMulti(roundId){
@@ -5626,13 +5634,8 @@ async function postRoundAnnounceMulti(roundId){
     r.posts=Array.isArray(r.posts)?r.posts:(r.postedMessageId?[{channelId:r.channelId, messageId:r.postedMessageId}]:[]);
     for(const chId of chosen){
       // แทนแท็กทีมที่เปิดรอบ ด้วยแท็กของ "ทุกทีมที่ติ๊กในห้องนี้" (ห้องรวม = แท็กครบทุกทีม)
-      const want=_annMentionOfCats(chCats[chId]);
-      let perTxt=raw;
-      if(want && roundMention && want!==roundMention){
-        // แทนแบบตรงตัว — ถ้าแก้บรรทัดแท็กเองในกล่องจนไม่ตรง จะสลับไม่ได้ ต้องเตือนไว้
-        if(raw.includes(roundMention)) perTxt=raw.split(roundMention).join(want);
-        else noSwap++;
-      }
+      let perTxt=_raRoomText(r, raw, chCats[chId]);
+      if(!_raCanTag(r, raw, chCats[chId])) noSwap++;   // ไม่มี {แท็ก}/แท็กเดิมในข้อความ → ห้องนี้จะไม่ถูกแท็ก
       // แปลง "@ชื่อโรล" → <@&id> ให้ ping ได้จริง
       try{ perTxt=_prApplyRoleMentions(perTxt, roleMap); }catch(e){}
       const ex=r.posts.find(p=>p&&p.channelId===chId);
@@ -5657,8 +5660,11 @@ async function postRoundAnnounceMulti(roundId){
 }
 function _raCopy(){
   const el=document.getElementById('ra-text'); if(!el) return;
+  let txt=el.value;
+  try{ const r=getRound(_avRoundId)||getRounds().find(x=>x&&String(el.getAttribute('oninput')||'').includes(x.id)); const {chCats}=_raPickedRooms();
+    if(r && chCats[window._raPvRoom]) txt=_raRoomText(r, txt, chCats[window._raPvRoom]); }catch(e){}
   el.select();
-  try{ navigator.clipboard.writeText(el.value); toast('📋 คัดลอกแล้ว','success'); }
+  try{ navigator.clipboard.writeText(txt); toast('📋 คัดลอกข้อความของห้องที่เปิดดูอยู่แล้ว','success'); }
   catch(e){ try{ document.execCommand('copy'); toast('📋 คัดลอกแล้ว','success'); }catch(_){ toast('กด Ctrl+C เพื่อคัดลอก','info'); } }
 }
 // ยกเลิกการผูกกับโพสเดิม — ใช้ตอนโพสผิดห้อง หรืออยากโพสใหม่
@@ -32440,7 +32446,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20260928-31"></script><script src="scene/nd-profile.js?v=20260928-31"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20260929-02"></script><script src="scene/nd-profile.js?v=20260929-02"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32450,7 +32456,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20260928-31';
+var UPD_BUILD = '20260929-02';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;

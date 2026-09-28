@@ -325,14 +325,18 @@ async function adminSync(){
   if(data && changed.length){ saveStaffData(data); try{ logAudit('staff.selfsync','ระบบ','นำข้อมูลที่สมาชิกแก้เองเข้าทะเบียน: '+changed.join(', ')); }catch(e){} }
   renderRoleReqCard(users);
 }
-const _unlDone=new Set();   // ผูก/เอาออกแล้วในรอบนี้ → ซ่อนทันที ไม่ต้องรอข้อมูลจาก Firebase
+const _unlDone=window._unlDone=new Set();   // ผูก/เอาออกแล้วในรอบนี้ → ซ่อนทันที ไม่ต้องรอข้อมูลจาก Firebase
+// ปุ่ม ผูก/เอาออก ของการ์ดนี้อยู่นอกกล่องโค้ดนี้ → เปิดให้เรียกได้ (เดิมเรียกไม่ถึง = "_unlDone is not defined" / ผูกแล้วแถวไม่หาย)
+window.renderRoleReqCard=(u)=>renderRoleReqCard(u);
 function renderRoleReqCard(users){
   const pg=$('page-staff'); if(!pg) return;
   let box=$('ndp-rolereq'); if(!box){ box=document.createElement('div'); box.id='ndp-rolereq'; const h=pg.querySelector('.page-header'); pg.insertBefore(box, h?h.nextSibling:pg.firstChild); }
   const allU=users||ls('mgr_users_cache')||{};
   const reqs=Object.entries(allU).filter(([uid,u])=>u&&u.roleReq&&(((u.roleReq.add||[]).length)||((u.roleReq.del||[]).length)));
   // 🔗 บัญชีที่สมัครแล้วแต่ยังไม่ได้ผูกกับรายชื่อทีม → เห็นข้อมูลทีมไม่ได้จนกว่าแอดมินจะผูก
-  const unl=Object.entries(allU).filter(([uid,u])=>u && !u.staffId && u.role!=='admin' && u.role!=='manager' && !_unlDone.has(uid));
+  // แอดมิน/เจ้าของ (อีเมลแอดมินหลัก) ไม่ต้องผูกกับรายชื่อทีม → ไม่ขึ้นในการ์ดนี้
+  const ownerEm=new Set((safe(()=>KNOWN_ADMIN_EMAILS,[])||[]).map(e=>String(e).toLowerCase()));
+  const unl=Object.entries(allU).filter(([uid,u])=>u && !u.staffId && u.role!=='admin' && u.role!=='manager' && !ownerEm.has(String(u.email||'').toLowerCase()) && !_unlDone.has(uid));
   const unlHTML=unl.length?`<div class="ndp-card" style="margin-bottom:14px"><div class="ndp-ch"><h3>🔗 บัญชีที่ยังไม่ได้ผูกกับรายชื่อทีม</h3><span class="ndp-pill">${unl.length} บัญชี</span></div>
     <div class="ndp-cb"><div class="muted" style="margin-bottom:8px">บัญชีเหล่านี้ล็อกอินได้แต่ยังเห็นข้อมูลทีมไม่ได้ · ถ้าเป็นคนในทีม: ใส่อีเมลนี้ในข้อมูลสมาชิก ระบบจะผูกให้เอง หรือกด "ผูก" · ถ้าไม่รู้จัก: ลบบัญชีได้ที่ Firebase → Authentication</div>
     ${unl.map(([uid,u])=>{ const c=u.claimStaffId?safe(()=>getStaffById(u.claimStaffId),null):null;
