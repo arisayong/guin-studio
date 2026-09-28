@@ -51,7 +51,7 @@ const badge = id => `<span class="nav-badge hidden" id="${id}">0</span>`;
 const sec = t => `<div class="nd-sec"><span>${t}</span></div>`;
 const grp = (key, page, ic, label, items) =>
   `<div class="nd-grp" data-grp="${key}">
-     <div class="nav-item" onclick="nav('${page}')" data-tip="${esc(label)}">${svg(ic)}<span class="nd-lb">${esc(label)}</span><svg class="nd-chev" viewBox="0 0 24 24" data-grp-toggle="1"><path d="${P.chev}"/></svg></div>
+     <div class="nav-item" onclick="nav('${page}')" data-tip="${esc(label)}">${svg(ic)}<span class="nd-lb">${esc(label)}</span><span class="nav-badge nd-grp-badge hidden"></span><svg class="nd-chev" viewBox="0 0 24 24" data-grp-toggle="1"><path d="${P.chev}"/></svg></div>
      <div class="nd-sub"><div>${items}</div></div></div>`;
 const PROJMGR = [['alloc','alloc','จัดสรรคน','ลงคนตามคำตอบในรอบลงคิว'],['drive','drive','จัดไฟล์งาน','สร้างโฟลเดอร์งานในไดรฟ์'],['projroom','projroom','ห้องโปรเจกต์','ห้อง Discord + โพสต์คู่มืองาน']];
 const FIN = [['queue','payq','คิวจ่ายเงิน','จ่ายเงินทีม · ใบยืนยันยอด','queue-badge'],['payroll','payroll','รอบจ่ายรายเดือน','รวมยอดรายเดือนของแต่ละคน'],
@@ -180,6 +180,21 @@ function wireFolders(){
   document.addEventListener('mouseover',e=>{ const n=e.target.closest('.sidebar [data-tip]');
     if(!n || !document.body.classList.contains('sidebar-collapsed') || innerWidth<=768){ tip.classList.remove('show'); return; }
     const r=n.getBoundingClientRect(); tip.textContent=n.dataset.tip; tip.style.left=(r.right+10)+'px'; tip.style.top=(r.top+r.height/2)+'px'; tip.classList.add('show'); });
+}
+/* 🔴 โฟลเดอร์ที่พับอยู่ → รวมตัวเลขแจ้งเตือนของเมนูข้างในมาโชว์ที่ไอคอนโฟลเดอร์ (ย่อเมนูแล้วก็ยังเห็น) */
+function syncGrpBadges(){
+  document.querySelectorAll('.nd-grp').forEach(g=>{
+    const gb=g.querySelector(':scope>.nav-item>.nd-grp-badge'); if(!gb) return;
+    const n=[...g.querySelectorAll('.nd-sub .nav-badge')].filter(b=>!b.classList.contains('hidden'))
+      .reduce((t,b)=>t+(parseInt(b.textContent,10)||0),0);
+    const txt=n>99?'99+':String(n); if(gb.textContent!==txt) gb.textContent=txt;
+    gb.classList.toggle('hidden', !n);
+  });
+}
+function watchGrpBadges(){
+  let t=0; const run=()=>{ clearTimeout(t); t=setTimeout(syncGrpBadges,60); };
+  document.querySelectorAll('.nd-grp .nd-sub').forEach(sub=>new MutationObserver(run).observe(sub,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class']}));
+  run();
 }
 /* เปิดหน้าไหน → กางโฟลเดอร์ที่มีหน้านั้น */
 function syncFolders(page){
@@ -750,7 +765,7 @@ function init(){
   const host=document.createElement('div'); host.id='nd-bg-host';
   host.innerHTML='<div id="nd-backdrop"><div class="nd-bd-img"></div><div class="nd-bd-tint"></div></div>';
   document.body.insertBefore(host, document.body.firstChild);
-  buildNav(); wireFolders(); tidyProfileMenu(); addPasswordToSettings(); setupPrefs(); setupExtraPages();
+  buildNav(); wireFolders(); try{ watchGrpBadges(); }catch(e){} tidyProfileMenu(); addPasswordToSettings(); setupPrefs(); setupExtraPages();
   try{ sheetify(); }catch(e){ console.warn('sheetify',e); }
   // 🔔 กดครั้งเดียวแต่ระบบเดิมแจ้งเตือนซ้อน 2 ชั้น (เช่น Safe Mode) → ภายใน 0.7 วินาที เหลือข้อความล่าสุดอันเดียว
   if(typeof window.toast==='function'){ const _t=window.toast; let last=0;

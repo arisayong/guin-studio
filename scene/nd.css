@@ -480,3 +480,8 @@ body.safe-mode #page-profit>.nd-safe-note{display:flex;flex-direction:column;ali
 .nd-doc-a{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .nd-doc-amt{font-weight:800;color:var(--green);font-size:15px}
 @media (max-width:768px){ .nd-doc{flex-wrap:wrap} .nd-doc-a{flex-direction:row;align-items:center;width:100%;justify-content:space-between} }
+
+/* 🔴 ป้ายรวมของโฟลเดอร์ — โชว์เฉพาะตอนพับ (ตอนกางอยู่ เห็นป้ายของแต่ละเมนูข้างในแล้ว) */
+.sidebar .nd-grp.open>.nav-item>.nd-grp-badge{display:none!important}
+.sidebar .nd-grp>.nav-item>.nd-grp-badge{margin-right:4px!important}
+body.sidebar-collapsed .sidebar .nd-grp>.nav-item>.nd-grp-badge{margin:0!important}
