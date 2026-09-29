@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20260929-03"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20260930-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -5221,7 +5221,8 @@ async function pullFromDiscord(silent, allHistory){
     });
     // เก็บคนที่จับคู่ไม่ได้ไว้ให้แอดมินกดผูก
     const list=getRounds(); const rr=list.find(x=>x.id===r.id);
-    if(rr){ rr.unmatched=unDedup.slice(-40); rr.pulledAt=new Date().toISOString(); await saveRounds(list); }
+    if(rr){ const skip=new Set(rr.skippedAuthors||[]);   // 🙈 คนที่แอดมินกด "ข้าม" ไว้ในรอบนี้ → ไม่เด้งกลับมา
+      rr.unmatched=unDedup.filter(x=>!(x.authorId && skip.has(x.authorId))).slice(-40); rr.pulledAt=new Date().toISOString(); await saveRounds(list); }
     if(!silent){
       if(!totalFetched && skipped){
         // มีข้อความในห้องแต่เก่ากว่าเวลาที่เปิดรอบ — ถามว่าจะดึงย้อนหลังทั้งหมดไหม
@@ -5523,7 +5524,14 @@ async function createRound(){
   const pv=document.getElementById('nr-preview');
   const pvTxt=String(pv?pv.value:'').trim();
   if(pvTxt && pvTxt!==_raTok(r, roundAnnounceText(r))) r.announceText=pvTxt;
-  const list=getRounds(); list.unshift(r); await saveRounds(list);
+  const list=getRounds();
+  // 🧹 เปิดรอบใหม่ = เริ่มกระดานจัดสรรคนใหม่ — ปิดรอบเก่าที่ยังเปิดอยู่ของทีมเดียวกัน
+  //    (กันเมเนเจอร์เผลอลงคนที่เคยตอบว่าว่างในรอบก่อน · คำตอบเก่าไม่หาย เปิดดู/เปิดคืนได้ที่หน้าลงคิว)
+  let closedOld=0;
+  list.forEach(o=>{ if(o && o.status==='open'){ const oc=Array.isArray(o.targetCats)&&o.targetCats.length?o.targetCats:[o.cat];
+    if(oc.some(c=>checked.includes(c))){ o.status='closed'; o.closedAt=new Date().toISOString(); o.closedReason='เปิดรอบใหม่'; closedOld++; } } });
+  list.unshift(r); await saveRounds(list);
+  if(closedOld) toast('🧹 ปิดรอบเก่าของทีมเดียวกัน '+closedOld+' รอบ — กระดานจัดสรรคนเริ่มใหม่จากคำตอบรอบนี้','info');
   _avRoundId=r.id;
   logAudit('recruit.round', (AV_CATS[r.cat]||{}).label||r.cat, 'ขอคิว '+_roundRangeLabel(r));
   document.getElementById('tag-overlay')?.remove();
@@ -6057,6 +6065,16 @@ function _alcUnmatched(){
   getRounds().filter(r=>r.status==='open').forEach(r=>(r.unmatched||[]).forEach((m,i)=>out.push({r,m,i})));
   return out;
 }
+// 🙈 ไม่รู้ว่าเป็นใคร/ไม่ใช่คนในทีม → เอาออกจากกล่อง "ระบบไม่รู้ว่าเป็นใคร" ของรอบนั้น (ไม่ผูก ไม่บันทึกคำตอบ)
+//    จำ authorId ไว้ — ดึงคำตอบซ้ำในรอบเดิมจะไม่เด้งกลับมา
+async function alcSkipUnmatched(roundId, idx){
+  const list=getRounds(); const r=list.find(x=>x.id===roundId); if(!r) return;
+  const m=(r.unmatched||[])[idx]; if(!m) return;
+  if(!confirm('ข้าม "'+(m.displayName||m.username||'?')+'"?\n\nเอาออกจากรายการนี้ (ไม่ผูกกับใคร) · ถ้าเขาตอบในรอบถัดไปจะขึ้นมาให้ผูกอีกครั้ง')) return;
+  r.unmatched=(r.unmatched||[]).filter((_,j)=>j!==idx);
+  r.skippedAuthors=[...new Set([...(r.skippedAuthors||[]), m.authorId].filter(Boolean))];
+  await saveRounds(list); renderAlloc();
+}
 // ผูกชื่อ Discord กับทีมงาน — จำถาวร (staff.discordId) + บันทึกคำตอบของเขาเข้ารอบทันที
 async function alcLinkUnmatched(roundId, idx){
   const sel=document.getElementById('alc-un-'+roundId+'-'+idx);
@@ -6349,7 +6367,10 @@ function renderAlloc(){
         const m=u.m;
         const pre=(m.options&&m.options[0]&&m.options[0].id)||'';
         return '<div style="margin-bottom:9px">'
-          +'<div style="font-size:12px;font-weight:700">💬 '+esc(m.displayName||m.username||'?')+'</div>'
+          +'<div style="font-size:12px;font-weight:700">💬 '+esc(m.displayName||m.username||'?')
+            +'<span style="font-weight:400;color:var(--text2);font-size:11px">'+(m.username&&m.username!==m.displayName?' · @'+esc(m.username):'')
+            +(m.at?' · ตอบเมื่อ '+esc(new Date(m.at).toLocaleDateString('th-TH',{day:'numeric',month:'short'})):'')
+            +' · รอบ '+esc(_roundRangeLabel(u.r))+'</span></div>'
           +(m.noContent
             ?'<div style="font-size:11px;color:var(--orange);margin:2px 0 5px">⚠️ บอทอ่านเนื้อความไม่ได้ — เปิดสิทธิ์ MESSAGE CONTENT INTENT แล้วดึงใหม่</div>'
             :'<div style="font-size:11px;color:var(--text2);margin:2px 0 5px">“'+esc(String(m.content||'').slice(0,100))+'”</div>')
@@ -6359,6 +6380,7 @@ function renderAlloc(){
           +staffOpts.map(s=>'<option value="'+esc(s.id)+'"'+(s.id===pre?' selected':'')+'>'+esc(s.nickname||s.name||s.id)+'</option>').join('')
           +'</select>'
           +'<button class="btn btn-sm btn-blue" onclick="alcLinkUnmatched(\''+esc(u.r.id)+'\','+u.i+')">🔗 ผูก</button>'
+          +'<button class="btn btn-sm btn-outline" title="ไม่รู้จัก/ไม่ใช่คนในทีม — เอาออกจากรายการนี้" onclick="alcSkipUnmatched(\''+esc(u.r.id)+'\','+u.i+')">🙈 ข้าม</button>'
           +'</div></div>';
       }).join('')
       +'</div>'
@@ -7397,7 +7419,7 @@ function _prRoomView(p){
             </select>
           </div>
           <span class="pr2-tool tpl" onclick="prSaveAsTemplate('${esc(p.id)}')" title="เก็บข้อความนี้ไว้เป็นเทมเพลตใช้ซ้ำกับงานอื่น">💾 บันทึกเป็นเทมเพลต</span>
-          <span class="pr2-tool" style="margin-left:auto" onclick="prInsertMention()" title="แทรกแท็กคน — คนที่ผูก Discord แล้ว ping จริง">👤 แท็กคน</span>
+          <span class="pr2-tool" style="margin-left:auto" onclick="prInsertMention()" title="แทรกแท็กคน — คนที่ผูก Discord แล้ว ping จริง · หรือพิมพ์ @ ในกล่องข้อความได้เลย">👤 แท็กคน <span style="font-size:10.5px;opacity:.7">(หรือพิมพ์ @)</span></span>
           ${currentUser?.role==='admin'?`<span class="pr2-tool" onclick="openProjPostTplEditor()" title="เพิ่ม/แก้/ลบชุดเทมเพลต">⚙️</span>`:''}
         </div>
         <textarea id="pr-post" class="pr2-ta" oninput="_prAutoGrow(this);prAutosave('${esc(p.id)}')" onblur="setTimeout(_prRenderIfPending,120)">${esc(cur.text||'')}</textarea>
@@ -7937,6 +7959,79 @@ function prPickMention(staffId){
   ta.focus();
   ta.selectionStart=ta.selectionEnd=pos.s+tag.length+1;
 }
+// ══ @ แท็กคนแบบพิมพ์ในกล่องโพสต์ (เหมือน Discord) ══
+//    พิมพ์ @ → ขึ้นรายชื่อทีมของงานนี้ตรงจุดที่พิมพ์ (ไม่ต้องเลื่อนขึ้นไปกดปุ่มแท็กคน) · ↑↓ เลือก · Enter/Tab แทรก · Esc ปิด
+function _prAtTag(s){ return s.discordId?('<@'+s.discordId+'>'):('@'+(s.nickname||s.name||'')); }
+function _prAtTeam(){
+  const proj=getProjects().find(x=>x.id===_prSel); if(!proj) return [];
+  const ids=[...new Set([...(proj.workers||[]).map(w=>w&&w.id), proj.managerId].filter(Boolean))];
+  const roleOf=id=>[...new Set((proj.workers||[]).filter(w=>w&&w.id===id).map(w=>(_SWAP_ROLE_TH[(w.slot||'').split('-')[0]]||'').replace(/^\S+\s/,'')).filter(Boolean))].join(' · ');
+  return ids.map(id=>{ const st=getStaffById(id); return st?{s:st, role:roleOf(id)||(id===proj.managerId?'เมเนเจอร์':'')}:null; }).filter(Boolean);
+}
+// ตำแหน่งเคอร์เซอร์บนจอ (สร้างกล่องเงาที่หน้าตาเหมือน textarea แล้ววัด)
+function _prCaretXY(ta){
+  const cs=getComputedStyle(ta), d=document.createElement('div');
+  ['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','paddingTop','paddingRight','paddingBottom','paddingLeft','borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth','boxSizing','wordSpacing','tabSize'].forEach(k=>d.style[k]=cs[k]);
+  d.style.position='absolute'; d.style.visibility='hidden'; d.style.whiteSpace='pre-wrap'; d.style.wordWrap='break-word'; d.style.width=ta.clientWidth+'px'; d.style.left='-9999px'; d.style.top='0';
+  d.textContent=ta.value.slice(0, ta.selectionStart); const m=document.createElement('span'); m.textContent='\u200b'; d.appendChild(m);
+  document.body.appendChild(d); const r=ta.getBoundingClientRect();
+  const x=r.left+m.offsetLeft-ta.scrollLeft, y=r.top+m.offsetTop-ta.scrollTop+(parseFloat(cs.lineHeight)||18);
+  d.remove(); return {x, y};
+}
+let _prAt=null;   // {start, q, items, idx}
+function _prAtClose(){ _prAt=null; document.getElementById('pr-at-pop')?.remove(); }
+function _prAtCheck(ta){
+  const pos=ta.selectionStart, before=ta.value.slice(0,pos);
+  const m=before.match(/(^|[\s(（\[])@([^\s@<>]{0,24})$/);
+  if(!m){ _prAtClose(); return; }
+  const q=m[2].toLowerCase(), team=_prAtTeam();
+  let items=team.filter(o=>!q || String((o.s.nickname||'')+' '+(o.s.name||'')).toLowerCase().includes(q));
+  items=items.map(o=>({type:'one', ...o}));
+  if(team.length>1 && (!q || 'ทั้งทีม ทุกคน all'.includes(q))) items.unshift({type:'all', team});
+  if(!items.length){ _prAtClose(); return; }
+  _prAt={start:pos-m[2].length-1, q, items, idx:0};
+  _prAtRender(ta);
+}
+function _prAtRender(ta){
+  let pop=document.getElementById('pr-at-pop');
+  if(!pop){ pop=document.createElement('div'); pop.id='pr-at-pop'; document.body.appendChild(pop);
+    pop.addEventListener('mousedown',e=>{ e.preventDefault(); const it=e.target.closest('[data-i]'); if(it){ _prAt.idx=+it.dataset.i; _prAtPick(); } }); }
+  const {x,y}=_prCaretXY(ta);
+  pop.style.cssText='position:fixed;z-index:450;min-width:230px;max-width:320px;max-height:260px;overflow-y:auto;background:var(--card);border:1px solid var(--border2);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.45);padding:4px;font-size:12.5px';
+  pop.innerHTML='<div style="font-size:10.5px;color:var(--text2);padding:4px 8px 5px">แท็กคนในทีมของงานนี้ · ↑↓ เลือก · Enter แทรก</div>'
+    + _prAt.items.map((o,i)=>`<div data-i="${i}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;cursor:pointer;${i===_prAt.idx?'background:rgba(21,101,255,.22)':''}">`
+      + (o.type==='all'
+        ? `<span style="font-weight:700">👥 แท็กทั้งทีม</span><span style="font-size:10.5px;color:var(--text2);margin-left:auto">${o.team.length} คน</span>`
+        : `<span style="font-weight:700">${esc(o.s.nickname||o.s.name)}</span><span style="font-size:10.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.role||'')}</span><span style="margin-left:auto;font-size:10px;${o.s.discordId?'':'color:var(--orange)'}">${o.s.discordId?'🔗':'ยังไม่ผูก'}</span>`)
+      + '</div>').join('');
+  const w=pop.offsetWidth||240, h=pop.offsetHeight||200;
+  let left=Math.min(x, innerWidth-w-8), top=y+4;
+  if(top+h>innerHeight-8) top=Math.max(8, y-(parseFloat(getComputedStyle(ta).lineHeight)||18)-h-6);   // ล้นจอล่าง → ขึ้นเหนือบรรทัด
+  pop.style.left=Math.max(8,left)+'px'; pop.style.top=top+'px';
+  pop.querySelector(`[data-i="${_prAt.idx}"]`)?.scrollIntoView({block:'nearest'});
+}
+function _prAtPick(){
+  const ta=document.getElementById('pr-post'); if(!ta||!_prAt) return;
+  const o=_prAt.items[_prAt.idx]; if(!o) return;
+  const tag=o.type==='all' ? o.team.map(t=>_prAtTag(t.s)).join(' ') : _prAtTag(o.s);
+  const end=ta.selectionStart, start=_prAt.start;
+  ta.value=ta.value.slice(0,start)+tag+' '+ta.value.slice(end);
+  const c=start+tag.length+1; ta.focus(); ta.selectionStart=ta.selectionEnd=c;
+  _prAtClose();
+  ta.dispatchEvent(new Event('input',{bubbles:true}));   // เก็บร่างอัตโนมัติ + ขยายกล่องเหมือนพิมพ์เอง
+}
+document.addEventListener('input', e=>{ if(e.target && e.target.id==='pr-post'){ if(e.isTrusted) _prAtCheck(e.target); } });
+document.addEventListener('keydown', e=>{
+  if(!_prAt || !e.target || e.target.id!=='pr-post') return;
+  const n=_prAt.items.length;
+  if(e.key==='ArrowDown'){ e.preventDefault(); _prAt.idx=(_prAt.idx+1)%n; _prAtRender(e.target); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); _prAt.idx=(_prAt.idx-1+n)%n; _prAtRender(e.target); }
+  else if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); _prAtPick(); }
+  else if(e.key==='Escape'){ e.preventDefault(); _prAtClose(); }
+}, true);
+document.addEventListener('click', e=>{ if(_prAt && !(e.target.closest&&(e.target.closest('#pr-at-pop')||e.target.id==='pr-post'))) _prAtClose(); });
+document.addEventListener('focusout', e=>{ if(e.target && e.target.id==='pr-post') setTimeout(()=>{ if(document.activeElement?.id!=='pr-post') _prAtClose(); },150); });
+window.addEventListener('scroll', ()=>{ if(_prAt){ const ta=document.getElementById('pr-post'); if(ta) _prAtRender(ta); } }, true);
 // ══ 🔄 สลับคนทำงาน — เปลี่ยนคนในโปรเจกต์ + สลับสิทธิ์ห้องดิส (เอาคนเก่าออก ดึงคนใหม่เข้า) จบในกล่องเดียว ══
 const _SWAP_ROLE_TH={dub:'🎤 พากย์',adp:'✍️ บท',mix:'🎧 มิกซ์',qc:'✅ QC',sub:'🎬 ซับ',trn:'🌐 แปล',mgr:'🗂️ เมเนเจอร์'};
 function openSwapWorker(projId){
@@ -30839,7 +30934,10 @@ function teamMemberCardHTML(s, col, viewer){
           ${wc?`<span title="ใบเตือน" style="padding:1px 7px;border-radius:8px;background:rgba(255,64,64,.15);color:#FF6060;font-size:10px;font-weight:700;margin-left:4px">⚠️${wc}</span>`:''}
           ${ac?`<span title="ใบชื่นชม" style="padding:1px 7px;border-radius:8px;background:rgba(255,199,0,.15);color:#FFC700;font-size:10px;font-weight:700;margin-left:4px">⭐${ac}</span>`:''}
         </div>
-        ${s.promptpay?`<div style="font-size:11px;color:var(--text2)">${esc(s.promptpay)}</div>`:''}
+        ${(()=>{ // 📞 เบอร์โทร — เมเนเจอร์เห็นด้วย (เบอร์ไม่ใช่ข้อมูลการเงิน) · พร้อมเพย์เป็นข้อมูลส่วนตัว โชว์แทนเฉพาะแอดมินเมื่อไม่มีเบอร์
+          const tel=String(s.phone||(s.profile&&s.profile.phone)||'').trim(), pp=viewer==='admin'?String(s.promptpay||'').trim():'';
+          if(tel) return `<div style="font-size:11px;color:var(--text2)">📞 <a href="tel:${esc(tel.replace(/[^0-9+]/g,''))}" onclick="event.stopPropagation()" style="color:inherit">${esc(tel)}</a></div>`;
+          return pp?`<div style="font-size:11px;color:var(--text2)" title="เบอร์พร้อมเพย์ (ยังไม่มีเบอร์โทรในข้อมูลสมาชิก)">${esc(pp)}</div>`:''; })()}
         ${(rank===''&&s.email)?`<div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(s.email)}">📧 ${esc(s.email)}</div>`:''}
         ${s.social?(()=>{const u=_extractUrls(s.social)[0];return `<div style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(s.social)}">${u?`<a href="${esc(u)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--accent2)">📱 ${esc(s.social)}</a>`:`<span style="color:var(--text2)">📱 ${esc(s.social)}</span>`}</div>`;})():''}
         ${staffTagChipsHTML(s)}
@@ -32446,7 +32544,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20260929-03"></script><script src="scene/nd-profile.js?v=20260929-03"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20260930-01"></script><script src="scene/nd-profile.js?v=20260930-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32456,7 +32554,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20260929-03';
+var UPD_BUILD = '20260930-01';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;

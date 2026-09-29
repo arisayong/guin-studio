@@ -187,7 +187,10 @@ function render(host){
     <div class="ndp-savebar" id="ndp-savebar"><span>มีการแก้ไขที่ยังไม่บันทึก</span><button class="btn btn-outline" type="button" id="ndp-undo">ยกเลิก</button><button class="btn btn-blue" type="button" id="ndp-save">💾 บันทึก</button></div>`;
   wire(host);
 }
-function markDirty(){ ST.dirty=true; $('ndp-savebar')?.classList.add('show'); }
+function topSaveState(){ const on=!!(ST&&ST.dirty&&ST.mode==='admin');
+  ['ndp-top-save','ndp-top-undo'].forEach(id=>{ const b=$(id); if(b) b.disabled=!on; });
+  const h=$('ndp-top-hint'); if(h){ h.textContent=on?'● มีการแก้ไขที่ยังไม่บันทึก':'แก้ในช่องได้เลย แล้วกดบันทึก'; h.style.color=on?'var(--orange)':'var(--text2)'; } }
+function markDirty(){ ST.dirty=true; $('ndp-savebar')?.classList.add('show'); topSaveState(); }
 function wire(host){
   host.querySelectorAll('[data-f]').forEach(el=>{ el.addEventListener('input',()=>{ ST.vals[el.dataset.f]=el.value; markDirty(); }); el.addEventListener('change',()=>{ ST.vals[el.dataset.f]=el.value; markDirty(); }); });
   host.querySelectorAll('[data-role]').forEach(el=>el.addEventListener('change',()=>{ const c=el.dataset.role;
@@ -232,6 +235,7 @@ async function open(mode, staffId){
   const other=mode==='admin'?$('ndp-self-body'):$('sd-body-1');
   if(other && other!==host && other.querySelector('#ndp-savebar')) other.innerHTML='';
   if(host) render(host);
+  topSaveState();
 }
 
 /* ─── บันทึก ─── */
@@ -383,7 +387,8 @@ function init(){
       const r=orig.apply(this,arguments);
       try{ if(typeof _sdTab!=='undefined' && _sdTab===1 && CU()&&CU().role==='admin'){
         const b1=$('sd-body-1'); const keep=b1?[...b1.querySelectorAll('.table-wrap')].filter(el=>/ใบเตือน|ใบชื่นชม/.test((el.textContent||'').slice(0,60))):[];
-        const act=$('sd-edit-actions'); if(act) act.innerHTML='';
+        // 💾 ปุ่มบันทึกมุมขวาบนให้เห็นตลอด (กดได้เมื่อมีการแก้) — ไม่ต้องเลื่อนหาแถบล่าง · ไม่มีเซฟอัตโนมัติ
+        const act=$('sd-edit-actions'); if(act) act.innerHTML=`<span id="ndp-top-hint" style="font-size:11.5px;color:var(--text2);align-self:center">แก้ในช่องได้เลย แล้วกดบันทึก</span><button class="btn btn-outline btn-sm" type="button" id="ndp-top-undo" disabled onclick="document.getElementById('ndp-undo')?.click()">ยกเลิก</button><button class="btn btn-blue" type="button" id="ndp-top-save" disabled onclick="document.getElementById('ndp-save')?.click()">💾 บันทึก</button>`;
         open('admin', _detailStaffId).then(()=>{ const slot=$('ndp-warn-slot'); if(slot) keep.forEach(el=>slot.appendChild(el)); });
       } }catch(e){ console.warn('nd profile admin',e); }
       return r; };
