@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20260930-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261001-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -4146,9 +4146,21 @@ var _privSplitOn = false;   // true = ทะเบียนทีมบน Fireb
 const _PRIV_TOP=['bank','account','accName','promptpay','qrUrl','payType','taxId','addr','moo','sub','dist','prov','zip','birth','adminPhoto','adminPhotoAt'];
 const _PRIV_PF=['bank','account','accName','promptpay','qrUrl','payType','taxId','addr','moo','sub','dist','prov','zip','birth'];
 const _privHas=v=>v!==undefined && v!==null && v!=='';
+// 📞 เบอร์โทรให้เมเนเจอร์เห็นได้ — หลายคนเก็บเบอร์ไว้ในช่อง "เบอร์ / พร้อมเพย์" (ข้อมูลส่วนตัว เมเนเจอร์อ่านไม่ได้)
+//    ถ้าไม่มีช่องเบอร์แยก และพร้อมเพย์เป็นเบอร์มือถือ (0 + 9 หลัก) → คัดเป็น phone ในทะเบียน (เลขบัญชี/เลขบัตร ไม่แตะ)
+function _staffPublicPhone(s){
+  if(!s) return '';
+  const own=String(s.phone||(s.profile&&s.profile.phone)||'').trim(); if(own) return own;
+  const pp=String(s.promptpay||(s.profile&&s.profile.promptpay)||'').replace(/[^0-9]/g,'');
+  return /^0[0-9]{9}$/.test(pp) ? pp.replace(/^(\d{3})(\d{3})(\d{4})$/,'$1-$2-$3') : '';
+}
 function _staffSplitOne(s){
   if(!s || typeof s!=='object') return [s, null];
   const c={...s}, p={}; let any=false;
+  if(!c.phone || c.phoneFromPP){   // phoneFromPP = เบอร์ที่ระบบคัดมาจากพร้อมเพย์ → อัปเดตตามได้ · เบอร์ที่กรอกเองไม่แตะ
+    const ph=_staffPublicPhone({...s, phone:c.phoneFromPP?'':s.phone});
+    if(ph){ c.phone=ph; if(!(s.profile&&s.profile.phone) && !(s.phone&&!s.phoneFromPP)) c.phoneFromPP=true; else delete c.phoneFromPP; }
+    else if(c.phoneFromPP){ delete c.phone; delete c.phoneFromPP; } }
   _PRIV_TOP.forEach(k=>{ if(_privHas(c[k])){ p[k]=c[k]; any=true; } delete c[k]; });
   if(c.profile && typeof c.profile==='object'){
     const cp={...c.profile}, pp={};
@@ -4194,6 +4206,7 @@ async function _loadStaffPrivate(){
       setTimeout(()=>{ try{ _autoLinkStaffIds(); }catch(e){} }, 6000);
       setTimeout(()=>{ try{ _syncStaffDocs(); }catch(e){} }, 12000);   // 📄 สำเนาใบสำคัญจ่ายให้สต๊าฟ (รวมใบเก่า)
       setTimeout(async()=>{ try{ await _pullDocSig(); await _pushDocSig(); }catch(e){} }, 15000);   // ✍️ ลายเซ็นท้ายใบให้สต๊าฟเห็นเหมือนกัน
+      setTimeout(()=>{ try{ _syncPublicPhones(); }catch(e){} }, 18000);   // 📞 เบอร์โทรให้เมเนเจอร์เห็น
       if(_staffPrivListening) return; _staffPrivListening=true;
       _fbDatabase.ref('staffPrivate').on('value', sn=>_staffPrivApply(sn.exists()?sn.val():{}), e=>console.warn('staffPrivate:', e.message));
     } else if(currentUser.staffId){
@@ -4202,6 +4215,18 @@ async function _loadStaffPrivate(){
       if(sn.exists()) _staffPrivApply({[currentUser.staffId]: sn.val()});
     }
   }catch(e){ /* ยังไม่ได้เพิ่มสิทธิ์ใน Firebase — ใช้ข้อมูลเดิมไปก่อน */ }
+}
+// 📞 แอดมิน: เติมเบอร์โทร (จากพร้อมเพย์ที่เป็นเบอร์มือถือ) เข้าทะเบียนที่เมเนเจอร์อ่านได้ — ทำเฉพาะเมื่อมีคนที่ยังขาด
+async function _syncPublicPhones(){
+  if(currentUser?.role!=='admin' || !_fbDatabase || !_privSplitOn) return;
+  const sn=await _fbDatabase.ref('staff').get(); if(!sn.exists()) return;
+  const pub=sn.val()||{}, have={};
+  Object.values(pub).forEach(a=>(Array.isArray(a)?a:Object.values(a||{})).forEach(x=>{ if(x&&x.id&&x.phone) have[x.id]=1; }));
+  const need=getAllStaff().filter(x=>x&&x.id&&!have[x.id]&&_staffPublicPhone(x));
+  if(!need.length) return;
+  await saveStaffData(getStaffData());
+  try{ logAudit('staff.edit','ระบบ','เติมเบอร์โทรให้เมเนเจอร์เห็น '+need.length+' คน'); }catch(e){}
+  console.log('📞 เติมเบอร์โทรในทะเบียน', need.length, 'คน');
 }
 // 🔗 แอดมิน: บัญชีที่ยังไม่ผูก (สมัครเอง) → ผูกกับรายชื่อทีมให้เมื่ออีเมลตรงกับที่แอดมินบันทึกไว้เท่านั้น
 async function _autoLinkStaffIds(){
@@ -30935,7 +30960,7 @@ function teamMemberCardHTML(s, col, viewer){
           ${ac?`<span title="ใบชื่นชม" style="padding:1px 7px;border-radius:8px;background:rgba(255,199,0,.15);color:#FFC700;font-size:10px;font-weight:700;margin-left:4px">⭐${ac}</span>`:''}
         </div>
         ${(()=>{ // 📞 เบอร์โทร — เมเนเจอร์เห็นด้วย (เบอร์ไม่ใช่ข้อมูลการเงิน) · พร้อมเพย์เป็นข้อมูลส่วนตัว โชว์แทนเฉพาะแอดมินเมื่อไม่มีเบอร์
-          const tel=String(s.phone||(s.profile&&s.profile.phone)||'').trim(), pp=viewer==='admin'?String(s.promptpay||'').trim():'';
+          const tel=_staffPublicPhone(s), pp=viewer==='admin'?String(s.promptpay||'').trim():'';
           if(tel) return `<div style="font-size:11px;color:var(--text2)">📞 <a href="tel:${esc(tel.replace(/[^0-9+]/g,''))}" onclick="event.stopPropagation()" style="color:inherit">${esc(tel)}</a></div>`;
           return pp?`<div style="font-size:11px;color:var(--text2)" title="เบอร์พร้อมเพย์ (ยังไม่มีเบอร์โทรในข้อมูลสมาชิก)">${esc(pp)}</div>`:''; })()}
         ${(rank===''&&s.email)?`<div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(s.email)}">📧 ${esc(s.email)}</div>`:''}
@@ -32544,7 +32569,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20260930-01"></script><script src="scene/nd-profile.js?v=20260930-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261001-01"></script><script src="scene/nd-profile.js?v=20261001-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32554,7 +32579,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20260930-01';
+var UPD_BUILD = '20261001-01';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
