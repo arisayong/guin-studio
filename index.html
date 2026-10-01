@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261001-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261001-02"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -17855,7 +17855,7 @@ function renderQueue() {
   function actionBtns(pid, wid, slot, status, clientPaid, w) {
     const a = `'${pid}','${wid}','${slot}'`;
     const _s = getStaffById(wid), _p = getProjects().find(x=>x.id===pid);
-    const title = (_s?.nickname||_s?.name||'') + (_p ? ' · '+_p.name : '');
+    const title = (_s?.nickname||_s?.name||'') + (_p ? ' · '+projDisp(_p) : '');
     const cs = w ? getWorkerConfirmStatus(w) : 'none';
     const inBox = isInConfirmCart(pid, wid, slot);
     const editAmt  = {t:'💰 แก้ยอด', js:`openPayAmt(${a})`};
@@ -17941,7 +17941,7 @@ function renderQueue() {
     else if (_late)          headerStatus = _qBtn('↻ ตามทีมที่ค้าง','nq-orange',_expand,'มีใบที่ส่งไปเกิน 3 วัน — เปิดดูรายคนเพื่อส่งซ้ำ');
     else                     headerStatus = _qTag(`⏳ รอทีมยืนยัน ${_live.length-_sent.length}/${_live.length}`,'nq-wait');
     const cancelableCount = g.workers.filter(w => w.status!=='paid' && ['sent','confirmed'].includes(getWorkerConfirmStatus(w))).length;
-    const headerMore = _qMoreBtn(p.name, [
+    const headerMore = _qMoreBtn(projDisp(p), [
       (!clientPaid && _toBox.length) ? {t:`📦 บันทึกทั้งทีมเข้ากล่องก่อน (${_toBox.length})`, js:`qBoxAll('${p.id}')`} : null,
       (_confirmCart.size && !(clientPaid && !_rej.length && !_toBox.length && _inBox.length)) ? {t:`📤 เปิดกล่อง · ส่งใบยืนยันยอด (${_confirmCart.size})`, js:'openConfirmCart()'} : null,
       (!clientPaid && _conf.length) ? {t:`💸 จ่ายทีมก่อนลูกค้าจ่าย (${_conf.length})`, js:`qPayAll('${p.id}')`} : null,
@@ -18043,7 +18043,7 @@ function renderQueue() {
            onclick="toggleQueueGroup('${groupId}')">
         <div class="qgroup-r1" style="display:contents">
           <div class="qgroup-title" style="flex:1">
-            <div style="font-weight:800;font-size:15px">${p.name}</div>
+            <div style="font-weight:800;font-size:15px;display:flex;align-items:center;gap:7px;flex-wrap:wrap">${projCode(p)?`<span style="font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:6px;background:rgba(21,101,255,.18);color:var(--accent2);border:1px solid rgba(21,101,255,.35)">${esc(projCode(p))}</span>`:''}<span>${esc(p.name&&p.name!==projCode(p)?p.name:(projCode(p)?'':(p.name||'(ไม่มีชื่อ)')))}</span></div>
             <div style="font-size:11px;color:var(--text2);margin-top:3px">
               ${p.client||''}${p.type?' · '+p.type:''} ${p.deadline?'· Deadline: '+fmtDate(p.deadline):''} · ${clientChip}
             </div>
@@ -32569,7 +32569,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261001-01"></script><script src="scene/nd-profile.js?v=20261001-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261001-02"></script><script src="scene/nd-profile.js?v=20261001-02"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32579,7 +32579,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261001-01';
+var UPD_BUILD = '20261001-02';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
