@@ -302,6 +302,9 @@ async function saveAdmin(v){
   if(ST.pendingPhoto){ if(ST.pendingPhoto==='__REMOVE__'){ delete merged.adminPhoto; delete merged.adminPhotoAt; } else { merged.adminPhoto=ST.pendingPhoto; merged.adminPhotoAt=at; } }
   writeStaff(merged, merged.categories);
   if(sysRole){ try{ await applyStaffRole(s.id, sysRole); }catch(e){} }
+  // ✉️ เปลี่ยนอีเมล → ผูกบัญชีที่ใช้อีเมลใหม่ให้ทันที (+ ยกเลิกผูกบัญชีอีเมลเก่า) ไม่ต้องรอเปิดเว็บใหม่
+  if(String(s.email||'').trim().toLowerCase()!==String(merged.email||'').trim().toLowerCase()){
+    setTimeout(()=>{ try{ if(typeof _autoLinkStaffIds==='function') _autoLinkStaffIds(); }catch(e){} }, 1500); }
   if(ST.acct && db){ try{ const pf={...readVals(), _at:at}; delete pf.email; await db.ref('private/'+ST.acct.uid+'/profile').set(pf);
       const uc=ls('mgr_users_cache')||{}; if(uc[ST.acct.uid]){ uc[ST.acct.uid].profile=pf; ls('mgr_users_cache',uc); } }catch(e){ console.warn('profile mirror',e); } }
   try{ logAudit('staff.edit', v.nickname, 'แก้ข้อมูลสมาชิก (หน้าโปรไฟล์)'); }catch(e){}
@@ -422,9 +425,15 @@ window.ndUnlinkedRemove=async function(uid){
 window.ndLinkStaff=async function(uid, staffId){
   const db=(typeof _fbDatabase!=='undefined')?_fbDatabase:null; if(!db) return;
   const s=(typeof getStaffById==='function')?getStaffById(staffId):null;
-  if(!confirm('ผูกบัญชีนี้กับ "'+(s?(s.nickname||s.name):staffId)+'"?\n\nบัญชีนี้จะเห็นงาน/ยอดเงิน/ข้อมูลส่วนตัวของคนนี้ — เช็คให้แน่ใจว่าเป็นคนเดียวกัน')) return;
+  const _uc0=ls('mgr_users_cache')||{};
+  const olds=Object.entries(_uc0).filter(([ou,o])=>ou!==uid && o && o.staffId===staffId && o.role!=='admin');
+  if(!confirm('ผูกบัญชีนี้กับ "'+(s?(s.nickname||s.name):staffId)+'"?'+(olds.length?'\n\n• บัญชีเดิมของคนนี้ ('+olds.map(([ou,o])=>o.email||ou).join(', ')+') จะถูกยกเลิกผูก — ใช้ตอนเปลี่ยนอีเมล':'')+'\n\nบัญชีนี้จะเห็นงาน/ยอดเงิน/ข้อมูลส่วนตัวของคนนี้ — เช็คให้แน่ใจว่าเป็นคนเดียวกัน')) return;
   try{ await db.ref('users/'+uid+'/staffId').set(staffId); await db.ref('users/'+uid+'/claimStaffId').remove();
-    const uc=ls('mgr_users_cache')||{}; if(uc[uid]){ uc[uid].staffId=staffId; delete uc[uid].claimStaffId; try{ ls('mgr_users_cache',uc); }catch(e){} }
+    try{ await db.ref('users/'+uid+'/noAutoLink').remove(); }catch(e){}
+    const uc=ls('mgr_users_cache')||{};
+    for(const [ou] of olds){ try{ await db.ref('users/'+ou+'/staffId').remove(); await db.ref('users/'+ou+'/noAutoLink').set(true); if(uc[ou]){ delete uc[ou].staffId; uc[ou].noAutoLink=true; } }catch(e){} }
+    if(uc[uid]){ uc[uid].staffId=staffId; delete uc[uid].claimStaffId; delete uc[uid].noAutoLink; }
+    try{ ls('mgr_users_cache',uc); }catch(e){}
     try{ logAudit('staff.link', s?(s.nickname||s.name):staffId, 'แอดมินผูกบัญชีกับรายชื่อทีม'); }catch(e){}
     toast('🔗 ผูกบัญชีแล้ว','success');
     _unlDone.add(uid); try{ renderRoleReqCard(uc); }catch(e){ console.warn('renderRoleReqCard',e); }
