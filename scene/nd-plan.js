@@ -546,6 +546,22 @@ function atRender(ta){ document.getElementById('pl-at')?.remove(); if(!AT||!AT.l
   d.innerHTML=AT.list.map((s,i)=>`<div class="${i===AT.i?'on':''}" onmousedown="event.preventDefault();NDP.atPick(${i})">${av(s.nickname||s.name)}${esc(s.nickname||s.name)}${s.discordId?'':' <small class="pl-mut">(ไม่มีดิส)</small>'}</div>`).join('');
   document.body.appendChild(d); }
 
+/* ── ตัวเลือกโปรเจกต์ (ค้นชื่อ/รหัสได้) ── */
+let pjOpen=false, pjQ='';
+const pjLabel=p=>safe(()=>projDisp(p),p.name)||p.name||p.id;
+const pjCode=p=>String(safe(()=>projCode(p),'')||'');
+function projPicker(projs){ const cur=projs.find(p=>p.id===S.id)||S.src;
+  const q=pjQ.trim().toLowerCase(), adm=isAdm();
+  const hit=p=>!q||[pjLabel(p),pjCode(p),p.name,p.clientCode,adm?p.client:''].some(v=>String(v||'').toLowerCase().includes(q));
+  const list=projs.filter(hit).sort((a,b)=>(a.projStatus==='cancelled')-(b.projStatus==='cancelled')||String(b.deadline||'').localeCompare(String(a.deadline||'')));
+  const stLbl=p=>p.projStatus==='cancelled'?'<small class="pl-bad">ยกเลิก</small>':p.projStatus==='done'?'<small class="pl-ok">เสร็จแล้ว</small>':(p.deadline?`<small>🏁 ${fd(dOnly(p.deadline))}</small>`:'');
+  return `<div style="position:relative;width:420px;max-width:100%" onclick="event.stopPropagation()">
+    <div class="form-input form-select" style="cursor:pointer;display:flex;align-items:center;gap:8px" onclick="NDP.pjToggle()"><b style="color:var(--accent2)">${esc(pjCode(cur))}</b><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cur.name&&cur.name!==pjCode(cur)?cur.name:'')}</span></div>
+    ${pjOpen?`<div class="pl-dd" style="width:100%;max-height:380px">
+      <input class="form-input" id="pl-pjq" style="padding:6px 9px;margin-bottom:5px" placeholder="🔍 ค้นชื่อเรื่อง หรือรหัส (เช่น M06)${adm?' / ลูกค้า':''}" value="${esc(pjQ)}" oninput="NDP.pjQ(this.value)" onkeydown="if(event.key==='Enter'){const f=document.querySelector('#nd-plan-body .pl-dd .op');if(f)f.click();}else if(event.key==='Escape')NDP.pjToggle()">
+      ${list.slice(0,80).map(p=>`<div class="op" style="${p.id===S.id?'background:rgba(21,101,255,.16)':''}" onclick="NDP.proj('${esc(p.id)}')"><b style="color:var(--accent2);min-width:44px">${esc(pjCode(p))}</b><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name&&p.name!==pjCode(p)?p.name:'')}</span>${stLbl(p)}</div>`).join('')||'<div class="pl-mut" style="padding:8px">ไม่พบงาน</div>'}
+      ${list.length>80?`<div class="pl-mut" style="padding:6px">แสดง 80 จาก ${list.length} งาน — พิมพ์ค้นให้แคบลง</div>`:''}</div>`:''}</div>`; }
+
 /* ── วาดหน้า ── */
 function render(){ const pg=$('nd-plan-body'); if(!pg) return;
   if(!['admin','manager'].includes(role())){ pg.innerHTML='<div class="pl-mut" style="padding:40px;text-align:center">🔒 สำหรับแอดมิน/เมเนเจอร์</div>'; return; }
@@ -553,11 +569,12 @@ function render(){ const pg=$('nd-plan-body'); if(!pg) return;
   if(!S){ pg.innerHTML='<div class="pl-mut" style="padding:40px;text-align:center">ยังไม่มีโปรเจกต์ — สร้างที่หน้า 📋 มอบหมายงาน ก่อน</div>'; return; }
   const ae=document.activeElement, keepEd=ae&&ae.id==='pl-ed', selS=keepEd?ae.selectionStart:0, selE=keepEd?ae.selectionEnd:0;
   const y=window.scrollY, mc=$('main-content'), my=mc?mc.scrollTop:0;
-  pg.innerHTML=`<div class="pl-top"><select class="form-input form-select" style="max-width:420px" onchange="NDP.proj(this.value)">${projs.slice().sort((a,b)=>String(b.deadline||'').localeCompare(String(a.deadline||''))).map(p=>`<option value="${esc(p.id)}"${p.id===S.id?' selected':''}>${esc(safe(()=>projDisp(p),p.name))}</option>`).join('')}</select>
+  pg.innerHTML=`<div class="pl-top">${projPicker(projs)}
      ${dirty?'<span class="pl-dirty">● มีการแก้ไขที่ยังไม่บันทึก</span>':''}<span style="flex:1"></span><button class="btn btn-outline" onclick="NDP.save()">💾 บันทึก</button><button class="btn btn-green" onclick="NDP.saveSend()">✅ บันทึกโปรเจกต์ + ส่งให้ทีม</button></div>
    <div class="pl-grid"><div>${leftHTML()}</div><div class="pl-right">${rightHTML()}</div></div>${driveHTML()}${dcHTML()}`;
   window.scrollTo(0,y); if(mc) mc.scrollTop=my;
   if(dd){ const q=$('pl-ddq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
+  else if(pjOpen){ const q=$('pl-pjq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
   else if(ae&&ae.id==='pl-pkq'){ const q=$('pl-pkq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
   if(keepEd){ const t=$('pl-ed'); if(t){ t.focus(); t.setSelectionRange(selS,selE); } }
 }
@@ -597,7 +614,8 @@ function pickCodeDialog(title, cb){ const sys=codesInSystem();
 
 /* ── ตัวสั่งงาน ── */
 const NDP=window.NDP={
-  proj(id){ if(dirty && !confirm('มีการแก้ไขที่ยังไม่บันทึก — ทิ้งการแก้ไขแล้วเปลี่ยนงาน?')){ render(); return; } loadProject(id); render(); },
+  pjToggle(){ pjOpen=!pjOpen; pjQ=''; render(); }, pjQ(v){ pjQ=v; render(); },
+  proj(id){ pjOpen=false; pjQ=''; if(S&&id===S.id){ render(); return; } if(dirty && !confirm('มีการแก้ไขที่ยังไม่บันทึก — ทิ้งการแก้ไขแล้วเปลี่ยนงาน?')){ render(); return; } loadProject(id); render(); },
   set(k,v){ S[k]=v; S.t[k]=1; if(k==='code') DR.tpl=''; if(k==='minutes'){ S.rolesT=true; ORDER.forEach(x=>S.roles[x].slots.forEach(s=>{ delete s.fix; })); } rr(); }, info(){ infoOpen=!infoOpen; render(); },
   ded(j,k,v){ S.dedT=true; if(k==='add') S.ded.push({label:'หักเพิ่ม',pct:2,on:true}); else if(k==='del') S.ded.splice(j,1); else S.ded[j][k]=v; rr(); },
   tog(k){ const r=S.roles[k];
@@ -743,10 +761,10 @@ const NDP=window.NDP={
     else pickCodeDialog('📄 บันทึกเป็นเทมเพลตใหม่', async c=>{ if(PRICE[c] && !confirm('มีเทมเพลตรหัส '+c+' อยู่แล้ว — บันทึกทับ?')) return; await write(c); }); },
   async pcDel(){ if(!confirm('ลบเทมเพลตราคา '+pcSel+'?')) return; delete PRICE[pcSel]; await fbSaveKeyed('pricetpl', PRICE); audit('price.tpl', pcSel, 'ลบเทมเพลตราคา'); pcSel=''; WK=null; priceRender(); },
 };
-document.addEventListener('click',()=>{ if(dd){ dd=null; render(); } });
+document.addEventListener('click',()=>{ if(dd||pjOpen){ dd=null; pjOpen=false; render(); } });
 
 /* ── ข้อมูลเปลี่ยนจากเครื่องอื่น → วาดใหม่ (เฉพาะตอนไม่ได้แก้ค้างอยู่) ── */
-setInterval(()=>{ const pg=$('page-nd-plan'); if(!S||!pg||pg.classList.contains('hidden')||dirty||saving||dd) return;
+setInterval(()=>{ const pg=$('page-nd-plan'); if(!S||!pg||pg.classList.contains('hidden')||dirty||saving||dd||pjOpen) return;
   const ae=document.activeElement; if(ae&&pg.contains(ae)&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)) return;
   const p=(safe(()=>getProjects(),[])||[]).find(x=>x.id===S.id); if(!p||p.updatedAt===S.src.updatedAt) return;
   const keep={openA, infoOpen, edPost, tplSel, DR, edText}; loadProject(S.id); ({openA, infoOpen, edPost, tplSel, DR, edText}=keep); render(); }, 4000);
