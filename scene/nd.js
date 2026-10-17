@@ -31,6 +31,8 @@ const P = {
   profit:'M4 20V10h3v10zm6.5 0V4h3v16zM17 20v-7h3v7z',
   docs:'M6 2h8l5 5v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm7 1.5V8h4.5zM8 12v2h8v-2zm0 4v2h8v-2z',
   payment:'M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v2H2zm0 5h20v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2zm3 4v2h5v-2z',
+  plan:'M7 2h2v2h6V2h2v2h3a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3zm-2 7v10h14V9zm2 2h4v2H7zm0 4h7v2H7zm9-4h1v6h-1z',
+  price:'M12 2 3 6v2h18V6zM5 10v7h3v-7zm5.5 0v7h3v-7zM16 10v7h3v-7zM3 19v2h18v-2z',
   team:'M9 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm8 0a3 3 0 1 1 0-6 3 3 0 0 1 0 6zM1 20c0-4 3.6-7 8-7s8 3 8 7zm17 0c0-2.5-.9-4.6-2.4-6.1C19.2 14.2 23 16.5 23 20z',
   settings:'m13.9 2 .5 2.6 1.6.9 2.5-.9 1.9 3.3-2 1.7v1.8l2 1.7-1.9 3.3-2.5-.9-1.6.9-.5 2.6h-3.8l-.5-2.6-1.6-.9-2.5.9-1.9-3.3 2-1.7v-1.8l-2-1.7 1.9-3.3 2.5.9 1.6-.9.5-2.6zM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z',
   confirm:'M11 3h2v9.6l3.3-3.3 1.4 1.4L12 16.4l-5.7-5.7 1.4-1.4 3.3 3.3zM4 15h2v4h12v-4h2v6H4z',
@@ -53,27 +55,25 @@ const grp = (key, page, ic, label, items) =>
   `<div class="nd-grp" data-grp="${key}">
      <div class="nav-item" onclick="nav('${page}')" data-tip="${esc(label)}">${svg(ic)}<span class="nd-lb">${esc(label)}</span><span class="nav-badge nd-grp-badge hidden"></span><svg class="nd-chev" viewBox="0 0 24 24" data-grp-toggle="1"><path d="${P.chev}"/></svg></div>
      <div class="nd-sub"><div>${items}</div></div></div>`;
-const PROJMGR = [['alloc','alloc','จัดสรรคน','ลงคนตามคำตอบในรอบลงคิว'],['drive','drive','จัดไฟล์งาน','สร้างโฟลเดอร์งานในไดรฟ์'],['projroom','projroom','ห้องโปรเจกต์','ห้อง Discord + โพสต์คู่มืองาน']];
 const FIN = [['queue','payq','คิวจ่ายเงิน','จ่ายเงินทีม · ใบยืนยันยอด','queue-badge'],['payroll','payroll','รอบจ่ายรายเดือน','รวมยอดรายเดือนของแต่ละคน'],
              ['profit','profit','สรุปการเงิน','รายรับ รายจ่าย กำไร'],['docs','docs','เอกสาร','ใบแจ้งหนี้ ใบเสร็จ ใบสำคัญจ่าย 50 ทวิ'],['payment','payment','บัญชีรับเงิน','บัญชี/QR ท้ายใบแจ้งหนี้']];
 function buildNav(){
   const a=$('admin-nav'), s=$('staff-nav'), m=$('manager-nav');
   if(!a||!s||!m) return;
-  const pm = PROJMGR.map(([p,i,l])=>item(p,i,l)).join('');
   a.innerHTML = item('home','home','หน้าแรก') + sec('งาน')
     + item('availability','queueAvail','ลงคิว') + item('assign','assign','มอบหมายงาน')
-    + grp('projmgr','nd-projmgr','projmgr','จัดการโปรเจกต์',pm)
+    + item('nd-plan','plan','วางแผนงาน')
     + item('projects','projects','โปรเจกต์',badge('deadline-badge')) + item('track','track','ติดตามงาน',badge('track-badge'))
     + item('calc','calc','คำนวนราคา') + sec('บัญชี')
     + grp('fin','nd-fin','fin','บัญชี',FIN.map(([p,i,l,,b])=>item(p,i,l,b?badge(b):'')).join(''))
-    + sec('ทีมงาน') + item('staff','team','จัดการทีม');
+    + sec('ทีมงาน') + item('staff','team','จัดการทีม') + item('nd-price','price','เทมเพลตราคา');
   s.innerHTML = item('home','home','หน้าแรก') + sec('ของฉัน')
     + item('my-calendar','track','ปฏิทินงาน') + item('my-dashboard','money','งานของฉัน')
     + item('confirm-amount','confirm','ยืนยันยอด',badge('ca-badge-staff'))
     + item('nd-docs','docs','เอกสารของฉัน') + sec('อื่น ๆ') + item('nd-settings','settings','ตั้งค่า');   // 🔔 แจ้งเตือน = ปุ่มกระดิ่งท้ายเมนูอย่างเดียว (มี "ดูทั้งหมด")
   m.innerHTML = item('home','home','หน้าแรก') + sec('งาน')
     + item('availability','queueAvail','ลงคิว') + item('assign','assign','มอบหมายงาน')
-    + grp('projmgr','nd-projmgr','projmgr','จัดการโปรเจกต์',pm)
+    + item('nd-plan','plan','วางแผนงาน')
     + item('projects','projects','โปรเจกต์') + item('track','track','ติดตามงาน') + item('mgr-calc','calc','คำนวนราคา')
     + sec('ของฉัน') + item('confirm-amount','confirm','ยืนยันยอด',badge('ca-badge-mgr'))
     + item('mgr-team','team','จัดการทีม')
@@ -275,7 +275,7 @@ const POP={
     work:{t:'มอบหมายงาน',go:'assign',b:()=>`<p>งานที่ยังไม่จบ</p><div class="big">${activeProjs().length} งาน</div><p>สร้างงาน / เดทไลน์ราย Role</p>`},
     projects:{t:'โปรเจกต์',go:'projects',b:()=>`<p>โปรเจกต์ทั้งหมด</p><div class="big">${projs().length} โปรเจกต์</div><p>จัดการงานและการจ่ายเงิน</p>`},
     money:{t:'บัญชี',go:'nd-fin',b:()=>`<p>ค่าจ้างทีมค้างจ่าย</p><div class="big">${fmt(safe(()=>sumProjectFinance(projs()).expensePending,0))}</div><p>คิวจ่าย · เอกสาร · สรุปการเงิน</p>`},
-    folder:{t:'จัดการโปรเจกต์',go:'nd-projmgr',b:()=>'<p>จัดสรรคน · จัดไฟล์งาน<br>ห้องโปรเจกต์</p>'},
+    folder:{t:'วางแผนงาน',go:'nd-plan',b:()=>'<p>คน · ราคา · เวลา<br>ไฟล์งาน · ห้อง Discord</p>'},
     pin:{t:'ลงคิว',go:'availability',b:()=>'<p>เปิดรอบลงคิว<br>ดูวันว่างของทีม</p>'},
     calc:{t:'คำนวนราคา',go:'calc',b:()=>'<p>คำนวนค่าจ้างและราคางาน</p>'},
     team:{t:'จัดการทีมงาน',go:'staff',b:()=>`<p>สมาชิกในทีม</p><div class="big">${safe(()=>getStaff().length,'—')} คน</div>`},
@@ -288,7 +288,7 @@ const POP={
     work:{t:'มอบหมายงาน',go:'assign',b:()=>'<p>สร้างงาน<br>ตั้งเดทไลน์ราย Role</p>'},
     history:{t:'เอกสารของฉัน',go:'nd-docs',b:()=>'<p>ใบสำคัญจ่าย · 50 ทวิ<br>ของฉัน</p>'},   // เดิม = ภาพรวมของฉัน (เอาออกแล้ว)
     money:{t:'ยืนยันยอด',go:'confirm-amount',b:()=>'<p>ยืนยันยอดค่าตอบแทน<br>ของฉัน</p>'},
-    folder:{t:'จัดการโปรเจกต์',go:'nd-projmgr',b:()=>'<p>จัดสรรคน · จัดไฟล์งาน<br>ห้องโปรเจกต์</p>'},
+    folder:{t:'วางแผนงาน',go:'nd-plan',b:()=>'<p>คน · ราคา · เวลา<br>ไฟล์งาน · ห้อง Discord</p>'},
     pin:{t:'ลงคิว',go:'availability',b:()=>'<p>เปิดรอบลงคิว<br>ดูวันว่างของทีม</p>'},
     calc:{t:'คำนวนราคา',go:'mgr-calc',b:()=>'<p>คำนวนค่าจ้างและราคางาน</p>'},
     team:{t:'จัดการทีม',go:'mgr-team',b:()=>'<p>ชื่นชม / ขอออกใบเตือน<br>พักงาน</p>'},
@@ -776,7 +776,6 @@ function init(){
   // 🔔 กดครั้งเดียวแต่ระบบเดิมแจ้งเตือนซ้อน 2 ชั้น (เช่น Safe Mode) → ภายใน 0.7 วินาที เหลือข้อความล่าสุดอันเดียว
   if(typeof window.toast==='function'){ const _t=window.toast; let last=0;
     window.toast=function(){ const now=Date.now(); if(now-last<700){ const w=$('toastWrap'), prev=w&&w.lastElementChild; if(prev) prev.remove(); } last=now; return _t.apply(this,arguments); }; }
-  makeFolderPage('nd-projmgr','📁 จัดการโปรเจกต์','จัดสรรคน · จัดไฟล์งาน · ห้องโปรเจกต์',PROJMGR);
   makeFolderPage('nd-fin','💰 บัญชี','รวมหมวดการเงินไว้ที่เดียว',FIN);
   // 🙈 Safe Mode: หน้าสรุปการเงินเบลอทั้งหน้า + ข้อความให้ปิด Safe Mode ก่อนดู
   const prof=$('page-profit'); if(prof && !prof.querySelector('.nd-safe-note')){ const n=document.createElement('div'); n.className='nd-safe-note';

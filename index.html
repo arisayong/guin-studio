@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261016-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261017-05"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -1139,9 +1139,7 @@ body.sidebar-collapsed .main-content{
    <div class="nav-section">งาน</div>
    <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">📌</span><span>ลงคิว</span></div>
    <div class="nav-item" onclick="nav('assign')"><span class="nav-icon">📋</span><span>มอบหมายงาน</span></div>
-   <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
-   <div class="nav-item" onclick="nav('drive')"><span class="nav-icon">📂</span><span>จัดไฟล์งาน</span></div>
-   <div class="nav-item" onclick="nav('projroom')"><span class="nav-icon">🐧</span><span>ห้องโปรเจกต์</span></div>
+   <div class="nav-item" onclick="nav('nd-plan')"><span class="nav-icon">🗓️</span><span>วางแผนงาน</span></div>
    <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span><span class="nav-badge hidden" id="deadline-badge">0</span></div>
    <div class="nav-item" onclick="nav('calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span><span class="nav-badge hidden" id="track-badge">0</span></div>
@@ -1167,9 +1165,7 @@ body.sidebar-collapsed .main-content{
    <div class="nav-item active" onclick="nav('mgr-home')"><span class="nav-icon">🏠</span><span>ภาพรวม</span></div>
    <div class="nav-item" onclick="nav('availability')"><span class="nav-icon">📌</span><span>ลงคิว</span></div>
    <div class="nav-item" onclick="nav('assign')"><span class="nav-icon">📋</span><span>มอบหมายงาน</span></div>
-   <div class="nav-item" onclick="nav('alloc')"><span class="nav-icon">🎯</span><span>จัดสรรคน</span></div>
-   <div class="nav-item" onclick="nav('drive')"><span class="nav-icon">📂</span><span>จัดไฟล์งาน</span></div>
-   <div class="nav-item" onclick="nav('projroom')"><span class="nav-icon">🐧</span><span>ห้องโปรเจกต์</span></div>
+   <div class="nav-item" onclick="nav('nd-plan')"><span class="nav-icon">🗓️</span><span>วางแผนงาน</span></div>
    <div class="nav-item" onclick="nav('projects')"><span class="nav-icon">📁</span><span>โปรเจกต์</span></div>
    <div class="nav-item" onclick="nav('mgr-calc')"><span class="nav-icon">🧮</span><span>คำนวนราคา</span></div>
    <div class="nav-item" onclick="nav('track')"><span class="nav-icon">📅</span><span>ติดตามงาน</span></div>
@@ -1762,8 +1758,7 @@ body.sidebar-collapsed .main-content{
     <div class="page-actions">
      <button class="btn btn-outline btn-sm" onclick="openEditProject(currentProjId)">✏️ แก้ไขโปรเจกต์</button>
      <button class="btn btn-outline btn-sm" onclick="lockSnapshot()">🔒 อัปเดทยอด Final</button>
-     <button class="btn btn-outline btn-sm" onclick="_prSel=currentProjId;nav('projroom')" style="border-color:rgba(88,101,242,.5);color:#98A5FF">🐧 ห้องโปรเจกต์</button>
-     <button class="btn btn-outline btn-sm" onclick="_drSel=currentProjId;nav('drive')">📂 จัดไฟล์งาน</button>
+     <button class="btn btn-outline btn-sm" onclick="openPlanFor(currentProjId)" style="border-color:rgba(88,101,242,.5);color:#98A5FF">🗓️ วางแผนงาน · ไฟล์ · ห้อง Discord</button>
      <button class="btn btn-blue" onclick="nav('queue')">💸 ออกใบสำคัญ</button>
     </div>
    </div>
@@ -5206,6 +5201,19 @@ async function avClearAndRepull(){
   await pullFromDiscord();   // ดึงสดใหม่ (เฉพาะหลังโพสต์ประกาศรอบนี้ — ไม่เอาข้อความรอบเก่า)
   toast('🧹 ล้างของเก่า + ดึงคำตอบใหม่แล้ว','success');
 }
+// 👑 แอดมิน/เจ้าของไม่ใช่คนรับงานจากรอบลงคิว — ข้อความที่แอดมินพิมพ์ในห้อง (เช่น โพสต์ประกาศเอง) ห้ามถูกนับเป็น "แจ้งสะดวก"
+function _isAdminStaff(sid){
+  if(!sid) return false;
+  try{ const uc=ls('mgr_users_cache')||{}; if(Object.values(uc).some(u=>u && u.role==='admin' && u.staffId===sid)) return true; }catch(e){}
+  try{ const st=getStaffById(sid), em=String(st&&st.email||'').toLowerCase(); if(em && (typeof KNOWN_ADMIN_EMAILS!=='undefined') && KNOWN_ADMIN_EMAILS.includes(em)) return true; }catch(e){}
+  return false;
+}
+function _adminDiscordIds(){
+  const ids=new Set();
+  try{ const uc=ls('mgr_users_cache')||{}; Object.values(uc).forEach(u=>{ if(u && u.role==='admin' && u.staffId){ const st=getStaffById(u.staffId); if(st&&st.discordId) ids.add(String(st.discordId)); } }); }catch(e){}
+  try{ (getAllStaff()||[]).forEach(st=>{ if(st && st.discordId && _isAdminStaff(st.id)) ids.add(String(st.discordId)); }); }catch(e){}
+  return ids;
+}
 async function pullFromDiscord(silent, allHistory){
   const r=getRound(_avRoundId); if(!r) return;
   // 🏠 ดึงจาก "ทุกห้อง" ที่รอบนี้โพสประกาศไป (r.posts) — ไม่ใช่แค่ห้องของทีมที่เปิดรอบ
@@ -5232,17 +5240,21 @@ async function pullFromDiscord(silent, allHistory){
         const inRange=msgs.filter(m=>String(m.at||'')>=since);
         skipped+=msgs.length-inRange.length; msgs=inRange;
       }
+      const _admIds=_adminDiscordIds();
+      msgs=msgs.filter(m=>!(m.authorId && _admIds.has(String(m.authorId))));   // 👑 ข้อความของแอดมินไม่นับเป็นคำตอบ
       const srcCat=chCat[chId]||r.cat;   // ทีมของ "ห้องนี้" (บท-qc→adaptation · มิกซ์-ซับ→mix · พากย์→dubbing)
       for(const m of msgs){
         const content=String(m.content||'').trim();
         if(!content){
           emptyCount++;
           const lk=matchStaffByDiscord(m);
+          if(lk.staff && _isAdminStaff(lk.staff.id)) continue;
           if(lk.staff){ _dcAutoLink(lk,m); await saveRoundReply(r.id, lk.staff.id, {freeText:'', discordName:m.displayName||m.username, source:'discord', srcCat}); n++; }
           else { unmatched.push({...m, content:'', options:lk.options||[], noContent:true, srcCat}); }
           continue;
         }
         const mt=matchStaffByDiscord(m);
+        if(mt.staff && _isAdminStaff(mt.staff.id)) continue;   // 👑 แอดมินไม่ขึ้นในรายชื่อลงคิว
         if(mt.staff){ _dcAutoLink(mt,m); await saveRoundReply(r.id, mt.staff.id, {freeText:content, discordName:m.displayName||m.username, source:'discord', srcCat}); n++; }
         else { unmatched.push({...m, options:mt.options||[], srcCat}); }
       }
@@ -6206,6 +6218,7 @@ function _alcPeople(){
     Object.entries(reps).forEach(([sid,e])=>{
       if(!e) return;
       const s=getStaffById(sid); if(!s || !isStaffAssignable(s)) return;
+      if(_isAdminStaff(sid)) return;   // 👑 คำตอบเก่าที่เคยดึงชื่อแอดมินมา → ไม่แสดงบนกระดาน
       if(!map[sid]) map[sid]={sid, staff:s, replies:[]};
       // เก็บสถานะ + ชุดวันหักลบ ติดมากับคำตอบด้วย (คนไม่ว่างก็เก็บ — ไปแสดงในกลุ่ม "แจ้งไม่ว่าง")
       //   cat = หมวดตาม "ห้องที่เขามาตอบ" (e.srcCat) ถ้ามี ไม่งั้นใช้หมวดของรอบ — 1 รอบดึงหลายห้อง จัดหมวดถูกตามห้อง
@@ -6618,8 +6631,7 @@ function _alcNextSteps(projId){
   const p=getProjects().find(x=>x.id===projId); if(!p) return;
   _tagOverlayShow('✅ จัดคนเข้า "'+esc(projDisp(p))+'" เรียบร้อย — ไปต่อเลยไหม?', `
     <div style="display:flex;flex-direction:column;gap:8px">
-      <button class="btn btn-blue" onclick="document.getElementById('tag-overlay')?.remove();_prSel='${esc(projId)}';nav('projroom')">🐧 สร้างห้อง + โพสต์คู่มือใน Discord</button>
-      <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove();_drSel='${esc(projId)}';nav('drive')">📂 สร้างโฟลเดอร์งานในไดรฟ์</button>
+      <button class="btn btn-blue" onclick="document.getElementById('tag-overlay')?.remove();openPlanFor('${esc(projId)}')">🗓️ เปิดวางแผนงาน (ห้อง Discord · โฟลเดอร์ไดรฟ์)</button>
       <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">เสร็จแล้ว ปิดได้เลย</button>
     </div>
     <div style="font-size:10.5px;color:var(--text2);margin-top:9px">ทั้งสองหน้าจะเลือกโปรเจกต์นี้รอไว้ให้เลย</div>`, 430);
@@ -16097,7 +16109,7 @@ const PRICE_QTY_UNITS = ['ชั่วโมง','หน้า','วัน','บ
 function calcWorkerAmt(w, dur){
   const rate = (w && parseFloat(w.amount)) || 0;
   const u = (w && w.unit) || 'นาที';
-  if(u === 'นาที') return dur > 0 ? rate * dur : rate;
+  if(u === 'นาที'){ const mw=parseFloat(w&&w.minWorked)||0; if(mw>0) return rate*mw; return dur > 0 ? rate * dur : rate; }   // minWorked = นาทีที่ทำจริงรายคน (จากหน้าวางแผนงาน)
   if(PRICE_QTY_UNITS.includes(u)) return rate * (parseFloat(w.qty) || 0);
   return rate; // เหมา / โปรเจกต์
 }
@@ -16402,7 +16414,7 @@ async function saveProject(){
       arr.forEach(w=>{
         if(!w.staffId) return; // ข้าม placeholder ที่ยังไม่เลือกคน (ก๊อปปี้ค่าไว้/จาก calc)
         const amt=calcWorkerAmt(w,dur);
-        workers.push({id:w.staffId,slot:(cat==='dub'&&w.keepSlot)?w.keepSlot:(cat+'-'+slot),amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,status:'pending',note:'',comment:w.comment||'',...(cat==='dub'&&w.tier?{tier:w.tier}:{})});
+        workers.push({id:w.staffId,slot:(cat==='dub'&&w.keepSlot)?w.keepSlot:(cat+'-'+slot),amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,status:'pending',note:'',comment:w.comment||'',...(w.minWorked?{minWorked:w.minWorked}:{}),...(w.ep?{ep:w.ep}:{}),...(cat==='dub'&&w.tier?{tier:w.tier}:{})});
       });
     });
   });
@@ -16485,7 +16497,8 @@ async function saveProject(){
     //    กันบั๊ก: แก้ฟอร์มงาน (เดทไลน์/งบ/คน) แล้วห้อง+โพสต์ที่ผูกไว้หายหมด → ระบบหลอกว่า "ยังไม่ได้สร้างห้อง"
     ['discordChannelId','discordChannelName','discordCategoryName','discordCategoryId','discordTalkId',
      'discordMsgId','discordMsgIds','discordPrivate','roomPosts','postDraft','postTplId',
-     'driveFolderId','driveFolderLink','allocDone','income'].forEach(k=>{
+     'driveFolderId','driveFolderLink','allocDone','income',
+     'driveFolderName','driveSharedAt','discordReadOnly','discordRoomMembers','deductions','deadlineTime'].forEach(k=>{
       if(existing && existing[k]!==undefined && proj[k]===undefined) proj[k]=existing[k];
     });
   }
@@ -16945,7 +16958,7 @@ async function openEditProject(id){
     if(!activeCats.has(cat)){activeCats.add(cat);if(cat!=='mgr'){const btn=document.getElementById('toggle-'+cat);const block=document.getElementById('catblock-'+cat);if(btn)btn.classList.add('on');if(block)block.classList.remove('hidden');}}
     // keepSlot: นักพากย์รองของเก่า (dub-sub) โชว์รวมในลิสต์เดียว แต่ตอนเซฟคง slot เดิมไว้
     //           — ไม่งั้นสถานะจ่ายแล้ว/เลขใบสำคัญจ่ายที่ผูกกับ slot เดิมจะหลุด
-    if(formSlots[cat]&&formSlots[cat][slot]!==undefined)formSlots[cat][slot].push({staffId:w.id,amount:w.ratePerUnit||w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,comment:w.comment||'',...(cat==='dub'&&w.tier?{tier:w.tier}:{}),...(cat==='dub'&&w.slot!=='dub-main'?{keepSlot:w.slot}:{})});
+    if(formSlots[cat]&&formSlots[cat][slot]!==undefined)formSlots[cat][slot].push({staffId:w.id,amount:w.ratePerUnit||w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,comment:w.comment||'',...(w.minWorked?{minWorked:w.minWorked}:{}),...(w.ep?{ep:w.ep}:{}),...(cat==='dub'&&w.tier?{tier:w.tier}:{}),...(cat==='dub'&&w.slot!=='dub-main'?{keepSlot:w.slot}:{})});
   });
   // โหลดเรทเบอร์นักพากย์ของงานนี้ (ไม่มี = ชุดว่าง 3 เบอร์)
   formDubTiers=(Array.isArray(p.dubTiers)&&p.dubTiers.length)?JSON.parse(JSON.stringify(p.dubTiers)):_dubTierDefaults();
@@ -32605,7 +32618,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261016-01"></script><script src="scene/nd-profile.js?v=20261016-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261017-05"></script><script src="scene/nd-profile.js?v=20261017-05"></script><script src="scene/nd-plan.js?v=20261017-05"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32615,7 +32628,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261016-01';
+var UPD_BUILD = '20261017-05';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
