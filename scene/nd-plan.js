@@ -71,7 +71,7 @@ const CSS=`
 .pl-step{display:inline-flex;align-items:center;border:1px solid var(--border2);border-radius:8px;overflow:hidden;height:30px}
 .pl-step button{width:26px;height:100%;border:0;background:rgba(255,255,255,.05);color:var(--text);cursor:pointer;font-size:15px}
 .pl-step button:disabled{opacity:.4;cursor:default}
-.pl-step input{width:34px;border:0;background:transparent;color:var(--text);text-align:center;font-family:Kanit;font-size:12.5px}
+.pl-step input{width:44px;border:0;background:transparent;color:var(--text);text-align:center;font-family:Kanit;font-size:12.5px}
 .pl-step span{font-size:11px;color:var(--text2);padding-right:6px}
 .pl-same{display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer}
 .pl-dirty{font-size:12px;color:var(--orange)}
@@ -507,9 +507,10 @@ function nameBtn(k,j){ const r=S.roles[k], s=r.slots[j], open=dd&&dd.k===k&&dd.j
 function bodyHTML(k){ syncSame(); const r=S.roles[k], hr=hoursOf(r), st=STD();
   const late=r.end&&S.deadline&&r.end>S.deadline, multi=(r.rounds||[]).length>0;
   const lk=r.sameAs&&S.roles[r.sameAs]?r.sameAs:'', dis=lk?'disabled':'';
-  const step=(i)=>`<span class="pl-step" title="เลื่อนเวลาส่งรอบนี้ทีละ … ชม."><button ${dis} onclick="NDP.shift('${k}',${i},-1)">−</button><input ${dis} value="${esc((r.step||{})[i]||1)}" onchange="NDP.stepSet('${k}',${i},this.value)"><span>ชม.</span><button ${dis} onclick="NDP.shift('${k}',${i},1)">+</button></span>`;
+  // ⏱ ชั่วโมงทำงาน (เริ่ม → ส่งรอบนี้) · กด −/+ = ลด/เพิ่มทีละ 1 ชม. · พิมพ์ตัวเลข = ตั้งเวลาส่งเป็นเริ่ม + กี่ชม.
+  const step=(i,d,t)=>{ const h=d?hoursTo(r,d,t):''; return `<span class="pl-step" title="ชั่วโมงทำงาน (เริ่ม → ส่ง) · กด −/+ ทีละ 1 ชม. หรือพิมพ์จำนวนชั่วโมง"><button ${dis} onclick="NDP.shift('${k}',${i},-1)">−</button><input ${dis} value="${h}" placeholder="—" onchange="NDP.setHrs('${k}',${i},this.value)"><span>ชม.</span><button ${dis} onclick="NDP.shift('${k}',${i},1)">+</button></span>`; };
   const dlRow=(i,lbl,d,t,late)=>{ const h=d?hoursTo(r,d,t):null;
-    return `<div class="pl-dlr"><input class="form-input" ${dis} value="${esc(lbl)}" placeholder="${i<0?'เดทไลน์':'ชื่อรอบ เช่น Final'}" onchange="NDP.dlSet('${k}',${i},'label',this.value)"><input class="form-input" type="date" ${dis} value="${esc(d)}" style="${late?'border-color:var(--red)':''}" onchange="NDP.dlSet('${k}',${i},'date',this.value)"><input class="form-input" type="time" ${dis} value="${esc(t)}" onchange="NDP.dlSet('${k}',${i},'time',this.value)">${step(i)}<span class="pl-dur2">${h==null?'⏱ —':'⏱ <b>'+fmtH(h)+'</b>'}${late?' <span class="pl-bad">เลยเดดไลน์ลูกค้า</span>':''}</span>${i<0?'<span></span>':`<span class="pl-x" title="ลบรอบนี้" ${lk?'style="visibility:hidden"':''} onclick="NDP.rndDel('${k}',${i})">✕</span>`}</div>`; };
+    return `<div class="pl-dlr"><input class="form-input" ${dis} value="${esc(lbl)}" placeholder="${i<0?'เดทไลน์':'ชื่อรอบ เช่น Final'}" onchange="NDP.dlSet('${k}',${i},'label',this.value)"><input class="form-input" type="date" ${dis} value="${esc(d)}" style="${late?'border-color:var(--red)':''}" onchange="NDP.dlSet('${k}',${i},'date',this.value)"><input class="form-input" type="time" ${dis} value="${esc(t)}" onchange="NDP.dlSet('${k}',${i},'time',this.value)">${step(i,d,t)}<span class="pl-dur2">${h==null?'⏱ —':'⏱ <b>'+fmtH(h)+'</b>'}${late?' <span class="pl-bad">เลยเดดไลน์ลูกค้า</span>':''}</span>${i<0?'<span></span>':`<span class="pl-x" title="ลบรอบนี้" ${lk?'style="visibility:hidden"':''} onclick="NDP.rndDel('${k}',${i})">✕</span>`}</div>`; };
   const time=`<div class="pl-dlbox ${lk?'linked':''}">
     <div class="pl-st"><span class="pl-mut">📅 เริ่ม</span><input class="form-input" type="date" ${dis} value="${esc(r.start)}" onchange="NDP.r('${k}','start',this.value)"><input class="form-input" type="time" ${dis} value="${esc(r.stime)}" onchange="NDP.r('${k}','stime',this.value)"></div>
     <div class="pl-mut" style="margin:6px 0 4px">🏁 เดดไลน์ — ตั้งชื่อแต่ละรอบเองได้ (ชื่อนี้ขึ้นในโพสต์ใต้หัวข้อ "${esc(R[k][0])}")</div>
@@ -1084,7 +1085,12 @@ const NDP=window.NDP={
   dlSet(k,i,f,v){ const r=S.roles[k]; if(i<0){ if(f==='label') r.endLabel=v; else if(f==='date') r.end=v; else r.etime=v; } else { r.rounds[i][f==='label'?'label':f==='date'?'date':'time']=v; } rt(); },
   stepSet(k,i,v){ const r=S.roles[k]; r.step=r.step||{}; r.step[i]=Math.max(1,parseFloat(v)||1); },
   // ⏩ เลื่อนเวลาส่งทีละ … ชม. (ไม่ต้องเปิดปฏิทิน) · ยังไม่ได้ตั้งวัน = เริ่มจากวันเริ่ม/ตอนนี้
-  shift(k,i,dir){ const r=S.roles[k], n=(r.step&&r.step[i])||1, x=i<0?{d:r.end,t:r.etime}:{d:r.rounds[i].date,t:r.rounds[i].time};
+  setHrs(k,i,v){ const r=S.roles[k], h=parseFloat(v); if(!(h>=0)){ render(); return; }
+    let base=new Date(rS(r)+'T'+(r.stime||'00:00')); if(isNaN(base)){ say('ตั้งวันเริ่มก่อน แล้วค่อยใส่จำนวนชั่วโมง','warn'); render(); return; }
+    base.setMinutes(base.getMinutes()+Math.round(h*60)); const p2=x=>String(x).padStart(2,'0');
+    const d=base.getFullYear()+'-'+p2(base.getMonth()+1)+'-'+p2(base.getDate()), t=p2(base.getHours())+':'+p2(base.getMinutes());
+    if(i<0){ r.end=d; r.etime=t; } else { r.rounds[i].date=d; r.rounds[i].time=t; } rt(); },
+  shift(k,i,dir){ const r=S.roles[k], n=1, x=i<0?{d:r.end,t:r.etime}:{d:r.rounds[i].date,t:r.rounds[i].time};
     let base=new Date((x.d||r.start||S.start||new Date().toISOString().slice(0,10))+'T'+(x.t||(x.d?'00:00':'09:00'))); if(isNaN(base)) base=new Date();
     base.setMinutes(base.getMinutes()+Math.round(dir*n*60)); const p2=v=>String(v).padStart(2,'0');
     const d=base.getFullYear()+'-'+p2(base.getMonth()+1)+'-'+p2(base.getDate()), t=p2(base.getHours())+':'+p2(base.getMinutes());
