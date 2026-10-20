@@ -64,7 +64,8 @@ const CSS=`
 .pl-pres{border-radius:12px;padding:7px 12px;margin-bottom:10px;background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.4);color:var(--orange);font-size:12.5px}
 .pl-dlbox{border:1px solid var(--border2);border-radius:12px;padding:8px 10px;margin-bottom:10px;background:rgba(255,255,255,.02)}
 .pl-dlbox.linked{border-style:dashed}
-.pl-dlr{display:grid;grid-template-columns:minmax(120px,1fr) 150px 128px auto minmax(110px,1fr) 20px;gap:6px;align-items:center;margin-bottom:6px}
+.pl-lnk select{width:100%;padding:4px 8px!important;font-size:12px!important}.pl-lnk.on select{border-color:var(--accent2)!important;color:var(--accent2)}
+.pl-dlr{display:grid;grid-template-columns:minmax(110px,1fr) 150px 128px 118px minmax(150px,190px) minmax(80px,auto) 20px;gap:6px;align-items:center;margin-bottom:6px}
 .pl-dlr input:disabled{opacity:.55}
 .pl-st{display:flex;align-items:center;gap:6px;margin-bottom:6px}.pl-st>span{min-width:52px}.pl-st input[type=date]{width:150px}.pl-st input[type=time]{width:128px}.pl-st input:disabled{opacity:.55}
 .pl-dur2{font-size:11.5px;color:var(--text2);text-align:right}.pl-dur2 b{color:var(--accent2)}
@@ -228,8 +229,8 @@ function loadProject(id){
     const mine=ws.filter(w=>preOf(w)===k); const key=R[k][3], pp=ph[key]||{};
     const r={k, on:!!(mine.length||ph[key]), st:pp.status||'none',
       start:dOnly(pp.startDate), stime:pp.startTime||'', end:dOnly(pp.deadline), etime:pp.submitTime||'', slots:[],
-      endLabel:pp.endLabel||'', sameAs:pp.sameAs||'', note:pp.note||'', step:{},
-      rounds:Array.isArray(pp.rounds)?pp.rounds.filter(Boolean).map(x=>({label:x.label||'',date:dOnly(x.date),time:x.time||''})):(pp.deadline2?[{label:'รอบ 2',date:dOnly(pp.deadline2),time:pp.submitTime2||''}]:[])};
+      endLabel:pp.endLabel||'', sameAs:pp.sameAs||'', note:pp.note||'', step:{}, endLink:pp.endLink||null,
+      rounds:Array.isArray(pp.rounds)?pp.rounds.filter(Boolean).map(x=>({label:x.label||'',date:dOnly(x.date),time:x.time||'',...(x.link?{link:x.link}:{})})):(pp.deadline2?[{label:'รอบ 2',date:dOnly(pp.deadline2),time:pp.submitTime2||''}]:[])};
     const base=w=>({n:nickOf(w.id), id:w.id, slot:w.slot, paid:w.status==='paid', ep:w.ep||'', old:+w.amount||0});
     if(k==='dub'){
       r.tiers=(Array.isArray(p.dubTiers)&&p.dubTiers.length?p.dubTiers:[{rate:'',unit:'นาที',qty:0}]).map(t=>({rate:+(t&&t.rate)||0, blank:!t||t.rate===''||t.rate==null, unit:(t&&t.unit)||'นาที', qty:+(t&&t.qty)||0}));
@@ -277,7 +278,13 @@ function loadProject(id){
   safe(()=>claimPresence(p.id,'viewing'));
 }
 // 🔗 "ใช้เดดไลน์เดียวกับ …" — ก๊อปวันเวลาทุกรอบจากหน้าที่ต้นทาง (ชั้นเดียว ไม่ไล่ต่อกันเป็นทอด)
-function syncSame(){ if(!S) return; ORDER.forEach(k=>{ const r=S.roles[k], src=r.sameAs&&S.roles[r.sameAs]; if(!src||src.sameAs) return;
+// 🔗 แถวเดดไลน์ที่ "ส่งพร้อม" แถวของหน้าที่อื่น → ใช้วันเวลาเดียวกัน (แถวอื่นของหน้าที่นี้ตั้งเองได้ตามปกติ)
+const rowOf=(k,i)=>{ const r=S.roles[k]; if(!r) return null; return i<0?{d:r.end,t:r.etime,lb:r.endLabel||'เดทไลน์'}:(r.rounds&&r.rounds[i]?{d:r.rounds[i].date,t:r.rounds[i].time,lb:r.rounds[i].label||('รอบ '+(i+2))}:null); };
+function syncLinks(){ for(let pass=0;pass<3;pass++) ORDER.forEach(k=>{ const r=S.roles[k];
+  const fix=(lnk,set)=>{ if(!lnk||!S.roles[lnk.k]||!S.roles[lnk.k].on) return; const x=rowOf(lnk.k,+lnk.i); if(x) set(x); };
+  fix(r.endLink, x=>{ r.end=x.d||''; r.etime=x.t||''; });
+  (r.rounds||[]).forEach(o=>fix(o.link, x=>{ o.date=x.d||''; o.time=x.t||''; })); }); }
+function syncSame(){ if(!S) return; syncLinks(); ORDER.forEach(k=>{ const r=S.roles[k], src=r.sameAs&&S.roles[r.sameAs]; if(!src||src.sameAs) return;
   r.start=src.start; r.stime=src.stime; r.end=src.end; r.etime=src.etime; r.endLabel=src.endLabel; r.rounds=JSON.parse(JSON.stringify(src.rounds||[])); }); }
 const on=()=>ORDER.map(k=>S.roles[k]).filter(r=>r.on);
 const planIds=()=>[...new Set(on().flatMap(r=>r.slots.map(s=>s.id).filter(Boolean)))];
@@ -359,8 +366,9 @@ function applyPlan(f){
       if(r.on && (ph[key] || r.start || r.end || r.etime || r.stime || r.note || r.endLabel || r.sameAs || (r.rounds||[]).length || (r.st&&r.st!=='none'))){ const o=ph[key]||{}; ph[key]={...o, startDate:r.start||'', deadline:r.end||'', submitTime:r.etime||'', status:r.st||'none', note:r.note||''}; if(r.stime) ph[key].startTime=r.stime;
         if(r.endLabel) ph[key].endLabel=r.endLabel; else delete ph[key].endLabel;
         if(r.sameAs) ph[key].sameAs=r.sameAs; else delete ph[key].sameAs;
+        if(r.endLink) ph[key].endLink=r.endLink; else delete ph[key].endLink;
         // 🏁 เดดไลน์รอบถัดไป (รอบ 2/ไฟนอล ฯลฯ) · รอบแรกที่เพิ่ม = deadline2 ให้ระบบเดิม (บรีฟ/ติดตามงาน) อ่านได้
-        const rs=(r.rounds||[]).filter(x=>x.date).map(x=>({label:String(x.label||'').trim()||'รอบถัดไป', date:x.date, time:x.time||''}));
+        const rs=(r.rounds||[]).filter(x=>x.date||x.link).map(x=>({label:String(x.label||'').trim()||'รอบถัดไป', date:x.date||'', time:x.time||'', ...(x.link?{link:x.link}:{})}));
         if(rs.length||o.rounds||o.deadline2){ ph[key].rounds=rs; if(rs[0]){ ph[key].deadline2=rs[0].date; if(rs[0].time) ph[key].submitTime2=rs[0].time; else delete ph[key].submitTime2; } else { delete ph[key].deadline2; delete ph[key].submitTime2; } } }
       else if(!r.on) delete ph[key]; });
     f.phases=ph;
@@ -509,17 +517,18 @@ function bodyHTML(k){ syncSame(); const r=S.roles[k], hr=hoursOf(r), st=STD();
   const lk=r.sameAs&&S.roles[r.sameAs]?r.sameAs:'', dis=lk?'disabled':'';
   // ⏱ ชั่วโมงทำงาน (เริ่ม → ส่งรอบนี้) · กด −/+ = ลด/เพิ่มทีละ 1 ชม. · พิมพ์ตัวเลข = ตั้งเวลาส่งเป็นเริ่ม + กี่ชม.
   const step=(i,d,t)=>{ const h=d?hoursTo(r,d,t):''; return `<span class="pl-step" title="ชั่วโมงทำงาน (เริ่ม → ส่ง) · กด −/+ ทีละ 1 ชม. หรือพิมพ์จำนวนชั่วโมง"><button ${dis} onclick="NDP.shift('${k}',${i},-1)">−</button><input ${dis} value="${h}" placeholder="—" onchange="NDP.setHrs('${k}',${i},this.value)"><span>ชม.</span><button ${dis} onclick="NDP.shift('${k}',${i},1)">+</button></span>`; };
-  const dlRow=(i,lbl,d,t,late)=>{ const h=d?hoursTo(r,d,t):null;
-    return `<div class="pl-dlr"><input class="form-input" ${dis} value="${esc(lbl)}" placeholder="${i<0?'เดทไลน์':'ชื่อรอบ เช่น Final'}" onchange="NDP.dlSet('${k}',${i},'label',this.value)"><input class="form-input" type="date" ${dis} value="${esc(d)}" style="${late?'border-color:var(--red)':''}" onchange="NDP.dlSet('${k}',${i},'date',this.value)"><input class="form-input" type="time" ${dis} value="${esc(t)}" onchange="NDP.dlSet('${k}',${i},'time',this.value)">${step(i,d,t)}<span class="pl-dur2">${h==null?'⏱ —':'⏱ <b>'+fmtH(h)+'</b>'}${late?' <span class="pl-bad">เลยเดดไลน์ลูกค้า</span>':''}</span>${i<0?'<span></span>':`<span class="pl-x" title="ลบรอบนี้" ${lk?'style="visibility:hidden"':''} onclick="NDP.rndDel('${k}',${i})">✕</span>`}</div>`; };
+  const opts=ORDER.filter(x=>x!==k&&S.roles[x].on).flatMap(x=>[-1,...(S.roles[x].rounds||[]).map((_,j)=>j)].map(j=>({v:x+'|'+j, l:R[x][1]+' '+R[x][0]+' · '+((rowOf(x,j)||{}).lb||'')})));
+  const linkCtl=(i,lnk)=>{ const cur=lnk?lnk.k+'|'+lnk.i:''; if(!opts.length) return '<span></span>';
+    return `<span class="pl-lnk ${cur?'on':''}" title="ส่งรอบนี้พร้อมเดดไลน์ของหน้าที่อื่น (วันเวลาตามกันอัตโนมัติ)"><select class="form-input form-select" ${dis} onchange="NDP.rowLink('${k}',${i},this.value)"><option value="">🔗 ส่งพร้อม…</option>${opts.map(o=>`<option value="${esc(o.v)}"${o.v===cur?' selected':''}>🔗 ${esc(o.l)}</option>`).join('')}</select></span>`; };
+  const dlRow=(i,lbl,d,t,late)=>{ const h=d?hoursTo(r,d,t):null, lnk=i<0?r.endLink:((r.rounds||[])[i]||{}).link, ld=(dis||lnk)?'disabled':'';
+    return `<div class="pl-dlr"><input class="form-input" ${dis} value="${esc(lbl)}" placeholder="${i<0?'เดทไลน์':'ชื่อรอบ เช่น Final'}" onchange="NDP.dlSet('${k}',${i},'label',this.value)"><input class="form-input" type="date" ${ld} value="${esc(d)}" style="${late?'border-color:var(--red)':''}" onchange="NDP.dlSet('${k}',${i},'date',this.value)"><input class="form-input" type="time" ${ld} value="${esc(t)}" onchange="NDP.dlSet('${k}',${i},'time',this.value)">${lnk?'<span class="pl-mut" style="font-size:11px;text-align:center">ตามหน้าที่ที่เลือก</span>':step(i,d,t)}${linkCtl(i,lnk)}<span class="pl-dur2">${h==null?'⏱ —':'⏱ <b>'+fmtH(h)+'</b>'}${late?' <span class="pl-bad">เลยเดดไลน์ลูกค้า</span>':''}</span>${i<0?'<span></span>':`<span class="pl-x" title="ลบรอบนี้" ${lk?'style="visibility:hidden"':''} onclick="NDP.rndDel('${k}',${i})">✕</span>`}</div>`; };
   const time=`<div class="pl-dlbox ${lk?'linked':''}">
     <div class="pl-st"><span class="pl-mut">📅 เริ่ม</span><input class="form-input" type="date" ${dis} value="${esc(r.start)}" onchange="NDP.r('${k}','start',this.value)"><input class="form-input" type="time" ${dis} value="${esc(r.stime)}" onchange="NDP.r('${k}','stime',this.value)"></div>
     <div class="pl-mut" style="margin:6px 0 4px">🏁 เดดไลน์ — ตั้งชื่อแต่ละรอบเองได้ (ชื่อนี้ขึ้นในโพสต์ใต้หัวข้อ "${esc(R[k][0])}")</div>
     ${dlRow(-1, r.endLabel||'', r.end, r.etime, late)}
     ${(r.rounds||[]).map((x,i)=>dlRow(i, x.label, x.date, x.time, x.date&&S.deadline&&x.date>S.deadline)).join('')}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">${lk?'':`<button class="btn btn-outline btn-sm" onclick="NDP.rndAdd('${k}')">＋ เพิ่มเดดไลน์</button>`}
-      <label class="pl-same"><input type="checkbox" ${lk?'checked':''} onchange="NDP.same('${k}',this.checked?(document.getElementById('pl-same-${k}')||{}).value:'')"> 🔗 ใช้เดดไลน์เดียวกับ</label>
-      <select class="form-input form-select" id="pl-same-${k}" style="width:auto;padding:3px 8px" onchange="if(${lk?'true':'false'}) NDP.same('${k}',this.value)">${ORDER.filter(x=>x!==k&&S.roles[x].on&&!S.roles[x].sameAs).map(x=>`<option value="${x}"${x===lk?' selected':''}>${R[x][1]} ${R[x][0]}</option>`).join('')||'<option value="">— ไม่มีหน้าที่อื่น —</option>'}</select>
-      ${lk?`<span class="pl-mut">แก้วันเวลาที่ ${esc(R[lk][0])} ที่เดียว</span>`:''}
+      ${lk?`<span class="pl-mut">🔗 เดดไลน์ทั้งหมดตาม ${esc(R[lk][0])} (ตั้งไว้แบบเดิม)</span><button class="btn btn-outline btn-sm" onclick="NDP.same('${k}','')">ยกเลิก · ตั้งเองทีละรอบ</button>`:'<span class="pl-mut">🔗 ส่งพร้อมหน้าที่อื่น = เลือกที่ช่อง "ส่งพร้อม…" ท้ายแต่ละรอบ</span>'}
       <span style="flex:1"></span><span class="pl-mut">👥 คน</span><div class="pl-cnt"><button onclick="NDP.cnt('${k}',-1)">−</button><b>${r.slots.length}</b><button onclick="NDP.cnt('${k}',1)">+</button></div></div>
     <input class="form-input" style="margin-top:8px" value="${esc(r.note||'')}" placeholder="📝 โน้ตแบ่งงาน เช่น ใช้ 4 คน · คนที่1 Ep.1-21" onchange="NDP.r('${k}','note',this.value)"></div>`;
   const unitSel=(v,fn)=>`<select class="form-input form-select" onchange="${fn}">${UNITS.map(u=>`<option${u===v?' selected':''}>${u}</option>`).join('')}</select>`;
@@ -1096,6 +1105,10 @@ const NDP=window.NDP={
     const d=base.getFullYear()+'-'+p2(base.getMonth()+1)+'-'+p2(base.getDate()), t=p2(base.getHours())+':'+p2(base.getMinutes());
     if(i<0){ r.end=d; r.etime=t; } else { r.rounds[i].date=d; r.rounds[i].time=t; } rt(); },
   same(k,v){ const r=S.roles[k]; r.sameAs=v||''; if(v) syncSame(); rt(); },
+  rowLink(k,i,v){ const r=S.roles[k], lnk=v?{k:v.split('|')[0], i:+v.split('|')[1]}:null;
+    if(lnk && lnk.k===k){ render(); return; }
+    if(i<0) r.endLink=lnk; else if(r.rounds[i]){ if(lnk) r.rounds[i].link=lnk; else delete r.rounds[i].link; }
+    syncSame(); rt(); },
   overview(){ safe(()=>_tagOverlayShow('👁️ ภาพรวมงาน '+esc(drCode()), overviewHTML(), 1100)); },
   ovGo(to){ document.getElementById('tag-overlay')?.remove(); if(to.startsWith('role:')) NDP.goRole(to.slice(5)); else { if(to==='info'&&!infoOpen){ infoOpen=true; render(); } setTimeout(()=>goTo(to),30); } },
   go(id){ if(id==='info'&&!infoOpen){ infoOpen=true; render(); } setTimeout(()=>goTo(id),30); },
