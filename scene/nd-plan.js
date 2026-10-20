@@ -413,7 +413,7 @@ function leftHTML(){ const c=PCODE()+(S.seq?String(S.seq).padStart(2,'0'):''), s
      <span class="btn btn-outline btn-sm" style="margin-left:auto">${infoOpen?'▴ พับเก็บ':'▾ แก้ข้อมูล'}</span></div>${infoOpen?`<div class="pl-cb">${infoHTML()}</div>`:''}</div>
    <div class="pl-card"><div class="pl-ch"><h3>① เลือกหน้าที่ที่งานนี้ใช้</h3><span class="pl-mut">ติ๊กเฉพาะที่ใช้ — กรอบหน้าที่ขึ้นด้านล่าง</span></div>
     <div class="pl-cb"><div class="pl-rp">${ORDER.map(k=>`<span class="${S.roles[k].on?'on':''}" style="--c:${R[k][2]}" onclick="NDP.tog('${k}')"><i>${S.roles[k].on?'✓':''}</i>${R[k][1]} ${R[k][0]}</span>`).join('')}</div></div></div>
-   <div class="pl-card"><div class="pl-ch"><h3>② หน้าที่ · คน · ราคา · เวลา</h3><span class="pl-mut">กดแถบเพื่อเปิดแก้ทีละหน้าที่</span>
+<!--ROLES-->   <div class="pl-card"><div class="pl-ch"><h3>② หน้าที่ · คน · ราคา · เวลา</h3><span class="pl-mut">กดแถบเพื่อเปิดแก้ทีละหน้าที่</span>
      ${st?`<span class="pl-tag" style="margin-left:auto;background:rgba(21,101,255,.16);color:var(--accent2)">💲 ราคามาตรฐานรหัส ${esc(PCODE())}</span>`:`<span class="pl-tag t-p" style="margin-left:auto">ยังไม่มีเทมเพลตราคารหัส ${esc(PCODE()||'-')}</span>`}</div><div class="pl-cb">
     ${ORDER.map((k,i)=>{ const r=S.roles[k]; if(!r.on) return ''; const o=i===openA, named=r.slots.filter(s=>s.id).length, late=r.end&&S.deadline&&r.end>S.deadline;
       return `<div class="pl-acc ${o?'open':''}" style="--c:${R[k][2]}"><div class="pl-ah" onclick="NDP.open(${i})"><span class="pl-ic">${R[k][1]}</span>
@@ -594,7 +594,7 @@ function render(){ const pg=$('nd-plan-body'); if(!pg) return;
   const y=window.scrollY, mc=$('main-content'), my=mc?mc.scrollTop:0;
   pg.innerHTML=`<div class="pl-top">${projPicker(projs)}
      ${dirty?'<span class="pl-dirty">● มีการแก้ไขที่ยังไม่บันทึก</span>':''}<span style="flex:1"></span><button class="btn btn-outline" onclick="NDP.save()">💾 บันทึก</button><button class="btn btn-green" onclick="NDP.saveSend()">✅ บันทึกโปรเจกต์ + ส่งให้ทีม</button></div>
-   <div class="pl-grid"><div>${leftHTML()}</div><div class="pl-right">${rightHTML()}</div></div>${driveHTML()}${dcHTML()}`;
+   ${(()=>{ const [top,roles]=leftHTML().split('<!--ROLES-->'); return top+`<div class="pl-grid"><div>${roles}</div><div class="pl-right">${rightHTML()}</div></div>`; })()}${driveHTML()}${dcHTML()}`;
   window.scrollTo(0,y); if(mc) mc.scrollTop=my;
   if(dd){ const q=$('pl-ddq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
   else if(pjOpen){ const q=$('pl-pjq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
