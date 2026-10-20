@@ -66,6 +66,7 @@ const CSS=`
 .pl-dlbox.linked{border-style:dashed}
 .pl-dlr{display:grid;grid-template-columns:minmax(120px,1fr) 150px 128px auto minmax(110px,1fr) 20px;gap:6px;align-items:center;margin-bottom:6px}
 .pl-dlr input:disabled{opacity:.55}
+.pl-st{display:flex;align-items:center;gap:6px;margin-bottom:6px}.pl-st>span{min-width:52px}.pl-st input[type=date]{width:150px}.pl-st input[type=time]{width:128px}.pl-st input:disabled{opacity:.55}
 .pl-dur2{font-size:11.5px;color:var(--text2);text-align:right}.pl-dur2 b{color:var(--accent2)}
 .pl-step{display:inline-flex;align-items:center;border:1px solid var(--border2);border-radius:8px;overflow:hidden;height:30px}
 .pl-step button{width:26px;height:100%;border:0;background:rgba(255,255,255,.05);color:var(--text);cursor:pointer;font-size:15px}
@@ -470,7 +471,6 @@ const roundLabel=rs=>[...new Set(rs.map(r=>safe(()=>_roundRangeLabel(r),'')).fil
 
 /* ── ข้อมูลโปรเจกต์ ── */
 function infoHTML(){ const adm=isAdm(), ms=mgrStaff(S.mgrId);
-  const inc=(S.src.income||[]).filter(Boolean), got=inc.filter(x=>x.paidAt).reduce((a,x)=>a+(+x.amount||0),0);
   const C=(n,lbl,body,cls='')=>`<div class="pl-c${n} ${cls}"><label class="pl-l">${lbl}</label>${body}</div>`;
   return `<div class="pl-info">
    ${C(1,'รหัส',`<input class="form-input" style="font-weight:800" value="${esc(S.code)}" onchange="NDP.set('code',this.value.toUpperCase())">`)}
@@ -494,7 +494,7 @@ function infoHTML(){ const adm=isAdm(), ms=mgrStaff(S.mgrId);
    ${C(8,'📝 หมายเหตุ (การหัก / เงื่อนไข)',`<input class="form-input" value="${esc(S.note)}" placeholder="—" onchange="NDP.set('note',this.value)">`)}
    ${C(4,'💰 ค่าเหมา Manager'+(adm?'':' <span class="pl-mut">(แอดมินตั้ง)</span>'),!S.mgrId?'<div class="pl-lock">— เลือก Manager ก่อน —</div>':adm?(ms?`<div class="pl-dt"><input class="form-input" type="number" step="any" value="${S.mgrFee||''}" placeholder="0" onchange="NDP.set('mgrFee',+this.value||0)"><span class="pl-mut" style="align-self:center;white-space:nowrap">฿ / งาน</span></div>`:'<div class="pl-lock pl-warn">เมเนเจอร์คนนี้ยังไม่ผูกกับรายชื่อทีม</div>'):`<div class="pl-lock">${S.mgrFee?B(S.mgrFee):'—'}</div>`)}
   </div>
-  ${adm?`<div class="pl-inc">💰 <b>การรับเงินจากลูกค้า</b><span class="pl-mut">${inc.length?inc.length+' งวด · รับแล้ว '+B(got)+' / '+B(budget())+' · ค้าง '+B(Math.max(0,budget()-got)):'ยังไม่ได้ตั้งงวดรับเงิน'}</span><span style="flex:1"></span><button class="btn btn-outline btn-sm" onclick="NDP.openProj()">✏️ แก้งวดรับเงิน (หน้าโปรเจกต์)</button></div>`:''}`; }
+  `; }
 
 /* ── หน้าที่ · คน · ราคา · เวลา ── */
 function nameBtn(k,j){ const r=S.roles[k], s=r.slots[j], open=dd&&dd.k===k&&dd.j===j;
@@ -511,7 +511,7 @@ function bodyHTML(k){ syncSame(); const r=S.roles[k], hr=hoursOf(r), st=STD();
   const dlRow=(i,lbl,d,t,late)=>{ const h=d?hoursTo(r,d,t):null;
     return `<div class="pl-dlr"><input class="form-input" ${dis} value="${esc(lbl)}" placeholder="${i<0?'เดทไลน์':'ชื่อรอบ เช่น Final'}" onchange="NDP.dlSet('${k}',${i},'label',this.value)"><input class="form-input" type="date" ${dis} value="${esc(d)}" style="${late?'border-color:var(--red)':''}" onchange="NDP.dlSet('${k}',${i},'date',this.value)"><input class="form-input" type="time" ${dis} value="${esc(t)}" onchange="NDP.dlSet('${k}',${i},'time',this.value)">${step(i)}<span class="pl-dur2">${h==null?'⏱ —':'⏱ <b>'+fmtH(h)+'</b>'}${late?' <span class="pl-bad">เลยเดดไลน์ลูกค้า</span>':''}</span>${i<0?'<span></span>':`<span class="pl-x" title="ลบรอบนี้" ${lk?'style="visibility:hidden"':''} onclick="NDP.rndDel('${k}',${i})">✕</span>`}</div>`; };
   const time=`<div class="pl-dlbox ${lk?'linked':''}">
-    <div class="pl-dlr"><span class="pl-mut">📅 เริ่ม</span><input class="form-input" type="date" ${dis} value="${esc(r.start)}" onchange="NDP.r('${k}','start',this.value)"><input class="form-input" type="time" ${dis} value="${esc(r.stime)}" onchange="NDP.r('${k}','stime',this.value)"><span></span><span></span><span></span></div>
+    <div class="pl-st"><span class="pl-mut">📅 เริ่ม</span><input class="form-input" type="date" ${dis} value="${esc(r.start)}" onchange="NDP.r('${k}','start',this.value)"><input class="form-input" type="time" ${dis} value="${esc(r.stime)}" onchange="NDP.r('${k}','stime',this.value)"></div>
     <div class="pl-mut" style="margin:6px 0 4px">🏁 เดดไลน์ — ตั้งชื่อแต่ละรอบเองได้ (ชื่อนี้ขึ้นในโพสต์ใต้หัวข้อ "${esc(R[k][0])}")</div>
     ${dlRow(-1, r.endLabel||'', r.end, r.etime, late)}
     ${(r.rounds||[]).map((x,i)=>dlRow(i, x.label, x.date, x.time, x.date&&S.deadline&&x.date>S.deadline)).join('')}
