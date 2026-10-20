@@ -152,7 +152,7 @@ const CSS=`
 
 /* ── สถานะของหน้า ── */
 let S=null, dirty=false, saving=false, PRICE={}, WK=null, pcSel='', pcNew=false, dd=null, ddQ='', pkRole='all', pkAll=false, pkQ='', openA=-1, infoOpen=true;
-let edText=null, edPost='', tplSel='';
+let edText=null, edPost='', tplSel='', edFromTpl=false;
 let DC={room:{}, keep:{}, pick:null};
 const DR0=()=>({cur:'', path:[], folders:null, err:'', tpl:'', edit:false, editText:null, name:''});
 let DR=DR0();
@@ -550,10 +550,130 @@ function syncRoom(){ const want=new Set(planIds());
   want.forEach(id=>{ if(!DC.room[id]) DC.room[id]='add'; }); }
 const posts=()=>safe(()=>_prPosts(S.src),[])||[];
 const tpls=()=>safe(()=>getPostTpls(),[])||[];
-function tplFill(t){ const txt=String((t&&t.text)||''); return safe(()=>_prFillTpl(previewProj(), txt),txt); }
+/* ══ 📋 เทมเพลตโพสต์อัจฉริยะ ══
+   • เลือกเทมเพลต → เติมข้อมูลงานปัจจุบันจากแผนด้านบนให้เอง (รหัส ตอน นาที คน Ep ราคา เดดไลน์ทุกรอบ)
+   • บันทึกเทมเพลต → ระบบอ่านข้อความ แล้วแปลงข้อมูลของงานนี้กลับเป็น "ช่องเติมอัตโนมัติ" { } ให้เอง (ตรวจ/แก้ก่อนบันทึกได้)
+   ช่องที่ใช้ได้:
+     {รหัส} {ชื่อเรื่อง} {ไฟล์} {ลิงก์โหลด} {ตอน} {นาที} {เดทไลน์} {เวลาส่งลูกค้า} {เมเนเจอร์}
+     ต่อหน้าที่ (แปล · เกลา · พากย์ · มิกซ์ · QC · ซับ):
+       {จำนวนเกลา} {ทีมเกลา} {เดทไลน์เกลา} {เวลาเกลา} {เดทไลน์เกลา:Final} {เวลาเกลา:Final} (ตามชื่อรอบที่ตั้งไว้)
+     บล็อกต่อคน (ซ้ำตามจำนวนคน):  {ทุกคน:เกลา} … {/ทุกคน}
+       ข้างในใช้ {ลำดับ} {คน} (แท็ก) {ชื่อคน} {Ep} {นาทีคน} {ราคาคน} {เรทพากย์} */
+const RK={trn:'แปล',adp:'เกลา',dub:'พากย์',mix:'มิกซ์',qc:'QC',sub:'ซับ'};
+const RKW={trn:['แปล'],adp:['เกลา','บท'],dub:['พากย์'],mix:['มิกซ์','mix'],qc:['qc','คิวซี'],sub:['ซับ','sub']};
+const keyOfRole=w=>{ w=String(w||'').trim().toLowerCase(); return ORDER.find(k=>RK[k].toLowerCase()===w)||ORDER.find(k=>RKW[k].some(x=>w.includes(x)))||''; };
+const tagOfS=s=>s?(s.discordId?'<@'+s.discordId+'>':'@'+(s.nickname||s.name||'')):'';
+const fmtD=d=>d?safe(()=>fmtDate(d),fd(d)):'—';
+const numFmts=n=>{ n=Math.round(+n||0); return n?[...new Set([n.toLocaleString('en-US'),String(n)])]:[]; };
+const dateFmts=d=>{ if(!d) return []; const x=new Date(d); if(isNaN(x)) return [];
+  const th=safe(()=>fmtDate(d),''), D=x.getDate(), M=x.getMonth()+1, Y=x.getFullYear(), BE=Y+543;
+  return [...new Set([th, D+'/'+M+'/'+BE, D+'/'+M+'/'+Y, String(D).padStart(2,'0')+'/'+String(M).padStart(2,'0')+'/'+BE, D+' '+TM[M-1]+' '+String(BE).slice(2), D+' '+TM[M-1], fd(d)].filter(Boolean))].sort((a,b)=>b.length-a.length); };
+const timeFmts=t=>t?[t, t.replace(':','.')]:[];
+const escRe=s=>String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const swap=(txt,from,to)=>from?txt.split(from).join(to):txt;
+// ข้อมูลของแต่ละคนในหน้าที่ (จากแผนตอนนี้)
+function pplOf(k){ const r=S.roles[k]; if(!r||!r.on) return [];
+  return r.slots.filter(s=>s.id).map((s,i)=>{ const st=staff(s.id)||{}; const t=k==='dub'?(r.tiers[(s.tier||1)-1]||{}):null;
+    return {i:i+1, id:s.id, s:st, tag:tagOfS(st), name:st.nickname||st.name||'', ep:s.ep||'', min:k==='adp'?(+s.min||0):0, amt:amt(r,s), tier:k==='dub'?(s.tier||1):0}; }); }
+function fillVals(){ const v={};
+  v['รหัส']=drCode(); v['ชื่อเรื่อง']=S.name||''; v['ไฟล์']=S.src.driveFolderLink||S.link||'—'; v['ลิงก์โหลด']=S.link||S.src.driveFolderLink||'—';
+  v['ตอน']=S.eps||'—'; v['นาที']=S.minutes||'—'; v['เดทไลน์']=fmtD(S.deadline); v['เวลาส่งลูกค้า']=S.dtime||'—';
+  const ms=mgrStaff(S.mgrId); v['เมเนเจอร์']=ms?tagOfS(ms):mgrName(S.mgrId);
+  ORDER.forEach(k=>{ const n=RK[k], r=S.roles[k], ppl=pplOf(k);
+    v['จำนวน'+n]=ppl.length||'—'; v['ทีม'+n]=ppl.map(p=>p.tag).join(' ')||'—';
+    v['เดทไลน์'+n]=r.on?fmtD(r.end):'—'; v['เวลา'+n]=r.on&&r.etime?r.etime:'—';
+    (r.rounds||[]).forEach((x,i)=>{ const lb=String(x.label||'').trim();
+      [lb, 'รอบ'+(i+2), String(i+2)].filter(Boolean).forEach(nm=>{ v['เดทไลน์'+n+':'+nm]=fmtD(x.date); v['เวลา'+n+':'+nm]=x.time||'—'; }); }); });
+  return v; }
+// เดดไลน์รอบอื่น (เช่น Final) ที่เทมเพลตยังไม่ได้เขียนถึง → เติมบรรทัดต่อจากบรรทัดเดดไลน์หลักของหน้าที่นั้นให้เอง
+function addRoundLines(t){
+  ORDER.forEach(k=>{ const n=RK[k], r=S.roles[k], rs=r.on?(r.rounds||[]).filter(x=>x.date):[]; if(!rs.length) return;
+    if(t.includes('{เดทไลน์'+n+':')) return;
+    t=t.split('\n').map(line=>{ if(!line.includes('{เดทไลน์'+n+'}')) return line;
+      return [line, ...rs.map((x,i)=>{ const nm=String(x.label||'').trim()||('รอบ'+(i+2));
+        let c=line.split('{เดทไลน์'+n+'}').join('{เดทไลน์'+n+':'+nm+'}').split('{เวลา'+n+'}').join('{เวลา'+n+':'+nm+'}');
+        let done=false; c=c.split(/(\{[^{}]*\})/).map(part=>{ if(done||/^\{/.test(part)) return part; const m=part.match(/เดทไลน์|เดดไลน์|deadline/i); if(!m) return part; done=true; return part.replace(m[0], m[0]+' '+nm); }).join('');
+        return done?c:nm+' '+c; })].join('\n'); }).join('\n'); });
+  return t; }
+function fillPlan(text){
+  let t=addRoundLines(String(text||''));
+  // บล็อกต่อคน
+  t=t.replace(/\{ทุกคน:([^}]+)\}[^\S\n]*\n?([\s\S]*?)\{\/ทุกคน\}[^\S\n]*\n?/g,(m,rk,body)=>{ const k=keyOfRole(rk); if(!k) return m;
+    const ppl=pplOf(k); if(!ppl.length) return '';
+    return ppl.map(p=>{ let b=body; const pv={'ลำดับ':p.i,'คน':p.tag,'ชื่อคน':p.name,'Ep':p.ep||'—','นาทีคน':p.min||'—','ราคาคน':Math.round(p.amt).toLocaleString('en-US'),'เรทพากย์':p.tier?'พากย์'+p.tier:''};
+      Object.entries(pv).forEach(([a,c])=>{ b=b.split('{'+a+'}').join(String(c)); }); return b; }).join(''); });
+  const v=fillVals();
+  Object.keys(v).sort((a,b)=>b.length-a.length).forEach(k=>{ t=t.split('{'+k+'}').join(String(v[k])); });
+  // ช่องมาตรฐานเดิมของระบบ (ทีมบท นักพากย์ชาย ฯลฯ) — ใช้ตัวเติมเดิมต่อ
+  return safe(()=>_prFillTpl(previewProj(), t), t);
+}
+// ข้อความโพสต์ของงานนี้ → เทมเพลต (แทนค่าของงานนี้ด้วยช่อง { })
+function toTemplate(text){
+  let L=String(text||'').split('\n');
+  const hasKw=(line,k)=>RKW[k].some(w=>line.toLowerCase().includes(w));
+  const isSep=l=>/^[\s—\-_=─━]{3,}$/.test(l)||!l.trim();
+  // 1) บล็อกต่อคน → {ทุกคน:…}
+  const ranges=[];
+  ORDER.forEach(k=>{ const ppl=pplOf(k); if(!ppl.length) return;
+    const tags=p=>[p.tag, p.s.discordId?'<@!'+p.s.discordId+'>':'', '@'+p.name].filter(x=>x&&x!=='@');
+    const found=ppl.map(p=>({p, at:L.findIndex(l=>tags(p).some(tg=>l.includes(tg)))})).filter(x=>x.at>=0).sort((a,b)=>a.at-b.at);
+    if(!found.length) return;
+    // บรรทัดเดียวที่แท็กหลายคน (เช่น "🎙 : @a / @b") — ไม่ใช่บล็อกต่อคน ข้ามไป (ช่อง {ทีม…} จัดการให้)
+    if(found.length>1 && found[0].at===found[1].at) return;
+    const start=found[0].at; let len=found.length>1?found[1].at-found[0].at:0;
+    // คนเดียว: เป็นบล็อกต่อคนเฉพาะเมื่อบรรทัดถัดไปมีข้อมูลของคนนั้น (Ep/นาที/ราคา) — ไม่งั้นใช้ {ทีม…} แทน
+    if(!len){ const p0=found[0].p, mine=l=>(p0.ep&&l.includes(p0.ep))||numFmts(p0.amt).some(a=>new RegExp('(^|[^\\d,])'+escRe(a)+'(?![\\d,])').test(l))||(p0.min&&new RegExp('(^|[^\\d.])'+p0.min+'\\s*นาที').test(l));
+      len=1; while(start+len<L.length && !isSep(L[start+len]) && mine(L[start+len])) len++;
+      if(len===1 && !mine(L[start])) return; }
+    const lastAt=found[found.length-1].at, end=Math.min(L.length, lastAt+len);
+    if(ranges.some(g=>!(end<=g.start||start>=g.end))) return;
+    let block=L.slice(start, start+len).join('\n'); const p=found[0].p;
+    tags(p).forEach(tg=>{ block=swap(block,tg,'{คน}'); });
+    if(p.ep) [p.ep, p.ep.replace(/-/g,'–'), p.ep.replace(/–/g,'-')].forEach(e=>{ block=swap(block,e,'{Ep}'); });
+    numFmts(p.amt).forEach(a=>{ block=block.replace(new RegExp('(^|[^\\d,])'+escRe(a)+'(?![\\d,])','g'),'$1{ราคาคน}'); });
+    if(p.min) block=block.replace(new RegExp('(^|[^\\d.])'+escRe(String(p.min))+'(?=\\s*นาที)','g'),'$1{นาทีคน}');
+    if(p.tier) block=block.replace(new RegExp('พากย์\\s*'+p.tier+'(?!\\d)','g'),'{เรทพากย์}');
+    block=block.replace(new RegExp('(^|[^\\d])'+p.i+'(\\s*[:：.)])'),'$1{ลำดับ}$2');
+    ranges.push({start, end, lines:['{ทุกคน:'+RK[k]+'}', ...block.split('\n'), '{/ทุกคน}']});
+  });
+  ranges.sort((a,b)=>b.start-a.start).forEach(g=>{ L.splice(g.start, g.end-g.start, ...g.lines); });
+  // 2) ค่าระดับงาน + เดดไลน์แยกตามหน้าที่ (ดูหัวข้อหน้าที่ที่อยู่ด้านบนบรรทัดนั้น)
+  const v=fillVals(); let ctx=[], inLoop=false;
+  const roleDates=k=>{ const r=S.roles[k], n=RK[k]; if(!r.on) return [];
+    return [{d:r.end, t:r.etime, dk:'เดทไลน์'+n, tk:'เวลา'+n}, ...(r.rounds||[]).filter(x=>x.date).map((x,i)=>{ const nm=String(x.label||'').trim()||('รอบ'+(i+2)); return {d:x.date, t:x.time, dk:'เดทไลน์'+n+':'+nm, tk:'เวลา'+n+':'+nm}; })]; };
+  L=L.map(line=>{
+    if(/^\{ทุกคน:/.test(line)){ inLoop=true; return line; } if(/^\{\/ทุกคน\}/.test(line)){ inLoop=false; return line; }
+    const kws=ORDER.filter(k=>hasKw(line,k)); if(kws.length && !inLoop) ctx=kws;
+    let out=line;
+    // เดดไลน์: หน้าที่ในหัวข้อปัจจุบันก่อน แล้วค่อยหน้าที่อื่น · สุดท้าย = เดดไลน์ลูกค้า
+    const order=[...ctx, ...ORDER.filter(k=>!ctx.includes(k))];
+    let hitDate=null;
+    for(const k of order){ for(const x of roleDates(k)){ const f=dateFmts(x.d).find(s=>out.includes(s)); if(f){ out=swap(out,f,'{'+x.dk+'}'); hitDate=x; break; } } if(hitDate) break; }
+    if(!hitDate){ const f=dateFmts(S.deadline).find(s=>out.includes(s)); if(f){ out=swap(out,f,'{เดทไลน์}'); hitDate={t:S.dtime, tk:'เวลาส่งลูกค้า'}; } }
+    if(hitDate&&hitDate.t){ const tf=timeFmts(hitDate.t).find(s=>out.includes(s)); if(tf) out=swap(out,tf,'{'+hitDate.tk+'}'); }
+    // จำนวนคนของหน้าที่ในหัวข้อนี้
+    if(/จำนวน/.test(out) && ctx.length===1){ const n=pplOf(ctx[0]).length; if(n) out=out.replace(new RegExp('(^|[^\\d])'+n+'(?!\\d)'),'$1{จำนวน'+RK[ctx[0]]+'}'); }
+    // ตอน / นาทีรวม
+    if(!inLoop && S.eps && /ep|ตอน/i.test(out) && !/\{ตอน\}/.test(out)) out=out.replace(new RegExp('(^|[^\\d])'+S.eps+'(?!\\d)'),'$1{ตอน}');
+    if(!inLoop && S.minutes && /นาที|เวลารวม|time/i.test(out)) out=out.replace(new RegExp('(^|[^\\d.])'+escRe(String(S.minutes))+'(?![\\d.])'),'$1{นาที}');
+    return out; });
+  let t=L.join('\n');
+  // ลิงก์/รหัส/ชื่อเรื่อง/แท็กทีมทั้งหน้าที่ (เรียงยาวก่อน กันชนกัน)
+  const reps=[[S.src.driveFolderLink,'{ไฟล์}'],[S.link&&S.link!==S.src.driveFolderLink?S.link:'','{ลิงก์โหลด}'],[drCode(),'{รหัส}'],[S.name&&S.name.length>=3&&S.name!==drCode()?S.name:'','{ชื่อเรื่อง}']];
+  ORDER.forEach(k=>{ const tg=pplOf(k).map(p=>p.tag).join(' '); if(pplOf(k).length>1) reps.push([tg,'{ทีม'+RK[k]+'}']); });
+  const ms=mgrStaff(S.mgrId); if(ms) reps.push([tagOfS(ms),'{เมเนเจอร์}']);
+  reps.filter(x=>x[0]&&String(x[0]).trim()).sort((a,b)=>String(b[0]).length-String(a[0]).length).forEach(([a,b])=>{ t=swap(t,String(a),b); });
+  // คนที่ยังเหลือเป็นแท็กเดี่ยว (นอกบล็อก) → {ทีม…} ของหน้าที่นั้น
+  ORDER.forEach(k=>{ pplOf(k).forEach(p=>{ if(p.tag&&t.includes(p.tag)) t=swap(t,p.tag,'{ทีม'+RK[k]+'}'); }); });
+  return t;
+}
+const slotCount=t=>(String(t).match(/\{[^{}\n]+\}/g)||[]).length;
+
+function tplFill(t){ return safe(()=>fillPlan((t&&t.text)||''), String((t&&t.text)||'')); }
 function edDefault(){ const p=posts().find(x=>x.id===edPost); if(p) return String(p.text||''); return tplFill(tpls().find(x=>x.id===tplSel)||tpls()[0]); }
 function dcHTML(){ const p=S.src, has=!!p.discordChannelId;
-  syncRoom(); const ids=Object.keys(DC.room), cnt=k=>ids.filter(id=>DC.room[id]===k&&(staff(id)||{}).discordId).length; if(edText==null) edText=edDefault();
+  syncRoom(); const ids=Object.keys(DC.room), cnt=k=>ids.filter(id=>DC.room[id]===k&&(staff(id)||{}).discordId).length; if(edText==null){ edText=edDefault(); edFromTpl=!posts().some(x=>x.id===edPost); }
+  else if(edFromTpl){ const t=tpls().find(x=>x.id===tplSel)||(!tplSel&&tpls()[0]); if(t) edText=tplFill(t); }
   const ms=mgrStaff(S.mgrId), noDc=planIds().filter(id=>!(staff(id)||{}).discordId);
   const left=has?`<div class="pl-tree"><b>📂 ${esc(p.discordCategoryName||'(หมวดหมู่)')}</b><br>&nbsp;&nbsp;#${esc(p.discordChannelName||'📁│project')} ${p.discordReadOnly?'<span class="pl-tag" style="background:rgba(88,101,242,.2);color:#aab3ff">🔒 ทีมอ่านอย่างเดียว</span>':`<a class="pl-tag t-p" style="cursor:pointer" title="ตอนนี้ทีมพิมพ์ในห้องนี้ได้ — กดเพื่อให้พิมพ์ได้เฉพาะแอดมิน/เมเนเจอร์" onclick="NDP.dcRO()">🔓 ตั้งให้ทีมอ่านอย่างเดียว</a>`}${p.discordTalkId?'<br>&nbsp;&nbsp;#🎙│พูดคุย':''}</div>
      <div style="margin:12px 0 6px;font-weight:600;font-size:13px">👥 สิทธิ์เข้าห้อง</div>
@@ -571,7 +691,7 @@ function dcHTML(){ const p=S.src, has=!!p.discordChannelId;
   return `<div class="pl-card"><div class="pl-ch pl-dch"><h3>💬 ห้อง Discord</h3><span class="pl-mut">${has?'ผูกห้องแล้ว · ชื่อคนมาจากแผนด้านบน':'ยังไม่มีห้อง — สร้างจากข้อมูลด้านบน'}</span></div>
    <div class="pl-cb pl-dcw"><div>${left}</div>
     <div><div class="pl-tpls">${P.length?`<select class="form-input form-select" style="width:auto;padding:4px 8px" title="เลือกโพสต์ที่จะแก้" onchange="NDP.post(this.value)">${P.map(x=>`<option value="${esc(x.id)}"${x.id===edPost?' selected':''}>${esc((x.emoji||'📝')+' '+(x.title||'โพสต์'))}${x.msgIds&&x.msgIds.length?' · โพสต์แล้ว':' · ร่าง'}</option>`).join('')}<option value=""${!cur?' selected':''}>＋ ข้อความใหม่</option></select>`:''}
-      ${(()=>{ const L=tpls(), c=L.find(t=>t.id===tplSel); return `<select class="form-input form-select" style="width:auto;max-width:280px;padding:4px 8px" title="ดึงข้อความจากเทมเพลต (เติมข้อมูลจากแผนให้)" onchange="NDP.tpl(this.value)"><option value="" selected>📋 ${c?'เทมเพลต: '+esc(c.name||'เทมเพลต')+' — เลือกเพื่อดึงข้อความ':'ดึงข้อความจากเทมเพลต…'}</option>${L.map(t=>`<option value="${esc(t.id)}">${t.id===tplSel?'✓ ':''}${esc(t.name||'เทมเพลต')}</option>`).join('')}</select>`; })()}<span style="flex:1"></span><button class="btn btn-outline btn-sm" onclick="NDP.saveTpl()">💾 บันทึกเป็นเทมเพลต</button></div>
+      ${(()=>{ const L=tpls(), c=L.find(t=>t.id===tplSel); return `<select class="form-input form-select" style="width:auto;max-width:280px;padding:4px 8px" title="ดึงข้อความจากเทมเพลต (เติมข้อมูลจากแผนให้)" onchange="NDP.tpl(this.value)"><option value="" selected>📋 ${c?'เทมเพลต: '+esc(c.name||'เทมเพลต')+' — เลือกเพื่อดึงข้อความ':'ดึงข้อความจากเทมเพลต…'}</option>${L.map(t=>`<option value="${esc(t.id)}">${t.id===tplSel?'✓ ':''}${esc(t.name||'เทมเพลต')}</option>`).join('')}</select>${isAdm()?`<button class="btn btn-outline btn-sm" style="padding:4px 9px" title="จัดการเทมเพลต (เปลี่ยนชื่อ · แก้ข้อความ · ลบ)" onclick="NDP.tplMgr()">⚙️</button>`:''}`; })()}<span style="flex:1"></span><button class="btn btn-outline btn-sm" onclick="NDP.saveTpl()">💾 บันทึกเป็นเทมเพลต</button></div>
      <textarea class="form-input" id="pl-ed" oninput="NDP.ed(this)" onkeydown="NDP.edKey(event)" onblur="setTimeout(()=>NDP.atClose(),150)">${esc(edText)}</textarea>
      <div style="display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap"><span class="pl-mut">พิมพ์ @ เพื่อแท็กคนในแผน · ${cur?(posted?'โพสต์นี้อยู่ในห้องแล้ว':'ร่าง — ยังไม่โพสต์'):'ข้อความใหม่'}</span><span style="flex:1"></span>
       ${posted?`<button class="btn btn-sm" style="background:#5865F2;color:#fff" onclick="NDP.send('update')">📣 อัปเดตโพสต์</button>`:''}<button class="btn ${posted?'btn-outline':''} btn-sm" style="${posted?'':'background:#5865F2;color:#fff'}" ${has?'':'disabled title="สร้างห้องก่อน"'} onclick="NDP.send('new')">📤 โพสต์ใหม่</button></div></div></div></div>`; }
@@ -762,18 +882,55 @@ const NDP=window.NDP={
     }catch(e){ say(/ไม่รู้จักคำสั่ง/.test(e.message)?'Worker ของบอทยังเป็นเวอร์ชันเก่า — Deploy worker.js ล่าสุดก่อน':'สร้างห้องไม่สำเร็จ: '+e.message,'error'); }
     finally{ busy(false); S.src=fresh(); render(); } },
   dcLink(){ if(dirty){ say('บันทึกแผนก่อน แล้วค่อยผูกห้อง','warn'); return; } safe(()=>prLinkExisting(S.id)); },
-  post(id){ const cur=($('pl-ed')||{}).value; if(cur!=null && cur!==edDefault() && !confirm('ทิ้งข้อความที่แก้ในกล่อง?')){ render(); return; } edPost=id; edText=null; render(); },
-  tpl(id){ if(!id) return; const cur=($('pl-ed')||{}).value||''; if(cur.trim() && cur!==edDefault() && !confirm('แทนที่ข้อความในกล่องด้วยเทมเพลตนี้?')){ render(); return; } tplSel=id; edText=tplFill(tpls().find(t=>t.id===id)); render(); },
-  async saveTpl(){ const txt=String(($('pl-ed')||{}).value||'').trim(); if(!txt){ say('กล่องข้อความว่าง','warn'); return; }
-    const list=tpls(), cur=list.find(t=>t.id===tplSel);
-    let mode='new'; if(cur && isAdm()) mode=confirm('บันทึกทับเทมเพลต "'+cur.name+'"?\n\nOK = บันทึกทับ · Cancel = บันทึกเป็นเทมเพลตใหม่')?'over':'new';
-    if(mode==='over'){ cur.text=txt; } else { const nm=prompt('ตั้งชื่อเทมเพลตใหม่:',''); if(!nm||!nm.trim()) return; const id='tpl_'+Date.now().toString(36); list.push({id,name:nm.trim(),text:txt}); tplSel=id; }
-    await savePostTpls(list); say('💾 บันทึกเทมเพลตแล้ว (ข้อความที่เติมชื่อ/วันไว้แล้วจะเก็บตามที่เห็น)','success'); render(); },
-  ed(ta){ edText=ta.value; const pos=ta.selectionStart, m=ta.value.slice(0,pos).match(/@([^\s@<>]{0,20})$/);
+  post(id){ const cur=($('pl-ed')||{}).value; if(cur!=null && !edFromTpl && cur!==edDefault() && !confirm('ทิ้งข้อความที่แก้ในกล่อง?')){ render(); return; } edPost=id; edText=null; render(); },
+  tpl(id){ if(!id) return; const cur=($('pl-ed')||{}).value||''; if(cur.trim() && !edFromTpl && cur!==edDefault() && !confirm('แทนที่ข้อความในกล่องด้วยเทมเพลตนี้?')){ render(); return; } tplSel=id; edText=tplFill(tpls().find(t=>t.id===id)); edFromTpl=true; render(); },
+
+  // ⚙️ จัดการเทมเพลตโพสต์ (แอดมิน): เปลี่ยนชื่อ · แก้ข้อความ · ลบ
+  tplMgr(){ if(!isAdm()) return; const L=tpls();
+    safe(()=>_tagOverlayShow('⚙️ จัดการเทมเพลตโพสต์', `<div class="pl-mut" style="margin-bottom:8px">✏️ เปลี่ยนชื่อ · 📝 แก้ข้อความเทมเพลต · 🗑️ ลบ — ทุกคนเห็นชุดเดียวกัน</div>
+      <div style="max-height:420px;overflow:auto">${L.map(t=>`<div style="display:flex;align-items:center;gap:6px;padding:7px 4px;border-top:1px solid var(--border2)">
+        <span style="flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📋 ${esc(t.name||'ไม่มีชื่อ')}${t.id===tplSel?' <small class="pl-mut">(ใช้อยู่)</small>':''}</span>
+        <span class="pl-mut" style="font-size:11px">${slotCount(t.text||'')} ช่องเติม</span>
+        <button class="btn btn-outline btn-sm" title="เปลี่ยนชื่อ" onclick="NDP.tplRen('${esc(t.id)}')">✏️</button>
+        <button class="btn btn-outline btn-sm" title="แก้ข้อความ" onclick="NDP.tplEdit('${esc(t.id)}')">📝</button>
+        <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:rgba(255,64,64,.35)" title="ลบ" onclick="NDP.tplDel('${esc(t.id)}')">🗑️</button></div>`).join('')||'<div class="pl-mut" style="padding:12px">ยังไม่มีเทมเพลต</div>'}</div>
+      <div style="display:flex;margin-top:10px"><button class="btn btn-outline" style="flex:1" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button></div>`, 560)); },
+  async tplRen(id){ const L=tpls(), t=L.find(x=>x.id===id); if(!t) return; const nm=prompt('ชื่อเทมเพลตใหม่:', t.name||''); if(nm==null||!nm.trim()) return;
+    if(L.some(x=>x.id!==id&&String(x.name||'').trim()===nm.trim()) && !confirm('มีเทมเพลตชื่อ "'+nm.trim()+'" อยู่แล้ว — ใช้ชื่อซ้ำ?')) return;
+    t.name=nm.trim(); await savePostTpls(L); say('✏️ เปลี่ยนชื่อแล้ว','success'); NDP.tplMgr(); render(); },
+  async tplDel(id){ const L=tpls(), t=L.find(x=>x.id===id); if(!t) return;
+    if(!confirm('ลบเทมเพลต "'+(t.name||'')+'"?\n(โพสต์ที่โพสต์ไปแล้วไม่ถูกลบ)')) return;
+    await savePostTpls(L.filter(x=>x.id!==id)); if(tplSel===id){ tplSel=''; edFromTpl=false; } say('🗑️ ลบเทมเพลตแล้ว','info'); NDP.tplMgr(); render(); },
+  tplEdit(id){ const L=tpls(), t=L.find(x=>x.id===id); if(!t) return;
+    safe(()=>_tagOverlayShow('📝 แก้เทมเพลต "'+esc(t.name||'')+'"', `<div class="pl-mut" style="margin-bottom:6px;line-height:1.6">ข้อความใน { } = ช่องที่ระบบเติมจากงานให้เอง เช่น {รหัส} {ตอน} {เดทไลน์เกลา} · บล็อกต่อคน {ทุกคน:เกลา} … {/ทุกคน}</div>
+      <input id="pl-tename" class="form-input" value="${esc(t.name||'')}" placeholder="ชื่อเทมเพลต" style="margin-bottom:8px">
+      <textarea id="pl-tetext" class="form-input" style="min-height:340px;font-size:12.5px;line-height:1.6;font-family:Kanit,sans-serif">${esc(t.text||'')}</textarea>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-green" style="flex:1" id="pl-tesave">💾 บันทึก</button><button class="btn btn-outline" onclick="NDP.tplMgr()">← กลับ</button></div>`, 760));
+    setTimeout(()=>{ const b=$('pl-tesave'); if(b) b.onclick=async()=>{ const nm=String(($('pl-tename')||{}).value||'').trim(), tx=String(($('pl-tetext')||{}).value||'');
+      if(!tx.trim()){ say('ข้อความว่าง','warn'); return; } const L2=tpls(), t2=L2.find(x=>x.id===id); if(!t2) return; if(nm) t2.name=nm; t2.text=tx;
+      await savePostTpls(L2); say('💾 บันทึกเทมเพลตแล้ว','success'); if(tplSel===id&&edFromTpl) edText=null; NDP.tplMgr(); render(); }; },60); },
+  // 💾 บันทึกเทมเพลต: แปลงข้อมูลของงานนี้ในข้อความ → ช่องเติมอัตโนมัติ แล้วให้ตรวจก่อนบันทึก
+  saveTpl(){ const raw=String(($('pl-ed')||{}).value||'').trim(); if(!raw){ say('กล่องข้อความว่าง','warn'); return; }
+    const conv=safe(()=>toTemplate(raw), raw), n=slotCount(conv), list=tpls(), cur=list.find(t=>t.id===tplSel);
+    const help=['รหัส','ชื่อเรื่อง','ไฟล์','ลิงก์โหลด','ตอน','นาที','เดทไลน์','เวลาส่งลูกค้า','เมเนเจอร์'].map(x=>'{'+x+'}').join(' ')
+      +'<br>ต่อหน้าที่ ('+ORDER.map(k=>RK[k]).join(' · ')+'): {จำนวนเกลา} {ทีมเกลา} {เดทไลน์เกลา} {เวลาเกลา} · รอบอื่นใช้ชื่อรอบ เช่น {เดทไลน์มิกซ์:Final} {เวลามิกซ์:Final}'
+      +'<br>บล็อกต่อคน: {ทุกคน:เกลา} … {/ทุกคน} ข้างในใช้ {ลำดับ} {คน} {ชื่อคน} {Ep} {นาทีคน} {ราคาคน} {เรทพากย์}';
+    safe(()=>_tagOverlayShow('💾 บันทึกเป็นเทมเพลต', `<div class="pl-mut" style="line-height:1.7;margin-bottom:8px">ระบบอ่านข้อความแล้วแปลงข้อมูลของงาน <b style="color:var(--accent2)">${esc(drCode())}</b> เป็นช่องเติมอัตโนมัติ <b>${n}</b> ช่อง (ตัวใน { }) — ครั้งหน้าเลือกเทมเพลตนี้ ระบบจะเติมจากงานที่เปิดอยู่ให้เอง · ตรวจ/แก้ได้ก่อนบันทึก</div>
+      <textarea id="pl-tplconv" class="form-input" style="min-height:320px;font-size:12.5px;line-height:1.6;font-family:Kanit,sans-serif">${esc(conv)}</textarea>
+      <details style="margin-top:6px"><summary class="pl-mut" style="cursor:pointer">📖 ช่องที่ใช้ได้</summary><div class="pl-mut" style="line-height:1.9;margin-top:4px">${help}</div></details>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center"><input id="pl-tplname" class="form-input" style="flex:1;min-width:180px" placeholder="ชื่อเทมเพลตใหม่ เช่น หนังแนวตั้ง M">
+        <button class="btn btn-green" id="pl-tplnew">📄 บันทึกเป็นเทมเพลตใหม่</button>${cur&&isAdm()?`<button class="btn btn-outline" id="pl-tplover">💾 บันทึกทับ "${esc(cur.name)}"</button>`:''}
+        <button class="btn btn-outline" onclick="document.getElementById('tag-overlay')?.remove()">ยกเลิก</button></div>`, 760));
+    setTimeout(()=>{ const ta=$('pl-tplconv'), done=async()=>{ document.getElementById('tag-overlay')?.remove(); await savePostTpls(list); edFromTpl=true; edText=null; say('💾 บันทึกเทมเพลตแล้ว — เลือกใช้กับงานอื่นได้ ระบบเติมข้อมูลให้เอง','success'); render(); };
+      const nb=$('pl-tplnew'), ob=$('pl-tplover');
+      if(nb) nb.onclick=async()=>{ const nm=String(($('pl-tplname')||{}).value||'').trim(); if(!nm){ say('ตั้งชื่อเทมเพลตก่อน','warn'); $('pl-tplname')?.focus(); return; }
+        const id='tpl_'+Date.now().toString(36); list.push({id,name:nm,text:ta.value}); tplSel=id; await done(); };
+      if(ob) ob.onclick=async()=>{ if(!confirm('บันทึกทับเทมเพลต "'+cur.name+'"?')) return; cur.text=ta.value; await done(); }; },60); },
+  ed(ta){ edText=ta.value; edFromTpl=false; const pos=ta.selectionStart, m=ta.value.slice(0,pos).match(/@([^\s@<>]{0,20})$/);
     if(m){ AT={start:pos-m[0].length, end:pos, list:atList(m[1]), i:0}; atRender(ta); } else NDP.atClose(); },
   edKey(e){ if(!AT||!AT.list.length) return; if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); AT.i=(AT.i+(e.key==='ArrowDown'?1:-1)+AT.list.length)%AT.list.length; atRender(e.target); } else if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); NDP.atPick(AT.i); } else if(e.key==='Escape') NDP.atClose(); },
   atPick(i){ const ta=$('pl-ed'); if(!ta||!AT) return; const s=AT.list[i]; if(!s) return; const tag=(s.discordId?'<@'+s.discordId+'>':'@'+(s.nickname||s.name))+' ';
-    ta.value=ta.value.slice(0,AT.start)+tag+ta.value.slice(AT.end); const p=AT.start+tag.length; edText=ta.value; NDP.atClose(); ta.focus(); ta.setSelectionRange(p,p); },
+    ta.value=ta.value.slice(0,AT.start)+tag+ta.value.slice(AT.end); const p=AT.start+tag.length; edText=ta.value; edFromTpl=false; NDP.atClose(); ta.focus(); ta.setSelectionRange(p,p); },
   atClose(){ AT=null; document.getElementById('pl-at')?.remove(); },
   async send(mode, noConfirm){ const txt=($('pl-ed')||{}).value||edText;
     if(dirty && !await save(true)) return;
