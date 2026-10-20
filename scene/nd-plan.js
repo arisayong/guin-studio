@@ -332,6 +332,25 @@ const teamOf=k=>{ const cat=R[k][3]; const seen=new Set();
   return (safe(()=>getAllStaff(),[])||[]).filter(s=>s&&s.id&&!seen.has(s.id)&&seen.add(s.id)&&safe(()=>isStaffAssignable(s),true)&&!safe(()=>_isAdminStaff(s.id),false))
     .filter(s=>(s.categories&&s.categories.length?s.categories:[s.category]).includes(cat))
     .sort((a,b)=>String(a.nickname||a.name||'').localeCompare(String(b.nickname||b.name||''),'th')); };
+// ห้องลงคิวที่ใช้ร่วมกัน (บท+QC · มิกซ์+ซับ) → คำตอบจากห้องเดียวกันนับให้ทุกหน้าที่ในห้องนั้น
+function catGroup(cat){ const ch=safe(()=>getDiscordCfg().channels,{})||{}, av=safe(()=>AV_CATS,{})||{};
+  const g=new Set([cat]); Object.keys(av).forEach(c=>{ if(c===cat) return;
+    if((ch[cat]&&ch[c]&&ch[cat]===ch[c]) || (av[cat]&&av[c]&&av[cat].channel&&av[cat].channel!=='-'&&av[cat].channel===av[c].channel)) g.add(c); });
+  return g; }
+// 🔄 ดึงคำตอบจาก Discord อัตโนมัติ (ตอนเปิดหน้า + ทุก 2 นาทีระหว่างเปิดหน้าอยู่) — ใช้ตัวดึงเดิมของหน้าลงคิว
+let QP={busy:false, at:0, err:''};
+async function pullQueue(force){
+  if(QP.busy) return; if(!force && Date.now()-QP.at<60000) return;
+  const rounds=safe(()=>getRounds().filter(r=>r.status==='open'),[])||[]; if(!rounds.length) return;
+  if(typeof pullFromDiscord!=='function') return;
+  QP.busy=true; QP.err=''; let keep=null; try{ keep=_avRoundId; }catch(e){}
+  try{ for(const r of rounds){ try{ _avRoundId=r.id; const st=await pullFromDiscord(true); if(st&&st.error) QP.err=st.error; }catch(e){ QP.err=String(e.message||e); } } }
+  finally{ try{ _avRoundId=keep; }catch(e){} QP.busy=false; QP.at=Date.now(); }
+  const pg=$('page-nd-plan'); if(!pg||pg.classList.contains('hidden')) return;
+  const ae=document.activeElement; if(dd||pjOpen||(ae&&pg.contains(ae)&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)&&ae.id!=='pl-pkq')) return;
+  render();
+}
+setInterval(()=>{ const pg=$('page-nd-plan'); if(pg&&!pg.classList.contains('hidden')&&!document.hidden) pullQueue(true); }, 120000);
 function queue(){ // คำตอบจากรอบลงคิวที่เปิดอยู่ (ไม่มีแอดมิน — _alcPeople กรองไว้แล้ว)
   const ppl=safe(()=>_alcPeople(),[])||[], rounds=safe(()=>getRounds().filter(r=>r.status==='open'),[])||[];
   return {rounds, ppl:ppl.map(o=>({n:o.staff.nickname||o.staff.name, id:o.sid, cats:[...new Set(o.replies.map(x=>x.cat))], free:o.replies.some(x=>x.status!=='unavailable'&&x.status!=='declined'), msg:(o.replies.map(x=>x.freeText).filter(Boolean).pop()||'')}))}; }
@@ -407,7 +426,8 @@ function rightHTML(){ const cost=on().reduce((a,r)=>a+subTot(r),0), bud=budget()
   const s0=+new Date(S.start||S.deadline), e0=+new Date(S.deadline)+864e5, span=Math.max(1,e0-s0), x=d=>{ const t=+new Date(d); return isNaN(t)?0:Math.max(0,Math.min(100,(t-s0)/span*100)); };
   const days=[]; if(!isNaN(s0)&&!isNaN(e0)) for(let t=s0;t<e0&&days.length<60;t+=864e5) days.push(new Date(t));
   const q=queue(), r=S.roles[pkRole], qq=pkQ.trim().toLowerCase(), hit=n=>String(n||'').toLowerCase().includes(qq);
-  let list=q.ppl.filter(o=>o.cats.includes(R[pkRole][3])&&(qq||pkAll||o.free)&&(!qq||hit(o.n)));
+  const grp=catGroup(R[pkRole][3]), team=new Set(teamOf(pkRole).map(x=>x.id));
+  let list=q.ppl.filter(o=>o.cats.some(c=>grp.has(c))&&(qq||pkAll||o.free)&&(!qq||hit(o.n))).sort((a,b)=>(!team.has(a.id))-(!team.has(b.id)));
   // 🔍 ค้นชื่อ = ค้นทุกคนในทีมด้วย (ใส่คนที่ไม่ได้มาลงคิวได้) — ทีมหน้าที่นี้ขึ้นก่อน
   if(qq){ const seen=new Set(list.map(o=>o.id)), mine=new Set(teamOf(pkRole).map(s=>s.id)); const all=[]; const uniq=new Set();
     (safe(()=>getAllStaff(),[])||[]).forEach(s=>{ if(!s||!s.id||uniq.has(s.id)||seen.has(s.id)) return; uniq.add(s.id);
@@ -424,7 +444,7 @@ function rightHTML(){ const cost=on().reduce((a,r)=>a+subTot(r),0), bud=budget()
      <input class="form-input" id="pl-pkq" style="padding:5px 9px;margin-top:6px" placeholder="🔍 ค้นชื่อ — ค้นได้ทุกคนในทีม (รวมคนที่ไม่ได้ลงคิว)" value="${esc(pkQ)}" oninput="NDP.pkQ(this.value)"></div>
     <div class="pl-cb" style="padding:6px 8px;max-height:360px;overflow:auto">${list.map(o=>{ const inn=r&&r.slots.some(s=>s.id===o.id);
       return `<div class="pl-pk ${inn?'in':''}" title="กดเพื่อใส่ในหน้าที่ ${R[pkRole][0]}" onclick="NDP.fromQ('${esc(o.id)}')">${av(o.n)}<div><b>${esc(o.n)}</b>${o.msg?`<div class="msg">“${esc(String(o.msg).slice(0,60))}”</div>`:''}</div><span class="pl-tag ${inn?'t-y':o.noQ?'t-p':o.free?'t-y':'t-n'}">${inn?'✓ ใส่แล้ว':o.noQ?(o.other?'ทีมอื่น · ไม่ได้ลงคิว':'ไม่ได้ลงคิว'):o.free?'ว่าง':'ไม่ว่าง'}</span></div>`; }).join('')||`<div class="pl-mut" style="padding:10px">${qq?'ไม่พบชื่อ "'+esc(pkQ)+'"':q.rounds.length?'ยังไม่มีคนแจ้งสะดวกในหน้าที่นี้ — ค้นชื่อด้านบนเพื่อใส่คนที่ไม่ได้ลงคิว':'ยังไม่มีรอบลงคิวที่เปิดอยู่ — ค้นชื่อด้านบนเพื่อใส่คนได้'}</div>`}</div>
-    <div class="pl-cb pl-mut" style="padding-top:0;font-size:11px">🗓️ ${q.rounds.length?'รอบลงคิว '+esc(roundLabel(q.rounds)||'ที่เปิดอยู่'):'ไม่มีรอบลงคิวที่เปิดอยู่'}</div></div>`; }
+    <div class="pl-cb pl-mut" style="padding-top:0;font-size:11px">🗓️ ${q.rounds.length?'รอบลงคิว '+esc(roundLabel(q.rounds)||'ที่เปิดอยู่'):'ไม่มีรอบลงคิวที่เปิดอยู่'}${QP.busy?' · <span>กำลังดึงคำตอบ…</span>':''}${QP.err?` · <span class="pl-warn" title="${esc(QP.err)}">ดึงคำตอบไม่สำเร็จ</span>`:''}</div></div>`; }
 
 /* ── 📂 โฟลเดอร์งาน (Google Drive) ── */
 const drCfg=()=>safe(()=>getDriveCfg(),{})||{};
@@ -787,7 +807,7 @@ function mk(id,title,sub,bodyId,onShow){ if($('page-'+id)) return; const d=docum
 window.openPlanFor=function(id){ if(id){ if(dirty&&S&&S.id!==id&&!confirm('มีการแก้ไขที่ยังไม่บันทึก — ทิ้งแล้วเปิดงานนี้?')) return; if(!S||S.id!==id) loadProject(id); window._ndPlanPending=true; } safe(()=>nav('nd-plan')); };
 function init(){ if(!document.querySelector('.main-content')) return;
   const st=document.createElement('style'); st.textContent=CSS; document.head.appendChild(st);
-  mk('nd-plan','🗓️ วางแผนงาน','เวลา · คน · ราคา · ไฟล์ · ห้อง Discord ของโปรเจกต์ในหน้าเดียว','nd-plan-body',async()=>{ if(!window._ndPlanPending && !dirty) S=null; window._ndPlanPending=false; render(); await loadPrice(); render(); });
+  mk('nd-plan','🗓️ วางแผนงาน','เวลา · คน · ราคา · ไฟล์ · ห้อง Discord ของโปรเจกต์ในหน้าเดียว','nd-plan-body',async()=>{ if(!window._ndPlanPending && !dirty) S=null; window._ndPlanPending=false; render(); await loadPrice(); render(); pullQueue(false); });
   mk('nd-price','💲 เทมเพลตราคา','ราคามาตรฐานต่อรหัสลูกค้า — หน้าวางแผนงานดึงไปใช้เป็นราคาเริ่มต้น','nd-price-body',async()=>{ await loadPrice(); WK=null; pcNew=false; priceRender(); });
   window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
 }
