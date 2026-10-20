@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261020-08"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261020-10"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -2611,7 +2611,7 @@ body.sidebar-collapsed .main-content{
 </div>
 
 <div id="modal-project" class="modal-overlay hidden">
- <div class="modal" style="width:820px">
+ <div class="modal" style="width:min(1040px,96vw)">
   <div class="modal-head" id="proj-modal-head" style="flex-direction:column;align-items:stretch;gap:0;padding:14px 18px">
    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
     <div style="flex:1;min-width:0">
@@ -2624,87 +2624,80 @@ body.sidebar-collapsed .main-content{
   </div>
   <div class="modal-body">
    <div id="edit-presence-banner" style="display:none;background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.4);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--orange);line-height:1.5"></div>
-   <!-- 🔖 รหัสงาน+ลำดับขึ้นก่อน — ทีมจำงานด้วยรหัสแบบ G01 เป็นหลัก ชื่อเรื่องยาว ๆ เป็นรอง -->
-   <div style="display:grid;grid-template-columns:90px 90px 1fr;gap:12px;margin-bottom:12px">
-    <div class="form-group" style="margin:0"><label class="form-label">รหัสงาน</label><input class="form-input" id="pj-clientcode" list="pj-clientcode-list" placeholder="เช่น G" maxlength="6" style="text-transform:uppercase;font-weight:800" oninput="_pjTitleSync()"><datalist id="pj-clientcode-list"></datalist></div>
-    <div class="form-group" style="margin:0"><label class="form-label">ลำดับ</label><input class="form-input" id="pj-seq" type="number" placeholder="1" min="0" onwheel="this.blur()" style="font-weight:800" oninput="_pjTitleSync()"></div>
-    <div class="form-group" style="margin:0"><label class="form-label">ชื่อโปรเจกต์ *</label><input class="form-input" id="pj-name" placeholder="เช่น One Piece Ep.1100" oninput="_pjTitleSync()"></div>
-   </div>
-   <div style="margin-bottom:12px">
-    <div class="form-group" style="margin:0"><label class="form-label">ประเภทงาน</label>
+   <!-- 📋 รายละเอียดโปรเจกต์ — ชุดเดียวกับหน้าวางแผนงาน (id เดิมทุกช่อง · ระบบอื่นอ่านได้เหมือนเดิม) -->
+   <style>
+    .pjinfo{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:8px 10px;margin-bottom:12px}
+    .pjinfo>div{min-width:0}.pjinfo .form-group{margin:0}.pjinfo .form-label{font-size:11px;margin-bottom:3px}
+    .pjinfo .form-input{padding:7px 9px;font-size:13px}
+    .pjinfo .s1{grid-column:span 1}.pjinfo .s2{grid-column:span 2}.pjinfo .s3{grid-column:span 3}.pjinfo .s4{grid-column:span 4}.pjinfo .s5{grid-column:span 5}.pjinfo .s6{grid-column:span 6}
+    .pjinfo .dtw{position:relative;display:flex;align-items:center}
+    .pj-ded{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px}
+    .pj-ded .d{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border2);border-radius:9px;padding:4px 8px}
+    .pj-ded .d.on{border-color:var(--accent2);background:rgba(0,180,255,.1)}
+    #modal-project .cat-block-head span:has(> input[id$="-tax"]){display:none}
+    .ph-rounds{display:flex;flex-direction:column;gap:5px;padding:0 12px 8px}
+    .ph-rounds .rr{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px}
+    .ph-rounds input{background:rgba(0,0,0,.35);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px;padding:4px 7px}
+    @media(max-width:760px){ .pjinfo>div{grid-column:span 12!important} }
+   </style>
+   <div class="pjinfo">
+    <div class="s1 form-group"><label class="form-label">รหัสงาน</label><input class="form-input" id="pj-clientcode" list="pj-clientcode-list" placeholder="G" maxlength="6" style="text-transform:uppercase;font-weight:800" oninput="_pjTitleSync()"><datalist id="pj-clientcode-list"></datalist></div>
+    <div class="s1 form-group"><label class="form-label">ลำดับ</label><input class="form-input" id="pj-seq" type="number" placeholder="1" min="0" onwheel="this.blur()" style="font-weight:800" oninput="_pjTitleSync()"></div>
+    <div class="s4 form-group"><label class="form-label">ชื่อโปรเจกต์ *</label><input class="form-input" id="pj-name" placeholder="เช่น One Piece Ep.1100" oninput="_pjTitleSync()"></div>
+    <div class="s2 form-group"><label class="form-label">ประเภทงาน</label>
      <select class="form-input form-select" id="pj-type">
       <option value="">-- เลือก --</option>
       <option>หนัง</option><option>ซีรีย์</option><option>อนิเมะ</option><option>อนิเมชัน</option>
       <option>หนังแนวตั้ง</option><option>เกม</option><option>โฆษณา</option>
       <option>บรรยาย</option><option>หนังสือเสียง</option><option>เพลง</option><option>มิกซ์</option>
-     </select>
-    </div>
-   </div>
-   <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:12px;margin-bottom:12px">
-    <div class="form-group" style="margin:0"><label class="form-label">Budget จากลูกค้า</label>
-     <div style="display:flex;gap:6px">
-      <select class="form-input form-select" id="pj-budget-type" style="width:110px;padding:10px 28px 10px 10px" onchange="toggleBudgetQty();calcProjSummary()" title="เหมา/โปรเจกต์ = ยอดรวม · นาที = คูณนาทีหนัง · ชั่วโมง/หน้า/วัน/บท = คูณจำนวนที่กรอก">
-       <option value="flat">เหมา</option>
-       <option value="per-minute">นาที</option>
-       <option value="per-hour">ชั่วโมง</option>
-       <option value="per-page">หน้า</option>
-       <option value="per-day">วัน</option>
-       <option value="per-episode">บท</option>
-       <option value="per-project">โปรเจกต์</option>
+     </select></div>
+    <div class="s1 form-group"><label class="form-label">นาที</label><input class="form-input" id="pj-duration" type="number" placeholder="—" min="0" step="any" onwheel="this.blur()" oninput="calcProjSummary();renderAllWorkerLists()"></div>
+    <div class="s1 form-group"><label class="form-label">ตอน (Ep.)</label><input class="form-input" id="pj-episodes" type="number" placeholder="—" min="0" onwheel="this.blur()"></div>
+    <div class="s2 form-group" id="pj-admin-fields"><label class="form-label">🗂️ Manager</label>
+     <select class="form-input form-select" id="pj-manager" onchange="syncManagerFee()"><option value="">— ไม่มี / แอดมินจัดการเอง —</option></select></div>
+
+    <div class="s2 form-group"><label class="form-label">วันเริ่มงาน</label>
+     <div class="dtw">
+      <input class="form-input" id="pj-start" type="text" placeholder="— วว/ดด/ปปปป —" maxlength="10" style="padding-right:30px"
+        onchange="validateDateThai(this,iso=>{document.getElementById('pj-start-pk').value=iso})"
+        oninput="let v=this.value.replace(/[^0-9/]/g,'');if(v.length==2&&!v.includes('/'))v+='/';else if(v.length==5&&v.split('/').length==2)v+='/';this.value=v">
+      <input type="date" id="pj-start-pk" tabindex="-1" style="position:absolute;right:0;width:28px;height:100%;opacity:0;cursor:pointer"
+        onchange="document.getElementById('pj-start').value=isoToThai(this.value);document.getElementById('pj-start').style.borderColor='rgba(0,223,160,.4)'">
+      <span onclick="const p=document.getElementById('pj-start-pk');p.showPicker?p.showPicker():p.click()" style="position:absolute;right:7px;cursor:pointer;font-size:14px;user-select:none">📅</span>
+     </div></div>
+    <div class="s4 form-group"><label class="form-label">🏁 Deadline ลูกค้า</label>
+     <div style="display:flex;gap:5px"><div class="dtw" style="flex:1;min-width:0">
+      <input class="form-input" id="pj-deadline" type="text" placeholder="— วว/ดด/ปปปป —" maxlength="10" style="padding-right:30px"
+        onchange="validateDateThai(this,iso=>{document.getElementById('pj-deadline-pk').value=iso})"
+        oninput="let v=this.value.replace(/[^0-9/]/g,'');if(v.length==2&&!v.includes('/'))v+='/';else if(v.length==5&&v.split('/').length==2)v+='/';this.value=v">
+      <input type="date" id="pj-deadline-pk" tabindex="-1" style="position:absolute;right:0;width:28px;height:100%;opacity:0;cursor:pointer"
+        onchange="document.getElementById('pj-deadline').value=isoToThai(this.value);document.getElementById('pj-deadline').style.borderColor='rgba(0,223,160,.4)'">
+      <span onclick="const p=document.getElementById('pj-deadline-pk');p.showPicker?p.showPicker():p.click()" style="position:absolute;right:7px;cursor:pointer;font-size:14px;user-select:none">📅</span>
+     </div><input class="form-input" id="pj-deadline-time" type="time" style="width:108px;flex-shrink:0" title="เวลาส่งลูกค้า"></div></div>
+    <div class="s3 form-group"><label class="form-label">Budget จากลูกค้า</label>
+     <div style="display:flex;gap:5px">
+      <select class="form-input form-select" id="pj-budget-type" style="width:92px;padding:7px 24px 7px 8px" onchange="toggleBudgetQty();calcProjSummary()" title="เหมา/โปรเจกต์ = ยอดรวม · นาที = คูณนาทีหนัง · ชั่วโมง/หน้า/วัน/บท = คูณจำนวนที่กรอก">
+       <option value="flat">เหมา</option><option value="per-minute">นาที</option><option value="per-hour">ชั่วโมง</option><option value="per-page">หน้า</option><option value="per-day">วัน</option><option value="per-episode">บท</option><option value="per-project">โปรเจกต์</option>
       </select>
       <input class="form-input" id="pj-budget" type="number" placeholder="0" min="0" step="any" data-price onwheel="this.blur()" oninput="calcProjSummary()" style="flex:1;min-width:0">
-      <input class="form-input" id="pj-budget-qty" type="number" placeholder="จำนวน" min="0" step="any" onwheel="this.blur()" oninput="calcProjSummary()" style="display:none;width:86px;text-align:center" title="จำนวน (ชั่วโมง/หน้า/วัน/บท)">
+      <input class="form-input" id="pj-budget-qty" type="number" placeholder="จำนวน" min="0" step="any" onwheel="this.blur()" oninput="calcProjSummary()" style="display:none;width:72px;text-align:center" title="จำนวน (ชั่วโมง/หน้า/วัน/บท)">
      </div>
-     <div id="pj-budget-calc" style="font-size:11px;color:var(--text2);margin-top:4px;display:none"></div>
-    </div>
-    <div class="form-group" style="margin:0"><label class="form-label">ความยาว (นาที)</label><input class="form-input" id="pj-duration" type="number" placeholder="ถ้ามี" min="0" step="any" onwheel="this.blur()" oninput="calcProjSummary();renderAllWorkerLists()"></div>
-   </div>
-   <div id="pj-client-row" style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px">
-    <div class="form-group" style="margin:0"><label class="form-label">ชื่อ / URL ลูกค้า</label><input class="form-input" id="pj-client" placeholder="ชื่อลูกค้า หรือ link"></div>
-   </div>
-   <div style="display:flex;gap:16px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
-    <div class="form-group" style="margin:0;width:180px"><label class="form-label">จำนวนตอน (Ep.)</label><input class="form-input" id="pj-episodes" type="number" placeholder="เช่น 100" min="0" onwheel="this.blur()"></div>
-    <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;padding-bottom:8px" title="บริษัทควักเงินสำรองจ่ายทีมไปก่อนแล้ว — จะขึ้นป้ายส้มชัด ๆ ในหน้ารายการโปรเจกต์">
-      <input type="checkbox" id="pj-advancepaid"> <span>💸 บริษัท<strong>สำรองจ่าย</strong>ไปก่อนแล้ว</span>
-    </label>
-   </div>
-   <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:12px;margin-bottom:12px">
-    <div class="form-group" style="margin:0"><label class="form-label">🔗 Link โหลดงาน</label><input class="form-input" id="pj-downloadlink" placeholder="https://..."></div>
-    <div class="form-group" style="margin:0"><label class="form-label">🔑 Secret key (ถ้ามี)</label><input class="form-input" id="pj-secretkey" placeholder="เห็นเฉพาะทีมที่เกี่ยวข้อง"></div>
-   </div>
-   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-    <div class="form-group" style="margin:0"><label class="form-label">วันเริ่มงาน</label>
-      <div style="position:relative;display:flex;align-items:center">
-       <input class="form-input" id="pj-start" type="text" placeholder="วว/ดด/ปปปป" maxlength="10" style="padding-right:36px"
-         onchange="validateDateThai(this,iso=>{document.getElementById('pj-start-pk').value=iso;syncDeadlineFromStart('pj-start','pj-deadline');syncProjectDatesToPhases(true)})"
-         oninput="let v=this.value.replace(/[^0-9/]/g,'');if(v.length==2&&!v.includes('/'))v+='/';else if(v.length==5&&v.split('/').length==2)v+='/';this.value=v">
-       <input type="date" id="pj-start-pk" tabindex="-1" style="position:absolute;right:0;width:32px;height:100%;opacity:0;cursor:pointer"
-         onchange="document.getElementById('pj-start').value=isoToThai(this.value);document.getElementById('pj-start').style.borderColor='rgba(0,223,160,.4)';syncDeadlineFromStart('pj-start','pj-deadline');syncProjectDatesToPhases(true)">
-       <span onclick="const p=document.getElementById('pj-start-pk');p.showPicker?p.showPicker():p.click()" style="position:absolute;right:8px;cursor:pointer;font-size:15px;user-select:none">📅</span>
-      </div></div>
-    <div class="form-group" style="margin:0"><label class="form-label">Deadline</label>
-      <div style="position:relative;display:flex;align-items:center">
-       <input class="form-input" id="pj-deadline" type="text" placeholder="วว/ดด/ปปปป" maxlength="10" style="padding-right:36px"
-         onchange="validateDateThai(this,iso=>{document.getElementById('pj-deadline-pk').value=iso;syncProjectDatesToPhases()})"
-         oninput="let v=this.value.replace(/[^0-9/]/g,'');if(v.length==2&&!v.includes('/'))v+='/';else if(v.length==5&&v.split('/').length==2)v+='/';this.value=v">
-       <input type="date" id="pj-deadline-pk" tabindex="-1" style="position:absolute;right:0;width:32px;height:100%;opacity:0;cursor:pointer"
-         onchange="document.getElementById('pj-deadline').value=isoToThai(this.value);document.getElementById('pj-deadline').style.borderColor='rgba(0,223,160,.4)';syncProjectDatesToPhases()">
-       <span onclick="const p=document.getElementById('pj-deadline-pk');p.showPicker?p.showPicker():p.click()" style="position:absolute;right:8px;cursor:pointer;font-size:15px;user-select:none">📅</span>
-      </div></div>
-   </div>
-   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px" id="pj-admin-fields">
-    <div class="form-group" style="margin:0"><label class="form-label">หมายเหตุ (การหัก / เงื่อนไข)</label><input class="form-input" id="pj-note" placeholder="เช่น หัก 3% ค่าธรรมเนียม"></div>
-    <div class="form-group" style="margin:0">
-     <label class="form-label">🗂️ มอบหมาย Manager</label>
-     <select class="form-input form-select" id="pj-manager" onchange="syncManagerFee()">
-      <option value="">— ไม่มี / แอดมินจัดการเอง —</option>
-     </select>
-     <div id="pj-manager-fee-wrap" style="display:none;align-items:center;gap:8px;margin-top:8px">
-      <span style="font-size:12px;color:var(--text2);white-space:nowrap">💰 ค่าเหมา Manager</span>
-      <input class="form-input" id="pj-manager-fee" type="number" min="0" step="any" data-price placeholder="0" onwheel="this.blur()" oninput="syncManagerFee()" style="flex:1;min-width:0;padding:7px 10px">
-      <span style="font-size:11px;color:var(--text2);white-space:nowrap">฿ (เหมา/โปรเจกต์)</span>
-     </div>
-    </div>
+     <div id="pj-budget-calc" style="font-size:11px;color:var(--text2);margin-top:3px;display:none"></div></div>
+    <div class="s3 form-group" id="pj-client-row"><label class="form-label">ชื่อ / URL ลูกค้า</label><input class="form-input" id="pj-client" placeholder="ชื่อลูกค้า หรือ link"></div>
+
+    <div class="s4 form-group"><label class="form-label">🔗 Link โหลดงาน</label><input class="form-input" id="pj-downloadlink" placeholder="https://..."></div>
+    <div class="s3 form-group"><label class="form-label">🔑 Secret key (ถ้ามี)</label><input class="form-input" id="pj-secretkey" placeholder="เห็นเฉพาะทีมที่เกี่ยวข้อง"></div>
+    <div class="s5 form-group"><label class="form-label">🧾 หัก ณ ที่จ่าย (จากค่าจ้างทีม · ค่าเริ่มต้น 3%)</label><div id="pj-ded" class="pj-ded"></div><div id="pj-ded-note" style="font-size:11px;color:var(--text2);margin-top:3px"></div></div>
+
+    <div class="s6 form-group"><label class="form-label">📝 หมายเหตุ (การหัก / เงื่อนไข)</label><input class="form-input" id="pj-note" placeholder="เช่น ลูกค้าหัก 3% ค่าธรรมเนียม"></div>
+    <div class="s3 form-group"><label class="form-label">💰 ค่าเหมา Manager</label>
+     <div id="pj-manager-fee-wrap" style="display:none;align-items:center;gap:6px">
+      <input class="form-input" id="pj-manager-fee" type="number" min="0" step="any" data-price placeholder="0" onwheel="this.blur()" oninput="syncManagerFee()" style="flex:1;min-width:0">
+      <span style="font-size:11px;color:var(--text2);white-space:nowrap">฿ / งาน</span>
+     </div><div id="pj-manager-fee-none" style="font-size:12px;color:var(--text2);padding:7px 0">— เลือก Manager ก่อน —</div></div>
+    <div class="s3 form-group" id="pj-advance-wrap"><label class="form-label">&nbsp;</label>
+     <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;border:1px solid var(--border2);border-radius:9px;padding:6px 9px" title="บริษัทควักเงินสำรองจ่ายทีมไปก่อนแล้ว — จะขึ้นป้ายส้มชัด ๆ ในหน้ารายการโปรเจกต์">
+      <input type="checkbox" id="pj-advancepaid"> <span>💸 บริษัท<strong>สำรองจ่าย</strong>ไปก่อนแล้ว</span></label></div>
    </div>
 
    <!-- CAT TOGGLES -->
@@ -2966,7 +2959,8 @@ body.sidebar-collapsed .main-content{
    </div>
    <div style="display:flex;gap:10px;width:100%;justify-content:flex-end">
     <button class="btn btn-outline" onclick="closeModal('modal-project')">ยกเลิก</button>
-    <button class="btn btn-blue" id="btn-save-project">💾 บันทึกโปรเจกต์</button>
+    <button class="btn btn-outline" onclick="pjSaveDraftNow()" title="เก็บที่กรอกไว้ก่อน — ยังไม่บันทึกจริง">📝 บันทึกแบบร่าง</button>
+    <button class="btn btn-blue" id="btn-save-project">✅ บันทึกโปรเจกต์</button>
    </div>
   </div>
  </div>
@@ -4474,12 +4468,13 @@ function saveStaffTags(staffId){
 //    เก็บ "ข้อความที่ทีมตอบ" ตามจริง — ไม่ตีความแทน · งานที่ถืออยู่ดึงจากระบบให้เอง
 // ══════════════════════════════════════════════
 const AV_CATS = {
+  // 🏠 แต่ละหน้าที่มีห้องลงคิวของตัวเองแล้ว (เจ้าของ 20 ต.ค. 2569) · แท็ก = ชื่อโรลจริงในเซิร์ฟเวอร์
   dubbing:{label:'นักพากย์', icon:'🎤', mention:'@นักพากย์ชาย @นักพากย์หญิง', channel:'ลงคิวนักพากย์'},
-  adaptation:{label:'ทีมบท', icon:'✍️', mention:'@ทีมบท', channel:'ลงคิวบท-qc'},
-  qc:{label:'ทีม QC', icon:'✅', mention:'@ทีม QC', channel:'ลงคิวบท-qc'},
-  mix:{label:'ทีมมิกซ์', icon:'🎧', mention:'@ทีมมิกซ์', channel:'ลงคิวมิกซ์-ซับ'},
-  subVideo:{label:'ทีมซับ/วิดีโอ', icon:'🎬', mention:'@ทีมซับ', channel:'ลงคิวมิกซ์-ซับ'},
-  translation:{label:'นักแปล', icon:'🌐', mention:'@นักแปล', channel:'-'},
+  adaptation:{label:'ทีมบท', icon:'✍️', mention:'@บท', channel:'ลงคิวบท'},
+  qc:{label:'ทีม QC', icon:'✅', mention:'@QC', channel:'ลงคิว QC'},
+  mix:{label:'ทีมมิกซ์', icon:'🎧', mention:'@มิกซ์', channel:'ลงคิว Mix'},
+  subVideo:{label:'ทีมซับ/วิดีโอ', icon:'🎬', mention:'@ซับ', channel:'ลงคิวทีมซับ'},
+  translation:{label:'นักแปล', icon:'🌐', mention:'@แปล', channel:'ลงคิวแปล'},
   manager:{label:'เมเนเจอร์', icon:'🗂️', mention:'@เมเนเจอร์', channel:'-'},
 };
 const _TH_MONTH_FULL=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
@@ -4589,6 +4584,18 @@ function _isoOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2
 // 🐧 เชื่อม Discord ผ่าน Apps Script (ไม่ต้องมีบอทออนไลน์ตลอด · โทเค็นอยู่ฝั่งเซิร์ฟเวอร์)
 // ══════════════════════════════════════════════
 function getDiscordCfg(){ const v=ls('discord_cfg'); return (v&&typeof v==='object')?v:{channels:{}}; }
+// 🏠 ย้ายไปห้องลงคิวแยกตามหน้าที่ (ครั้งเดียว · แอดมิน) — ID ห้องจากเจ้าของ 20 ต.ค. 2569 · แท็กตามชื่อโรลจริงในเซิร์ฟเวอร์
+const _DC_ROOMS_20261020={translation:'1562130209329643550', adaptation:'1494447115529621564', dubbing:'1494448185995694232', mix:'1494447886447149076', qc:'1562129353914056976', subVideo:'1562130393753321622'};
+const _DC_TAGS_20261020={translation:'@แปล', adaptation:'@บท', dubbing:'@นักพากย์ชาย @นักพากย์หญิง', mix:'@มิกซ์', qc:'@QC', subVideo:'@ซับ'};
+async function _dcMigrateRooms20261020(){
+  if(currentUser?.role!=='admin') return;
+  const cfg=getDiscordCfg(); if(cfg.roomsV===20261020) return;
+  cfg.channels={...(cfg.channels||{}), ..._DC_ROOMS_20261020};
+  cfg.mentions={...(cfg.mentions||{}), ..._DC_TAGS_20261020};
+  cfg.roomsV=20261020;
+  await saveDiscordCfg(cfg);
+  try{ logAudit('discord.cfg','ห้องลงคิว','แยกห้องลงคิวตามหน้าที่ 6 ห้อง + แท็กโรล'); }catch(e){}
+}
 async function saveDiscordCfg(v){ ls('discord_cfg',v); await fbSaveKeyed('discord_cfg', v); }
 function _dcChannelOf(cat){
   const chans=getDiscordCfg().channels||{};
@@ -11544,6 +11551,7 @@ async function enterApp(){
     ...['tags_master','brief_templates','company_expenses','payroll_profiles','payroll_runs','recruit_rounds','discord_cfg','allocdraft',
         'announcetpl','wipecode','projposttpl','drivecfg','posttpls','posttplalias'].map(k=>_q(()=>fbLoadKeyed(k))),
   ]);
+  try{ await _dcMigrateRooms20261020(); }catch(e){ console.warn('discord rooms migrate:', e); }
   try { logLogin(); startIdleWatch(); } catch(e) {}
   // 🕐 สำรองอัตโนมัติรายวัน — รอ 8 วิ ให้ข้อมูลโหลดครบก่อน
   try { setTimeout(()=>{ try{ autoDailyBackup(); }catch(e){} }, 8000); } catch(e) {}
@@ -15225,12 +15233,55 @@ function _mgrStaffIdOf(uid){
   const u=uc[uid]||Object.values(uc).find(x=>x&&x.uid===uid);
   return (u&&u.staffId)||'';
 }
+// 🧾 หัก ณ ที่จ่าย (ชุดเดียวกับหน้าวางแผนงาน): ค่าเริ่มต้น 3% · ติ๊กออกได้ · ＋ รายการหักอื่น → ตั้งเปอร์เซ็นต์ทุกหมวดเท่ากัน
+let _pjDed=null, _pjDedTouched=false, _pjDedLegacy=null;
+const _PJ_DED_CATS=['adp','dub','mix','qc','sub','trn'];
+function pjDedInit(p){
+  const tax=(p&&p.tax)||{}, ws=(p&&p.workers)||[];
+  const used=_PJ_DED_CATS.filter(k=>ws.some(w=>w&&String(w.slot||'').split('-')[0]===k));
+  const vals=used.map(k=>+tax[k]||0), max=Math.max(0,...vals), isNew=!used.length;
+  _pjDedTouched=false; _pjDedLegacy=null;
+  if(p&&Array.isArray(p.deductions)&&p.deductions.length){ _pjDed=JSON.parse(JSON.stringify(p.deductions)); }
+  else { _pjDed=[{label:'หัก ณ ที่จ่าย (บริษัท)',pct:max||3,on:max>0||isNew}]; if(!isNew&&new Set(vals).size>1) _pjDedLegacy=tax; if(isNew) pjDedApply(); }
+  pjDedRender();
+}
+function pjDedSum(){ return (_pjDed||[]).filter(d=>d&&d.on).reduce((a,d)=>a+(parseFloat(d.pct)||0),0); }
+function pjDedApply(){ const v=pjDedSum(); _PJ_DED_CATS.forEach(k=>{ const el=document.getElementById(k+'-tax'); if(el) el.value=v||''; }); try{ calcProjSummary(); }catch(e){} }
+function pjDedSet(j,k,v){ if(!_pjDed) _pjDed=[];
+  if(k==='add') _pjDed.push({label:'หักเพิ่ม',pct:2,on:true}); else if(k==='del') _pjDed.splice(j,1); else if(_pjDed[j]) _pjDed[j][k]=v;
+  _pjDedTouched=true; _pjDedLegacy=null; window._formDirty=true; pjDedApply(); pjDedRender(); }
+function pjDedRender(){ const box=document.getElementById('pj-ded'); if(!box) return; const L=_pjDed||[];
+  box.innerHTML=L.map((d,j)=>`<span class="d ${d.on?'on':''}"><input type="checkbox" ${d.on?'checked':''} onchange="pjDedSet(${j},'on',this.checked)">${j===0?`<b>${esc(d.pct)}%</b> ${esc(d.label)}`:`<input class="form-input" style="width:96px;padding:3px 6px" value="${esc(d.label)}" onchange="pjDedSet(${j},'label',this.value)"><input class="form-input" style="width:46px;padding:3px 6px" value="${esc(d.pct)}" onchange="pjDedSet(${j},'pct',parseFloat(this.value)||0)">% <a style="cursor:pointer;opacity:.6" onclick="pjDedSet(${j},'del')">✕</a>`}</span>`).join('')
+    +`<button type="button" class="btn btn-outline btn-sm" title="เพิ่มรายการหักอื่น" onclick="pjDedSet(-1,'add')">＋</button>`;
+  const n=document.getElementById('pj-ded-note'); if(n){ const lbl={adp:'บท',dub:'พากย์',mix:'มิกซ์',qc:'QC',sub:'ซับ',trn:'แปล'};
+    n.innerHTML=_pjDedLegacy?('<span style="color:var(--orange)">งานเดิมหักแยกหมวด ('+_PJ_DED_CATS.filter(k=>_pjDedLegacy[k]!=null&&_pjDedLegacy[k]!=='').map(k=>lbl[k]+' '+(+_pjDedLegacy[k]||0)+'%').join(' · ')+') — คงไว้ตามเดิม · แก้ช่องนี้ = ใช้ค่าเดียวทุกหมวด</span>')
+      :(pjDedSum()?'รวมหัก <b>'+pjDedSum()+'%</b> จากค่าจ้างทุกคนในงานนี้':'<span style="color:var(--orange)">ไม่หัก — เช่น งานสั่งในชื่อส่วนตัว</span>'); } }
+// 🏁 เดดไลน์หลายรอบต่อหมวด (ชุดเดียวกับหน้าวางแผนงาน) — ตั้งชื่อรอบเองได้ เช่น Final · มิกซ์แก้
+function pjRndRender(c){
+  const block=document.getElementById('catblock-'+c); if(!block) return;
+  let box=document.getElementById('ph-'+c+'-rounds');
+  if(!box){ const ph=block.querySelector('.cat-block-phase'); if(!ph) return; box=document.createElement('div'); box.className='ph-rounds'; box.id='ph-'+c+'-rounds'; ph.after(box); }
+  const L=(formPhases[c]&&Array.isArray(formPhases[c].rounds))?formPhases[c].rounds:[];
+  box.innerHTML=L.map((x,i)=>`<div class="rr">🏁 <input value="${esc(x.label||'')}" placeholder="ชื่อรอบ เช่น Final" style="width:150px" onchange="pjRndSet('${c}',${i},'label',this.value)">
+     <input type="date" value="${esc(String(x.date||'').slice(0,10))}" onchange="pjRndSet('${c}',${i},'date',this.value)"><input type="time" value="${esc(x.time||'')}" style="width:100px" onchange="pjRndSet('${c}',${i},'time',this.value)">
+     <a style="cursor:pointer;opacity:.6" title="ลบรอบนี้" onclick="pjRndSet('${c}',${i},'del')">✕</a></div>`).join('')
+    +`<div class="rr"><button type="button" class="btn btn-outline btn-sm" style="padding:2px 9px;font-size:11.5px" onclick="pjRndSet('${c}',-1,'add')">＋ เดดไลน์รอบถัดไป</button></div>`;
+}
+function pjRndSet(c,i,f,v){ if(!formPhases[c]) formPhases[c]={startDate:'',deadline:'',submitTime:'',status:'none',note:'',rounds:[]};
+  const L=formPhases[c].rounds=Array.isArray(formPhases[c].rounds)?formPhases[c].rounds:[];
+  if(f==='add') L.push({label:L.length?'รอบ '+(L.length+2):'Final', date:'', time:''});
+  else if(f==='del'){ if(L[i]&&L[i].date&&!confirm('ลบเดดไลน์ "'+(L[i].label||'')+'"?')) return; L.splice(i,1); }
+  else if(L[i]) L[i][f]=v;
+  window._formDirty=true; pjRndRender(c); }
+// 📝 บันทึกแบบร่างทันที (ปุ่ม) — ใช้ระบบเก็บร่างเดิมของฟอร์ม
+function pjSaveDraftNow(){ window._formDirty=true; const snap=_getCurrentFormSnapshot(); if(!_isFormMeaningful(snap)){ toast('ยังไม่มีข้อมูลให้เก็บ','warn'); return; } saveDraft(); toast('📝 บันทึกแบบร่างแล้ว — ยังไม่บันทึกจริง (ทีมยังไม่เห็น)','success'); }
 function syncManagerFee(){
   try{
     const uid=document.getElementById('pj-manager')?.value||'';
     const feeEl=document.getElementById('pj-manager-fee');
     const wrap=document.getElementById('pj-manager-fee-wrap');
     if(wrap) wrap.style.display = uid ? 'flex' : 'none';
+    { const _n=document.getElementById('pj-manager-fee-none'); if(_n) _n.style.display = uid ? 'none' : ''; }
     if(!formSlots.mgr) formSlots.mgr={only:[]};
     if(!formSlots.mgr.only) formSlots.mgr.only=[];
     const staffId = uid ? _mgrStaffIdOf(uid) : '';
@@ -15267,6 +15318,7 @@ function prefillManagerFee(p){
     const staffId=uid?_mgrStaffIdOf(uid):'';
     window._mgrFeeStaffId=staffId;
     if(wrap) wrap.style.display = uid ? 'flex' : 'none';
+    { const _n=document.getElementById('pj-manager-fee-none'); if(_n) _n.style.display = uid ? 'none' : ''; }
     if(!feeEl) return;
     const entry=(formSlots.mgr&&formSlots.mgr.only||[]).find(w=>w.staffId===staffId);
     feeEl.value = entry ? (entry.amount||'') : '';
@@ -15283,8 +15335,8 @@ const SHORT_FROM_PHASE_KEY = { adaptation:'adp', dubbing:'dub', mix:'mix', qc:'q
 
 function initFormPhases(){
   formPhases = {};
-  ['adp','dub','mix','qc','sub','mgr'].forEach(c=>{
-    formPhases[c] = { startDate:'', deadline:'', submitTime:'', status:'none', note:'' };
+  ['adp','dub','mix','qc','sub','trn','mgr'].forEach(c=>{
+    formPhases[c] = { startDate:'', deadline:'', submitTime:'', status:'none', note:'', rounds:[] };
   });
 }
 
@@ -15304,7 +15356,8 @@ function applyProjectDatesToEmptyPhases(overrideStart){
 
 // Populate UI inputs ของ phase (เรียกหลัง openEditProject หรือ openNewProject)
 function populateFormPhasesUI(){
-  ['adp','dub','mix','qc','sub','mgr'].forEach(c=>{
+  ['adp','dub','mix','qc','sub','trn','mgr'].forEach(c=>{
+    try{ pjRndRender(c); }catch(e){}
     const ph = formPhases[c] || {};
     const sEl = document.getElementById('ph-'+c+'-start');
     const dEl = document.getElementById('ph-'+c+'-deadline');
@@ -15322,18 +15375,11 @@ function populateFormPhasesUI(){
 // Handler ตอน user เปลี่ยนวันของ phase
 function onPhaseDateChange(cat, field, value){
   if(!formPhases[cat]) formPhases[cat] = { startDate:'', deadline:'', submitTime:'', status:'none' };
+  // ⛔ ไม่เติมวันให้เองแล้ว (เจ้าของ 20 ต.ค. 2569: คนทำงานงง) — ช่องไหนยังไม่ใส่ ปล่อยว่าง "—"
   if(field === 'start'){
     formPhases[cat].startDate = value;
-    // Auto-fill deadline ถ้าว่าง
-    if(value && !formPhases[cat].deadline){
-      formPhases[cat].deadline = value;
-      const dEl = document.getElementById('ph-'+cat+'-deadline');
-      if(dEl) dEl.value = value;
-    }
   } else if(field === 'deadline'){
     formPhases[cat].deadline = value;
-    // 🔗 ไล่เดทไลน์เฟสถัดไป +1 วันอัตโนมัติ (เฉพาะเฟสที่เปิดใช้และยังว่าง — พิมพ์แก้เองได้เสมอ)
-    if(value) cascadePhaseDeadlines(cat, value);
   } else if(field === 'time'){
     formPhases[cat].submitTime = value;
   } else if(field === 'note'){
@@ -15372,19 +15418,23 @@ function cascadePhaseDeadlines(fromCat, fromIso){
 // คืน object key แบบยาว (adaptation/dubbing/...) เพื่อ compatibility กับระบบ track เดิม
 function collectFormPhasesForSave(){
   const out = {};
-  ['adp','dub','mix','qc','sub','mgr'].forEach(c=>{
+  ['adp','dub','mix','qc','sub','trn','mgr'].forEach(c=>{
     // บันทึกเฉพาะหมวดที่ user เปิด active ไว้
     if(!activeCats.has(c)) return;
     const ph = formPhases[c];
     if(!ph) return;
-    if(!ph.startDate && !ph.deadline && !ph.submitTime && !ph.status) return;
-    out[PHASE_KEY_FROM_SHORT[c]] = {
+    const rs=(Array.isArray(ph.rounds)?ph.rounds:[]).filter(x=>x&&x.date).map(x=>({label:String(x.label||'').trim()||'รอบถัดไป', date:x.date, time:x.time||''}));
+    if(!ph.startDate && !ph.deadline && !ph.submitTime && !ph.status && !rs.length && !ph._orig) return;
+    // 🔒 คงช่องอื่นของเฟสเดิมไว้ (เวลาเริ่ม · ชื่อรอบหลัก · ผูกเดดไลน์กับหน้าที่อื่น ฯลฯ จากหน้าวางแผนงาน)
+    const o = {...(ph._orig||{}),
       startDate: ph.startDate || '',
       deadline: ph.deadline || '',
       submitTime: ph.submitTime || '',
       status: ph.status || 'none',
       note: ph.note || ''
     };
+    if(rs.length || o.rounds || o.deadline2){ o.rounds=rs; if(rs[0]){ o.deadline2=rs[0].date; if(rs[0].time) o.submitTime2=rs[0].time; else delete o.submitTime2; } else { delete o.deadline2; delete o.submitTime2; } }
+    out[PHASE_KEY_FROM_SHORT[c]] = o;
   });
   return out;
 }
@@ -15401,7 +15451,9 @@ function loadPhasesFromProject(p){
       deadline: ph.deadline || '',
       submitTime: ph.submitTime || '',
       status: ph.status || 'none',
-      note: ph.note || ''
+      note: ph.note || '',
+      rounds: Array.isArray(ph.rounds)?JSON.parse(JSON.stringify(ph.rounds)):(ph.deadline2?[{label:'รอบ 2',date:String(ph.deadline2).slice(0,10),time:ph.submitTime2||''}]:[]),
+      _orig: JSON.parse(JSON.stringify(ph))
     };
   });
 }
@@ -15498,16 +15550,13 @@ async function openNewProject(){
   window._mgrFeeStaffId='';
   window._projRateHints=null;
   ['pj-type'].forEach(id=>{const el=document.getElementById(id);if(el)el.selectedIndex=0;});
-  const today=new Date().toISOString().split('T')[0];
-  const ps=document.getElementById('pj-start');if(ps)ps.value=isoToThai(today);
-  const pspk=document.getElementById('pj-start-pk');if(pspk)pspk.value=today;
-  const pd=document.getElementById('pj-deadline');if(pd)pd.value=isoToThai(today);
-  const pdpk=document.getElementById('pj-deadline-pk');if(pdpk)pdpk.value=today;
+  // ⛔ ค่าเริ่มต้นว่าง "—" (ไม่เติมวันนี้ให้เอง)
+  ['pj-start','pj-start-pk','pj-deadline','pj-deadline-pk','pj-deadline-time'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  try{ pjDedInit(null); }catch(e){}
+  { const _aw=document.getElementById('pj-advance-wrap'); if(_aw) _aw.style.display=(currentUser?.role==='manager')?'none':''; }
   document.querySelectorAll('.cat-toggle-btn').forEach(b=>b.classList.remove('on'));
   ['dub','adp','mix','qc','sub','trn','mgr'].forEach(k=>{const el=document.getElementById('catblock-'+k);if(el)el.classList.add('hidden');});
   ['dub','adp','mix','qc','sub','trn','mgr'].forEach(k=>{const el=document.getElementById(k+'-tax');if(el)el.value='';});
-  // Default phase dates = project today
-  applyProjectDatesToEmptyPhases();
   populateFormPhasesUI();
   populateWorkerSelects();clearAllWorkerLists();renderDubTiers();calcProjSummary();
   openModal('modal-project');
@@ -16454,6 +16503,10 @@ async function saveProject(){
     workers,tax,evidenceLogs:[],snapshot:null,createdAt:new Date(),
     phases: collectFormPhasesForSave()
   };
+  { const _dt=document.getElementById('pj-deadline-time'); if(_dt) proj.deadlineTime=_dt.value||''; }
+  // 🧾 หัก ณ ที่จ่ายแบบใหม่ (3% + รายการหักอื่น) — งานเก่าที่หักแยกหมวดไว้ ไม่แตะจนกว่าจะแก้ช่องนี้
+  try{ const _ex=editingProjId?getProjects().find(x=>x.id===editingProjId):null;
+    if(_pjDed && (_pjDedTouched || !editingProjId || (_ex&&Array.isArray(_ex.deductions)))) proj.deductions=JSON.parse(JSON.stringify(_pjDed)); }catch(e){}
   // 1.2 ไม่ตั้งชื่อ → ใช้รหัส+ลำดับเป็นชื่อชั่วคราว (เช่น H33) หา/บันทึกได้ไม่ error
   if(!proj.name) proj.name=projCode(proj);
   let _resendCandidates = []; // คนที่ยอดเปลี่ยน + เคยส่งใบยืนยันแล้ว → ถามส่งใหม่หลังบันทึก
@@ -16506,7 +16559,11 @@ async function saveProject(){
     });
   }
   // ─ บันทึกผ่าน saveProjectSafe (transaction + version check) ─
-  const result = await saveProjectSafe(proj, { baseVersion: _editingBaseVersion });
+  let result = await saveProjectSafe(proj, { baseVersion: _editingBaseVersion });
+  // 👤 คนที่บันทึกล่าสุดคือตัวเราเอง (เช่น เพิ่งบันทึกจากหน้าวางแผนงาน) → บันทึกผ่านเลย ไม่ต้องถาม
+  if(result.conflict && result.remote && (result.remote._lastSavedByEmail||'') && result.remote._lastSavedByEmail===((_meForPresence()||{}).email||'~')){
+    result = await saveProjectSafe(proj, { forceOverride: true });
+  }
   if(result.conflict){
     // มีแอดมินอื่นบันทึกหลังจากเราโหลด — ให้เลือก
     const choice = await showConflictDialog(result.remote, proj);
@@ -16947,7 +17004,9 @@ async function openEditProject(id){
   document.getElementById('pj-duration').value=p.duration||'';
   document.getElementById('pj-note').value=p.note||'';
   document.getElementById('pj-start').value=isoToThai(p.startDate||'');document.getElementById('pj-start-pk').value=p.startDate||'';
-  document.getElementById('pj-deadline').value=isoToThai(p.deadline||'');document.getElementById('pj-deadline-pk').value=p.deadline||'';
+  { const _dl=String(p.deadline||''), _d=_dl.slice(0,10);
+    document.getElementById('pj-deadline').value=isoToThai(_d);document.getElementById('pj-deadline-pk').value=_d;
+    const _dt=document.getElementById('pj-deadline-time'); if(_dt) _dt.value=p.deadlineTime||(_dl.includes('T')?_dl.slice(11,16):''); }
   const typeEl=document.getElementById('pj-type');[...typeEl.options].forEach((o,i)=>{if(o.value===p.type)typeEl.selectedIndex=i});
   // cycle removed - ignored
   const tax=p.tax||{};['dub','adp','mix','qc','sub','trn','mgr'].forEach(k=>{const el=document.getElementById(k+'-tax');if(el)el.value=tax[k]||''});
@@ -16987,12 +17046,18 @@ async function openEditProject(id){
       }
     }catch(e){}
   }
-  // เติมวันโปรเจกต์ให้ phase ที่ยังว่าง
-  applyProjectDatesToEmptyPhases();
+  // 🔒 หน้าที่ที่มีเดดไลน์/สถานะแต่ยังไม่มีคน (เช่น นักแปลที่ตั้งจากหน้าวางแผนงาน) → เปิดหมวดไว้ด้วย ไม่ให้เฟสหายตอนบันทึก
+  ['adp','dub','mix','qc','sub','trn'].forEach(c=>{ const ph=formPhases[c]; if(!ph||activeCats.has(c)) return;
+    if(ph.startDate||ph.deadline||ph.submitTime||(ph.rounds||[]).length||(ph.status&&ph.status!=='none')||ph._orig){ activeCats.add(c);
+      const btn=document.getElementById('toggle-'+c), block=document.getElementById('catblock-'+c); if(btn) btn.classList.add('on'); if(block) block.classList.remove('hidden'); } });
   populateFormPhasesUI();
   window._projRateHints = p.rateHints || null;   // 💡 เรทอ้างอิงจากแบบร่าง (ถ้าแปลงมาจากคำนวนราคา)
   populateWorkerSelects();renderAllWorkerLists();calcProjSummary();
   prefillManagerFee(p);   // 💰 เติมช่องค่าเหมา Manager จาก entry เดิม
+  try{ pjDedInit(p); }catch(e){ console.warn('pjDedInit:',e); }
+  // 🔒 ค่าเหมา Manager แก้ได้เฉพาะแอดมิน (เมเนเจอร์เห็นแต่แก้ไม่ได้) · สำรองจ่าย = แอดมินเท่านั้น
+  { const _mf=document.getElementById('pj-manager-fee'); if(_mf){ _mf.disabled=_isMgr; _mf.title=_isMgr?'แก้ได้เฉพาะแอดมิน':''; } }
+  { const _aw=document.getElementById('pj-advance-wrap'); if(_aw) _aw.style.display=_isMgr?'none':''; }
   openModal('modal-project');
   // ─ Claim presence + auto-draft ─
   claimPresence(id, 'editing');
@@ -32621,7 +32686,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261020-08"></script><script src="scene/nd-profile.js?v=20261020-08"></script><script src="scene/nd-plan.js?v=20261020-08"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261020-10"></script><script src="scene/nd-profile.js?v=20261020-10"></script><script src="scene/nd-plan.js?v=20261020-10"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32631,7 +32696,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261020-08';
+var UPD_BUILD = '20261020-10';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;

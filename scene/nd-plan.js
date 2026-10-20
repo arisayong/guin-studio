@@ -34,6 +34,45 @@ const amtOf=(rate,unit,qty,dur)=>{ rate=+rate||0; if(unit==='นาที') retu
 /* ── สไตล์ (ใช้สี/ตัวแปรของเว็บ) ── */
 const CSS=`
 .pl-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.pl-jump.fix{position:fixed;top:8px;margin:0}
+.pl-jump{position:relative;z-index:40;display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:7px 10px;margin:0 0 12px;border-radius:14px;background:color-mix(in srgb,var(--card) 92%,transparent);border:1px solid var(--border2);backdrop-filter:blur(8px);box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.pl-jl{font-size:12.5px;padding:4px 10px;border-radius:9px;cursor:pointer;color:var(--text2);border:1px solid transparent}
+.pl-jl:hover{background:rgba(255,255,255,.06);color:var(--text)} .pl-jr{border-color:color-mix(in srgb,var(--c) 45%,transparent);color:var(--text)}
+.pl-jw{display:inline-flex;min-width:18px;height:18px;border-radius:9px;background:var(--orange);color:#1a1000;font-size:11px;font-weight:700;align-items:center;justify-content:center;margin-left:4px;padding:0 5px}
+.pl-anchor{scroll-margin-top:72px}
+#nd-plan-body .pl-acc{scroll-margin-top:72px}
+.pl-ov .pl-ovh{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:10px}
+.pl-ovw{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.pl-ovw span{font-size:12px;border-radius:9px;padding:4px 9px;background:rgba(255,158,0,.13);border:1px solid rgba(255,158,0,.4);color:var(--orange);cursor:pointer}
+.pl-ovw.ok span{background:rgba(0,223,160,.12);border-color:rgba(0,223,160,.4);color:var(--green);cursor:default}
+.pl-ovt{width:100%;border-collapse:collapse;font-size:13px}
+.pl-ovt th{font-size:11.5px;color:var(--text2);font-weight:500;text-align:left;padding:6px 8px;border-bottom:1px solid var(--border2)}
+.pl-ovt td{padding:8px;border-bottom:1px dashed var(--border2);vertical-align:top}
+.pl-ovt tr:not(:first-child){cursor:pointer} .pl-ovt tr:not(:first-child):hover td{background:rgba(255,255,255,.04)}
+.pl-ovr{font-weight:700;border-left:4px solid var(--c);padding-left:7px;white-space:nowrap}
+.pl-ovp{display:inline-flex;align-items:center;gap:5px;margin:0 8px 4px 0;font-size:12.5px}
+.pl-ovp .pl-av{width:22px;height:22px;font-size:10.5px}
+.pl-ovg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.pl-ovg>div{border:1px solid var(--border2);border-radius:12px;padding:9px 11px;cursor:pointer}
+.pl-ovg>div:hover{background:rgba(255,255,255,.04)}
+@media(max-width:800px){ .pl-ovg{grid-template-columns:1fr} .pl-ovt th:nth-child(4),.pl-ovt td:nth-child(4){display:none} }
+.pl-info{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:8px 10px}
+.pl-info>div{min-width:0}.pl-c1{grid-column:span 1}.pl-c2{grid-column:span 2}.pl-c3{grid-column:span 3}.pl-c4{grid-column:span 4}.pl-c5{grid-column:span 5}.pl-c6{grid-column:span 6}.pl-c8{grid-column:span 8}
+#page-nd-plan .pl-info .form-input{padding:6px 9px;font-size:13px}
+.pl-inc{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;padding:7px 12px;border-radius:12px;background:rgba(0,223,160,.06);border:1px solid rgba(0,223,160,.25);font-size:12.5px}
+.pl-draftbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-radius:12px;padding:8px 12px;margin-bottom:10px;background:rgba(155,111,255,.12);border:1px solid rgba(155,111,255,.4);font-size:13px}
+.pl-pres{border-radius:12px;padding:7px 12px;margin-bottom:10px;background:rgba(255,158,0,.12);border:1px solid rgba(255,158,0,.4);color:var(--orange);font-size:12.5px}
+.pl-dlbox{border:1px solid var(--border2);border-radius:12px;padding:8px 10px;margin-bottom:10px;background:rgba(255,255,255,.02)}
+.pl-dlbox.linked{border-style:dashed}
+.pl-dlr{display:grid;grid-template-columns:minmax(120px,1fr) 150px 128px auto minmax(110px,1fr) 20px;gap:6px;align-items:center;margin-bottom:6px}
+.pl-dlr input:disabled{opacity:.55}
+.pl-dur2{font-size:11.5px;color:var(--text2);text-align:right}.pl-dur2 b{color:var(--accent2)}
+.pl-step{display:inline-flex;align-items:center;border:1px solid var(--border2);border-radius:8px;overflow:hidden;height:30px}
+.pl-step button{width:26px;height:100%;border:0;background:rgba(255,255,255,.05);color:var(--text);cursor:pointer;font-size:15px}
+.pl-step button:disabled{opacity:.4;cursor:default}
+.pl-step input{width:34px;border:0;background:transparent;color:var(--text);text-align:center;font-family:Kanit;font-size:12.5px}
+.pl-step span{font-size:11px;color:var(--text2);padding-right:6px}
+.pl-same{display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer}
 .pl-dirty{font-size:12px;color:var(--orange)}
 .pl-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;align-items:start}
 .pl-right{position:sticky;top:12px;display:flex;flex-direction:column;gap:12px}
@@ -135,6 +174,10 @@ const CSS=`
 .pl-dm.in{background:rgba(0,223,160,.12)} .pl-dm.add{background:rgba(0,180,255,.12);border-color:rgba(0,180,255,.55)} .pl-dm.rm{background:rgba(255,64,64,.14);border-color:var(--red);color:var(--red)}
 .pl-dm.nod{opacity:.55;border-style:dashed;border-color:var(--border2)}
 .pl-dm.pick{box-shadow:0 0 0 3px rgba(255,64,64,.4)}
+.pl-chip{display:inline-block;border-radius:8px;padding:2px 7px;margin:2px;font-size:12px;cursor:pointer;border:1px solid}
+.k-p{background:rgba(0,180,255,.13);border-color:rgba(0,180,255,.45);color:#7fd6ff}.k-d{background:rgba(255,158,0,.13);border-color:rgba(255,158,0,.45);color:#ffc56b}
+.k-m{background:rgba(0,223,160,.13);border-color:rgba(0,223,160,.45);color:#5ff0c3}.k-l{background:rgba(155,111,255,.16);border-color:rgba(155,111,255,.5);color:#c4a8ff}
+.k-t{background:rgba(255,111,174,.14);border-color:rgba(255,111,174,.45);color:#ff9cc8}.k-x{background:rgba(255,64,64,.16);border-color:rgba(255,64,64,.5);color:#ff9b9b}
 .pl-tpls{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
 .pl-tpls span{border:1px solid var(--border2);border-radius:10px;padding:4px 10px;font-size:12.5px;cursor:pointer}
 .pl-tpls span.on{border-color:#5865F2;background:rgba(88,101,242,.2)}
@@ -147,7 +190,7 @@ const CSS=`
 .pl-tx{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .pl-tx .t{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.05);border-radius:9px;padding:4px 8px;font-size:12.5px}
 .pl-tx input{width:70px!important;padding:3px 6px!important} .pl-tx select{width:auto!important;padding:3px 6px!important}
-@media(max-width:1250px){ .pl-rnd{grid-template-columns:1fr}  .pl-grid{grid-template-columns:1fr} .pl-right{position:static} .pl-dcw,.pl-2col{grid-template-columns:1fr} .pl-g6,.pl-g4{grid-template-columns:1fr 1fr} .pl-phase{grid-template-columns:1fr} .pl-wk{grid-template-columns:1fr 1fr!important} .pl-wk.hd{display:none} }
+@media(max-width:1250px){ .pl-info>div{grid-column:span 6} .pl-dlr{grid-template-columns:1fr 1fr}  .pl-rnd{grid-template-columns:1fr}  .pl-grid{grid-template-columns:1fr} .pl-right{position:static} .pl-dcw,.pl-2col{grid-template-columns:1fr} .pl-g6,.pl-g4{grid-template-columns:1fr 1fr} .pl-phase{grid-template-columns:1fr} .pl-wk{grid-template-columns:1fr 1fr!important} .pl-wk.hd{display:none} }
 `;
 
 /* ── สถานะของหน้า ── */
@@ -184,6 +227,7 @@ function loadProject(id){
     const mine=ws.filter(w=>preOf(w)===k); const key=R[k][3], pp=ph[key]||{};
     const r={k, on:!!(mine.length||ph[key]), st:pp.status||'none',
       start:dOnly(pp.startDate), stime:pp.startTime||'', end:dOnly(pp.deadline), etime:pp.submitTime||'', slots:[],
+      endLabel:pp.endLabel||'', sameAs:pp.sameAs||'', note:pp.note||'', step:{},
       rounds:Array.isArray(pp.rounds)?pp.rounds.filter(Boolean).map(x=>({label:x.label||'',date:dOnly(x.date),time:x.time||''})):(pp.deadline2?[{label:'รอบ 2',date:dOnly(pp.deadline2),time:pp.submitTime2||''}]:[])};
     const base=w=>({n:nickOf(w.id), id:w.id, slot:w.slot, paid:w.status==='paid', ep:w.ep||'', old:+w.amount||0});
     if(k==='dub'){
@@ -218,16 +262,22 @@ function loadProject(id){
      ded:(Array.isArray(p.deductions)&&p.deductions.length)?p.deductions.map(d=>({label:d.label||'',pct:+d.pct||0,on:!!d.on}))
          :[{label:'หัก ณ ที่จ่าย (บริษัท)',pct:maxTax||3,on:maxTax>0||isNew}],
      legacyTax:!Array.isArray(p.deductions)&&!isNew&&new Set(taxVals).size>1 ? tax : null,
-     isNew, roles, t:{}, rolesT:false, dedT:false};
+     isNew, roles, t:{}, rolesT:false, dedT:false, note:p.note||'',
+     mgrFee:(()=>{ const ms=mgrStaff(p.managerId); const w=ws.find(x=>preOf(x)==='mgr'&&(!ms||x.id===ms.id)); return w?(+w.amount||0):0; })()};
   // ยอดเดิมที่ไม่ตรงสูตร → คงไว้ (ไม่เปลี่ยนเงินใครถ้าไม่ได้แก้)
   ORDER.forEach(k=>{ const r=roles[k]; r.slots.forEach(s=>{ if(s.id && !same(calc(r,s),s.old)) s.fix=s.old; }); });
   // ห้อง Discord: ใครมีสิทธิ์อยู่แล้ว (บันทึกไว้ตอนอัปเดตสิทธิ์ · ห้องเก่า = ถือว่าทีมในโปรเจกต์อยู่ในห้อง)
   DC={room:{}, keep:{}, pick:null};
   if(p.discordChannelId){ const was=Array.isArray(p.discordRoomMembers)?p.discordRoomMembers:[...new Set(ws.filter(w=>preOf(w)!=='mgr').map(w=>w.id))]; was.forEach(sid=>{ if(sid) DC.room[sid]='in'; }); }
   edText=null; edPost=(safe(()=>_prPosts(p),[])[0]||{}).id||''; tplSel=p.postTplId||''; dd=null; dirty=false;
-  DR=DR0();
+  DR=DR0(); S.loadedAt=p.updatedAt||''; S.draft=null;
   if(openA<0 || !S.roles[ORDER[openA]]||!S.roles[ORDER[openA]].on) openA=ORDER.findIndex(k=>S.roles[k].on);
+  checkDraft(p.id);
+  safe(()=>claimPresence(p.id,'viewing'));
 }
+// 🔗 "ใช้เดดไลน์เดียวกับ …" — ก๊อปวันเวลาทุกรอบจากหน้าที่ต้นทาง (ชั้นเดียว ไม่ไล่ต่อกันเป็นทอด)
+function syncSame(){ if(!S) return; ORDER.forEach(k=>{ const r=S.roles[k], src=r.sameAs&&S.roles[r.sameAs]; if(!src||src.sameAs) return;
+  r.start=src.start; r.stime=src.stime; r.end=src.end; r.etime=src.etime; r.endLabel=src.endLabel; r.rounds=JSON.parse(JSON.stringify(src.rounds||[])); }); }
 const on=()=>ORDER.map(k=>S.roles[k]).filter(r=>r.on);
 const planIds=()=>[...new Set(on().flatMap(r=>r.slots.map(s=>s.id).filter(Boolean)))];
 const WHT=()=>S.ded.filter(d=>d.on).reduce((a,d)=>a+(+d.pct||0),0);
@@ -285,6 +335,13 @@ function applyPlan(f){
   if(T.link) f.downloadLink=S.link||'';
   if(T.secret) f.secretKey=S.secret||'';
   if(isAdm()){ if(T.client) f.client=S.client; if(T.mgrId) f.managerId=S.mgrId||''; }
+  if(T.note) f.note=S.note||'';
+  // 💰 ค่าเหมา Manager (แอดมินเท่านั้น) = รายการในหมวด mgr ของเมเนเจอร์คนนั้น · ระบบเดิมของหน้าโปรเจกต์ใช้ชุดเดียวกัน
+  if(isAdm() && (T.mgrFee||T.mgrId)){ const ms=mgrStaff(S.mgrId), fee=+S.mgrFee||0; f.workers=(f.workers||[]).filter(Boolean);
+    if(T.mgrId){ const prev=mgrStaff(S.src.managerId); if(prev&&(!ms||prev.id!==ms.id)) f.workers=f.workers.filter(w=>!(preOf(w)==='mgr'&&w.id===prev.id&&w.status!=='paid')); }
+    if(ms){ const i=f.workers.findIndex(w=>preOf(w)==='mgr'&&w.id===ms.id);
+      if(fee>0){ if(i>=0) Object.assign(f.workers[i],{amount:fee, ratePerUnit:fee, unit:'เหมา'}); else f.workers.push({id:ms.id, slot:'mgr-only', amount:fee, ratePerUnit:fee, unit:'เหมา', qty:0, status:'pending', note:'', comment:'', confirmStatus:'none'}); }
+      else if(i>=0 && f.workers[i].status!=='paid') f.workers.splice(i,1); } }
   // คน · ราคา · เวลา — เขียนเฉพาะเมื่อแตะส่วนนี้
   if(S.rolesT){
     const old=(f.workers||[]).filter(Boolean), nw=buildWorkers(), used=new Set();
@@ -298,7 +355,9 @@ function applyPlan(f){
     const d=S.roles.dub; f.dubTiers=d.tiers.map(t=>({rate:t.blank?'':(+t.rate||0), unit:t.unit||'นาที', qty:+t.qty||0}));
     const ph={...(f.phases||{})};
     ORDER.forEach(k=>{ const r=S.roles[k], key=R[k][3];
-      if(r.on && (ph[key] || r.start || r.end || r.etime || r.stime || (r.rounds||[]).length || (r.st&&r.st!=='none'))){ const o=ph[key]||{}; ph[key]={...o, startDate:r.start||'', deadline:r.end||'', submitTime:r.etime||'', status:r.st||'none', note:o.note||''}; if(r.stime) ph[key].startTime=r.stime;
+      if(r.on && (ph[key] || r.start || r.end || r.etime || r.stime || r.note || r.endLabel || r.sameAs || (r.rounds||[]).length || (r.st&&r.st!=='none'))){ const o=ph[key]||{}; ph[key]={...o, startDate:r.start||'', deadline:r.end||'', submitTime:r.etime||'', status:r.st||'none', note:r.note||''}; if(r.stime) ph[key].startTime=r.stime;
+        if(r.endLabel) ph[key].endLabel=r.endLabel; else delete ph[key].endLabel;
+        if(r.sameAs) ph[key].sameAs=r.sameAs; else delete ph[key].sameAs;
         // 🏁 เดดไลน์รอบถัดไป (รอบ 2/ไฟนอล ฯลฯ) · รอบแรกที่เพิ่ม = deadline2 ให้ระบบเดิม (บรีฟ/ติดตามงาน) อ่านได้
         const rs=(r.rounds||[]).filter(x=>x.date).map(x=>({label:String(x.label||'').trim()||'รอบถัดไป', date:x.date, time:x.time||''}));
         if(rs.length||o.rounds||o.deadline2){ ph[key].rounds=rs; if(rs[0]){ ph[key].deadline2=rs[0].date; if(rs[0].time) ph[key].submitTime2=rs[0].time; else delete ph[key].submitTime2; } else { delete ph[key].deadline2; delete ph[key].submitTime2; } } }
@@ -312,7 +371,34 @@ function applyPlan(f){
   }
   return resend;
 }
-function previewProj(){ const f=JSON.parse(JSON.stringify(S.src)); applyPlan(f); return f; }
+function previewProj(){ syncSame(); const f=JSON.parse(JSON.stringify(S.src)); applyPlan(f); return f; }
+
+/* ── 📝 แบบร่าง (เก็บในระบบ misc/plandraft_<id> — ทีม/คิวจ่ายเงินยังไม่เห็น · ทุกคนที่เปิดงานนี้เห็นแถบแบบร่าง) ── */
+const DKEY=id=>'plandraft_'+id;
+const packS=()=>{ const o={...S}; delete o.src; delete o.draft; return JSON.parse(JSON.stringify(o)); };
+async function checkDraft(id){ let d=safe(()=>ls(DKEY(id)),null); try{ const v=await fbLoadKeyed(DKEY(id)); if(v!==undefined) d=v; }catch(e){}
+  if(!S||S.id!==id) return; S.draft=(d&&d.data&&d.at)?d:null; render(); }
+async function saveDraftNow(){ if(!S) return; syncSame();
+  const me=safe(()=>_meForPresence(),null)||{}; const d={at:new Date().toISOString(), by:me.email||'', byName:me.nickname||'', data:packS(), base:S.loadedAt||''};
+  await fbSaveKeyed(DKEY(S.id), d); S.draft=d; dirty=false; say('📝 บันทึกแบบร่างแล้ว — ยังไม่บันทึกจริง (ทีมยังไม่เห็น)','success'); render(); }
+async function dropDraft(id){ try{ await fbSaveKeyed(DKEY(id), null); }catch(e){} if(S&&S.id===id) S.draft=null; }
+function openDraft(){ const d=S&&S.draft; if(!d) return; const keep={src:S.src, id:S.id, loadedAt:S.loadedAt};
+  S={...d.data, ...keep, draft:d}; dirty=true; say('📝 เปิดแบบร่างของ '+(d.byName||'')+' แล้ว — กด ✅ บันทึกโปรเจกต์ เมื่อพร้อม','info'); render(); }
+
+/* ── ⚠️ ชนกัน: เตือนเฉพาะเมื่อ "คนอื่น" บันทึกงานนี้หลังจากเราเปิด · คนเดิมบันทึกเอง = ผ่านเลย ── */
+async function remoteCopy(id){ try{ if(typeof _fbDatabase!=='undefined'&&_fbDatabase){ const sn=await _fbDatabase.ref('projects/'+id).get(); if(sn.exists()) return sn.val(); } }catch(e){} return fresh(); }
+function diffSummary(a,b){ const out=[], L={name:'ชื่อ',deadline:'เดดไลน์ลูกค้า',budget:'Budget',duration:'นาที',episodes:'ตอน',managerId:'Manager',downloadLink:'ลิงก์งาน',note:'หมายเหตุ'};
+  Object.keys(L).forEach(k=>{ if(String((a||{})[k]??'')!==String((b||{})[k]??'')) out.push(L[k]); });
+  const wk=x=>((x&&x.workers)||[]).filter(Boolean).map(w=>w.id+':'+w.slot+':'+w.amount).sort().join('|'); if(wk(a)!==wk(b)) out.push('คน/ราคา');
+  if(JSON.stringify((a||{}).phases||{})!==JSON.stringify((b||{}).phases||{})) out.push('เดดไลน์หน้าที่');
+  return out.join(' · ')||'รายละเอียดย่อย'; }
+function conflictAsk(remote){ return new Promise(res=>{
+  const who=remote._lastSavedBy||'คนอื่น', when=safe(()=>_prTimeAgo(remote.updatedAt),'');
+  safe(()=>_tagOverlayShow('⚠️ มีคนบันทึกงานนี้หลังจากคุณเปิด', `<div style="background:var(--bg2,rgba(255,255,255,.05));border-radius:10px;padding:9px 11px;font-size:13px;line-height:1.8">👤 <b>${esc(who)}</b> บันทึกเมื่อ <b>${esc(when)}</b><br>เขาแก้: ${esc(diffSummary(S.src,remote))}</div>
+    <div class="pl-mut" style="margin:8px 0;line-height:1.7">ถ้าบันทึกทับ ส่วนที่ <b>${esc(who)}</b> แก้ในช่องเดียวกันจะถูกแทนด้วยของคุณ</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-outline" id="cf-x">ยกเลิก</button><button class="btn btn-outline" id="cf-load">🔄 โหลดของ ${esc(who)} มาดู</button><button class="btn btn-blue" id="cf-draft">📝 เก็บของฉันเป็นแบบร่าง</button><button class="btn btn-outline" id="cf-over" style="border-color:var(--orange);color:var(--orange)">บันทึกทับ</button></div>`, 560));
+  setTimeout(()=>{ const ov=()=>document.getElementById('tag-overlay'); const done=v=>{ ov()?.remove(); res(v); };
+    [['cf-x','cancel'],['cf-load','load'],['cf-draft','draft'],['cf-over','over']].forEach(([id,v])=>{ const b=$(id); if(b) b.onclick=()=>done(v); }); },50); }); }
 
 async function save(quiet){
   if(!S||saving) return false;
@@ -322,6 +408,14 @@ async function save(quiet){
   if(gone.length && !confirm('⚠️ เอาคนที่ "จ่ายเงินแล้ว" ออกจากงาน: '+gone.map(w=>nickOf(w.id)).join(', ')+'\nรายการจ่ายของคนนี้จะหายจากโปรเจกต์ — ยืนยัน?')) return false;
   const chg=(S.src.workers||[]).filter(w=>w&&w.status==='paid').map(w=>({w, n:nw.find(x=>x.id===w.id&&x.slot===w.slot)})).filter(o=>o.n&&(+o.n.amount||0)!==(+o.w.amount||0));
   if(chg.length && !confirm('⚠️ ยอดของคนที่ "จ่ายเงินแล้ว" จะเปลี่ยน:\n'+chg.map(o=>'• '+nickOf(o.w.id)+' '+B(o.w.amount)+' → '+B(o.n.amount)).join('\n')+'\n\nยืนยันบันทึก?')) return false;
+  syncSame();
+  // ⚠️ มีคนอื่นบันทึกหลังจากเราเปิดไหม (คนเดิม = ผ่าน)
+  { const remote=await remoteCopy(S.id), me=(safe(()=>_meForPresence(),null)||{}).email||'~';
+    if(remote && (remote.updatedAt||'')!==(S.loadedAt||'') && (remote._lastSavedByEmail||'')!==me){
+      const ch=await conflictAsk(remote);
+      if(ch==='cancel') return false;
+      if(ch==='draft'){ await saveDraftNow(); return false; }
+      if(ch==='load'){ if(dirty && !confirm('โหลดของล่าสุดมาแทน — สิ่งที่แก้ค้างไว้จะหาย (ถ้าอยากเก็บ กดยกเลิก แล้วบันทึกแบบร่างก่อน)')) return false; loadProject(S.id); render(); return false; } } }
   saving=true; busy(true);
   let resend=[];
   try{
@@ -332,6 +426,7 @@ async function save(quiet){
     if(role()==='manager') safe(()=>notifyAdmin('project-updated',{projId:S.id, projName:saved.name}));
     else if(saved.managerId && saved.managerId!==(S.src.managerId||'')) safe(()=>addNotification({type:'project',title:'🗂️ คุณได้รับมอบหมายโปรเจกต์ใหม่',text:`${saved.name} — เข้าไปวางแผนงานได้เลย`,recipientUid:saved.managerId,projId:S.id}));
     audit('project.plan', saved.name, 'บันทึกจากหน้าวางแผนงาน ('+nw.length+' คน)');
+    if(S.draft) await dropDraft(S.id);
     const keep={openA, infoOpen, edText, edPost, tplSel, DC, DR};
     loadProject(S.id); ({openA, infoOpen, edText, edPost, tplSel, DC, DR}=keep);
     if(!quiet) say('💾 บันทึกแล้ว','success');
@@ -374,23 +469,32 @@ function queue(){ // คำตอบจากรอบลงคิวที่�
 const roundLabel=rs=>[...new Set(rs.map(r=>safe(()=>_roundRangeLabel(r),'')).filter(x=>x&&x!=='—'))].join(' · ');
 
 /* ── ข้อมูลโปรเจกต์ ── */
-function infoHTML(){ const adm=isAdm();
-  return `<div class="pl-f pl-g6"><div><label class="pl-l">รหัสงาน</label><input class="form-input" value="${esc(S.code)}" onchange="NDP.set('code',this.value.toUpperCase())"></div>
-   <div><label class="pl-l">ลำดับ</label><input class="form-input" value="${esc(S.seq)}" onchange="NDP.set('seq',this.value)"></div>
-   <div><label class="pl-l">ชื่อโปรเจกต์ *</label><input class="form-input" value="${esc(S.name)}" onchange="NDP.set('name',this.value)"></div>
-   <div><label class="pl-l">ประเภทงาน</label><select class="form-input form-select" onchange="NDP.set('type',this.value)">${[...new Set(['',S.type,'หนัง','ซีรีย์','อนิเมะ','อนิเมชัน','หนังแนวตั้ง','เกม','โฆษณา','บรรยาย','หนังสือเสียง','เพลง','มิกซ์'])].map(t=>`<option${t===S.type?' selected':''}>${esc(t)}</option>`).join('')}</select></div></div>
-  <div class="pl-f pl-g4" style="margin-top:10px"><div><label class="pl-l">ความยาว (นาที)</label><input class="form-input" type="number" step="any" value="${S.minutes||''}" onchange="NDP.set('minutes',+this.value||0)"></div>
-   <div><label class="pl-l">จำนวนตอน (Ep.)</label><input class="form-input" type="number" value="${S.eps||''}" onchange="NDP.set('eps',+this.value||0)"></div>
-   <div><label class="pl-l">วันเริ่มงาน</label><input class="form-input" type="date" value="${esc(S.start)}" onchange="NDP.set('start',this.value)"></div>
-   <div><label class="pl-l">🏁 Deadline ลูกค้า</label><div class="pl-dt"><input class="form-input" type="date" value="${esc(S.deadline)}" onchange="NDP.set('deadline',this.value)"><input class="form-input" type="time" value="${esc(S.dtime)}" onchange="NDP.set('dtime',this.value)"></div></div></div>
-  <div class="pl-f pl-g3" style="margin-top:10px">
-   <div><label class="pl-l">Budget จากลูกค้า</label><div class="pl-bud"><select class="form-input form-select" onchange="NDP.set('budType',this.value)">${[['flat','เหมา'],['per-minute','ต่อนาที'],['per-hour','ต่อชั่วโมง'],['per-episode','ต่อบท'],['per-page','ต่อหน้า'],['per-day','ต่อวัน'],['per-project','ต่อโปรเจกต์']].map(([v,l])=>`<option value="${v}"${v===S.budType?' selected':''}>${l}</option>`).join('')}</select><input class="form-input" type="number" step="any" value="${S.budRate||''}" onchange="NDP.set('budRate',+this.value||0)">${['flat','per-minute','per-project'].includes(S.budType)?'<span></span>':`<input class="form-input" type="number" step="any" value="${S.budQty||''}" placeholder="จำนวน" onchange="NDP.set('budQty',+this.value||0)">`}</div></div>
-   ${adm?`<div><label class="pl-l">ชื่อ / URL ลูกค้า</label><input class="form-input" value="${esc(S.client)}" onchange="NDP.set('client',this.value)"></div>`:`<div><label class="pl-l">ลูกค้า</label><div class="pl-lock">🔒 เฉพาะแอดมิน</div></div>`}
-   <div><label class="pl-l">🗂️ Manager</label>${adm?`<select class="form-input form-select" onchange="NDP.set('mgrId',this.value)"><option value="">— แอดมินดูแลเอง —</option>${managers().map(m=>`<option value="${esc(m.uid)}"${m.uid===S.mgrId?' selected':''}>${esc(m.nickname||m.email)}</option>`).join('')}</select>`:`<div class="pl-lock">${esc(mgrName(S.mgrId))}</div>`}</div></div>
-  <div class="pl-f pl-g3" style="margin-top:10px"><div><label class="pl-l">🔗 Link โหลดงาน</label><input class="form-input" value="${esc(S.link)}" onchange="NDP.set('link',this.value)"></div>
-   <div><label class="pl-l">🔑 Secret key</label><input class="form-input" value="${esc(S.secret)}" placeholder="เห็นเฉพาะทีมที่เกี่ยวข้อง" onchange="NDP.set('secret',this.value)"></div>
-   <div><label class="pl-l">🧾 หัก ณ ที่จ่าย (จากค่าจ้างทีม · ค่าเริ่มต้น 3%)</label><div class="pl-ded">${S.ded.map((d,j)=>`<span class="d ${d.on?'on':''}"><input type="checkbox" ${d.on?'checked':''} onchange="NDP.ded(${j},'on',this.checked)">${j===0?`<b>${d.pct}%</b> ${esc(d.label)}`:`<input class="form-input" style="width:100px;padding:3px 6px" value="${esc(d.label)}" onchange="NDP.ded(${j},'label',this.value)"><input class="form-input" style="width:46px;padding:3px 6px" value="${d.pct}" onchange="NDP.ded(${j},'pct',+this.value||0)">% <a style="cursor:pointer;opacity:.6" onclick="NDP.ded(${j},'del')">✕</a>`}</span>`).join('')}<button class="btn btn-outline btn-sm" title="เพิ่มรายการหักอื่น" onclick="NDP.ded(-1,'add')">＋</button></div>
-     <div class="pl-mut" style="margin-top:3px">${S.legacyTax&&!S.dedT?`<span class="pl-warn">งานเดิมหักแยกตามหน้าที่ (${ORDER.filter(k=>S.roles[k].on).map(k=>R[k][0]+' '+(+S.legacyTax[k]||0)+'%').join(' · ')}) — คงไว้ตามเดิม · แก้ช่องนี้ = ใช้ค่าเดียวทุกหน้าที่</span>`:WHT()?`รวมหัก <b>${WHT()}%</b> จากค่าจ้างทุกคนในงานนี้`:'<span class="pl-warn">ไม่หัก — เช่น งานสั่งในชื่อส่วนตัว</span>'}</div></div></div>`; }
+function infoHTML(){ const adm=isAdm(), ms=mgrStaff(S.mgrId);
+  const inc=(S.src.income||[]).filter(Boolean), got=inc.filter(x=>x.paidAt).reduce((a,x)=>a+(+x.amount||0),0);
+  const C=(n,lbl,body,cls='')=>`<div class="pl-c${n} ${cls}"><label class="pl-l">${lbl}</label>${body}</div>`;
+  return `<div class="pl-info">
+   ${C(1,'รหัส',`<input class="form-input" style="font-weight:800" value="${esc(S.code)}" onchange="NDP.set('code',this.value.toUpperCase())">`)}
+   ${C(1,'ลำดับ',`<input class="form-input" style="font-weight:800" value="${esc(S.seq)}" onchange="NDP.set('seq',this.value)">`)}
+   ${C(4,'ชื่อโปรเจกต์ *',`<input class="form-input" value="${esc(S.name)}" onchange="NDP.set('name',this.value)">`)}
+   ${C(2,'ประเภทงาน',`<select class="form-input form-select" onchange="NDP.set('type',this.value)">${[...new Set(['',S.type,'หนัง','ซีรีย์','อนิเมะ','อนิเมชัน','หนังแนวตั้ง','เกม','โฆษณา','บรรยาย','หนังสือเสียง','เพลง','มิกซ์'])].map(t=>`<option${t===S.type?' selected':''}>${esc(t)}</option>`).join('')}</select>`)}
+   ${C(1,'นาที',`<input class="form-input" type="number" step="any" value="${S.minutes||''}" placeholder="—" onchange="NDP.set('minutes',+this.value||0)">`)}
+   ${C(1,'ตอน (Ep.)',`<input class="form-input" type="number" value="${S.eps||''}" placeholder="—" onchange="NDP.set('eps',+this.value||0)">`)}
+   ${C(2,'🗂️ Manager',adm?`<select class="form-input form-select" onchange="NDP.set('mgrId',this.value)"><option value="">— แอดมินดูแลเอง —</option>${managers().map(m=>`<option value="${esc(m.uid)}"${m.uid===S.mgrId?' selected':''}>${esc(m.nickname||m.email)}</option>`).join('')}</select>`:`<div class="pl-lock">${esc(mgrName(S.mgrId))}</div>`)}
+
+   ${C(2,'วันเริ่มงาน',`<input class="form-input" type="date" value="${esc(S.start)}" onchange="NDP.set('start',this.value)">`)}
+   ${C(4,'🏁 Deadline ลูกค้า',`<div class="pl-dt"><input class="form-input" type="date" value="${esc(S.deadline)}" onchange="NDP.set('deadline',this.value)"><input class="form-input" type="time" value="${esc(S.dtime)}" onchange="NDP.set('dtime',this.value)"></div>`)}
+   ${C(3,'Budget จากลูกค้า',`<div class="pl-dt"><select class="form-input form-select" style="width:92px;flex-shrink:0" onchange="NDP.set('budType',this.value)">${[['flat','เหมา'],['per-minute','นาที'],['per-hour','ชั่วโมง'],['per-page','หน้า'],['per-day','วัน'],['per-episode','บท'],['per-project','โปรเจกต์']].map(([v,l])=>`<option value="${v}"${v===S.budType?' selected':''}>${l}</option>`).join('')}</select><input class="form-input" type="number" step="any" value="${S.budRate||''}" onchange="NDP.set('budRate',+this.value||0)">${['flat','per-minute','per-project'].includes(S.budType)?'':`<input class="form-input" type="number" step="any" style="width:72px;flex-shrink:0" value="${S.budQty||''}" placeholder="จำนวน" onchange="NDP.set('budQty',+this.value||0)">`}</div>`)}
+   ${C(3,adm?'ชื่อ / URL ลูกค้า':'ลูกค้า',adm?`<input class="form-input" value="${esc(S.client)}" onchange="NDP.set('client',this.value)">`:'<div class="pl-lock">🔒 เฉพาะแอดมิน</div>')}
+
+   ${C(4,'🔗 Link โหลดงาน',`<input class="form-input" value="${esc(S.link)}" placeholder="https://…" onchange="NDP.set('link',this.value)">`)}
+   ${C(3,'🔑 Secret key',`<input class="form-input" value="${esc(S.secret)}" placeholder="เห็นเฉพาะทีมที่เกี่ยวข้อง" onchange="NDP.set('secret',this.value)">`)}
+   ${C(5,'🧾 หัก ณ ที่จ่าย (จากค่าจ้างทีม · ค่าเริ่มต้น 3%)',`<div class="pl-ded">${S.ded.map((d,j)=>`<span class="d ${d.on?'on':''}"><input type="checkbox" ${d.on?'checked':''} onchange="NDP.ded(${j},'on',this.checked)">${j===0?`<b>${d.pct}%</b> ${esc(d.label)}`:`<input class="form-input" style="width:96px;padding:3px 6px" value="${esc(d.label)}" onchange="NDP.ded(${j},'label',this.value)"><input class="form-input" style="width:46px;padding:3px 6px" value="${d.pct}" onchange="NDP.ded(${j},'pct',+this.value||0)">% <a style="cursor:pointer;opacity:.6" onclick="NDP.ded(${j},'del')">✕</a>`}</span>`).join('')}<button class="btn btn-outline btn-sm" title="เพิ่มรายการหักอื่น" onclick="NDP.ded(-1,'add')">＋</button></div>
+     <div class="pl-mut" style="margin-top:3px">${S.legacyTax&&!S.dedT?`<span class="pl-warn">งานเดิมหักแยกตามหน้าที่ (${ORDER.filter(k=>S.roles[k].on).map(k=>R[k][0]+' '+(+S.legacyTax[k]||0)+'%').join(' · ')}) — คงไว้ตามเดิม · แก้ช่องนี้ = ใช้ค่าเดียวทุกหน้าที่</span>`:WHT()?`รวมหัก <b>${WHT()}%</b> จากค่าจ้างทุกคนในงานนี้`:'<span class="pl-warn">ไม่หัก — เช่น งานสั่งในชื่อส่วนตัว</span>'}</div>`)}
+
+   ${C(8,'📝 หมายเหตุ (การหัก / เงื่อนไข)',`<input class="form-input" value="${esc(S.note)}" placeholder="—" onchange="NDP.set('note',this.value)">`)}
+   ${C(4,'💰 ค่าเหมา Manager'+(adm?'':' <span class="pl-mut">(แอดมินตั้ง)</span>'),!S.mgrId?'<div class="pl-lock">— เลือก Manager ก่อน —</div>':adm?(ms?`<div class="pl-dt"><input class="form-input" type="number" step="any" value="${S.mgrFee||''}" placeholder="0" onchange="NDP.set('mgrFee',+this.value||0)"><span class="pl-mut" style="align-self:center;white-space:nowrap">฿ / งาน</span></div>`:'<div class="pl-lock pl-warn">เมเนเจอร์คนนี้ยังไม่ผูกกับรายชื่อทีม</div>'):`<div class="pl-lock">${S.mgrFee?B(S.mgrFee):'—'}</div>`)}
+  </div>
+  ${adm?`<div class="pl-inc">💰 <b>การรับเงินจากลูกค้า</b><span class="pl-mut">${inc.length?inc.length+' งวด · รับแล้ว '+B(got)+' / '+B(budget())+' · ค้าง '+B(Math.max(0,budget()-got)):'ยังไม่ได้ตั้งงวดรับเงิน'}</span><span style="flex:1"></span><button class="btn btn-outline btn-sm" onclick="NDP.openProj()">✏️ แก้งวดรับเงิน (หน้าโปรเจกต์)</button></div>`:''}`; }
 
 /* ── หน้าที่ · คน · ราคา · เวลา ── */
 function nameBtn(k,j){ const r=S.roles[k], s=r.slots[j], open=dd&&dd.k===k&&dd.j===j;
@@ -400,14 +504,23 @@ function nameBtn(k,j){ const r=S.roles[k], s=r.slots[j], open=dd&&dd.k===k&&dd.j
      ${pool.filter(x=>!q||String((x.nickname||'')+' '+(x.name||'')).toLowerCase().includes(q)).slice(0,60).map(x=>`<div class="op" onclick="NDP.pick('${k}',${j},'${esc(x.id)}')">${av(x.nickname||x.name)}${esc(x.nickname||x.name)}<small class="pl-mut">${esc(x.name&&x.nickname?x.name:'')}${x.discordId?'':' · ไม่มีดิส'}</small></div>`).join('')||'<div class="pl-mut" style="padding:6px">ไม่พบชื่อ (ดูเฉพาะคนในทีมหน้าที่นี้)</div>'}
      ${s.n?`<div class="op" style="color:var(--red)" onclick="NDP.pick('${k}',${j},'')">✕ เอาชื่อออก (เก็บช่องไว้)</div>`:''}</div>`:''}</div>`; }
 
-function bodyHTML(k){ const r=S.roles[k], hr=hoursOf(r), st=STD();
+function bodyHTML(k){ syncSame(); const r=S.roles[k], hr=hoursOf(r), st=STD();
   const late=r.end&&S.deadline&&r.end>S.deadline, multi=(r.rounds||[]).length>0;
-  const time=`<div class="pl-phase"><div><label class="pl-l">📅 เริ่ม (วัน · เวลา)</label><div class="pl-dt"><input class="form-input" type="date" value="${esc(r.start)}" onchange="NDP.r('${k}','start',this.value)"><input class="form-input" type="time" value="${esc(r.stime)}" onchange="NDP.r('${k}','stime',this.value)"></div></div>
-    <div><label class="pl-l">🏁 ส่ง${multi?'รอบ 1':''} (วัน · เวลา)${late?' <span class="pl-bad">เลยเดดไลน์ลูกค้า</span>':''}</label><div class="pl-dt"><input class="form-input" type="date" value="${esc(r.end)}" style="${late?'border-color:var(--red)':''}" onchange="NDP.r('${k}','end',this.value)"><input class="form-input" type="time" value="${esc(r.etime)}" onchange="NDP.r('${k}','etime',this.value)"></div></div>
-    <div><label class="pl-l">👥 จำนวนคนทำงาน</label><div class="pl-cnt"><button onclick="NDP.cnt('${k}',-1)">−</button><b>${r.slots.length}</b><button onclick="NDP.cnt('${k}',1)">+</button></div></div></div>
-    ${(r.rounds||[]).map((x,i)=>{ const lt=x.date&&S.deadline&&x.date>S.deadline; return `<div class="pl-rnd"><input class="form-input" value="${esc(x.label)}" placeholder="ชื่อรอบ เช่น รอบ 2 (ไฟนอล)" onchange="NDP.rnd('${k}',${i},'label',this.value)"><div class="pl-dt"><input class="form-input" type="date" value="${esc(x.date)}" style="${lt?'border-color:var(--red)':''}" onchange="NDP.rnd('${k}',${i},'date',this.value)"><input class="form-input" type="time" value="${esc(x.time)}" onchange="NDP.rnd('${k}',${i},'time',this.value)"></div><span class="pl-mut">${x.date?'⏱ '+fmtH(hoursTo(r,x.date,x.time)):''}${lt?' <span class="pl-bad">เลยเดดไลน์ลูกค้า</span>':''}</span><span class="pl-x" title="ลบรอบนี้" onclick="NDP.rndDel('${k}',${i})">✕</span></div>`; }).join('')}
-    <div class="pl-dur">⏱ เริ่ม → ส่ง${multi?'รอบ 1':''} มีเวลา <b>${fmtH(hr)}</b>${hr>=24?` <span class="pl-mut">(${hr} ชม.)</span>`:''}${rds(r).map(x=>` · → ${esc(x.label||'รอบถัดไป')} <b>${fmtH(hoursTo(r,x.date,x.time))}</b>`).join('')}
-      <span style="flex:1"></span><button class="btn btn-outline btn-sm" onclick="NDP.rndAdd('${k}')">＋ เพิ่มเดดไลน์รอบถัดไป</button></div>`;
+  const lk=r.sameAs&&S.roles[r.sameAs]?r.sameAs:'', dis=lk?'disabled':'';
+  const step=(i)=>`<span class="pl-step" title="เลื่อนเวลาส่งรอบนี้ทีละ … ชม."><button ${dis} onclick="NDP.shift('${k}',${i},-1)">−</button><input ${dis} value="${esc((r.step||{})[i]||1)}" onchange="NDP.stepSet('${k}',${i},this.value)"><span>ชม.</span><button ${dis} onclick="NDP.shift('${k}',${i},1)">+</button></span>`;
+  const dlRow=(i,lbl,d,t,late)=>{ const h=d?hoursTo(r,d,t):null;
+    return `<div class="pl-dlr"><input class="form-input" ${dis} value="${esc(lbl)}" placeholder="${i<0?'เดทไลน์':'ชื่อรอบ เช่น Final'}" onchange="NDP.dlSet('${k}',${i},'label',this.value)"><input class="form-input" type="date" ${dis} value="${esc(d)}" style="${late?'border-color:var(--red)':''}" onchange="NDP.dlSet('${k}',${i},'date',this.value)"><input class="form-input" type="time" ${dis} value="${esc(t)}" onchange="NDP.dlSet('${k}',${i},'time',this.value)">${step(i)}<span class="pl-dur2">${h==null?'⏱ —':'⏱ <b>'+fmtH(h)+'</b>'}${late?' <span class="pl-bad">เลยเดดไลน์ลูกค้า</span>':''}</span>${i<0?'<span></span>':`<span class="pl-x" title="ลบรอบนี้" ${lk?'style="visibility:hidden"':''} onclick="NDP.rndDel('${k}',${i})">✕</span>`}</div>`; };
+  const time=`<div class="pl-dlbox ${lk?'linked':''}">
+    <div class="pl-dlr"><span class="pl-mut">📅 เริ่ม</span><input class="form-input" type="date" ${dis} value="${esc(r.start)}" onchange="NDP.r('${k}','start',this.value)"><input class="form-input" type="time" ${dis} value="${esc(r.stime)}" onchange="NDP.r('${k}','stime',this.value)"><span></span><span></span><span></span></div>
+    <div class="pl-mut" style="margin:6px 0 4px">🏁 เดดไลน์ — ตั้งชื่อแต่ละรอบเองได้ (ชื่อนี้ขึ้นในโพสต์ใต้หัวข้อ "${esc(R[k][0])}")</div>
+    ${dlRow(-1, r.endLabel||'', r.end, r.etime, late)}
+    ${(r.rounds||[]).map((x,i)=>dlRow(i, x.label, x.date, x.time, x.date&&S.deadline&&x.date>S.deadline)).join('')}
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">${lk?'':`<button class="btn btn-outline btn-sm" onclick="NDP.rndAdd('${k}')">＋ เพิ่มเดดไลน์</button>`}
+      <label class="pl-same"><input type="checkbox" ${lk?'checked':''} onchange="NDP.same('${k}',this.checked?(document.getElementById('pl-same-${k}')||{}).value:'')"> 🔗 ใช้เดดไลน์เดียวกับ</label>
+      <select class="form-input form-select" id="pl-same-${k}" style="width:auto;padding:3px 8px" onchange="if(${lk?'true':'false'}) NDP.same('${k}',this.value)">${ORDER.filter(x=>x!==k&&S.roles[x].on&&!S.roles[x].sameAs).map(x=>`<option value="${x}"${x===lk?' selected':''}>${R[x][1]} ${R[x][0]}</option>`).join('')||'<option value="">— ไม่มีหน้าที่อื่น —</option>'}</select>
+      ${lk?`<span class="pl-mut">แก้วันเวลาที่ ${esc(R[lk][0])} ที่เดียว</span>`:''}
+      <span style="flex:1"></span><span class="pl-mut">👥 คน</span><div class="pl-cnt"><button onclick="NDP.cnt('${k}',-1)">−</button><b>${r.slots.length}</b><button onclick="NDP.cnt('${k}',1)">+</button></div></div>
+    <input class="form-input" style="margin-top:8px" value="${esc(r.note||'')}" placeholder="📝 โน้ตแบ่งงาน เช่น ใช้ 4 คน · คนที่1 Ep.1-21" onchange="NDP.r('${k}','note',this.value)"></div>`;
   const unitSel=(v,fn)=>`<select class="form-input form-select" onchange="${fn}">${UNITS.map(u=>`<option${u===v?' selected':''}>${u}</option>`).join('')}</select>`;
   const qtyIn=(u,q,fn)=>QTYU.includes(u)?`× <input class="form-input" style="width:54px!important" type="number" step="any" value="${q||''}" onchange="${fn}">`:(u==='นาที'?`<span class="pl-mut">× ${S.minutes||0} นาที</span>`:'');
   let rate='', head='', rows='';
@@ -437,7 +550,7 @@ function leftHTML(){ const c=PCODE()+(S.seq?String(S.seq).padStart(2,'0'):''), s
      ${st?`<span class="pl-tag" style="margin-left:auto;background:rgba(21,101,255,.16);color:var(--accent2)">💲 ราคามาตรฐานรหัส ${esc(PCODE())}</span>`:`<span class="pl-tag t-p" style="margin-left:auto">ยังไม่มีเทมเพลตราคารหัส ${esc(PCODE()||'-')}</span>`}</div><div class="pl-cb">
     ${ORDER.map((k,i)=>{ const r=S.roles[k]; if(!r.on) return ''; const o=i===openA, named=r.slots.filter(s=>s.id).length, late=isLate(r);
       return `<div class="pl-acc ${o?'open':''}" style="--c:${R[k][2]}"><div class="pl-ah" onclick="NDP.open(${i})"><span class="pl-ic">${R[k][1]}</span>
-        <div><b>${R[k][0]}</b><small>${fd(rS(r))} ${esc(r.stime)} → <span class="${late?'pl-bad':''}">${fd(rE(r))} ${esc(r.etime)}</span>${rds(r).map(x=>` · ${esc(x.label||'รอบถัดไป')} <span class="${S.deadline&&x.date>S.deadline?'pl-bad':''}">${fd(x.date)} ${esc(x.time)}</span>`).join('')} · ${fmtH(hoursOf(r))} · ${r.slots.length} คน${r.slots.length>named?` <span class="pl-warn">(ว่าง ${r.slots.length-named} ช่อง)</span>`:''}</small></div>
+        <div><b>${R[k][0]}</b><small>${r.sameAs&&S.roles[r.sameAs]?'🔗 เดดไลน์เดียวกับ '+esc(R[r.sameAs][0])+' · ':''}${!r.end&&!rds(r).length?'<span class="pl-mut">— ยังไม่ตั้งเดดไลน์ —</span>':`${r.endLabel?esc(r.endLabel)+' ':''}<span class="${late?'pl-bad':''}">${fd(r.end)} ${esc(r.etime)}</span>${rds(r).map(x=>` · ${esc(x.label||'รอบถัดไป')} <span class="${S.deadline&&x.date>S.deadline?'pl-bad':''}">${fd(x.date)} ${esc(x.time)}</span>`).join('')} · ${fmtH(hoursOf(r))}`} · ${r.slots.length} คน${r.slots.length>named?` <span class="pl-warn">(ว่าง ${r.slots.length-named} ช่อง)</span>`:''}</small></div>
         <span class="pl-faces">${r.slots.map(s=>av(s.n)).join('')}</span><b>${B(subTot(r))}</b><span class="pl-stt s-${esc(r.st)}" title="กดเพื่อเปลี่ยนสถานะ" onclick="event.stopPropagation();NDP.stt('${k}')">${(ST.find(x=>x[0]===r.st)||ST[0])[1]}</span><span class="pl-mut">${o?'▴':'▾'}</span></div>
         ${o?`<div class="pl-ab">${bodyHTML(k)}</div>`:''}</div>`; }).join('')||'<div class="pl-mut">ยังไม่ได้เลือกหน้าที่</div>'}
    </div></div>`; }
@@ -458,13 +571,17 @@ function queueRole(o){ // คนนี้ควรอยู่หัวข้อ
   const s=staff(o.id), cs=(s&&(s.categories&&s.categories.length?s.categories:[s.category]))||[];
   return ORDER.find(k=>cs.includes(R[k][3])&&o.cats.some(c=>catGroup(R[k][3]).has(c)))
       || ORDER.find(k=>o.cats.includes(R[k][3])) || ORDER.find(k=>o.cats.some(c=>catGroup(R[k][3]).has(c))) || roleOfStaff(s); }
+// คนนี้ขึ้นในหน้าที่ k ไหม: ต้องตอบจากห้องของหน้าที่นั้น + (ถ้ามีหน้าที่ในทะเบียน) ต้องเป็นทีมนั้นจริง
+//   เช่น เนเน่ (QC + พากย์) ตอบห้องรวม → ขึ้นที่ QC กับพากย์ ไม่ขึ้นที่เกลาบท
+function roleShows(o,k){ const grp=catGroup(R[k][3]); if(!o.cats.some(c=>grp.has(c))) return false;
+  const s=staff(o.id), cs=((s&&(s.categories&&s.categories.length?s.categories:[s.category]))||[]).filter(Boolean);
+  return cs.length?cs.includes(R[k][3]):true; }
 function queueHTML(){
   const q=queue(), qq=pkQ.trim().toLowerCase(), hit=n=>String(n||'').toLowerCase().includes(qq), ALL=pkRole==='all';
   const ok=o=>(qq||pkAll||o.free)&&(!qq||hit(o.n));
   const rows=[];   // {o, k}
-  if(ALL){ q.ppl.filter(ok).forEach(o=>{ const k=queueRole(o); if(k) rows.push({o,k}); }); }
-  else { const grp=catGroup(R[pkRole][3]), team=new Set(teamOf(pkRole).map(x=>x.id));
-    q.ppl.filter(o=>ok(o)&&o.cats.some(c=>grp.has(c))).sort((a,b)=>(!team.has(a.id))-(!team.has(b.id))).forEach(o=>rows.push({o,k:pkRole})); }
+  if(ALL){ q.ppl.filter(ok).forEach(o=>{ ORDER.forEach(k=>{ if(roleShows(o,k)) rows.push({o,k}); }); }); }
+  else { q.ppl.filter(o=>ok(o)&&roleShows(o,pkRole)).forEach(o=>rows.push({o,k:pkRole})); }
   // 🔍 ค้นชื่อ = ค้นทุกคนในทีมด้วย (ใส่คนที่ไม่ได้มาลงคิวได้)
   if(qq){ const seen=new Set(rows.map(x=>x.o.id)), uniq=new Set(), extra=[];
     (safe(()=>getAllStaff(),[])||[]).forEach(s=>{ if(!s||!s.id||uniq.has(s.id)||seen.has(s.id)) return; uniq.add(s.id);
@@ -480,7 +597,7 @@ function queueHTML(){
         return `<div class="pl-qh" style="--c:${R[k][2]}" onclick="NDP.pk('${k}')" title="ดูเฉพาะทีมนี้">${R[k][1]} ${R[k][0]} <span>${rs.length}</span></div>${rs.map(row).join('')}`; }).join('')
     : rows.map(row).join('');
   const empty=qq?'ไม่พบชื่อ "'+esc(pkQ)+'"':!q.rounds.length?'ยังไม่มีรอบลงคิวที่เปิดอยู่ — ค้นชื่อด้านบนเพื่อใส่คนได้':QP.busy&&!QP.at?'กำลังดึงคำตอบจาก Discord…':(ALL?'ยังไม่มีคนแจ้งสะดวก':'ยังไม่มีคนแจ้งสะดวกในทีมนี้')+' — ค้นชื่อด้านบนเพื่อใส่คนที่ไม่ได้ลงคิว';
-  const cnt=k=>q.ppl.filter(o=>(pkAll||o.free)&&queueRole(o)===k).length;
+  const cnt=k=>q.ppl.filter(o=>(pkAll||o.free)&&roleShows(o,k)).length;
   return `<div class="pl-card"><div class="pl-ch" style="display:block"><h3>🙋 คนที่ลงคิว</h3>
      <div style="display:flex;gap:6px;margin-top:8px"><select class="form-input form-select" style="padding:5px 8px" onchange="NDP.pk(this.value)"><option value="all"${ALL?' selected':''}>👥 ทุกทีม (${q.ppl.filter(o=>pkAll||o.free).length})</option>${ORDER.map(k=>`<option value="${k}"${k===pkRole?' selected':''}>${R[k][1]} ${R[k][0]} (${cnt(k)})</option>`).join('')}</select>
        <select class="form-input form-select" style="padding:5px 8px;width:auto" onchange="NDP.pkAll(this.value==='all')"><option value="free">แจ้งสะดวก</option><option value="all"${pkAll?' selected':''}>ทุกคนที่ตอบ</option></select></div>
@@ -550,68 +667,83 @@ function syncRoom(){ const want=new Set(planIds());
   want.forEach(id=>{ if(!DC.room[id]) DC.room[id]='add'; }); }
 const posts=()=>safe(()=>_prPosts(S.src),[])||[];
 const tpls=()=>safe(()=>getPostTpls(),[])||[];
-/* ══ 📋 เทมเพลตโพสต์อัจฉริยะ ══
-   • เลือกเทมเพลต → เติมข้อมูลงานปัจจุบันจากแผนด้านบนให้เอง (รหัส ตอน นาที คน Ep ราคา เดดไลน์ทุกรอบ)
-   • บันทึกเทมเพลต → ระบบอ่านข้อความ แล้วแปลงข้อมูลของงานนี้กลับเป็น "ช่องเติมอัตโนมัติ" { } ให้เอง (ตรวจ/แก้ก่อนบันทึกได้)
+/* ══ 📋 เทมเพลตโพสต์อัจฉริยะ v2 — อ่าน "ตามหัวข้อ" ══
+   • เลือกเทมเพลต → เติมข้อมูลงานปัจจุบันจากแผนด้านบน (รหัส ตอน ลิงก์ คน Ep นาที ราคา เรทพากย์ เดดไลน์ทุกรอบตามชื่อ)
+   • บันทึก/แปลงเทมเพลต → ระบบดูว่าบรรทัดอยู่ใต้หัวข้อไหน (เกลา · พากย์ · Sub · มิกซ์ · QC · แปล) แล้วเปลี่ยนข้อมูลที่ค้างเป็นช่องเติม
+     ใช้ได้ทั้งเทมเพลตของงานที่เปิดอยู่ และเทมเพลตเก่าที่จำไม่ได้ว่ามาจากงานไหน (อ่านจาก "รูปแบบ" เช่น Ep. 1-26 · 38 นาที · 💵570)
    ช่องที่ใช้ได้:
-     {รหัส} {ชื่อเรื่อง} {ไฟล์} {ลิงก์โหลด} {ตอน} {นาที} {เดทไลน์} {เวลาส่งลูกค้า} {เมเนเจอร์}
-     ต่อหน้าที่ (แปล · เกลา · พากย์ · มิกซ์ · QC · ซับ):
-       {จำนวนเกลา} {ทีมเกลา} {เดทไลน์เกลา} {เวลาเกลา} {เดทไลน์เกลา:Final} {เวลาเกลา:Final} (ตามชื่อรอบที่ตั้งไว้)
-     บล็อกต่อคน (ซ้ำตามจำนวนคน):  {ทุกคน:เกลา} … {/ทุกคน}
-       ข้างในใช้ {ลำดับ} {คน} (แท็ก) {ชื่อคน} {Ep} {นาทีคน} {ราคาคน} {เรทพากย์} */
+     งาน: {รหัส} {ชื่อเรื่อง} {ไฟล์} {ลิงก์โหลด} {ตอน} {นาที} {เดทไลน์} {เวลาส่งลูกค้า} {เมเนเจอร์}
+     ต่อหน้าที่ (แปล · เกลา · พากย์ · มิกซ์ · QC · ซับ): {จำนวนเกลา} {ทีมเกลา} {ราคาเกลา} {เดทไลน์เกลา} {เวลาเกลา} {เดทไลน์มิกซ์:Final}
+     เดดไลน์ทุกรอบ (ซ้ำตามรอบในแผน): {ทุกรอบ:มิกซ์} … {ชื่อรอบ} {วันรอบ} {เวลารอบ} … {/ทุกรอบ}
+     ต่อคน (ซ้ำตามคน): {ทุกคน:เกลา} … {ลำดับ} {คน} {ชื่อคน} {Ep} {นาทีคน} {ราคาคน} {เรทพากย์} … {/ทุกคน}
+     เรทพากย์ (ซ้ำตามเบอร์): {ทุกเรท:พากย์} … {เบอร์} {ราคาเบอร์} … {/ทุกเรท} · {นักพากย์หญิง} {นักพากย์ชาย} */
 const RK={trn:'แปล',adp:'เกลา',dub:'พากย์',mix:'มิกซ์',qc:'QC',sub:'ซับ'};
 const RKW={trn:['แปล'],adp:['เกลา','บท'],dub:['พากย์'],mix:['มิกซ์','mix'],qc:['qc','คิวซี'],sub:['ซับ','sub']};
 const keyOfRole=w=>{ w=String(w||'').trim().toLowerCase(); return ORDER.find(k=>RK[k].toLowerCase()===w)||ORDER.find(k=>RKW[k].some(x=>w.includes(x)))||''; };
 const tagOfS=s=>s?(s.discordId?'<@'+s.discordId+'>':'@'+(s.nickname||s.name||'')):'';
 const fmtD=d=>d?safe(()=>fmtDate(d),fd(d)):'—';
+const fmtN=n=>Math.round(+n||0).toLocaleString('en-US');
 const numFmts=n=>{ n=Math.round(+n||0); return n?[...new Set([n.toLocaleString('en-US'),String(n)])]:[]; };
 const dateFmts=d=>{ if(!d) return []; const x=new Date(d); if(isNaN(x)) return [];
   const th=safe(()=>fmtDate(d),''), D=x.getDate(), M=x.getMonth()+1, Y=x.getFullYear(), BE=Y+543;
   return [...new Set([th, D+'/'+M+'/'+BE, D+'/'+M+'/'+Y, String(D).padStart(2,'0')+'/'+String(M).padStart(2,'0')+'/'+BE, D+' '+TM[M-1]+' '+String(BE).slice(2), D+' '+TM[M-1], fd(d)].filter(Boolean))].sort((a,b)=>b.length-a.length); };
 const timeFmts=t=>t?[t, t.replace(':','.')]:[];
 const DATE_RE=/(?:(?:อา|จ|อ|พ|พฤ|ศ|ส)\.\s*)?\d{1,2}\s*(?:ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)(?:\s*\d{2,4})?|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/;
+const TIME_RE=/\d{1,2}[:.]\d{2}(?:\s*น\.)?/;
+const DRIVE_RE=/https?:\/\/drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\/[\w-]+(?:\?[^\s)]*)?/g;
 const escRe=s=>String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const swap=(txt,from,to)=>from?txt.split(from).join(to):txt;
 // ข้อมูลของแต่ละคนในหน้าที่ (จากแผนตอนนี้)
 function pplOf(k){ const r=S.roles[k]; if(!r||!r.on) return [];
-  return r.slots.filter(s=>s.id).map((s,i)=>{ const st=staff(s.id)||{}; const t=k==='dub'?(r.tiers[(s.tier||1)-1]||{}):null;
+  return r.slots.filter(s=>s.id).map((s,i)=>{ const st=staff(s.id)||{};
     return {i:i+1, id:s.id, s:st, tag:tagOfS(st), name:st.nickname||st.name||'', ep:s.ep||'', min:k==='adp'?(+s.min||0):0, amt:amt(r,s), tier:k==='dub'?(s.tier||1):0}; }); }
+// รอบเดดไลน์ทั้งหมดของหน้าที่ (รอบหลัก + รอบถัดไป) ตามชื่อที่ตั้งในแผน
+function roundsOf(k){ syncSame(); const r=S.roles[k]; if(!r||!r.on) return [];
+  return [{label:String(r.endLabel||'').trim()||'เดทไลน์', date:r.end, time:r.etime}, ...(r.rounds||[]).filter(x=>x&&(x.date||x.label)).map((x,i)=>({label:String(x.label||'').trim()||('รอบ '+(i+2)), date:x.date, time:x.time}))]; }
 function fillVals(){ const v={};
   v['รหัส']=drCode(); v['ชื่อเรื่อง']=S.name||''; v['ไฟล์']=S.src.driveFolderLink||S.link||'—'; v['ลิงก์โหลด']=S.link||S.src.driveFolderLink||'—';
   v['ตอน']=S.eps||'—'; v['นาที']=S.minutes||'—'; v['เดทไลน์']=fmtD(S.deadline); v['เวลาส่งลูกค้า']=S.dtime||'—';
   const ms=mgrStaff(S.mgrId); v['เมเนเจอร์']=ms?tagOfS(ms):mgrName(S.mgrId);
   ORDER.forEach(k=>{ const n=RK[k], r=S.roles[k], ppl=pplOf(k);
     v['จำนวน'+n]=ppl.length||'—'; v['ทีม'+n]=ppl.map(p=>p.tag).join(' ')||'—';
+    v['ราคา'+n]=[...new Set(ppl.map(p=>fmtN(p.amt)))].join(' / ')||(r.on&&k!=='dub'&&k!=='adp'&&+r.rate?fmtN(roleUnit(r)):'—');
     v['เดทไลน์'+n]=r.on?fmtD(r.end):'—'; v['เวลา'+n]=r.on&&r.etime?r.etime:'—';
     (r.rounds||[]).forEach((x,i)=>{ const lb=String(x.label||'').trim();
-      [...new Set([lb, lb.toLowerCase(), lb.replace(/\s+/g,''), 'รอบ'+(i+2), String(i+2)])].filter(Boolean).forEach(nm=>{ v['เดทไลน์'+n+':'+nm]=fmtD(x.date); v['เวลา'+n+':'+nm]=x.time||'—'; }); }); });
+      [...new Set([lb, lb.toLowerCase(), lb.replace(/\s+/g,''), lb.toLowerCase().replace(/\s+/g,''), 'รอบ'+(i+2), String(i+2)])].filter(Boolean).forEach(nm=>{ v['เดทไลน์'+n+':'+nm]=fmtD(x.date); v['เวลา'+n+':'+nm]=x.time||'—'; }); }); });
   return v; }
-// เดดไลน์รอบอื่น (เช่น Final) ที่เทมเพลตยังไม่ได้เขียนถึง → เติมบรรทัดต่อจากบรรทัดเดดไลน์หลักของหน้าที่นั้นให้เอง
+// (เทมเพลตแบบเก่า) เดดไลน์รอบอื่นที่ยังไม่ได้เขียนถึง → เติมบรรทัดต่อจากเดดไลน์หลักให้เอง
 function addRoundLines(t){
   ORDER.forEach(k=>{ const n=RK[k], r=S.roles[k], rs=r.on?(r.rounds||[]).filter(x=>x.date):[]; if(!rs.length) return;
-    if(t.includes('{เดทไลน์'+n+':')) return;
+    if(t.includes('{เดทไลน์'+n+':')||t.includes('{ทุกรอบ:'+n+'}')) return;
     t=t.split('\n').map(line=>{ if(!line.includes('{เดทไลน์'+n+'}')) return line;
       return [line, ...rs.map((x,i)=>{ const nm=String(x.label||'').trim()||('รอบ'+(i+2));
         let c=line.split('{เดทไลน์'+n+'}').join('{เดทไลน์'+n+':'+nm+'}').split('{เวลา'+n+'}').join('{เวลา'+n+':'+nm+'}');
         let done=false; c=c.split(/(\{[^{}]*\})/).map(part=>{ if(done||/^\{/.test(part)) return part; const m=part.match(/เดทไลน์|เดดไลน์|deadline/i); if(!m) return part; done=true; return part.replace(m[0], m[0]+' '+nm); }).join('');
         return done?c:nm+' '+c; })].join('\n'); }).join('\n'); });
   return t; }
+const loopRe=tag=>new RegExp('\\{'+tag+':([^}]+)\\}[^\\S\\n]*\\n?([\\s\\S]*?)\\{\\/'+tag+'\\}[^\\S\\n]*\\n?','g');
 function fillPlan(text){
   let t=addRoundLines(String(text||''));
-  // บล็อกต่อคน
-  t=t.replace(/\{ทุกคน:([^}]+)\}[^\S\n]*\n?([\s\S]*?)\{\/ทุกคน\}[^\S\n]*\n?/g,(m,rk,body)=>{ const k=keyOfRole(rk); if(!k) return m;
+  // 🎙️ เรทพากย์ทุกเบอร์
+  t=t.replace(loopRe('ทุกเรท'),(m,rk,body)=>{ const r=S.roles.dub; if(!r||!r.on) return '';
+    return r.tiers.map((x,i)=>body.split('{เบอร์}').join(String(i+1)).split('{ราคาเบอร์}').join(fmtN(tierAmt(x)))).join(''); });
+  // 📆 เดดไลน์ทุกรอบ ตามชื่อรอบในแผน
+  t=t.replace(loopRe('ทุกรอบ'),(m,rk,body)=>{ const k=keyOfRole(rk); if(!k) return m; const L=roundsOf(k); if(!L.length) return '';
+    return L.map(x=>body.split('{ชื่อรอบ}').join(x.label).split('{วันรอบ}').join(fmtD(x.date)).split('{เวลารอบ}').join(x.time||'—')).join(''); });
+  // 👥 บล็อกต่อคน
+  t=t.replace(loopRe('ทุกคน'),(m,rk,body)=>{ const k=keyOfRole(rk); if(!k) return m;
     const ppl=pplOf(k); if(!ppl.length) return '';
-    return ppl.map(p=>{ let b=body; const pv={'ลำดับ':p.i,'คน':p.tag,'ชื่อคน':p.name,'Ep':p.ep||'—','นาทีคน':p.min||'—','ราคาคน':Math.round(p.amt).toLocaleString('en-US'),'เรทพากย์':p.tier?'พากย์'+p.tier:''};
+    return ppl.map(p=>{ let b=body; const pv={'ลำดับ':p.i,'คน':p.tag,'ชื่อคน':p.name,'Ep':p.ep||'—','นาทีคน':p.min||'—','ราคาคน':fmtN(p.amt),'เรทพากย์':p.tier?'พากย์'+p.tier:''};
       Object.entries(pv).forEach(([a,c])=>{ b=b.split('{'+a+'}').join(String(c)); }); return b; }).join(''); });
   const v=fillVals();
   Object.keys(v).sort((a,b)=>b.length-a.length).forEach(k=>{ t=t.split('{'+k+'}').join(String(v[k])); });
   // ชื่อรอบที่งานนี้ไม่มี (เช่น {เดทไลน์มิกซ์:Final} แต่งานนี้ไม่ได้ตั้งรอบ Final) → ขีด —
   t=t.replace(/\{(?:เดทไลน์|เวลา)(?:แปล|เกลา|พากย์|มิกซ์|QC|ซับ):[^{}\n]+\}/g,'—');
-  // ช่องมาตรฐานเดิมของระบบ (ทีมบท นักพากย์ชาย ฯลฯ) — ใช้ตัวเติมเดิมต่อ
+  // ช่องมาตรฐานเดิมของระบบ (ทีมบท นักพากย์ชาย/หญิง ฯลฯ) — ใช้ตัวเติมเดิมต่อ
   return safe(()=>_prFillTpl(previewProj(), t), t);
 }
 // ข้อความโพสต์ของงานนี้ → เทมเพลต (แทนค่าของงานนี้ด้วยช่อง { })
-function toTemplate(text){
+function toTemplateV1(text){
   let L=String(text||'').split('\n');
   const hasKw=(line,k)=>RKW[k].some(w=>line.toLowerCase().includes(w));
   const isSep=l=>/^[\s—\-_=─━]{3,}$/.test(l)||!l.trim();
@@ -677,6 +809,73 @@ function toTemplate(text){
   ORDER.forEach(k=>{ pplOf(k).forEach(p=>{ if(p.tag&&t.includes(p.tag)) t=swap(t,p.tag,'{ทีม'+RK[k]+'}'); }); });
   return t;
 }
+
+// ── ขั้นที่ 2: อ่านตามหัวข้อ + รูปแบบ (ไม่ต้องรู้ว่าเทมเพลตมาจากงานไหน) ──
+const isHeadLine=l=>{ const x=String(l||'').trim(); if(!x||x.length>60) return false; if(DATE_RE.test(x)||/\{(?:เดทไลน์|วันรอบ|คน|Ep)/.test(x)) return false;
+  if(/<@|^[^:]*\d+\s*[:：]/.test(x)) return false; return ORDER.some(k=>RKW[k].some(w=>x.toLowerCase().includes(w))); };
+const headRoles=l=>ORDER.filter(k=>RKW[k].some(w=>String(l).toLowerCase().includes(w)));
+const isDlLine=l=>{ const x=String(l||''); return (DATE_RE.test(x)||/\{(?:เดทไลน์)[^}]*\}/.test(x)) && !/\{ทุก/.test(x); };
+function genPersonBody(body){ let b=body;
+  b=b.replace(/<@!?\d+>|@(?![{])[^\s@:|/]+/g,'{คน}');
+  b=b.replace(/(Ep\.?\s*)(\d+\s*[-–]\s*\d+|\d+)/gi,'$1{Ep}');
+  b=b.replace(/(\d+(?:\.\d+)?)(\s*นาที)/g,'{นาทีคน}$2');
+  b=b.replace(/(💵|฿|ราคา[^\d\n{]*)\s*([\d,]{2,}(?:\.\d+)?)/g,'$1{ราคาคน}');
+  b=b.replace(/(^|\n)([^\n{]*?)(\d{1,2})(\s*[:：])/,'$1$2{ลำดับ}$4');
+  return b; }
+function tplPatterns(text){
+  const L=String(text||'').split('\n'), out=[]; let ctx=[], inLoop='', i=0;
+  const put=(...a)=>out.push(...a);
+  while(i<L.length){ let line=L[i];
+    const lm=line.match(/^\s*\{(ทุกคน|ทุกรอบ|ทุกเรท):([^}]+)\}/); if(lm){ inLoop=lm[1]; put(line); i++; continue; }
+    if(/^\s*\{\/(ทุกคน|ทุกรอบ|ทุกเรท)\}/.test(line)){ inLoop=''; put(line); i++; continue; }
+    if(inLoop==='ทุกคน'){ put(genPersonBody(line)); i++; continue; }
+    if(inLoop){ put(line); i++; continue; }
+    // หัวข้อหน้าที่
+    if(isHeadLine(line)){ ctx=headRoles(line);
+      if(ctx.length===1 && /\|\s*$/.test(line)) line=line.replace(/\|\s*$/,'| {ทีม'+RK[ctx[0]]+'}');
+      else if(ctx.length===1) line=line.replace(/<@!?\d+>(\s*<@!?\d+>)*/g,'{ทีม'+RK[ctx[0]]+'}');
+      put(line); i++; continue; }
+    // ลิงก์โฟลเดอร์ไดรฟ์ของงาน · รหัสงาน · จำนวนตอน (ส่วนหัวโพสต์)
+    if(/drive\.google\.com\/drive\//.test(line) && !/docs\.google|spreadsheets/.test(line)) line=line.replace(DRIVE_RE,'{ไฟล์}');
+    line=line.replace(/((?:project|โปรเจกต์|รหัส)\s*[—–:\-]+\s*)([A-Z]{1,4}\d{1,4})\b/i,'$1{รหัส}');
+    if(!ctx.length && /\b(ep|ตอน)\b|🎞/i.test(line) && !/\{ตอน\}/.test(line)) line=line.replace(/((?:ep|ตอน)[^\d\n{]*)(\d+)/i,'$1{ตอน}');
+    const k=ctx[0];
+    if(k){
+      // 📆 บรรทัดเดดไลน์ติดกัน → บรรทัดเดียวที่ซ้ำตามรอบในแผน (ใส่ชื่อรอบให้เอง)
+      if(isDlLine(line)){ const grp=[line]; let j=i+1; while(j<L.length && isDlLine(L[j])) grp.push(L[j++]);
+        const f=grp[0], tok=(f.match(/\{เดทไลน์[^}]*\}/)||f.match(DATE_RE)||[''])[0], at=f.indexOf(tok);
+        const pre=f.slice(0,at), post=f.slice(at+tok.length), pm=pre.match(/^(\s*[^\wก-๙{]*\s*)(.*?)(\s*[—–\-:|]+\s*)$/);
+        let rest=post.replace(/\{เวลา[^}]*\}/,'{เวลารอบ}'); if(!/\{เวลารอบ\}/.test(rest)) rest=rest.replace(TIME_RE,'{เวลารอบ}');
+        put('{ทุกรอบ:'+RK[k]+'}', (pm?pm[1]:pre)+'{ชื่อรอบ}'+(pm?pm[3]:' — ')+'{วันรอบ}'+rest, '{/ทุกรอบ}'); i=j; continue; }
+      // 🎙️ เรทพากย์ทีละเบอร์
+      if(k==='dub' && /ราคา|💵|฿/.test(line) && /\d/.test(line) && !/\{ราคา/.test(line)){ const grp=[line]; let j=i+1; while(j<L.length && /ราคา|💵|฿/.test(L[j]) && /\d/.test(L[j]) && !isDlLine(L[j])) grp.push(L[j++]);
+        let b=grp[0].replace(/(\D)(\d{1,2})(?=\D)/,'$1{เบอร์}'); const nums=b.match(/[\d,]{2,}(?:\.\d+)?/g); if(nums) b=b.slice(0,b.lastIndexOf(nums[nums.length-1]))+'{ราคาเบอร์}'+b.slice(b.lastIndexOf(nums[nums.length-1])+nums[nums.length-1].length);
+        put('{ทุกเรท:พากย์}', b, '{/ทุกเรท}'); i=j; continue; }
+      if(k==='dub' && /🙍‍♀️|👩|♀|หญิง/.test(line) && /[:：]/.test(line) && !/\{นักพากย์/.test(line)){ put(line.replace(/([:：]).*$/,'$1 {นักพากย์หญิง}')); i++; continue; }
+      if(k==='dub' && /🙎‍♂️|👨|♂|ชาย/.test(line) && /[:：]/.test(line) && !/\{นักพากย์/.test(line)){ put(line.replace(/([:：]).*$/,'$1 {นักพากย์ชาย}')); i++; continue; }
+      // 🙋 จำนวนคน
+      if(/จำนวน/.test(line) && !/\{จำนวน/.test(line)) line=line.replace(/(\d+)/,'{จำนวน'+RK[k]+'}');
+      // 👥 บล็อกต่อคนที่ยังเป็นข้อความ (เช่น "ทีมเกลา 1: @นก / Ep. 1-26 | 38 นาที / 💵570")
+      if(/\d+\s*[:：]\s*(<@|@|\{คน\})/.test(line)){ const st=i; let j=i+1;
+        while(j<L.length && L[j].trim() && !isHeadLine(L[j]) && !/^[\s—\-_=─━]{3,}$/.test(L[j]) && !/\d+\s*[:：]\s*(<@|@|\{คน\})/.test(L[j])) j++;
+        let end=j; while(end<L.length && /\d+\s*[:：]\s*(<@|@|\{คน\})/.test(L[end])){ let e=end+1; while(e<L.length && L[e].trim() && !isHeadLine(L[e]) && !/^[\s—\-_=─━]{3,}$/.test(L[e]) && !/\d+\s*[:：]\s*(<@|@|\{คน\})/.test(L[e])) e++; end=e; while(end<L.length && !L[end].trim() && end+1<L.length && /\d+\s*[:：]\s*(<@|@|\{คน\})/.test(L[end+1])) end++; }
+        put('{ทุกคน:'+RK[k]+'}', ...genPersonBody(L.slice(st,j).join('\n')).split('\n'), '{/ทุกคน}'); i=end; continue; }
+      // 💵 ราคาของหน้าที่ (ไม่ใช่ต่อคน)
+      if(/💵|ราคา|฿/.test(line) && !/\{ราคา/.test(line)){ const nums=line.match(/[\d,]{2,}(?:\.\d+)?/g); if(nums){ const n=nums[nums.length-1], at=line.lastIndexOf(n); line=line.slice(0,at)+'{ราคา'+RK[k]+'}'+line.slice(at+n.length); } }
+    }
+    put(line); i++; }
+  return out.join('\n'); }
+function toTemplate(text){ return tplPatterns(toTemplateV1(text)); }
+// ข้อมูลที่ยังค้างในเทมเพลต (วันที่ · แท็กคนตายตัว · ลิงก์โฟลเดอร์ · ราคา) — ไว้เตือน/ให้แก้มือ
+function leftovers(text){ const t=String(text||'').replace(/\{[^{}\n]*\}/g,' '), out=[];
+  (t.match(new RegExp(DATE_RE.source,'g'))||[]).forEach(x=>out.push({k:'วันที่',v:x.trim()}));
+  (t.match(/<@!?\d+>/g)||[]).forEach(x=>out.push({k:'แท็กคนตายตัว',v:x}));
+  (t.match(DRIVE_RE)||[]).forEach(x=>out.push({k:'ลิงก์โฟลเดอร์',v:x}));
+  (t.match(/(?:💵|฿)\s*[\d,]{2,}/g)||[]).forEach(x=>out.push({k:'ราคา',v:x.trim()}));
+  const seen=new Set(); return out.filter(x=>!seen.has(x.v)&&seen.add(x.v)); }
+const SLOTS=[['งาน','p',['รหัส','ชื่อเรื่อง','ไฟล์','ลิงก์โหลด','ตอน','นาที','เมเนเจอร์','เดทไลน์','เวลาส่งลูกค้า']],
+  ['ต่อหน้าที่','m',['จำนวน@','ทีม@','ราคา@']],['เดดไลน์ (ซ้ำตามรอบ)','d',['ทุกรอบ:@','ชื่อรอบ','วันรอบ','เวลารอบ','/ทุกรอบ']],
+  ['ต่อคน (ซ้ำตามคน)','l',['ทุกคน:@','ลำดับ','คน','ชื่อคน','Ep','นาทีคน','ราคาคน','/ทุกคน']],['พากย์','t',['ทุกเรท:พากย์','เบอร์','ราคาเบอร์','/ทุกเรท','นักพากย์หญิง','นักพากย์ชาย']]];
 // <@id> ↔ @ชื่อเล่น (เฉพาะชื่อที่ไม่ซ้ำกันในทีมที่ผูก Discord)
 let _dcNameCache=null, _dcNameAt=0;
 function dcNames(){ if(_dcNameCache&&Date.now()-_dcNameAt<5000) return _dcNameCache; const byId={}, byNick={}, cnt={};
@@ -766,6 +965,51 @@ function projPicker(projs){ const cur=projs.find(p=>p.id===S.id)||S.src;
       ${list.slice(0,80).map(p=>`<div class="op" style="${p.id===S.id?'background:rgba(21,101,255,.16)':''}" onclick="NDP.proj('${esc(p.id)}')"><b style="color:var(--accent2);min-width:44px">${esc(pjCode(p))}</b><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name&&p.name!==pjCode(p)?p.name:'')}</span>${stLbl(p)}</div>`).join('')||'<div class="pl-mut" style="padding:8px">ไม่พบงาน</div>'}
       ${list.length>80?`<div class="pl-mut" style="padding:6px">แสดง 80 จาก ${list.length} งาน — พิมพ์ค้นให้แคบลง</div>`:''}</div>`:''}</div>`; }
 
+/* ── 👁️ ภาพรวมทั้งหน้า + แถบนำทาง (กดไปส่วนที่ต้องการ ไม่ต้องเลื่อนหา) ── */
+function jumpBar(){ const has=k=>S.roles[k].on;
+  const warn=overviewWarnings().length;
+  return `<div id="pl-jumpwrap"><div class="pl-jump"><button class="btn btn-blue btn-sm" onclick="NDP.overview()">👁️ ดูภาพรวมทั้งหมด${warn?` <span class="pl-jw">${warn}</span>`:''}</button>
+    <span class="pl-jl" onclick="NDP.go('info')">📋 ข้อมูลโปรเจกต์</span><span class="pl-jl" onclick="NDP.go('roles')">👥 หน้าที่ · คน · เวลา</span>
+    ${ORDER.filter(has).map(k=>`<span class="pl-jl pl-jr" style="--c:${R[k][2]}" onclick="NDP.goRole('${k}')">${R[k][1]} ${R[k][0]}</span>`).join('')}
+    <span class="pl-jl" onclick="NDP.go('drive')">📂 ไฟล์งาน</span><span class="pl-jl" onclick="NDP.go('dc')">💬 Discord</span></div></div>`; }
+// 📌 แถบนำทางติดขอบบนตอนเลื่อน (หน้าเว็บเลื่อนที่ตัวเอกสาร ไม่ใช่กล่องเนื้อหา → ใช้ position:fixed ตามตำแหน่งจริง)
+function pinJump(){ const w=$('pl-jumpwrap'), b=w&&w.firstElementChild, pg=$('page-nd-plan'); if(!w||!b) return;
+  if(!pg||pg.classList.contains('hidden')){ b.classList.remove('fix'); return; }
+  const r=w.getBoundingClientRect(); w.style.minHeight=b.offsetHeight+'px';
+  if(r.top<8){ b.classList.add('fix'); b.style.left=r.left+'px'; b.style.width=r.width+'px'; } else { b.classList.remove('fix'); b.style.left=''; b.style.width=''; } }
+window.addEventListener('scroll',pinJump,{passive:true}); window.addEventListener('resize',pinJump);
+function overviewWarnings(){ const out=[]; if(!S) return out;
+  if(!S.deadline) out.push(['info','ยังไม่ได้ตั้ง Deadline ลูกค้า']);
+  on().forEach(r=>{ const n=R[r.k][0], empty=r.slots.filter(s=>!s.id).length;
+    if(empty) out.push(['role:'+r.k, n+' ยังว่าง '+empty+' ช่อง']);
+    if(!r.end && !rds(r).length) out.push(['role:'+r.k, n+' ยังไม่ตั้งเดดไลน์']);
+    if(isLate(r)) out.push(['role:'+r.k, n+' เดดไลน์เลยวันส่งลูกค้า']);
+    if(!subTot(r) && r.slots.some(s=>s.id)) out.push(['role:'+r.k, n+' ยังไม่ได้ใส่ราคา']); });
+  const noDc=planIds().filter(id=>!(staff(id)||{}).discordId); if(noDc.length) out.push(['dc','ยังไม่ผูก Discord: '+noDc.map(nickOf).join(', ')]);
+  if(!S.src.driveFolderId) out.push(['drive','ยังไม่มีโฟลเดอร์งานในไดรฟ์']);
+  if(!S.src.discordChannelId) out.push(['dc','ยังไม่มีห้อง Discord']);
+  return out; }
+function overviewHTML(){ syncSame(); const cost=on().reduce((a,r)=>a+subTot(r),0), bud=budget(), pf=bud-cost, w=WHT(), warns=overviewWarnings();
+  const P=posts(), posted=P.filter(x=>x.msgIds&&x.msgIds.length).length;
+  const dl=r=>[{label:r.endLabel||'เดทไลน์',date:r.end,time:r.etime},...rds(r)].filter(x=>x.date).map(x=>`<div><span class="pl-mut">${esc(x.label)}</span> <b class="${S.deadline&&x.date>S.deadline?'pl-bad':''}">${fd(x.date)}</b> ${esc(x.time||'')}</div>`).join('')||'<span class="pl-mut">— ยังไม่ตั้ง —</span>';
+  return `<div class="pl-ov">
+   <div class="pl-ovh"><div><div style="font-size:18px;font-weight:800"><span style="color:var(--accent2)">${esc(drCode())}</span> ${esc(S.name)}</div>
+     <div class="pl-mut">${esc(S.type||'—')} · ${S.eps||'—'} ตอน · ${S.minutes||'—'} นาที · 🏁 ส่งลูกค้า <b style="color:var(--text)">${fd(S.deadline)} ${esc(S.dtime||'')}</b> · 🗂️ ${esc(mgrName(S.mgrId))}</div></div>
+     <div class="pl-mrow" style="min-width:330px"><div><span>💰 Budget</span><b>${B(bud)}</b></div><div><span>👥 จ่ายทีม${w?' (หัก '+w+'%)':''}</span><b>${B(cost)}</b></div><div><span>📈 กำไร</span><b class="${pf<0?'pl-bad':'pl-ok'}">${B(pf)}</b></div></div></div>
+   ${warns.length?`<div class="pl-ovw">${warns.map(([to,t])=>`<span onclick="NDP.ovGo('${to}')">⚠️ ${esc(t)}</span>`).join('')}</div>`:'<div class="pl-ovw ok"><span>✅ ข้อมูลครบ ไม่มีจุดที่ต้องเช็ก</span></div>'}
+   <table class="pl-ovt"><tr><th>หน้าที่</th><th>คนทำงาน</th><th>เดดไลน์</th><th>สถานะ</th><th style="text-align:right">ค่าตอบแทน</th></tr>
+    ${on().map(r=>`<tr onclick="NDP.ovGo('role:${r.k}')" title="กดเพื่อไปแก้หน้าที่นี้"><td style="--c:${R[r.k][2]}"><span class="pl-ovr">${R[r.k][1]} ${R[r.k][0]}</span>${r.sameAs&&S.roles[r.sameAs]?`<div class="pl-mut">🔗 ตาม${esc(R[r.sameAs][0])}</div>`:''}</td>
+      <td>${r.slots.map(s=>s.id?`<span class="pl-ovp">${av(s.n)}${esc(s.n)}${s.ep?' <small class="pl-mut">Ep '+esc(s.ep)+'</small>':''}</span>`:'<span class="pl-ovp pl-warn">ว่าง</span>').join('')}</td>
+      <td>${dl(r)}</td><td><span class="pl-stt s-${esc(r.st)}" style="cursor:default">${(ST.find(x=>x[0]===r.st)||ST[0])[1]}</span></td><td style="text-align:right"><b>${B(subTot(r))}</b></td></tr>`).join('')||'<tr><td colspan="5" class="pl-mut">ยังไม่ได้เลือกหน้าที่</td></tr>'}
+   </table>
+   <div class="pl-ovg">
+    <div onclick="NDP.ovGo('drive')"><b>📂 ไฟล์งาน</b><div class="pl-mut">${S.src.driveFolderId?'✅ ผูกโฟลเดอร์แล้ว'+(S.src.scriptLink?' · 📄 มีไฟล์บท':''):'ยังไม่มีโฟลเดอร์'}</div></div>
+    <div onclick="NDP.ovGo('dc')"><b>💬 ห้อง Discord</b><div class="pl-mut">${S.src.discordChannelId?'✅ '+esc(S.src.discordCategoryName||'มีห้องแล้ว')+' · โพสต์แล้ว '+posted+' โพสต์':'ยังไม่มีห้อง'}</div></div>
+    <div onclick="NDP.ovGo('info')"><b>📋 ข้อมูลโปรเจกต์</b><div class="pl-mut">${S.link?'🔗 มีลิงก์โหลดงาน · ':''}🧾 ${S.legacyTax&&!S.dedT?'หักแยกหมวด (งานเดิม)':w?'หัก '+w+'%':'ไม่หัก'}${S.note?' · 📝 '+esc(String(S.note).slice(0,40)):''}</div></div>
+   </div>
+   <div class="pl-mut" style="margin-top:8px">กดแถวหรือกล่องไหนก็ได้ = ไปที่ส่วนนั้นของหน้า (เปิดแก้ให้เลย)</div></div>`; }
+function goTo(id){ const el=$('pl-s-'+id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
+
 /* ── วาดหน้า ── */
 function render(){ const pg=$('nd-plan-body'); if(!pg) return;
   if(!['admin','manager'].includes(role())){ pg.innerHTML='<div class="pl-mut" style="padding:40px;text-align:center">🔒 สำหรับแอดมิน/เมเนเจอร์</div>'; return; }
@@ -774,15 +1018,19 @@ function render(){ const pg=$('nd-plan-body'); if(!pg) return;
   const ae=document.activeElement, keepEd=ae&&ae.id==='pl-ed', selS=keepEd?ae.selectionStart:0, selE=keepEd?ae.selectionEnd:0;
   const y=window.scrollY, mc=$('main-content'), my=mc?mc.scrollTop:0;
   pg.innerHTML=`<div class="pl-top">${projPicker(projs)}
-     ${dirty?'<span class="pl-dirty">● มีการแก้ไขที่ยังไม่บันทึก</span>':''}<span style="flex:1"></span><button class="btn btn-outline" onclick="NDP.save()">💾 บันทึก</button><button class="btn btn-green" onclick="NDP.saveSend()">✅ บันทึกโปรเจกต์ + ส่งให้ทีม</button></div>
-   ${(()=>{ const [top,roles]=leftHTML().split('<!--ROLES-->'); return top+`<div class="pl-grid"><div>${roles}</div><div class="pl-right">${rightHTML()}</div></div>`; })()}${driveHTML()}${dcHTML()}`;
+     ${dirty?'<span class="pl-dirty">● มีการแก้ไขที่ยังไม่บันทึก</span>':S.draft?`<span class="pl-mut">📝 แบบร่างล่าสุด ${esc(safe(()=>_prTimeAgo(S.draft.at),''))}</span>`:''}<span style="flex:1"></span><button class="btn btn-outline" onclick="NDP.draft()" title="เก็บไว้ก่อน — ยังไม่บันทึกจริง ทีมยังไม่เห็น">📝 บันทึกแบบร่าง</button><button class="btn btn-green" onclick="NDP.save()">✅ บันทึกโปรเจกต์</button></div>
+   ${(()=>{ const ed=safe(()=>getOtherAdminsOnProject(S.id),[]).filter(u=>u&&u.action==='editing'); return ed.length?`<div class="pl-pres">👁️ <b>${esc(ed.map(u=>u.nickname).join(', '))}</b> กำลังเปิดแก้งานนี้อยู่ — ถ้าเขาบันทึกก่อน ระบบจะเตือนตอนคุณกดบันทึก</div>`:''; })()}
+   ${S.draft&&!dirty?`<div class="pl-draftbar">📝 <span>มีแบบร่างที่ยังไม่บันทึกของงานนี้ — โดย <b>${esc(S.draft.byName||'—')}</b> · ${esc(safe(()=>_prTimeAgo(S.draft.at),''))}</span><span style="flex:1"></span><button class="btn btn-outline btn-sm" onclick="NDP.openDraft()">เปิดแบบร่าง</button><button class="btn btn-outline btn-sm" onclick="NDP.dropDraft()">ทิ้งแบบร่าง</button></div>`:''}
+   ${jumpBar()}
+   ${(()=>{ const [top,roles]=leftHTML().split('<!--ROLES-->'); return `<div id="pl-s-info" class="pl-anchor"></div>`+top+`<div id="pl-s-roles" class="pl-anchor"></div><div class="pl-grid"><div>${roles}</div><div class="pl-right">${rightHTML()}</div></div>`; })()}<div id="pl-s-drive" class="pl-anchor"></div>${driveHTML()}<div id="pl-s-dc" class="pl-anchor"></div>${dcHTML()}`;
   window.scrollTo(0,y); if(mc) mc.scrollTop=my;
   if(dd){ const q=$('pl-ddq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
   else if(pjOpen){ const q=$('pl-pjq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
   else if(ae&&ae.id==='pl-pkq'){ const q=$('pl-pkq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
   if(keepEd){ const t=$('pl-ed'); if(t){ t.focus(); t.setSelectionRange(selS,selE); } }
+  pinJump();
 }
-const rr=()=>{ dirty=true; render(); };
+const rr=()=>{ if(!dirty) safe(()=>claimPresence(S.id,'editing')); dirty=true; render(); };
 const rt=()=>{ S.rolesT=true; rr(); };
 const unfixRole=k=>S.roles[k].slots.forEach(s=>{ delete s.fix; });
 
@@ -820,18 +1068,35 @@ function pickCodeDialog(title, cb){ const sys=codesInSystem();
 const NDP=window.NDP={
   pjToggle(){ pjOpen=!pjOpen; pjQ=''; render(); }, pjQ(v){ pjQ=v; render(); },
   proj(id){ pjOpen=false; pjQ=''; if(S&&id===S.id){ render(); return; } if(dirty && !confirm('มีการแก้ไขที่ยังไม่บันทึก — ทิ้งการแก้ไขแล้วเปลี่ยนงาน?')){ render(); return; } loadProject(id); render(); },
-  set(k,v){ S[k]=v; S.t[k]=1; if(k==='code') DR.tpl=''; if(k==='minutes'){ S.rolesT=true; ORDER.forEach(x=>S.roles[x].slots.forEach(s=>{ delete s.fix; })); } rr(); }, info(){ infoOpen=!infoOpen; render(); },
+  set(k,v){ S[k]=v; S.t[k]=1; if(k==='mgrId'){ const ms=mgrStaff(v), w=(S.src.workers||[]).find(x=>x&&preOf(x)==='mgr'&&ms&&x.id===ms.id); S.mgrFee=w?(+w.amount||0):0; } if(k==='code') DR.tpl=''; if(k==='minutes'){ S.rolesT=true; ORDER.forEach(x=>S.roles[x].slots.forEach(s=>{ delete s.fix; })); } rr(); }, info(){ infoOpen=!infoOpen; render(); },
   ded(j,k,v){ S.dedT=true; if(k==='add') S.ded.push({label:'หักเพิ่ม',pct:2,on:true}); else if(k==='del') S.ded.splice(j,1); else S.ded[j][k]=v; rr(); },
   tog(k){ const r=S.roles[k];
     if(r.on && r.slots.some(s=>s.paid) && !confirm('หน้าที่นี้มีคนที่จ่ายเงินแล้ว — ปิดหน้าที่นี้จะเอาคนออกจากงานตอนบันทึก ยืนยัน?')) return;
-    r.on=!r.on; if(r.on){ openA=ORDER.indexOf(k); if(pkRole!=='all') pkRole=k; NDP.std(k,null,true); if(!r.start) r.start=S.start; if(!r.end) r.end=S.deadline; if(!r.stime) r.stime='10:00'; if(!r.etime) r.etime='18:00'; } rt(); },
+    r.on=!r.on; if(r.on){ openA=ORDER.indexOf(k); if(pkRole!=='all') pkRole=k; NDP.std(k,null,true); } rt(); },   // ⛔ ไม่เติมวันเวลาให้เอง — ว่าง "—" ไว้ก่อน
   open(i){ openA=openA===i?-1:i; if(i>=0&&pkRole!=='all') pkRole=ORDER[i]; render(); },
   stt(k){ const r=S.roles[k], i=ST.findIndex(x=>x[0]===r.st); r.st=ST[(i+1)%ST.length][0]; rt(); },
   r(k,f,v){ S.roles[k][f]=v; if(['rate','unit','qty'].includes(f)) unfixRole(k); rt(); },
   s(k,j,f,v){ const s=S.roles[k].slots[j]; s[f]=v; if(f==='min'||f==='tier'){ delete s.fix; if(f==='tier') delete s.cu; } rt(); },
   tier(j,f,v){ const r=S.roles.dub; if(f==='add') r.tiers.push({rate:0,unit:'นาที',qty:0}); else if(f==='del') r.tiers.splice(j,1); else { r.tiers[j][f]=v; r.tiers[j].blank=false; r.slots.forEach(s=>{ if((s.tier||1)===j+1&&!s.cu) delete s.fix; }); } rt(); },
-  rndAdd(k){ const r=S.roles[k]; r.rounds=r.rounds||[]; const n=r.rounds.length, prev=n?r.rounds[n-1]:{date:r.end,time:r.etime};
-    r.rounds.push({label:n?'รอบ '+(n+2):'รอบ 2 (ไฟนอล)', date:prev.date||S.deadline||'', time:prev.time||r.etime||''}); rt(); },
+  rndAdd(k){ const r=S.roles[k]; r.rounds=r.rounds||[]; const n=r.rounds.length;
+    r.rounds.push({label:n?'รอบ '+(n+2):'Final', date:'', time:''}); rt(); },
+  // แก้แถวเดดไลน์: i=-1 = รอบหลัก · i>=0 = รอบถัดไป
+  dlSet(k,i,f,v){ const r=S.roles[k]; if(i<0){ if(f==='label') r.endLabel=v; else if(f==='date') r.end=v; else r.etime=v; } else { r.rounds[i][f==='label'?'label':f==='date'?'date':'time']=v; } rt(); },
+  stepSet(k,i,v){ const r=S.roles[k]; r.step=r.step||{}; r.step[i]=Math.max(1,parseFloat(v)||1); },
+  // ⏩ เลื่อนเวลาส่งทีละ … ชม. (ไม่ต้องเปิดปฏิทิน) · ยังไม่ได้ตั้งวัน = เริ่มจากวันเริ่ม/ตอนนี้
+  shift(k,i,dir){ const r=S.roles[k], n=(r.step&&r.step[i])||1, x=i<0?{d:r.end,t:r.etime}:{d:r.rounds[i].date,t:r.rounds[i].time};
+    let base=new Date((x.d||r.start||S.start||new Date().toISOString().slice(0,10))+'T'+(x.t||(x.d?'00:00':'09:00'))); if(isNaN(base)) base=new Date();
+    base.setMinutes(base.getMinutes()+Math.round(dir*n*60)); const p2=v=>String(v).padStart(2,'0');
+    const d=base.getFullYear()+'-'+p2(base.getMonth()+1)+'-'+p2(base.getDate()), t=p2(base.getHours())+':'+p2(base.getMinutes());
+    if(i<0){ r.end=d; r.etime=t; } else { r.rounds[i].date=d; r.rounds[i].time=t; } rt(); },
+  same(k,v){ const r=S.roles[k]; r.sameAs=v||''; if(v) syncSame(); rt(); },
+  overview(){ safe(()=>_tagOverlayShow('👁️ ภาพรวมงาน '+esc(drCode()), overviewHTML(), 1100)); },
+  ovGo(to){ document.getElementById('tag-overlay')?.remove(); if(to.startsWith('role:')) NDP.goRole(to.slice(5)); else { if(to==='info'&&!infoOpen){ infoOpen=true; render(); } setTimeout(()=>goTo(to),30); } },
+  go(id){ if(id==='info'&&!infoOpen){ infoOpen=true; render(); } setTimeout(()=>goTo(id),30); },
+  goRole(k){ const i=ORDER.indexOf(k); if(openA!==i){ openA=i; if(pkRole!=='all') pkRole=k; render(); } setTimeout(()=>{ const el=document.querySelector('#nd-plan-body .pl-acc.open'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },30); },
+  openProj(){ if(dirty && !confirm('มีการแก้ไขที่ยังไม่บันทึก — เปิดหน้าโปรเจกต์ก่อน (สิ่งที่แก้ค้างไว้ในหน้านี้ยังอยู่)?')) return; safe(()=>openEditProject(S.id)); },
+  draft(){ saveDraftNow(); }, openDraft(){ if(dirty && !confirm('แทนที่สิ่งที่แก้ค้างไว้ด้วยแบบร่าง?')) return; openDraft(); },
+  dropDraft(){ if(!confirm('ทิ้งแบบร่างของงานนี้?')) return; dropDraft(S.id).then(render); },
   rnd(k,i,f,v){ S.roles[k].rounds[i][f]=v; rt(); },
   rndDel(k,i){ const x=S.roles[k].rounds[i]; if(x&&x.date&&!confirm('ลบเดดไลน์ "'+(x.label||'รอบนี้')+'"?')) return; S.roles[k].rounds.splice(i,1); rt(); },
   unCu(k,j){ const s=S.roles[k].slots[j]; if(!confirm('ให้ '+s.n+' ใช้เรทของหน้าที่แทนเรทเฉพาะตัว?')) return; delete s.cu; delete s.fix; rt(); },
@@ -904,37 +1169,55 @@ const NDP=window.NDP={
   post(id){ const cur=($('pl-ed')||{}).value; if(cur!=null && !edFromTpl && fromDisp(cur)!==edDefault() && !confirm('ทิ้งข้อความที่แก้ในกล่อง?')){ render(); return; } edPost=id; edText=null; render(); },
   tpl(id){ if(!id) return; const cur=($('pl-ed')||{}).value||''; if(cur.trim() && !edFromTpl && fromDisp(cur)!==edDefault() && !confirm('แทนที่ข้อความในกล่องด้วยเทมเพลตนี้?')){ render(); return; } tplSel=id; edText=tplFill(tpls().find(t=>t.id===id)); edFromTpl=true; render(); },
 
-  // ⚙️ จัดการเทมเพลตโพสต์ (แอดมิน): เปลี่ยนชื่อ · แก้ข้อความ · ลบ
+  // ⚙️ จัดการเทมเพลตโพสต์ (แอดมิน): ＋ ใหม่ · ✏️ แก้ชื่อ+ข้อความ · 🗑️ ลบ
   tplMgr(){ if(!isAdm()) return; const L=tpls();
-    safe(()=>_tagOverlayShow('⚙️ จัดการเทมเพลตโพสต์', `<div class="pl-mut" style="margin-bottom:8px">✏️ แก้ชื่อและข้อความโพสต์ · 🗑️ ลบ — ทุกคนเห็นชุดเดียวกัน</div>
-      <div style="max-height:420px;overflow:auto">${L.map(t=>`<div style="display:flex;align-items:center;gap:6px;padding:7px 4px;border-top:1px solid var(--border2)">
-        <span style="flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📋 ${esc(t.name||'ไม่มีชื่อ')}${t.id===tplSel?' <small class="pl-mut">(ใช้อยู่)</small>':''}</span>
-        <span class="pl-mut" style="font-size:11px">${slotCount(t.text||'')} ช่องเติม</span>
+    safe(()=>_tagOverlayShow('⚙️ จัดการเทมเพลตโพสต์', `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="pl-mut" style="flex:1">✏️ แก้ชื่อและข้อความโพสต์ · 🗑️ ลบ — ทุกคนเห็นชุดเดียวกัน</span><button class="btn btn-blue btn-sm" onclick="NDP.tplEdit('')">＋ เทมเพลตใหม่</button></div>
+      <div style="max-height:440px;overflow:auto">${L.map(t=>{ const n=slotCount(t.text||''), lo=leftovers(t.text||'').length;
+        return `<div style="display:flex;align-items:center;gap:6px;padding:7px 4px;border-top:1px solid var(--border2)">
+        <span style="flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📋 <b>${esc(t.name||'ไม่มีชื่อ')}</b>${t.id===tplSel?' <small class="pl-mut">(ใช้อยู่)</small>':''}</span>
+        ${lo?`<span class="pl-tag t-p" title="ยังมีวันที่/ราคา/แท็กตายตัวค้าง — กด ✏️ แก้ แล้ว 🪄 แปลงอัตโนมัติ">⚠️ ข้อมูลค้าง ${lo} จุด</span>`:''}${n?`<span class="pl-tag t-y">✓ เติมอัตโนมัติ ${n} ช่อง</span>`:'<span class="pl-tag" style="color:var(--text2)">ข้อความล้วน</span>'}
         <button class="btn btn-outline btn-sm" title="แก้ชื่อ + ข้อความโพสต์" onclick="NDP.tplEdit('${esc(t.id)}')">✏️ แก้</button>
-        <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:rgba(255,64,64,.35)" title="ลบ" onclick="NDP.tplDel('${esc(t.id)}')">🗑️</button></div>`).join('')||'<div class="pl-mut" style="padding:12px">ยังไม่มีเทมเพลต</div>'}</div>
-      <div style="display:flex;margin-top:10px"><button class="btn btn-outline" style="flex:1" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button></div>`, 560)); },
+        <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:rgba(255,64,64,.35)" title="ลบ" onclick="NDP.tplDel('${esc(t.id)}')">🗑️</button></div>`; }).join('')||'<div class="pl-mut" style="padding:12px">ยังไม่มีเทมเพลต</div>'}</div>
+      <div style="display:flex;margin-top:10px"><button class="btn btn-outline" style="flex:1" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button></div>`, 640)); },
   async tplRen(id){ const L=tpls(), t=L.find(x=>x.id===id); if(!t) return; const nm=prompt('ชื่อเทมเพลตใหม่:', t.name||''); if(nm==null||!nm.trim()) return;
     if(L.some(x=>x.id!==id&&String(x.name||'').trim()===nm.trim()) && !confirm('มีเทมเพลตชื่อ "'+nm.trim()+'" อยู่แล้ว — ใช้ชื่อซ้ำ?')) return;
     t.name=nm.trim(); await savePostTpls(L); say('✏️ เปลี่ยนชื่อแล้ว','success'); NDP.tplMgr(); render(); },
   async tplDel(id){ const L=tpls(), t=L.find(x=>x.id===id); if(!t) return;
     if(!confirm('ลบเทมเพลต "'+(t.name||'')+'"?\n(โพสต์ที่โพสต์ไปแล้วไม่ถูกลบ)')) return;
     await savePostTpls(L.filter(x=>x.id!==id)); if(tplSel===id){ tplSel=''; edFromTpl=false; } say('🗑️ ลบเทมเพลตแล้ว','info'); NDP.tplMgr(); render(); },
-  tplEdit(id){ const L=tpls(), t=L.find(x=>x.id===id); if(!t) return;
-    safe(()=>_tagOverlayShow('📝 แก้เทมเพลต "'+esc(t.name||'')+'"', `<div class="pl-mut" style="margin-bottom:6px;line-height:1.6">ข้อความใน { } = ช่องที่ระบบเติมจากงานให้เอง เช่น {รหัส} {ตอน} {เดทไลน์เกลา} · บล็อกต่อคน {ทุกคน:เกลา} … {/ทุกคน}</div>
-      <input id="pl-tename" class="form-input" value="${esc(t.name||'')}" placeholder="ชื่อเทมเพลต" style="margin-bottom:8px">
-      <textarea id="pl-tetext" class="form-input" style="min-height:340px;font-size:12.5px;line-height:1.6;font-family:Kanit,sans-serif">${esc(toDisp(t.text||''))}</textarea>
-      <div class="pl-mut" style="margin-top:6px">มีข้อมูลของงาน <b>${esc(drCode())}</b> ค้างอยู่ในข้อความ? กด 🪄 ให้ระบบเปลี่ยนเป็นช่องเติมอัตโนมัติ</div>
-      <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-green" style="flex:1" id="pl-tesave">💾 บันทึก</button><button class="btn btn-outline" id="pl-teauto" title="แปลงข้อมูลของงานที่เปิดอยู่ในข้อความ → ช่อง { }">🪄 แปลงอัตโนมัติ</button><button class="btn btn-outline" onclick="NDP.tplMgr()">← กลับ</button></div>`, 760));
-    setTimeout(()=>{ const au=$('pl-teauto'); if(au) au.onclick=()=>{ const ta=$('pl-tetext'); const before=slotCount(ta.value); ta.value=toDisp(toTemplate(fromDisp(ta.value))); say('🪄 แปลงแล้ว — ช่องเติม '+before+' → '+slotCount(ta.value)+' ช่อง (ตรวจก่อนกดบันทึก)','success'); };
+  // ✏️ แก้/สร้างเทมเพลต — แถบช่องเติม (กดแทรก/แทนที่ข้อความที่เลือก) · 🪄 แปลงอัตโนมัติ · รายการข้อมูลที่ยังค้าง
+  tplEdit(id){ const L=tpls(), t=id?L.find(x=>x.id===id):{id:'', name:'', text:''}; if(!t) return;
+    const role=window._plSlotRole||'เกลา';
+    const pal=SLOTS.map(([h,c,arr])=>`<div class="pl-mut" style="margin:8px 0 3px">${h}${c==='m'||c==='d'||c==='l'?` <select class="form-input form-select" style="width:auto;padding:1px 6px;font-size:11.5px;display:inline-block" onchange="window._plSlotRole=this.value;NDP.tplEditKeep('${esc(t.id)}')">${ORDER.map(k=>`<option${RK[k]===role?' selected':''}>${RK[k]}</option>`).join('')}</select>`:''}</div>`
+      +arr.map(x=>{ const v=x.replace('@',role); return `<span class="pl-chip k-${c}" title="กดเพื่อแทรก {${esc(v)}}" onmousedown="event.preventDefault();NDP.slotIns('${esc(v)}')">${esc(v)}</span>`; }).join('')).join('');
+    const lo=leftovers(t.text||'');
+    safe(()=>_tagOverlayShow((id?'✏️ แก้เทมเพลต "'+esc(t.name||'')+'"':'＋ เทมเพลตใหม่'), `<div style="display:grid;grid-template-columns:200px minmax(0,1fr);gap:12px">
+      <div style="max-height:470px;overflow:auto"><div class="pl-mut">🧩 ช่องเติม — กดเพื่อแทรกที่เคอร์เซอร์ (เลือกข้อความแล้วกด = แทนที่)</div>${pal}</div>
+      <div><input id="pl-tename" class="form-input" value="${esc(t.name||'')}" placeholder="ชื่อเทมเพลต เช่น หนังแนวตั้ง M" style="margin-bottom:8px">
+       <textarea id="pl-tetext" class="form-input" style="min-height:330px;font-size:12.5px;line-height:1.6;font-family:Kanit,sans-serif" oninput="NDP.loRefresh()">${esc(toDisp(t.text||''))}</textarea>
+       <div id="pl-telo" style="margin-top:6px"></div>
+       <div class="pl-mut" style="margin-top:6px;line-height:1.6">🪄 <b>แปลงอัตโนมัติ</b> อ่านตามหัวข้อ (เกลา · พากย์ · Sub · มิกซ์ · QC) — ไม่ต้องรู้ว่าเทมเพลตมาจากงานไหน · ข้อมูลของงานที่เปิดอยู่ (<b>${esc(drCode())}</b>) ในข้อความก็เปลี่ยนเป็นช่องให้ด้วย</div>
+       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn btn-green" style="flex:1" id="pl-tesave">💾 บันทึก</button><button class="btn btn-blue" id="pl-teauto">🪄 แปลงอัตโนมัติ</button><button class="btn btn-outline" id="pl-tepv">👀 ดูผลกับงาน ${esc(drCode())}</button><button class="btn btn-outline" onclick="NDP.tplMgr()">← กลับ</button></div>
+       <div id="pl-tepvbox" class="pl-mut" style="display:none;white-space:pre-wrap;margin-top:8px;max-height:220px;overflow:auto;border:1px dashed var(--border2);border-radius:10px;padding:8px 10px;color:var(--text)"></div></div></div>`, 980));
+    setTimeout(()=>{ NDP.loRefresh();
+      const au=$('pl-teauto'); if(au) au.onclick=()=>{ const ta=$('pl-tetext'); const before=slotCount(ta.value); ta.value=toDisp(toTemplate(fromDisp(ta.value))); NDP.loRefresh(); say('🪄 แปลงแล้ว — ช่องเติม '+before+' → '+slotCount(ta.value)+' ช่อง (ตรวจก่อนกดบันทึก)','success'); };
+      const pv=$('pl-tepv'); if(pv) pv.onclick=()=>{ const bx=$('pl-tepvbox'); bx.style.display=''; bx.textContent=toDisp(fillPlan(fromDisp($('pl-tetext').value))); };
       const b=$('pl-tesave'); if(b) b.onclick=async()=>{ const nm=String(($('pl-tename')||{}).value||'').trim(), tx=fromDisp(String(($('pl-tetext')||{}).value||''));
-      if(!tx.trim()){ say('ข้อความว่าง','warn'); return; } const L2=tpls(), t2=L2.find(x=>x.id===id); if(!t2) return; if(nm) t2.name=nm; t2.text=tx;
-      await savePostTpls(L2); say('💾 บันทึกเทมเพลตแล้ว','success'); if(tplSel===id&&edFromTpl) edText=null; NDP.tplMgr(); render(); }; },60); },
+      if(!tx.trim()){ say('ข้อความว่าง','warn'); return; } if(!nm){ say('ตั้งชื่อเทมเพลตก่อน','warn'); $('pl-tename')?.focus(); return; }
+      const L2=tpls(); let t2=id?L2.find(x=>x.id===id):null;
+      if(!t2){ t2={id:'tpl_'+Date.now().toString(36), name:nm, text:tx}; L2.push(t2); } else { if(L2.some(x=>x.id!==id&&String(x.name||'').trim()===nm) && !confirm('มีเทมเพลตชื่อ "'+nm+'" อยู่แล้ว — ใช้ชื่อซ้ำ?')) return; t2.name=nm; t2.text=tx; }
+      await savePostTpls(L2); say('💾 บันทึกเทมเพลตแล้ว','success'); if(tplSel===t2.id&&edFromTpl) edText=null; NDP.tplMgr(); render(); }; },60); },
+  tplEditKeep(id){ const nm=($('pl-tename')||{}).value, tx=($('pl-tetext')||{}).value; NDP.tplEdit(id); setTimeout(()=>{ if($('pl-tename')) $('pl-tename').value=nm||''; if($('pl-tetext')) $('pl-tetext').value=tx||''; NDP.loRefresh(); },80); },
+  slotIns(v){ const ta=$('pl-tetext'); if(!ta) return; const s0=ta.selectionStart??ta.value.length, e0=ta.selectionEnd??s0, ins='{'+v+'}';
+    ta.value=ta.value.slice(0,s0)+ins+ta.value.slice(e0); ta.focus(); ta.setSelectionRange(s0+ins.length,s0+ins.length); NDP.loRefresh(); },
+  loRefresh(){ const box=$('pl-telo'), ta=$('pl-tetext'); if(!box||!ta) return; const lo=leftovers(fromDisp(ta.value));
+    box.innerHTML=lo.length?`<span class="pl-mut">⚠️ ยังค้าง ${lo.length} จุด — กดเพื่อเลือก แล้วกดช่องเติมทางซ้ายเพื่อแทนที่:</span> `+lo.map((x,i)=>`<span class="pl-chip k-x" title="${esc(x.k)}" onmousedown="event.preventDefault();NDP.loPick(${i})">${esc(toDisp(x.v).slice(0,40))}</span>`).join(''):'<span class="pl-ok" style="font-size:12px">✓ ไม่มีข้อมูลค้าง</span>';
+    window._plLo=lo; },
+  loPick(i){ const ta=$('pl-tetext'), x=(window._plLo||[])[i]; if(!ta||!x) return; const v=toDisp(x.v), at=ta.value.indexOf(v); if(at<0) return; ta.focus(); ta.setSelectionRange(at,at+v.length); },
   // 💾 บันทึกเทมเพลต: แปลงข้อมูลของงานนี้ในข้อความ → ช่องเติมอัตโนมัติ แล้วให้ตรวจก่อนบันทึก
   saveTpl(){ const raw=fromDisp(String(($('pl-ed')||{}).value||'').trim()); if(!raw){ say('กล่องข้อความว่าง','warn'); return; }
     const conv=safe(()=>toTemplate(raw), raw), n=slotCount(conv), list=tpls(), cur=list.find(t=>t.id===tplSel);
-    const help=['รหัส','ชื่อเรื่อง','ไฟล์','ลิงก์โหลด','ตอน','นาที','เดทไลน์','เวลาส่งลูกค้า','เมเนเจอร์'].map(x=>'{'+x+'}').join(' ')
-      +'<br>ต่อหน้าที่ ('+ORDER.map(k=>RK[k]).join(' · ')+'): {จำนวนเกลา} {ทีมเกลา} {เดทไลน์เกลา} {เวลาเกลา} · รอบอื่นใช้ชื่อรอบ เช่น {เดทไลน์มิกซ์:Final} {เวลามิกซ์:Final}'
-      +'<br>บล็อกต่อคน: {ทุกคน:เกลา} … {/ทุกคน} ข้างในใช้ {ลำดับ} {คน} {ชื่อคน} {Ep} {นาทีคน} {ราคาคน} {เรทพากย์}';
+    const help=SLOTS.map(([h,,arr])=>'<b>'+h+'</b>: '+arr.map(x=>'{'+x.replace('@','เกลา')+'}').join(' ')).join('<br>')+'<br>หน้าที่: '+ORDER.map(k=>RK[k]).join(' · ');
     safe(()=>_tagOverlayShow('💾 บันทึกเป็นเทมเพลต', `<div class="pl-mut" style="line-height:1.7;margin-bottom:8px">ระบบอ่านข้อความแล้วแปลงข้อมูลของงาน <b style="color:var(--accent2)">${esc(drCode())}</b> เป็นช่องเติมอัตโนมัติ <b>${n}</b> ช่อง (ตัวใน { }) — ครั้งหน้าเลือกเทมเพลตนี้ ระบบจะเติมจากงานที่เปิดอยู่ให้เอง · ตรวจ/แก้ได้ก่อนบันทึก</div>
       <textarea id="pl-tplconv" class="form-input" style="min-height:320px;font-size:12.5px;line-height:1.6;font-family:Kanit,sans-serif">${esc(toDisp(conv))}</textarea>
       <details style="margin-top:6px"><summary class="pl-mut" style="cursor:pointer">📖 ช่องที่ใช้ได้</summary><div class="pl-mut" style="line-height:1.9;margin-top:4px">${help}</div></details>
