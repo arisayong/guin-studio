@@ -447,7 +447,10 @@ function driveHTML(){ const p=S.src, linked=!!p.driveFolderId, ready=drReady();
   const people=planIds().map(staff).filter(Boolean), noMail=people.filter(s=>!(s.email||'').trim());
   if(linked){
     return `<div class="pl-card">${head}<div class="pl-cb pl-2col"><div><div class="pl-tree">📁 <b>${esc(p.driveFolderName||drFolderName())}</b>${DR.folders&&DR.cur===p.driveFolderId?'<br>'+(DR.folders.map(f=>'&nbsp;&nbsp;&nbsp;&nbsp;📁 '+esc(f.name)).join('<br>')||'<span class="pl-mut">(ว่าง)</span>'):''}</div>
-       <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="NDP.drInside()">🔄 ดูโฟลเดอร์ข้างใน</button><button class="btn btn-outline btn-sm" onclick="NDP.drUnlink()">🔗 เปลี่ยนโฟลเดอร์</button></div></div>
+       <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="NDP.drInside()">🔄 ดูโฟลเดอร์ข้างใน</button><button class="btn btn-outline btn-sm" onclick="NDP.drUnlink()">🔗 เปลี่ยนโฟลเดอร์</button></div>
+       <div style="margin-top:12px"><label class="pl-l">📄 ไฟล์บท (ชีทสคริปต์)</label>${p.scriptLink?`<div style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn btn-outline btn-sm" href="${esc(p.scriptLink)}" target="_blank" rel="noopener">↗ เปิด ${esc(p.scriptName||'ไฟล์บท')}</a><button class="btn btn-outline btn-sm" onclick="NDP.drScript()">＋ สร้างอีกไฟล์</button></div>`
+         :drCfg().scriptTplId?`<button class="btn btn-green btn-sm" onclick="NDP.drScript()">📄 สร้างไฟล์บท Script/CV_${esc(drCode())}</button><div class="pl-mut" style="margin-top:4px">ก๊อปจากไฟล์บทต้นฉบับ ไว้ในโฟลเดอร์งานนี้</div>`
+         :`<div class="pl-mut">ยังไม่ได้ตั้งไฟล์บทต้นฉบับ ${isAdm()?'— <a style="cursor:pointer;color:var(--accent2)" onclick="openDriveSetup()">🔧 ตั้งค่า Drive</a> (ช่อง "ไฟล์เทมเพลตบท")':'— ให้แอดมินตั้งที่ 🔧 ตั้งค่า Drive'}</div>`}</div></div>
       <div><label class="pl-l">🔐 สิทธิ์ของทีม</label><div class="pl-mut" style="line-height:1.7">เพิ่มสิทธิ์แก้ไขเงียบ ๆ ให้คนในแผน <b>${people.length}</b> คน — เฉพาะคนที่อีเมลยังไม่มีสิทธิ์ · ไม่ส่งอีเมลแจ้งเตือน${noMail.length?`<br><span class="pl-warn">ไม่มีอีเมลในทะเบียน: ${noMail.map(s=>esc(s.nickname||s.name)).join(', ')}</span>`:''}</div>
        <button class="btn btn-green" style="margin-top:8px;width:100%" onclick="NDP.drShare()">🔐 เพิ่มสิทธิ์ให้คนในแผน</button>${p.driveSharedAt?`<div class="pl-mut" style="margin-top:5px">เพิ่มสิทธิ์ล่าสุด ${esc(safe(()=>_prTimeAgo(p.driveSharedAt),''))}</div>`:''}</div></div></div>`;
   }
@@ -745,6 +748,12 @@ const NDP=window.NDP={
       if(planIds().length){ await drShare(root.id, true); S.src=fresh(); }
     }catch(e){ say('สร้างไม่สำเร็จ: '+e.message,'error'); }
     finally{ busy(false); render(); } },
+  async drScript(){ const p=fresh(), tid=drCfg().scriptTplId; if(!p.driveFolderId){ say('สร้าง/ผูกโฟลเดอร์งานก่อน','warn'); return; } if(!tid){ say('ยังไม่ได้ตั้งไฟล์บทต้นฉบับ — ตั้งได้ที่ 🔧 ตั้งค่า Drive','warn'); return; }
+    let name='Script/CV_'+drCode(); if(p.scriptLink){ const nm=prompt('ชื่อไฟล์บทใหม่:', name+' (2)'); if(!nm||!nm.trim()) return; name=nm.trim(); }
+    busy(true); try{ const d=await callDrive({action:'copy', fileId:tid, destId:p.driveFolderId, name});
+      if(!p.scriptLink) await saveProjectMerge(S.id, f=>{ f.scriptLink=d.link||''; f.scriptName=d.name||name; });
+      S.src=fresh(); audit('project.drive', S.name, 'สร้างไฟล์บท '+name); say('📄 สร้างไฟล์บท '+name+' แล้ว','success'); if(d.link) window.open(d.link,'_blank'); }
+    catch(e){ say('สร้างไฟล์บทไม่ได้: '+e.message,'error'); } finally{ busy(false); render(); } },
   async drInside(){ const id=S.src.driveFolderId; DR.cur=id; busy(true); try{ const d=await callDrive({action:'list', parentId:id}); DR.folders=d.folders||[]; }catch(e){ say('โหลดไม่ได้: '+e.message,'error'); } finally{ busy(false); render(); } },
   async drUnlink(){ if(!confirm('เลิกผูกโฟลเดอร์นี้กับโปรเจกต์? (โฟลเดอร์ในไดรฟ์ไม่ถูกลบ)')) return;
     await saveProjectMerge(S.id, f=>{ delete f.driveFolderId; delete f.driveFolderLink; delete f.driveFolderName; }); S.src=fresh(); DR=DR0(); render(); },
