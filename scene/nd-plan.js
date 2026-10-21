@@ -52,6 +52,11 @@ const CSS=`
 .pl-ovr{font-weight:700;border-left:4px solid var(--c);padding-left:7px;white-space:nowrap}
 .pl-ovp{display:inline-flex;align-items:center;gap:5px;margin:0 8px 4px 0;font-size:12.5px}
 .pl-ovp .pl-av{width:22px;height:22px;font-size:10.5px}
+.pl-ovs{margin-top:10px;cursor:pointer}
+.pl-ovpost{margin-top:8px;border:1px solid var(--border2);border-left:4px solid #5865F2;border-radius:10px;background:rgba(88,101,242,.06)}
+.pl-ovph{font-size:12.5px;padding:6px 12px;border-bottom:1px solid var(--border2)}
+.pl-ovpt{white-space:pre-wrap;word-break:break-word;line-height:1.65;font-size:13.5px;padding:10px 12px}
+.pl-time{text-align:center;font-variant-numeric:tabular-nums}
 .pl-ovg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .pl-ovg>div{border:1px solid var(--border2);border-radius:12px;padding:9px 11px;cursor:pointer}
 .pl-ovg>div:hover{background:rgba(255,255,255,.04)}
@@ -185,7 +190,7 @@ const CSS=`
 .pl-tpls{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
 .pl-tpls span{border:1px solid var(--border2);border-radius:10px;padding:4px 10px;font-size:12.5px;cursor:pointer}
 .pl-tpls span.on{border-color:#5865F2;background:rgba(88,101,242,.2)}
-#pl-ed{min-height:300px;line-height:1.65;resize:vertical;border-left:4px solid #5865F2!important;font-family:Kanit,sans-serif}
+#pl-ed{min-height:300px;line-height:1.65;resize:vertical;overflow:hidden;border-left:4px solid #5865F2!important;font-family:Kanit,sans-serif}
 .pl-at{position:fixed;z-index:9999;background:var(--card);border:1px solid var(--border2);border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.45);padding:5px;min-width:180px;max-height:240px;overflow:auto}
 .pl-at div{display:flex;gap:7px;align-items:center;padding:5px 7px;border-radius:7px;cursor:pointer;font-size:13px}
 .pl-at div.on,.pl-at div:hover{background:rgba(88,101,242,.22)}
@@ -498,7 +503,7 @@ function infoHTML(){ const adm=isAdm(), ms=mgrStaff(S.mgrId);
    ${C(2,'🗂️ Manager',adm?`<select class="form-input form-select" onchange="NDP.set('mgrId',this.value)"><option value="">— แอดมินดูแลเอง —</option>${managers().map(m=>`<option value="${esc(m.uid)}"${m.uid===S.mgrId?' selected':''}>${esc(m.nickname||m.email)}</option>`).join('')}</select>`:`<div class="pl-lock">${esc(mgrName(S.mgrId))}</div>`)}
 
    ${C(2,'วันเริ่มงาน',`<input class="form-input" type="date" value="${esc(S.start)}" onchange="NDP.set('start',this.value)">`)}
-   ${C(4,'🏁 Deadline ลูกค้า',`<div class="pl-dt"><input class="form-input" type="date" value="${esc(S.deadline)}" onchange="NDP.set('deadline',this.value)"><input class="form-input" type="time" value="${esc(S.dtime)}" onchange="NDP.set('dtime',this.value)"></div>`)}
+   ${C(4,'🏁 Deadline ลูกค้า',`<div class="pl-dt"><input class="form-input" type="date" value="${esc(S.deadline)}" onchange="NDP.set('deadline',this.value)"><input class="form-input pl-time" type="text" inputmode="numeric" maxlength="5" placeholder="--:--" autocomplete="off" value="${esc(S.dtime)}" onchange="NDP.tm(this,v=>NDP.set('dtime',v))"></div>`)}
    ${C(3,'Budget จากลูกค้า',`<div class="pl-dt"><select class="form-input form-select" style="width:92px;flex-shrink:0" onchange="NDP.set('budType',this.value)">${[['flat','เหมา'],['per-minute','นาที'],['per-hour','ชั่วโมง'],['per-page','หน้า'],['per-day','วัน'],['per-episode','บท'],['per-project','โปรเจกต์']].map(([v,l])=>`<option value="${v}"${v===S.budType?' selected':''}>${l}</option>`).join('')}</select><input class="form-input" type="number" step="any" value="${S.budRate||''}" onchange="NDP.set('budRate',+this.value||0)">${['flat','per-minute','per-project'].includes(S.budType)?'':`<input class="form-input" type="number" step="any" style="width:72px;flex-shrink:0" value="${S.budQty||''}" placeholder="จำนวน" onchange="NDP.set('budQty',+this.value||0)">`}</div>`)}
    ${C(3,adm?'ชื่อ / URL ลูกค้า':'ลูกค้า',adm?`<input class="form-input" value="${esc(S.client)}" onchange="NDP.set('client',this.value)">`:'<div class="pl-lock">🔒 เฉพาะแอดมิน</div>')}
 
@@ -529,9 +534,9 @@ function bodyHTML(k){ syncSame(); const r=S.roles[k], hr=hoursOf(r), st=STD();
   const linkCtl=(i,lnk)=>{ const cur=lnk?lnk.k+'|'+lnk.i:''; if(!opts.length) return '<span></span>';
     return `<span class="pl-lnk ${cur?'on':''}" title="ส่งรอบนี้พร้อมเดดไลน์ของหน้าที่อื่น (วันเวลาตามกันอัตโนมัติ)"><select class="form-input form-select" ${dis} onchange="NDP.rowLink('${k}',${i},this.value)"><option value="">🔗 ส่งพร้อม…</option>${opts.map(o=>`<option value="${esc(o.v)}"${o.v===cur?' selected':''}>🔗 ${esc(o.l)}</option>`).join('')}</select></span>`; };
   const dlRow=(i,lbl,d,t,late)=>{ const h=d?hoursTo(r,d,t):null, lnk=i<0?r.endLink:((r.rounds||[])[i]||{}).link, ld=(dis||lnk)?'disabled':'';
-    return `<div class="pl-dlr"><input class="form-input" ${dis} value="${esc(lbl)}" placeholder="${i<0?'เดทไลน์':'ชื่อรอบ เช่น Final'}" onchange="NDP.dlSet('${k}',${i},'label',this.value)"><input class="form-input" type="date" ${ld} value="${esc(d)}" style="${late?'border-color:var(--red)':''}" onchange="NDP.dlSet('${k}',${i},'date',this.value)"><input class="form-input" type="time" ${ld} value="${esc(t)}" onchange="NDP.dlSet('${k}',${i},'time',this.value)">${lnk?'<span class="pl-mut" style="font-size:11px;text-align:center">ตามหน้าที่ที่เลือก</span>':step(i,d,t)}${linkCtl(i,lnk)}<span class="pl-dur2">${h==null?'⏱ —':'⏱ <b>'+fmtH(h)+'</b>'}${late?' <span class="pl-bad">เลยเดดไลน์ลูกค้า</span>':''}</span>${i<0?'<span></span>':`<span class="pl-x" title="ลบรอบนี้" ${lk?'style="visibility:hidden"':''} onclick="NDP.rndDel('${k}',${i})">✕</span>`}</div>`; };
+    return `<div class="pl-dlr"><input class="form-input" ${dis} value="${esc(lbl)}" placeholder="${i<0?'เดทไลน์':'ชื่อรอบ เช่น Final'}" onchange="NDP.dlSet('${k}',${i},'label',this.value)"><input class="form-input" type="date" ${ld} value="${esc(d)}" style="${late?'border-color:var(--red)':''}" onchange="NDP.dlSet('${k}',${i},'date',this.value)"><input class="form-input pl-time" type="text" inputmode="numeric" maxlength="5" placeholder="--:--" autocomplete="off" ${ld} value="${esc(t)}" onchange="NDP.tm(this,v=>NDP.dlSet('${k}',${i},'time',v))">${lnk?'<span class="pl-mut" style="font-size:11px;text-align:center">ตามหน้าที่ที่เลือก</span>':step(i,d,t)}${linkCtl(i,lnk)}<span class="pl-dur2">${h==null?'⏱ —':'⏱ <b>'+fmtH(h)+'</b>'}${late?' <span class="pl-bad">เลยเดดไลน์ลูกค้า</span>':''}</span>${i<0?'<span></span>':`<span class="pl-x" title="ลบรอบนี้" ${lk?'style="visibility:hidden"':''} onclick="NDP.rndDel('${k}',${i})">✕</span>`}</div>`; };
   const time=`<div class="pl-dlbox ${lk?'linked':''}">
-    <div class="pl-st"><span class="pl-mut">📅 เริ่ม</span><input class="form-input" type="date" ${dis} value="${esc(r.start)}" onchange="NDP.r('${k}','start',this.value)"><input class="form-input" type="time" ${dis} value="${esc(r.stime)}" onchange="NDP.r('${k}','stime',this.value)"></div>
+    <div class="pl-st"><span class="pl-mut">📅 เริ่ม</span><input class="form-input" type="date" ${dis} value="${esc(r.start)}" onchange="NDP.r('${k}','start',this.value)"><input class="form-input pl-time" type="text" inputmode="numeric" maxlength="5" placeholder="--:--" autocomplete="off" ${dis} value="${esc(r.stime)}" onchange="NDP.tm(this,v=>NDP.r('${k}','stime',v))"></div>
     <div class="pl-mut" style="margin:6px 0 4px">🏁 เดดไลน์ — ตั้งชื่อแต่ละรอบเองได้ (ชื่อนี้ขึ้นในโพสต์ใต้หัวข้อ "${esc(R[k][0])}")</div>
     ${dlRow(-1, r.endLabel||'', r.end, r.etime, late)}
     ${(r.rounds||[]).map((x,i)=>dlRow(i, x.label, x.date, x.time, x.date&&S.deadline&&x.date>S.deadline)).join('')}
@@ -1050,7 +1055,13 @@ function overviewHTML(){ syncSame(); const cost=on().reduce((a,r)=>a+subTot(r),0
     <div onclick="NDP.ovGo('dc')"><b>💬 ห้อง Discord</b><div class="pl-mut">${S.src.discordChannelId?'✅ '+esc(S.src.discordCategoryName||'มีห้องแล้ว')+' · โพสต์แล้ว '+posted+' โพสต์':'ยังไม่มีห้อง'}</div></div>
     <div onclick="NDP.ovGo('info')"><b>📋 ข้อมูลโปรเจกต์</b><div class="pl-mut">${S.link?'🔗 มีลิงก์โหลดงาน · ':''}🧾 ${S.legacyTax&&!S.dedT?'หักแยกหมวด (งานเดิม)':w?'หัก '+w+'%':'ไม่หัก'}${S.note?' · 📝 '+esc(String(S.note).slice(0,40)):''}</div></div>
    </div>
+   ${(()=>{ const L=P.filter(x=>String(x.text||'').trim()), cur=String(edText||'').trim();
+     const box=(t,head)=>`<div class="pl-ovpost"><div class="pl-ovph">${head}</div><div class="pl-ovpt">${esc(toDisp(t))}</div></div>`;
+     const items=L.map(x=>box(x.id===edPost&&cur?edText:x.text, `${esc((x.emoji||'📝')+' '+(x.title||'โพสต์'))} · ${x.msgIds&&x.msgIds.length?'<span class="pl-ok">✅ โพสต์ในห้องแล้ว</span>':'<span class="pl-warn">ร่าง — ยังไม่โพสต์</span>'}${x.id===edPost&&cur&&cur!==String(x.text||'').trim()?' · <span class="pl-warn">มีแก้ในหน้ายังไม่อัปเดต</span>':''}`));
+     if(!L.length && cur) items.push(box(edText,'📝 ข้อความในหน้า · <span class="pl-warn">ยังไม่โพสต์</span>'));
+     return `<div class="pl-ovs" onclick="NDP.ovGo('dc')"><b>💬 โพสต์ Discord</b> <span class="pl-mut">(${items.length} โพสต์ · เต็มความยาว · กดเพื่อไปแก้)</span>${items.join('')||'<div class="pl-mut" style="margin-top:6px">ยังไม่มีโพสต์</div>'}</div>`; })()}
    <div class="pl-mut" style="margin-top:8px">กดแถวหรือกล่องไหนก็ได้ = ไปที่ส่วนนั้นของหน้า (เปิดแก้ให้เลย)</div></div>`; }
+function edGrow(t){ const y=window.scrollY, mc=$('main-content'), my=mc?mc.scrollTop:0; t.style.height='auto'; t.style.height=Math.max(300,t.scrollHeight+4)+'px'; window.scrollTo(0,y); if(mc) mc.scrollTop=my; }
 function goTo(id){ const el=$('pl-s-'+id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
 
 /* ── วาดหน้า ── */
@@ -1070,6 +1081,7 @@ function render(){ const pg=$('nd-plan-body'); if(!pg) return;
   if(dd){ const q=$('pl-ddq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
   else if(pjOpen){ const q=$('pl-pjq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
   else if(ae&&ae.id==='pl-pkq'){ const q=$('pl-pkq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
+  { const t=$('pl-ed'); if(t) edGrow(t); }
   if(keepEd){ const t=$('pl-ed'); if(t){ t.focus(); t.setSelectionRange(selS,selE); } }
   pinJump();
 }
@@ -1281,7 +1293,11 @@ const NDP=window.NDP={
       if(nb) nb.onclick=async()=>{ const nm=String(($('pl-tplname')||{}).value||'').trim(); if(!nm){ say('ตั้งชื่อเทมเพลตก่อน','warn'); $('pl-tplname')?.focus(); return; }
         const id='tpl_'+Date.now().toString(36); list.push({id,name:nm,text:fromDisp(ta.value)}); tplSel=id; await done(); };
       if(ob) ob.onclick=async()=>{ if(!confirm('บันทึกทับเทมเพลต "'+cur.name+'"?')) return; cur.text=fromDisp(ta.value); await done(); }; },60); },
-  ed(ta){ edText=ta.value; edFromTpl=false; const pos=ta.selectionStart, m=ta.value.slice(0,pos).match(/@([^\s@<>]{0,20})$/);
+  // ⌨️ พิมพ์เวลาได้เลย: 2359 · 23.59 · 23:59 · 9 · 930 → 23:59 / 09:00 / 09:30 · ผิด = คืนค่าเดิม
+  tm(el,set){ const v=safe(()=>_tmNorm(el.value),null);
+    if(v===null){ say('เวลาไม่ถูกต้อง — พิมพ์เช่น 2359 หรือ 23:59','error'); el.value=el.defaultValue; return; }
+    el.value=v; set(v); },
+  ed(ta){ edText=ta.value; edGrow(ta); edFromTpl=false; const pos=ta.selectionStart, m=ta.value.slice(0,pos).match(/@([^\s@<>]{0,20})$/);
     if(m){ AT={start:pos-m[0].length, end:pos, list:atList(m[1]), i:0}; atRender(ta); } else NDP.atClose(); },
   edKey(e){ if(!AT||!AT.list.length) return; if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); AT.i=(AT.i+(e.key==='ArrowDown'?1:-1)+AT.list.length)%AT.list.length; atRender(e.target); } else if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); NDP.atPick(AT.i); } else if(e.key==='Escape') NDP.atClose(); },
   atPick(i){ const ta=$('pl-ed'); if(!ta||!AT) return; const s=AT.list[i]; if(!s) return; const tag='@'+(s.nickname||s.name)+' ';
