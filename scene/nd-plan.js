@@ -275,6 +275,7 @@ function loadProject(id){
   if(p.discordChannelId){ const was=Array.isArray(p.discordRoomMembers)?p.discordRoomMembers:[...new Set(ws.filter(w=>preOf(w)!=='mgr').map(w=>w.id))]; was.forEach(sid=>{ if(sid) DC.room[sid]='in'; }); }
   edText=null; edPost=(safe(()=>_prPosts(p),[])[0]||{}).id||''; tplSel=p.postTplId||''; dd=null; dirty=false;
   DR=DR0(); S.loadedAt=p.updatedAt||''; S.draft=null;
+  S.base0=Object.fromEntries(ORDER.map(k=>[k,roleSig(roles[k])])); S.st0=Object.fromEntries(ORDER.map(k=>[k,roles[k].st]));
   if(openA<0 || !S.roles[ORDER[openA]]||!S.roles[ORDER[openA]].on) openA=ORDER.findIndex(k=>S.roles[k].on);
   checkDraft(p.id);
   safe(()=>claimPresence(p.id,'viewing'));
@@ -330,6 +331,9 @@ function buildWorkers(){
   }));
   return out;
 }
+// ลายเซ็นของแต่ละหน้าที่ตอนเปิด — หน้าที่ที่ไม่ได้แตะ จะไม่เขียนทับของล่าสุดบนเซิร์ฟเวอร์ (คน/ราคา/เดดไลน์/สถานะ)
+function roleSig(r){ const o={...r}; delete o.step; return JSON.stringify(o); }
+const roleTouched=k=>!S.base0 || S.t.minutes || roleSig(S.roles[k])!==S.base0[k];
 function applyPlan(f){
   const T=S.t, resend=[];
   // ข้อมูลโปรเจกต์ — เขียนเฉพาะช่องที่แก้
@@ -354,18 +358,20 @@ function applyPlan(f){
       else if(i>=0 && f.workers[i].status!=='paid') f.workers.splice(i,1); } }
   // คน · ราคา · เวลา — เขียนเฉพาะเมื่อแตะส่วนนี้
   if(S.rolesT){
-    const old=(f.workers||[]).filter(Boolean), nw=buildWorkers(), used=new Set();
+    const old=(f.workers||[]).filter(Boolean), TK=new Set(ORDER.filter(roleTouched)), nw=buildWorkers().filter(w=>TK.has(preOf(w))), used=new Set();
     const merged=nw.map(w=>{ const i=old.findIndex((x,ix)=>!used.has(ix)&&x.id===w.id&&x.slot===w.slot); const ex=i>=0?old[i]:null; if(i>=0) used.add(i);
       if(!ex) return {...w, status:'pending', note:'', comment:'', confirmStatus:'none'};
       const m={...ex, ...w};
       if(!same(ex.amount,w.amount) && ['sent','confirmed','rejected'].includes(ex.confirmStatus)){
         m.confirmStatus='none'; m.confirmSentAt=null; m.confirmRespondedAt=null; m.confirmRejectReason=null; resend.push({id:w.id,slot:w.slot}); }
       return m; });
-    f.workers=[...merged, ...old.filter(w=>!ORDER.includes(preOf(w)))];   // 🗂️ ค่าเมเนเจอร์ (mgr) และหมวดอื่นคงเดิม
-    const d=S.roles.dub; f.dubTiers=d.tiers.map(t=>({rate:t.blank?'':(+t.rate||0), unit:t.unit||'นาที', qty:+t.qty||0}));
+    // หน้าที่ที่แตะ = ใช้ของในหน้านี้ · หน้าที่ที่ไม่ได้แตะ = คงของล่าสุด (เผื่อคนอื่นแก้หลังเราเปิด) · ค่าเมเนเจอร์ (mgr) และหมวดอื่นคงเดิม
+    f.workers=[...ORDER.flatMap(k=>TK.has(k)?merged.filter(w=>preOf(w)===k):old.filter(w=>preOf(w)===k)), ...old.filter(w=>!ORDER.includes(preOf(w)))];
+    const d=S.roles.dub; if(TK.has('dub')) f.dubTiers=d.tiers.map(t=>({rate:t.blank?'':(+t.rate||0), unit:t.unit||'นาที', qty:+t.qty||0}));
     const ph={...(f.phases||{})};
-    ORDER.forEach(k=>{ const r=S.roles[k], key=R[k][3];
-      if(r.on && (ph[key] || r.start || r.end || r.etime || r.stime || r.note || r.endLabel || r.sameAs || (r.rounds||[]).length || (r.st&&r.st!=='none'))){ const o=ph[key]||{}; ph[key]={...o, startDate:r.start||'', deadline:r.end||'', submitTime:r.etime||'', status:r.st||'none', note:r.note||''}; if(r.stime) ph[key].startTime=r.stime;
+    ORDER.forEach(k=>{ const r=S.roles[k], key=R[k][3]; if(!TK.has(k)) return;
+      const stKeep=S.st0&&r.st===S.st0[k]&&ph[key]&&ph[key].status;   // ไม่ได้กดเปลี่ยนสถานะ → คงสถานะล่าสุด (หน้าติดตามงานอาจอัปเดต)
+      if(r.on && (ph[key] || r.start || r.end || r.etime || r.stime || r.note || r.endLabel || r.sameAs || (r.rounds||[]).length || (r.st&&r.st!=='none'))){ const o=ph[key]||{}; ph[key]={...o, startDate:r.start||'', deadline:r.end||'', submitTime:r.etime||'', status:stKeep||r.st||'none', note:r.note||''}; if(r.stime) ph[key].startTime=r.stime;
         if(r.endLabel) ph[key].endLabel=r.endLabel; else delete ph[key].endLabel;
         if(r.sameAs) ph[key].sameAs=r.sameAs; else delete ph[key].sameAs;
         if(r.endLink) ph[key].endLink=r.endLink; else delete ph[key].endLink;
