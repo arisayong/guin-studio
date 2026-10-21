@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261021-04"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261021-05"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -4997,6 +4997,14 @@ function openDemoPicker(staffId){
     ${s.demoNote?`<div style="font-size:11.5px;color:var(--text2);margin-top:8px">📝 ${esc(s.demoNote)}</div>`:''}
     <div style="display:flex;margin-top:10px"><button class="btn btn-outline" style="flex:1" onclick="document.getElementById('tag-overlay')?.remove()">ปิด</button></div>`, 480);
 }
+// 🎬 ปุ่มเปิดเดโม่ — ใช้ได้ทุกหน้า (การ์ดทีม · หน้าลงคิว · หน้าวางแผนงาน) · 1 ลิงก์ = เปิดเลย · หลายลิงก์ = ให้เลือก
+function staffDemoChip(s, size){
+  const links=(s&&Array.isArray(s.demoLinks))?s.demoLinks.filter(Boolean):[];
+  if(!links.length) return '';
+  const st='display:inline-flex;align-items:center;gap:3px;font-size:'+(size||10.5)+'px;padding:1px 8px;border-radius:8px;background:rgba(0,180,255,.14);border:1px solid rgba(0,180,255,.35);color:var(--accent2);font-weight:600;cursor:pointer;white-space:nowrap;vertical-align:middle';
+  const act=links.length===1?"window.open('"+escJs(links[0])+"','_blank')":"openDemoPicker('"+escJs(s.id)+"')";
+  return '<span style="'+st+'" onclick="event.stopPropagation();'+act+'" title="เปิดตัวอย่างผลงาน/เดโม่'+(links.length>1?' ('+links.length+' ลิงก์)':'')+'">🎬 เดโม่'+(links.length>1?' ×'+links.length:'')+'</span>';
+}
 // ปุ่ม/อิโมจิเดโม่ บนแถวคนในหน้าจัดสรร
 function _alcDemoBtn(s){
   const links=(s&&s.demoLinks)||[];
@@ -5941,7 +5949,7 @@ function renderAvailability(){
     return `<div style="background:var(--card);border:1px solid rgba(0,223,160,.28);border-radius:12px;padding:12px 14px">
       <div style="display:flex;align-items:flex-start;gap:9px;flex-wrap:wrap">
         <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:800;color:var(--text)">${esc(s.nickname||s.name||'')}</div>
+          <div style="font-size:14px;font-weight:800;color:var(--text)">${esc(s.nickname||s.name||'')} ${staffDemoChip(s)}</div>
           <div style="font-size:10.5px;color:var(--text2);margin-top:1px">
             ${e.discordName?'💬 '+esc(e.discordName)+' · ':''}${e.updatedAt?_logWhen(e.updatedAt):''}
             ${nHist?` · <span style="cursor:pointer;color:var(--accent2)" onclick="avShowHistory('${escJs(s.id)}')">🕓 แก้ ${nHist} ครั้ง</span>`:''}
@@ -5994,7 +6002,7 @@ function renderAvailability(){
       <summary style="cursor:pointer;font-size:13px;font-weight:700;color:var(--red)">❌ แจ้งไม่สะดวกแล้ว (${cancelled.length})</summary>
       <div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">
         ${cancelled.map(p=>`<div style="background:var(--card);border:1px solid rgba(255,64,64,.22);border-radius:10px;padding:9px 12px;opacity:.8">
-          <div style="font-size:13px;font-weight:700">${esc(p.s.nickname||p.s.name)}</div>
+          <div style="font-size:13px;font-weight:700">${esc(p.s.nickname||p.s.name)} ${staffDemoChip(p.s)}</div>
           <div style="font-size:11.5px;color:var(--text2);margin-top:3px;text-decoration:line-through">${esc(p.e.freeText||'')}</div>
           <button class="btn btn-xs btn-outline" style="font-size:10px;padding:2px 8px;margin-top:6px;border-color:rgba(0,223,160,.3);color:var(--green)"
             onclick="avToggleStatus('${escJs(p.s.id)}')">✅ กลับมาสะดวก</button>
@@ -6009,7 +6017,7 @@ function renderAvailability(){
       <div style="margin-top:8px;max-height:420px;overflow-y:auto;border:1px solid var(--border2);border-radius:10px">
         <table style="width:100%;border-collapse:collapse">
           <tbody>${pending.map(p=>`<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-            <td style="padding:6px 10px;font-size:12.5px;white-space:nowrap;width:150px">${esc(p.s.nickname||p.s.name||'')}</td>
+            <td style="padding:6px 10px;font-size:12.5px;white-space:nowrap;width:150px">${esc(p.s.nickname||p.s.name||'')} ${staffDemoChip(p.s,10)}</td>
             <td style="padding:6px 10px">
               <input placeholder="วางคำตอบจาก Discord หรือพิมพ์เอง" onchange="avSet('${escJs(p.s.id)}','freeText',this.value)"
                 style="width:100%;padding:5px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px">
@@ -21224,6 +21232,7 @@ function renderStaffGrid(){
         html+='<div style="flex:1;min-width:0">';
         html+='<div style="font-weight:700;font-size:14px">'+s.name+'</div>';
         html+='<div style="font-size:11px;color:var(--text2);margin-bottom:4px">'+(s.nickname?'('+s.nickname+') · ':'')+s.gender+'</div>';
+        if(staffDemoChip(s)) html+='<div style="margin-bottom:4px">'+staffDemoChip(s,11)+'</div>';
         // แสดงทุกตำแหน่งที่มี
         if(s.categories&&s.categories.length>1){
           const catColors2={dubbing:'var(--orange)',adaptation:'var(--cyan)',mix:'var(--green)',qc:'var(--purple)',subVideo:'var(--red)',translation:'#FF6FAE',manager:'var(--accent2)'};
@@ -31082,6 +31091,7 @@ function teamMemberCardHTML(s, col, viewer){
           return pp?`<div style="font-size:11px;color:var(--text2)" title="เบอร์พร้อมเพย์ (ยังไม่มีเบอร์โทรในข้อมูลสมาชิก)">${esc(pp)}</div>`:''; })()}
         ${(rank===''&&s.email)?`<div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(s.email)}">📧 ${esc(s.email)}</div>`:''}
         ${s.social?(()=>{const u=_extractUrls(s.social)[0];return `<div style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(s.social)}">${u?`<a href="${esc(u)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--accent2)">📱 ${esc(s.social)}</a>`:`<span style="color:var(--text2)">📱 ${esc(s.social)}</span>`}</div>`;})():''}
+        ${staffDemoChip(s)?`<div style="margin-top:3px">${staffDemoChip(s,11)}</div>`:''}
         ${staffTagChipsHTML(s)}
       </div>
       ${viewer==='admin'?'<span style="color:var(--text2);font-size:14px;flex-shrink:0">›</span>':''}
@@ -32686,7 +32696,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261021-04"></script><script src="scene/nd-profile.js?v=20261021-04"></script><script src="scene/nd-plan.js?v=20261021-04"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261021-05"></script><script src="scene/nd-profile.js?v=20261021-05"></script><script src="scene/nd-plan.js?v=20261021-05"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32696,7 +32706,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261021-04';
+var UPD_BUILD = '20261021-05';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;

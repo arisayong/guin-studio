@@ -509,7 +509,7 @@ function nameBtn(k,j){ const r=S.roles[k], s=r.slots[j], open=dd&&dd.k===k&&dd.j
   const pool=teamOf(k), q=ddQ.trim().toLowerCase();
   return `<div class="pl-nb" onclick="event.stopPropagation();NDP.dd('${k}',${j})">${av(s.n)}<div style="min-width:0">${s.n?`<b>${esc(s.n)}</b>${s.paid?' <span class="pl-paid">✓ จ่ายแล้ว</span>':''}`:'<span class="pl-mut">กดเพื่อเลือกคน…</span>'}</div>
    ${open?`<div class="pl-dd" onclick="event.stopPropagation()"><input class="form-input" id="pl-ddq" style="padding:4px 8px;margin-bottom:5px" placeholder="🔍 พิมพ์ชื่อ…" value="${esc(ddQ)}" oninput="NDP.ddq(this.value)">
-     ${pool.filter(x=>!q||String((x.nickname||'')+' '+(x.name||'')).toLowerCase().includes(q)).slice(0,60).map(x=>`<div class="op" onclick="NDP.pick('${k}',${j},'${esc(x.id)}')">${av(x.nickname||x.name)}${esc(x.nickname||x.name)}<small class="pl-mut">${esc(x.name&&x.nickname?x.name:'')}${x.discordId?'':' · ไม่มีดิส'}</small></div>`).join('')||'<div class="pl-mut" style="padding:6px">ไม่พบชื่อ (ดูเฉพาะคนในทีมหน้าที่นี้)</div>'}
+     ${pool.filter(x=>!q||String((x.nickname||'')+' '+(x.name||'')).toLowerCase().includes(q)).slice(0,60).map(x=>`<div class="op" onclick="NDP.pick('${k}',${j},'${esc(x.id)}')">${av(x.nickname||x.name)}${esc(x.nickname||x.name)}<small class="pl-mut">${esc(x.name&&x.nickname?x.name:'')}${x.discordId?'':' · ไม่มีดิส'}</small>${safe(()=>staffDemoChip(x,10),'')}</div>`).join('')||'<div class="pl-mut" style="padding:6px">ไม่พบชื่อ (ดูเฉพาะคนในทีมหน้าที่นี้)</div>'}
      ${s.n?`<div class="op" style="color:var(--red)" onclick="NDP.pick('${k}',${j},'')">✕ เอาชื่อออก (เก็บช่องไว้)</div>`:''}</div>`:''}</div>`; }
 
 function bodyHTML(k){ syncSame(); const r=S.roles[k], hr=hoursOf(r), st=STD();
@@ -581,36 +581,40 @@ function queueRole(o){ // คนนี้ควรอยู่หัวข้อ
   const s=staff(o.id), cs=(s&&(s.categories&&s.categories.length?s.categories:[s.category]))||[];
   return ORDER.find(k=>cs.includes(R[k][3])&&o.cats.some(c=>catGroup(R[k][3]).has(c)))
       || ORDER.find(k=>o.cats.includes(R[k][3])) || ORDER.find(k=>o.cats.some(c=>catGroup(R[k][3]).has(c))) || roleOfStaff(s); }
-// คนนี้ขึ้นในหน้าที่ k ไหม: ต้องตอบจากห้องของหน้าที่นั้น + (ถ้ามีหน้าที่ในทะเบียน) ต้องเป็นทีมนั้นจริง
-//   เช่น เนเน่ (QC + พากย์) ตอบห้องรวม → ขึ้นที่ QC กับพากย์ ไม่ขึ้นที่เกลาบท
-function roleShows(o,k){ const grp=catGroup(R[k][3]); if(!o.cats.some(c=>grp.has(c))) return false;
-  const s=staff(o.id), cs=((s&&(s.categories&&s.categories.length?s.categories:[s.category]))||[]).filter(Boolean);
-  return cs.length?cs.includes(R[k][3]):true; }
+// คนนี้ขึ้นในหน้าที่ k ไหม = ต้องมีหน้าที่นั้นติ๊กไว้ในทะเบียนทีม (หลังบ้าน) เท่านั้น — ไม่ดูห้อง Discord ที่ตอบ (เจ้าของ 21 ต.ค. 2569)
+const catsOfStaff=s=>((s&&(s.categories&&s.categories.length?s.categories:[s.category]))||[]).filter(Boolean);
+function roleShows(o,k){ return catsOfStaff(staff(o.id)).includes(R[k][3]); }
+let pkMode='free';   // free = แจ้งสะดวก · all = ทุกคนที่ตอบ · team = ทุกคนในทีม (รวมคนที่ไม่ได้ลงคิว)
 function queueHTML(){
-  const q=queue(), qq=pkQ.trim().toLowerCase(), hit=n=>String(n||'').toLowerCase().includes(qq), ALL=pkRole==='all';
-  const ok=o=>(qq||pkAll||o.free)&&(!qq||hit(o.n));
+  const q=queue(), qq=pkQ.trim().toLowerCase(), hit=n=>String(n||'').toLowerCase().includes(qq), ALL=pkRole==='all', TEAM=pkMode==='team';
+  const ok=o=>(qq||pkMode!=='free'||o.free)&&(!qq||hit(o.n));
   const rows=[];   // {o, k}
-  if(ALL){ q.ppl.filter(ok).forEach(o=>{ ORDER.forEach(k=>{ if(roleShows(o,k)) rows.push({o,k}); }); }); }
-  else { q.ppl.filter(o=>ok(o)&&roleShows(o,pkRole)).forEach(o=>rows.push({o,k:pkRole})); }
-  // 🔍 ค้นชื่อ = ค้นทุกคนในทีมด้วย (ใส่คนที่ไม่ได้มาลงคิวได้)
-  if(qq){ const seen=new Set(rows.map(x=>x.o.id)), uniq=new Set(), extra=[];
+  const keys=ALL?ORDER:[pkRole];
+  if(TEAM){ const byId={}; q.ppl.forEach(o=>{ byId[o.id]=o; });
+    keys.forEach(k=>teamOf(k).forEach(st=>{ const n=st.nickname||st.name; if(qq&&!(hit(st.nickname)||hit(st.name))) return;
+      rows.push({o:byId[st.id]||{n, id:st.id, noQ:true}, k}); })); }
+  else keys.forEach(k=>q.ppl.filter(o=>ok(o)&&roleShows(o,k)).forEach(o=>rows.push({o,k})));
+  // 🔍 ค้นชื่อ = ค้นทุกคนในทีมด้วย (ใส่คนที่ไม่ได้มาลงคิวได้ เช่น ติดต่อส่วนตัวด่วน)
+  if(qq && !TEAM){ const seen=new Set(rows.map(x=>x.o.id)), uniq=new Set(), extra=[];
     (safe(()=>getAllStaff(),[])||[]).forEach(s=>{ if(!s||!s.id||uniq.has(s.id)||seen.has(s.id)) return; uniq.add(s.id);
       if(!safe(()=>isStaffAssignable(s),true)||safe(()=>_isAdminStaff(s.id),false)) return;
       if(!(hit(s.nickname)||hit(s.name))) return;
-      const home=roleOfStaff(s), k=ALL?home:pkRole; if(!k) return;
-      extra.push({o:{n:s.nickname||s.name, id:s.id, noQ:true, other:!ALL&&home!==pkRole}, k}); });
-    extra.sort((a,b)=>(a.o.other-b.o.other)||String(a.o.n).localeCompare(String(b.o.n),'th')); rows.push(...extra.slice(0,40)); }
+      const mine=ORDER.filter(k=>catsOfStaff(s).includes(R[k][3]));
+      if(ALL) mine.forEach(k=>extra.push({o:{n:s.nickname||s.name, id:s.id, noQ:true}, k}));
+      else extra.push({o:{n:s.nickname||s.name, id:s.id, noQ:true, other:!mine.includes(pkRole)}, k:pkRole}); });
+    extra.sort((a,b)=>(a.o.other-b.o.other)||String(a.o.n).localeCompare(String(b.o.n),'th')); rows.push(...extra.slice(0,60)); }
   const row=({o,k})=>{ const r=S.roles[k], inn=r&&r.slots.some(s=>s.id===o.id);
-    return `<div class="pl-pk ${inn?'in':''}" title="กดเพื่อใส่ในหน้าที่ ${R[k][0]}" onclick="NDP.fromQ('${esc(o.id)}','${k}')">${av(o.n)}<div><b>${esc(o.n)}</b>${o.msg?`<div class="msg">“${esc(String(o.msg).slice(0,60))}”</div>`:''}</div><span class="pl-tag ${inn?'t-y':o.noQ?'t-p':o.free?'t-y':'t-n'}">${inn?'✓ ใส่แล้ว':o.noQ?(o.other?'ทีมอื่น · ไม่ได้ลงคิว':'ไม่ได้ลงคิว'):o.free?'ว่าง':'ไม่ว่าง'}</span></div>`; };
+    return `<div class="pl-pk ${inn?'in':''}" title="กดเพื่อใส่ในหน้าที่ ${R[k][0]}" onclick="NDP.fromQ('${esc(o.id)}','${k}')">${av(o.n)}<div><b>${esc(o.n)}</b> ${safe(()=>staffDemoChip(staff(o.id),10),'')}${o.msg?`<div class="msg">“${esc(String(o.msg).slice(0,60))}”</div>`:''}</div><span class="pl-tag ${inn?'t-y':o.noQ?'t-p':o.free?'t-y':'t-n'}">${inn?'✓ ใส่แล้ว':o.noQ?(o.other?'ทีมอื่น · ไม่ได้ลงคิว':'ไม่ได้ลงคิว'):o.free?'ว่าง':'ไม่ว่าง'}</span></div>`; };
   const body=ALL
     ? ORDER.map(k=>{ const rs=rows.filter(x=>x.k===k); if(!rs.length) return '';
         return `<div class="pl-qh" style="--c:${R[k][2]}" onclick="NDP.pk('${k}')" title="ดูเฉพาะทีมนี้">${R[k][1]} ${R[k][0]} <span>${rs.length}</span></div>${rs.map(row).join('')}`; }).join('')
     : rows.map(row).join('');
-  const empty=qq?'ไม่พบชื่อ "'+esc(pkQ)+'"':!q.rounds.length?'ยังไม่มีรอบลงคิวที่เปิดอยู่ — ค้นชื่อด้านบนเพื่อใส่คนได้':QP.busy&&!QP.at?'กำลังดึงคำตอบจาก Discord…':(ALL?'ยังไม่มีคนแจ้งสะดวก':'ยังไม่มีคนแจ้งสะดวกในทีมนี้')+' — ค้นชื่อด้านบนเพื่อใส่คนที่ไม่ได้ลงคิว';
-  const cnt=k=>q.ppl.filter(o=>(pkAll||o.free)&&roleShows(o,k)).length;
+  const empty=qq?'ไม่พบชื่อ "'+esc(pkQ)+'"':TEAM?'ยังไม่มีคนในทีมหน้าที่นี้':!q.rounds.length?'ยังไม่มีรอบลงคิวที่เปิดอยู่ — ค้นชื่อด้านบนเพื่อใส่คนได้':QP.busy&&!QP.at?'กำลังดึงคำตอบจาก Discord…':(ALL?'ยังไม่มีคนแจ้งสะดวก':'ยังไม่มีคนแจ้งสะดวกในทีมนี้')+' — ค้นชื่อด้านบนเพื่อใส่คนที่ไม่ได้ลงคิว';
+  const cnt=k=>TEAM?teamOf(k).length:q.ppl.filter(o=>(pkMode!=='free'||o.free)&&roleShows(o,k)).length;
+  const allCnt=TEAM?new Set(ORDER.flatMap(k=>teamOf(k).map(x=>x.id))).size:q.ppl.filter(o=>(pkMode!=='free'||o.free)&&ORDER.some(k=>roleShows(o,k))).length;
   return `<div class="pl-card"><div class="pl-ch" style="display:block"><h3>🙋 คนที่ลงคิว</h3>
-     <div style="display:flex;gap:6px;margin-top:8px"><select class="form-input form-select" style="padding:5px 8px" onchange="NDP.pk(this.value)"><option value="all"${ALL?' selected':''}>👥 ทุกทีม (${q.ppl.filter(o=>pkAll||o.free).length})</option>${ORDER.map(k=>`<option value="${k}"${k===pkRole?' selected':''}>${R[k][1]} ${R[k][0]} (${cnt(k)})</option>`).join('')}</select>
-       <select class="form-input form-select" style="padding:5px 8px;width:auto" onchange="NDP.pkAll(this.value==='all')"><option value="free">แจ้งสะดวก</option><option value="all"${pkAll?' selected':''}>ทุกคนที่ตอบ</option></select></div>
+     <div style="display:flex;gap:6px;margin-top:8px"><select class="form-input form-select" style="padding:5px 8px" onchange="NDP.pk(this.value)"><option value="all"${ALL?' selected':''}>👥 ทุกทีม (${allCnt})</option>${ORDER.map(k=>`<option value="${k}"${k===pkRole?' selected':''}>${R[k][1]} ${R[k][0]} (${cnt(k)})</option>`).join('')}</select>
+       <select class="form-input form-select" style="padding:5px 8px;width:auto" onchange="NDP.pkMode(this.value)"><option value="free">แจ้งสะดวก</option><option value="all"${pkMode==='all'?' selected':''}>ทุกคนที่ตอบ</option><option value="team"${pkMode==='team'?' selected':''}>ทุกคนในทีม</option></select></div>
      <input class="form-input" id="pl-pkq" style="padding:5px 9px;margin-top:6px" placeholder="🔍 ค้นชื่อ — ค้นได้ทุกคนในทีม (รวมคนที่ไม่ได้ลงคิว)" value="${esc(pkQ)}" oninput="NDP.pkQ(this.value)"></div>
     <div class="pl-cb" style="padding:6px 8px;max-height:420px;overflow:auto">${body||`<div class="pl-mut" style="padding:10px">${empty}</div>`}</div>
     <div class="pl-cb pl-mut" style="padding-top:0;font-size:11px">🗓️ ${q.rounds.length?'รอบลงคิว '+esc(roundLabel(q.rounds)||'ที่เปิดอยู่'):'ไม่มีรอบลงคิวที่เปิดอยู่'}${QP.busy?' · <span>กำลังดึงคำตอบใหม่…</span>':''}${QP.err?` · <span class="pl-warn" title="${esc(QP.err)}">ดึงคำตอบไม่สำเร็จ</span>`:''}</div></div>`; }
@@ -1132,7 +1136,7 @@ const NDP=window.NDP={
   dd(k,j){ dd=(dd&&dd.k===k&&dd.j===j)?null:{k,j}; ddQ=''; render(); }, ddq(v){ ddQ=v; render(); },
   pick(k,j,id){ const r=S.roles[k], s=r.slots[j]; if(id&&r.slots.some((x,i)=>i!==j&&x.id===id)){ say(nickOf(id)+' อยู่ในหน้าที่นี้แล้ว','warn'); return; }
     if(s.id!==id){ s.slot=undefined; s.paid=false; delete s.fix; delete s.cu; } s.id=id||undefined; s.n=id?nickOf(id):''; dd=null; rt(); },
-  pk(k){ pkRole=k; render(); }, pkAll(v){ pkAll=v; render(); }, pkQ(v){ pkQ=v; render(); },
+  pk(k){ pkRole=k; render(); }, pkAll(v){ pkMode=v?'all':'free'; render(); }, pkMode(v){ pkMode=v||'free'; render(); }, pkQ(v){ pkQ=v; render(); },
   fromQ(id,kk){ const k=kk||pkRole; if(k==='all') return; const r=S.roles[k], n=nickOf(id); if(r.slots.some(s=>s.id===id)) return; if(!r.on) NDP.tog(k);
     const e=r.slots.find(s=>!s.id); if(e){ e.n=n; e.id=id; } else r.slots.push(k==='adp'?{n,id,ep:'',min:0}:k==='dub'?{n,id,tier:r.tiers.length}:{n,id}); openA=ORDER.indexOf(k); rt(); },
   async save(){ await save(); },
