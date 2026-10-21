@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261021-07"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261021-08"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -5345,13 +5345,21 @@ function _dcUnmatchedHTML(r){
           <div style="font-size:12.5px;font-weight:700">${esc(m.displayName||m.username||'?')}</div>
           <div style="font-size:11px;color:${m.noContent?'var(--orange)':'var(--text2)'}">${m.noContent?'⚠️ บอทอ่านเนื้อความไม่ได้ — เปิดสิทธิ์ MESSAGE CONTENT INTENT แล้วดึงใหม่':esc(String(m.content||'').slice(0,90))}</div>
         </div>
+        <input id="dc-unq-${i}" placeholder="🔍 พิมพ์ชื่อ…" oninput="_dcUnFilter(${i},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('dc-un-btn-${i}').click();}" style="width:150px;padding:6px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px">
         <select id="dc-un-${i}" style="min-width:150px;padding:6px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px">
           <option value="">— เลือกคนในทีม —</option>
-          ${opts.map(s=>`<option value="${esc(s.id)}"${(m.options||[]).some(o=>o.id===s.id)?' selected':''}>${esc(s.nickname||s.name)}${s.name&&s.nickname?' · '+esc(s.name):''}</option>`).join('')}
+          ${opts.map(s=>`<option data-q="${esc(String((s.nickname||'')+' '+(s.name||'')+' '+(s.discordName||s.discordUsername||'')).toLowerCase())}" value="${esc(s.id)}"${(m.options||[]).some(o=>o.id===s.id)?' selected':''}>${esc(s.nickname||s.name)}${s.name&&s.nickname?' · '+esc(s.name):''}</option>`).join('')}
         </select>
-        <button class="btn btn-sm" onclick="linkDiscordUser(document.getElementById('dc-un-${i}').value,'${escJs(m.authorId)}','${escJs(m.displayName||m.username)}')">🔗 ผูก</button>
+        <button class="btn btn-sm" id="dc-un-btn-${i}" onclick="linkDiscordUser(document.getElementById('dc-un-${i}').value,'${escJs(m.authorId)}','${escJs(m.displayName||m.username)}')">🔗 ผูก</button>
       </div>`).join('')}
   </div>`;
+}
+// 🔍 ค้นชื่อในช่องผูกคน — ซ่อนตัวเลือกที่ไม่ตรง แล้วเลือกคนแรกที่ตรงให้เลย (กด Enter = ผูก)
+function _dcUnFilter(i,q){
+  const sel=document.getElementById('dc-un-'+i); if(!sel) return;
+  q=String(q||'').trim().toLowerCase(); let first=null, n=0;
+  [...sel.options].forEach(o=>{ if(!o.value) return; const ok=!q||(o.dataset.q||o.text.toLowerCase()).includes(q); o.hidden=!ok; o.disabled=!ok; if(ok){ n++; if(!first) first=o; } });
+  if(q){ sel.value=first?first.value:''; sel.options[0].text=first?'— พบ '+n+' คน —':'— ไม่พบชื่อ —'; } else sel.options[0].text='— เลือกคนในทีม —';
 }
 // ช่วงวันของรอบ → รายการวันจริง (ไม่เกิน 45 วัน กันหลุด)
 function _roundDays(r){
@@ -32739,7 +32747,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261021-07"></script><script src="scene/nd-profile.js?v=20261021-07"></script><script src="scene/nd-plan.js?v=20261021-07"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261021-08"></script><script src="scene/nd-profile.js?v=20261021-08"></script><script src="scene/nd-plan.js?v=20261021-08"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32749,7 +32757,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261021-07';
+var UPD_BUILD = '20261021-08';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;

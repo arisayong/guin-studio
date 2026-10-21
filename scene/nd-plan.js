@@ -516,8 +516,8 @@ function infoHTML(){ const adm=isAdm(), ms=mgrStaff(S.mgrId);
 function nameBtn(k,j){ const r=S.roles[k], s=r.slots[j], open=dd&&dd.k===k&&dd.j===j;
   const pool=teamOf(k), q=ddQ.trim().toLowerCase(), BZd=open?busyMap():{};
   return `<div class="pl-nb" onclick="event.stopPropagation();NDP.dd('${k}',${j})">${av(s.n)}<div style="min-width:0">${s.n?`<b>${esc(s.n)}</b>${s.paid?' <span class="pl-paid">✓ จ่ายแล้ว</span>':''}`:'<span class="pl-mut">กดเพื่อเลือกคน…</span>'}</div>
-   ${open?`<div class="pl-dd" onclick="event.stopPropagation()"><input class="form-input" id="pl-ddq" style="padding:4px 8px;margin-bottom:5px" placeholder="🔍 พิมพ์ชื่อ…" value="${esc(ddQ)}" oninput="NDP.ddq(this.value)">
-     ${pool.filter(x=>!q||String((x.nickname||'')+' '+(x.name||'')).toLowerCase().includes(q)).slice(0,60).map(x=>`<div class="op" onclick="NDP.pick('${k}',${j},'${esc(x.id)}')">${av(x.nickname||x.name)}${esc(x.nickname||x.name)}<small class="pl-mut">${esc(x.name&&x.nickname?x.name:'')}${x.discordId?'':' · ไม่มีดิส'}</small>${safe(()=>staffDemoChip(x,10),'')}${(BZd[x.id]||[]).length?`<small style="color:var(--orange);margin-left:4px" title="${esc(BZd[x.id].map(y=>y.code+' · '+R[y.c][0]+' · ส่ง '+dmy(y.dl)).join('\n'))}">⏳ ติด ${BZd[x.id].length} งาน</small>`:''}</div>`).join('')||'<div class="pl-mut" style="padding:6px">ไม่พบชื่อ (ดูเฉพาะคนในทีมหน้าที่นี้)</div>'}
+   ${open?`<div class="pl-dd" onclick="event.stopPropagation()"><input class="form-input" id="pl-ddq" style="padding:4px 8px;margin-bottom:5px" placeholder="🔍 พิมพ์ชื่อ…" value="${esc(ddQ)}" oninput="NDP.ddq(this.value)"><div id="pl-ddlist">
+     ${pool.filter(x=>!q||String((x.nickname||'')+' '+(x.name||'')).toLowerCase().includes(q)).slice(0,60).map(x=>`<div class="op" onclick="NDP.pick('${k}',${j},'${esc(x.id)}')">${av(x.nickname||x.name)}${esc(x.nickname||x.name)}<small class="pl-mut">${esc(x.name&&x.nickname?x.name:'')}${x.discordId?'':' · ไม่มีดิส'}</small>${safe(()=>staffDemoChip(x,10),'')}${(BZd[x.id]||[]).length?`<small style="color:var(--orange);margin-left:4px" title="${esc(BZd[x.id].map(y=>y.code+' · '+R[y.c][0]+' · ส่ง '+dmy(y.dl)).join('\n'))}">⏳ ติด ${BZd[x.id].length} งาน</small>`:''}</div>`).join('')||'<div class="pl-mut" style="padding:6px">ไม่พบชื่อ (ดูเฉพาะคนในทีมหน้าที่นี้)</div>'}</div>
      ${s.n?`<div class="op" style="color:var(--red)" onclick="NDP.pick('${k}',${j},'')">✕ เอาชื่อออก (เก็บช่องไว้)</div>`:''}</div>`:''}</div>`; }
 
 function bodyHTML(k){ syncSame(); const r=S.roles[k], hr=hoursOf(r), st=STD();
@@ -593,7 +593,9 @@ function queueRole(o){ // คนนี้ควรอยู่หัวข้อ
 const catsOfStaff=s=>((s&&(s.categories&&s.categories.length?s.categories:[s.category]))||[]).filter(Boolean);
 function roleShows(o,k){ return catsOfStaff(staff(o.id)).includes(R[k][3]); }
 // ⏳ ใครติดงานอื่นอยู่ — งานที่ยังไม่ปิด + หน้าที่นั้นยังไม่ "เสร็จ" (เดดไลน์เลยมาเกิน 7 วันถือว่าค้างลืมปิด ไม่นับ)
-function busyMap(){ const m={}, today=new Date().toISOString().slice(0,10), old=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+let _bzC=null;
+function busyMap(){ const ps=safe(()=>getProjects(),[])||[]; if(_bzC&&_bzC.ps===ps&&_bzC.id===S.id&&Date.now()-_bzC.at<5000) return _bzC.m; const m=_busyMap(); _bzC={ps,id:S.id,at:Date.now(),m}; return m; }
+function _busyMap(){ const m={}, today=new Date().toISOString().slice(0,10), old=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
   (safe(()=>getProjects(),[])||[]).forEach(p=>{ if(!p||p.id===S.id||['done','cancelled','paid'].includes(p.projStatus)) return;
     (p.workers||[]).forEach(w=>{ if(!w||!w.id) return; const c=safe(()=>preOf(w),''); if(!R[c]) return;
       const ph=(p.phases||{})[R[c][3]]||{}; if(ph.status==='done') return;
@@ -607,7 +609,10 @@ function busyChip(L,k){ if(!L||!L.length) return ''; const r=S.roles[k]||{}, a=r
   const clash=x=>!!(a&&b&&x.dl&&x.dl>=a&&(x.st||x.dl)<=b);
   const n=L.filter(clash).length, tip=L.map(x=>`${x.code} · ${R[x.c][0]} · ส่ง ${dmy(x.dl)}${x.late?' (เลยกำหนด)':''}${clash(x)?' ⚠️ ชนช่วงนี้':''}`).join('\n');
   return `<div class="pl-busy ${n?'hot':''}" title="${esc(tip)}">${n?'⚠️ ชน '+n+' งาน':'⏳ ติด '+L.length+' งาน'} · ${L.slice(0,3).map(x=>esc(x.code)+' '+R[x.c][1]+' '+dmy(x.dl)).join(' · ')}${L.length>3?' · +'+(L.length-3):''}</div>`; }
-let pkMode='free';   // free = แจ้งสะดวก · all = ทุกคนที่ตอบ · team = ทุกคนในทีม (รวมคนที่ไม่ได้ลงคิว)
+let pkMode='free', pkQT=null;
+// ค้นชื่อ: อัปเดตเฉพาะรายชื่อในกล่อง (ไม่วาดทั้งหน้าใหม่ทุกตัวอักษร = ไม่หน่วง ช่องพิมพ์ไม่หลุดโฟกัส)
+function pkQuick(){ const box=$('pl-pkbody'); if(!box||!S){ render(); return; }
+  const t=document.createElement('div'); t.innerHTML=queueHTML(); const nb=t.querySelector('#pl-pkbody'); if(nb){ box.innerHTML=nb.innerHTML; box.scrollTop=0; } else render(); }   // free = แจ้งสะดวก · all = ทุกคนที่ตอบ · team = ทุกคนในทีม (รวมคนที่ไม่ได้ลงคิว)
 function queueHTML(){
   const q=queue(), qq=pkQ.trim().toLowerCase(), hit=n=>String(n||'').toLowerCase().includes(qq), ALL=pkRole==='all', TEAM=pkMode==='team';
   const ok=o=>(qq||pkMode!=='free'||o.free)&&(!qq||hit(o.n));
@@ -640,7 +645,7 @@ function queueHTML(){
      <div style="display:flex;gap:6px;margin-top:8px"><select class="form-input form-select" style="padding:5px 8px" onchange="NDP.pk(this.value)"><option value="all"${ALL?' selected':''}>👥 ทุกทีม (${allCnt})</option>${ORDER.map(k=>`<option value="${k}"${k===pkRole?' selected':''}>${R[k][1]} ${R[k][0]} (${cnt(k)})</option>`).join('')}</select>
        <select class="form-input form-select" style="padding:5px 8px;width:auto" onchange="NDP.pkMode(this.value)"><option value="free">แจ้งสะดวก</option><option value="all"${pkMode==='all'?' selected':''}>ทุกคนที่ตอบ</option><option value="team"${pkMode==='team'?' selected':''}>ทุกคนในทีม</option></select></div>
      <input class="form-input" id="pl-pkq" style="padding:5px 9px;margin-top:6px" placeholder="🔍 ค้นชื่อ — ค้นได้ทุกคนในทีม (รวมคนที่ไม่ได้ลงคิว)" value="${esc(pkQ)}" oninput="NDP.pkQ(this.value)"></div>
-    <div class="pl-cb" style="padding:6px 8px;max-height:420px;overflow:auto">${body||`<div class="pl-mut" style="padding:10px">${empty}</div>`}</div>
+    <div class="pl-cb" id="pl-pkbody" style="padding:6px 8px;max-height:420px;overflow:auto">${body||`<div class="pl-mut" style="padding:10px">${empty}</div>`}</div>
     <div class="pl-cb pl-mut" style="padding-top:0;font-size:11px">🗓️ ${q.rounds.length?'รอบลงคิว '+esc(roundLabel(q.rounds)||'ที่เปิดอยู่'):'ไม่มีรอบลงคิวที่เปิดอยู่'}${QP.busy?' · <span>กำลังดึงคำตอบใหม่…</span>':''}${QP.err?` · <span class="pl-warn" title="${esc(QP.err)}">ดึงคำตอบไม่สำเร็จ</span>`:''}</div></div>`; }
 
 /* ── 📂 โฟลเดอร์งาน (Google Drive) ── */
@@ -1157,10 +1162,10 @@ const NDP=window.NDP={
   cnt(k,d){ const r=S.roles[k]; if(d>0) r.slots.push(k==='adp'?{n:'',ep:'',min:0}:k==='dub'?{n:'',tier:r.tiers.length}:{n:''});
     else if(r.slots.length>1){ const i=r.slots.map(s=>!s.id).lastIndexOf(true); if(i<0 && !confirm('ทุกช่องมีคนแล้ว — เอาคนสุดท้ายออก?')) return; r.slots.splice(i>=0?i:r.slots.length-1,1); } rt(); },
   rm(k,j){ const r=S.roles[k], s=r.slots[j]; if(s.paid && !confirm(s.n+' จ่ายเงินแล้วในงานนี้ — เอาออก?')) return; r.slots.splice(j,1); if(!r.slots.length) r.slots.push(k==='adp'?{n:'',ep:'',min:0}:k==='dub'?{n:'',tier:1}:{n:''}); rt(); },
-  dd(k,j){ dd=(dd&&dd.k===k&&dd.j===j)?null:{k,j}; ddQ=''; render(); }, ddq(v){ ddQ=v; render(); },
+  dd(k,j){ dd=(dd&&dd.k===k&&dd.j===j)?null:{k,j}; ddQ=''; render(); }, ddq(v){ ddQ=v; clearTimeout(pkQT); pkQT=setTimeout(()=>{ const box=$('pl-ddlist'); if(!box||!dd){ render(); return; } const t=document.createElement('div'); t.innerHTML=nameBtn(dd.k,dd.j); const nb=t.querySelector('#pl-ddlist'); if(nb) box.innerHTML=nb.innerHTML; else render(); },100); },
   pick(k,j,id){ const r=S.roles[k], s=r.slots[j]; if(id&&r.slots.some((x,i)=>i!==j&&x.id===id)){ say(nickOf(id)+' อยู่ในหน้าที่นี้แล้ว','warn'); return; }
     if(s.id!==id){ s.slot=undefined; s.paid=false; delete s.fix; delete s.cu; } s.id=id||undefined; s.n=id?nickOf(id):''; dd=null; rt(); },
-  pk(k){ pkRole=k; render(); }, pkAll(v){ pkMode=v?'all':'free'; render(); }, pkMode(v){ pkMode=v||'free'; render(); }, pkQ(v){ pkQ=v; render(); },
+  pk(k){ pkRole=k; render(); }, pkAll(v){ pkMode=v?'all':'free'; render(); }, pkMode(v){ pkMode=v||'free'; render(); }, pkQ(v){ pkQ=v; clearTimeout(pkQT); pkQT=setTimeout(pkQuick,120); },
   fromQ(id,kk){ const k=kk||pkRole; if(k==='all') return; const r=S.roles[k], n=nickOf(id); if(r.slots.some(s=>s.id===id)) return; if(!r.on) NDP.tog(k);
     const e=r.slots.find(s=>!s.id); if(e){ e.n=n; e.id=id; } else r.slots.push(k==='adp'?{n,id,ep:'',min:0}:k==='dub'?{n,id,tier:r.tiers.length}:{n,id}); openA=ORDER.indexOf(k); rt(); },
   async save(){ await save(); },
