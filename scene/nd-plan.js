@@ -160,6 +160,8 @@ const CSS=`
 .pl-pk b{font-weight:600;font-size:13px}
 .pl-qh{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--c);padding:8px 5px 3px;border-bottom:1px solid color-mix(in srgb,var(--c) 35%,transparent);margin-bottom:2px;cursor:pointer;position:sticky;top:-6px;background:var(--card);z-index:1}
 .pl-qh span{font-size:10.5px;color:var(--text2);font-weight:600}
+.pl-busy{font-size:10.5px;margin-top:2px;color:var(--orange);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%} .pl-busy.hot{color:var(--red);font-weight:600}
+.pl-pk>div{min-width:0}
 .pl-pk .msg{font-size:11px;color:var(--text2);font-style:italic}
 .pl-tag{font-size:10.5px;border-radius:8px;padding:2px 7px;font-weight:600;white-space:nowrap}
 .t-y{background:rgba(0,223,160,.15);color:var(--green)} .t-n{background:rgba(255,64,64,.15);color:var(--red)} .t-p{background:rgba(255,158,0,.15);color:var(--orange)}
@@ -506,10 +508,10 @@ function infoHTML(){ const adm=isAdm(), ms=mgrStaff(S.mgrId);
 
 /* ── หน้าที่ · คน · ราคา · เวลา ── */
 function nameBtn(k,j){ const r=S.roles[k], s=r.slots[j], open=dd&&dd.k===k&&dd.j===j;
-  const pool=teamOf(k), q=ddQ.trim().toLowerCase();
+  const pool=teamOf(k), q=ddQ.trim().toLowerCase(), BZd=open?busyMap():{};
   return `<div class="pl-nb" onclick="event.stopPropagation();NDP.dd('${k}',${j})">${av(s.n)}<div style="min-width:0">${s.n?`<b>${esc(s.n)}</b>${s.paid?' <span class="pl-paid">✓ จ่ายแล้ว</span>':''}`:'<span class="pl-mut">กดเพื่อเลือกคน…</span>'}</div>
    ${open?`<div class="pl-dd" onclick="event.stopPropagation()"><input class="form-input" id="pl-ddq" style="padding:4px 8px;margin-bottom:5px" placeholder="🔍 พิมพ์ชื่อ…" value="${esc(ddQ)}" oninput="NDP.ddq(this.value)">
-     ${pool.filter(x=>!q||String((x.nickname||'')+' '+(x.name||'')).toLowerCase().includes(q)).slice(0,60).map(x=>`<div class="op" onclick="NDP.pick('${k}',${j},'${esc(x.id)}')">${av(x.nickname||x.name)}${esc(x.nickname||x.name)}<small class="pl-mut">${esc(x.name&&x.nickname?x.name:'')}${x.discordId?'':' · ไม่มีดิส'}</small>${safe(()=>staffDemoChip(x,10),'')}</div>`).join('')||'<div class="pl-mut" style="padding:6px">ไม่พบชื่อ (ดูเฉพาะคนในทีมหน้าที่นี้)</div>'}
+     ${pool.filter(x=>!q||String((x.nickname||'')+' '+(x.name||'')).toLowerCase().includes(q)).slice(0,60).map(x=>`<div class="op" onclick="NDP.pick('${k}',${j},'${esc(x.id)}')">${av(x.nickname||x.name)}${esc(x.nickname||x.name)}<small class="pl-mut">${esc(x.name&&x.nickname?x.name:'')}${x.discordId?'':' · ไม่มีดิส'}</small>${safe(()=>staffDemoChip(x,10),'')}${(BZd[x.id]||[]).length?`<small style="color:var(--orange);margin-left:4px" title="${esc(BZd[x.id].map(y=>y.code+' · '+R[y.c][0]+' · ส่ง '+dmy(y.dl)).join('\n'))}">⏳ ติด ${BZd[x.id].length} งาน</small>`:''}</div>`).join('')||'<div class="pl-mut" style="padding:6px">ไม่พบชื่อ (ดูเฉพาะคนในทีมหน้าที่นี้)</div>'}
      ${s.n?`<div class="op" style="color:var(--red)" onclick="NDP.pick('${k}',${j},'')">✕ เอาชื่อออก (เก็บช่องไว้)</div>`:''}</div>`:''}</div>`; }
 
 function bodyHTML(k){ syncSame(); const r=S.roles[k], hr=hoursOf(r), st=STD();
@@ -584,6 +586,21 @@ function queueRole(o){ // คนนี้ควรอยู่หัวข้อ
 // คนนี้ขึ้นในหน้าที่ k ไหม = ต้องมีหน้าที่นั้นติ๊กไว้ในทะเบียนทีม (หลังบ้าน) เท่านั้น — ไม่ดูห้อง Discord ที่ตอบ (เจ้าของ 21 ต.ค. 2569)
 const catsOfStaff=s=>((s&&(s.categories&&s.categories.length?s.categories:[s.category]))||[]).filter(Boolean);
 function roleShows(o,k){ return catsOfStaff(staff(o.id)).includes(R[k][3]); }
+// ⏳ ใครติดงานอื่นอยู่ — งานที่ยังไม่ปิด + หน้าที่นั้นยังไม่ "เสร็จ" (เดดไลน์เลยมาเกิน 7 วันถือว่าค้างลืมปิด ไม่นับ)
+function busyMap(){ const m={}, today=new Date().toISOString().slice(0,10), old=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+  (safe(()=>getProjects(),[])||[]).forEach(p=>{ if(!p||p.id===S.id||['done','cancelled','paid'].includes(p.projStatus)) return;
+    (p.workers||[]).forEach(w=>{ if(!w||!w.id) return; const c=safe(()=>preOf(w),''); if(!R[c]) return;
+      const ph=(p.phases||{})[R[c][3]]||{}; if(ph.status==='done') return;
+      const dl=dOnly(ph.deadline||p.deadline||''); if(dl&&dl<old) return;
+      const L=m[w.id]=m[w.id]||[]; if(L.some(x=>x.p===p.id&&x.c===c)) return;
+      L.push({p:p.id, c, code:safe(()=>projCode(p),'')||p.name||'', name:p.name||'', st:dOnly(ph.startDate||''), dl, late:!!(dl&&dl<today)}); }); });
+  Object.values(m).forEach(L=>L.sort((a,b)=>String(a.dl||'9').localeCompare(String(b.dl||'9')))); return m; }
+const dmy=d=>d?d.slice(8,10)+'/'+d.slice(5,7):'—';
+function busyChip(L,k){ if(!L||!L.length) return ''; const r=S.roles[k]||{}, a=r.start||S.start||'', b=r.end||S.deadline||'';   // หน้าที่ยังไม่ตั้งวัน → ใช้ช่วงของทั้งงาน
+  // ชน = ช่วงงานอื่นคาบเกี่ยวช่วงของหน้าที่นี้ในงานนี้ (ถ้ามีวันครบ)
+  const clash=x=>!!(a&&b&&x.dl&&x.dl>=a&&(x.st||x.dl)<=b);
+  const n=L.filter(clash).length, tip=L.map(x=>`${x.code} · ${R[x.c][0]} · ส่ง ${dmy(x.dl)}${x.late?' (เลยกำหนด)':''}${clash(x)?' ⚠️ ชนช่วงนี้':''}`).join('\n');
+  return `<div class="pl-busy ${n?'hot':''}" title="${esc(tip)}">${n?'⚠️ ชน '+n+' งาน':'⏳ ติด '+L.length+' งาน'} · ${L.slice(0,3).map(x=>esc(x.code)+' '+R[x.c][1]+' '+dmy(x.dl)).join(' · ')}${L.length>3?' · +'+(L.length-3):''}</div>`; }
 let pkMode='free';   // free = แจ้งสะดวก · all = ทุกคนที่ตอบ · team = ทุกคนในทีม (รวมคนที่ไม่ได้ลงคิว)
 function queueHTML(){
   const q=queue(), qq=pkQ.trim().toLowerCase(), hit=n=>String(n||'').toLowerCase().includes(qq), ALL=pkRole==='all', TEAM=pkMode==='team';
@@ -603,8 +620,9 @@ function queueHTML(){
       if(ALL) mine.forEach(k=>extra.push({o:{n:s.nickname||s.name, id:s.id, noQ:true}, k}));
       else extra.push({o:{n:s.nickname||s.name, id:s.id, noQ:true, other:!mine.includes(pkRole)}, k:pkRole}); });
     extra.sort((a,b)=>(a.o.other-b.o.other)||String(a.o.n).localeCompare(String(b.o.n),'th')); rows.push(...extra.slice(0,60)); }
+  const BZ=busyMap();
   const row=({o,k})=>{ const r=S.roles[k], inn=r&&r.slots.some(s=>s.id===o.id);
-    return `<div class="pl-pk ${inn?'in':''}" title="กดเพื่อใส่ในหน้าที่ ${R[k][0]}" onclick="NDP.fromQ('${esc(o.id)}','${k}')">${av(o.n)}<div><b>${esc(o.n)}</b> ${safe(()=>staffDemoChip(staff(o.id),10),'')}${o.msg?`<div class="msg">“${esc(String(o.msg).slice(0,60))}”</div>`:''}</div><span class="pl-tag ${inn?'t-y':o.noQ?'t-p':o.free?'t-y':'t-n'}">${inn?'✓ ใส่แล้ว':o.noQ?(o.other?'ทีมอื่น · ไม่ได้ลงคิว':'ไม่ได้ลงคิว'):o.free?'ว่าง':'ไม่ว่าง'}</span></div>`; };
+    return `<div class="pl-pk ${inn?'in':''}" title="กดเพื่อใส่ในหน้าที่ ${R[k][0]}" onclick="NDP.fromQ('${esc(o.id)}','${k}')">${av(o.n)}<div><b>${esc(o.n)}</b> ${safe(()=>staffDemoChip(staff(o.id),10),'')}${o.msg?`<div class="msg">“${esc(String(o.msg).slice(0,60))}”</div>`:''}${busyChip(BZ[o.id],k)}</div><span class="pl-tag ${inn?'t-y':o.noQ?'t-p':o.free?'t-y':'t-n'}">${inn?'✓ ใส่แล้ว':o.noQ?(o.other?'ทีมอื่น · ไม่ได้ลงคิว':'ไม่ได้ลงคิว'):o.free?'ว่าง':'ไม่ว่าง'}</span></div>`; };
   const body=ALL
     ? ORDER.map(k=>{ const rs=rows.filter(x=>x.k===k); if(!rs.length) return '';
         return `<div class="pl-qh" style="--c:${R[k][2]}" onclick="NDP.pk('${k}')" title="ดูเฉพาะทีมนี้">${R[k][1]} ${R[k][0]} <span>${rs.length}</span></div>${rs.map(row).join('')}`; }).join('')

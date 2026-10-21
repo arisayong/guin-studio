@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261021-05"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261021-06"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -3328,6 +3328,8 @@ let redoStack = [];
 // ── Multi-admin collaboration state ──
 let _editingBaseVersion = null;   // updatedAt ของโปรเจกต์ตอนเปิด modal (สำหรับ conflict check)
 let _editingBaseSnapshot = null;  // snapshot ของโปรเจกต์ตอนเปิด (สำหรับ merge)
+let _pjFormBase = null;           // ส่วนของฟอร์ม (คน/เดดไลน์/เรทพากย์/งวดรับเงิน) ตอนเปิด — ส่วนที่ไม่ได้แตะ จะไม่เขียนทับของล่าสุด
+function _pjFormSections(){ try{ return { workers:JSON.stringify(formSlots), phases:JSON.stringify(formPhases), dubTiers:JSON.stringify(formDubTiers), income:JSON.stringify(formIncome) }; }catch(e){ return null; } }
 let _presenceHeartbeat = null;    // interval id สำหรับ heartbeat
 let _presenceProjId = null;       // project id ที่เรากำลัง claim presence อยู่
 let _presenceAction = null;       // 'viewing' | 'editing'
@@ -15538,6 +15540,7 @@ async function openNewProject(){
   editingProjId=null;
   _editingBaseVersion = null;
   _editingBaseSnapshot = null;
+  _pjFormBase = null;
   window._formDirty = false;
   initFormSlots();
   initFormPhases();
@@ -16523,7 +16526,8 @@ async function saveProject(){
     if(existing)proj.workers=proj.workers.map(w=>{
       const ex=(existing.workers||[]).find(x=>x.id===w.id&&x.slot===w.slot);
       if(!ex) return w;
-      const merged={...w, status:ex.status, voucherNo:ex.voucherNo, paidAt:ex.paidAt};
+      const merged={...ex, ...w, status:ex.status, voucherNo:ex.voucherNo, paidAt:ex.paidAt, note:ex.note||w.note||''};
+      ['minWorked','ep','tier'].forEach(f=>{ if(!(f in w)) delete merged[f]; });   // ลบในฟอร์ม = ลบจริง
       // 🔑 คงสถานะยืนยันยอด (confirm) ของคนที่ "ยอดไม่เปลี่ยน" — รีเซ็ตเฉพาะคนที่ยอดเปลี่ยน (ต้องส่งใบใหม่)
       //    กันบั๊ก: แก้คนเดียวแล้วใบยืนยันทั้งโปรเจกต์ถูกล้าง
       const amtChanged = (ex.amount||0) !== (w.amount||0);
@@ -16567,10 +16571,15 @@ async function saveProject(){
     });
   }
   // ─ บันทึกผ่าน saveProjectSafe (transaction + version check) ─
-  let result = await saveProjectSafe(proj, { baseVersion: _editingBaseVersion });
+  const _m3 = {};
+  if(editingProjId && _editingBaseSnapshot){
+    const now=_pjFormSections()||{}, b=_pjFormBase||{};
+    _m3.base=_editingBaseSnapshot; _m3.untouched=Object.keys(now).filter(k=>b[k]!=null && b[k]===now[k]);
+  }
+  let result = await saveProjectSafe(proj, Object.assign({ baseVersion: _editingBaseVersion }, _m3));
   // 👤 คนที่บันทึกล่าสุดคือตัวเราเอง (เช่น เพิ่งบันทึกจากหน้าวางแผนงาน) → บันทึกผ่านเลย ไม่ต้องถาม
   if(result.conflict && result.remote && (result.remote._lastSavedByEmail||'') && result.remote._lastSavedByEmail===((_meForPresence()||{}).email||'~')){
-    result = await saveProjectSafe(proj, { forceOverride: true });
+    result = await saveProjectSafe(proj, Object.assign({ forceOverride: true }, _m3));
   }
   if(result.conflict){
     // มีแอดมินอื่นบันทึกหลังจากเราโหลด — ให้เลือก
@@ -16593,7 +16602,7 @@ async function saveProject(){
     }
     if(choice === 'override'){
       // บันทึกทับ
-      const r2 = await saveProjectSafe(proj, { forceOverride: true });
+      const r2 = await saveProjectSafe(proj, Object.assign({ forceOverride: true }, _m3));
       if(!r2.ok){
         toast('บันทึกไม่สำเร็จ: '+(r2.error?.message||''),'error');
         return;
@@ -16608,6 +16617,7 @@ async function saveProject(){
   clearDraft(editingProjId);
   _editingBaseVersion = null;
   _editingBaseSnapshot = null;
+  _pjFormBase = null;
   window._formDirty = false;
   // Bridge phases → trkCard เพื่อให้หน้า Track/Calendar เดิมเห็นข้อมูลตรงกัน
   try{ syncPhasesToTrkCard(proj.id, proj.phases); }catch(e){}
@@ -17067,6 +17077,7 @@ async function openEditProject(id){
   { const _mf=document.getElementById('pj-manager-fee'); if(_mf){ _mf.disabled=_isMgr; _mf.title=_isMgr?'แก้ได้เฉพาะแอดมิน':''; } }
   { const _aw=document.getElementById('pj-advance-wrap'); if(_aw) _aw.style.display=_isMgr?'none':''; }
   openModal('modal-project');
+  _pjFormBase = _pjFormSections();
   // ─ Claim presence + auto-draft ─
   claimPresence(id, 'editing');
   // ตรวจว่ามี draft ค้างไว้ไหม (กรณี refresh กลางคัน)
@@ -27978,6 +27989,36 @@ async function saveProjectSafe(proj, options){
     _lastSavedBy: me ? me.nickname : 'admin',
     _lastSavedByEmail: me ? me.email : ''
   });
+  if(options.base && _fbDatabase){
+    const SKIP={updatedAt:1,_lastSavedBy:1,_lastSavedByEmail:1}, un=new Set(options.untouched||[]), base=options.base;
+    let conflictData=null, conflictKeys=[];
+    try{
+      const res = await _fbDatabase.ref('projects/'+withDate.id).transaction(current=>{
+        if(!current) return withDate;
+        const out=Object.assign({}, current); conflictKeys=[];
+        Object.keys(withDate).forEach(k=>{
+          if(SKIP[k]){ out[k]=withDate[k]; return; }
+          if(un.has(k)) return;                                   // ส่วนนี้ไม่ได้แตะในฟอร์ม → ใช้ของล่าสุด
+          const mine=_stableJ(withDate[k]), was=_stableJ(base[k]), now=_stableJ(current[k]);
+          if(mine===was) return;                                  // ไม่ได้แก้ → ใช้ของล่าสุด
+          if(now!==was && now!==mine) conflictKeys.push(k);       // คนอื่นก็แก้ช่องเดียวกัน
+          out[k]=withDate[k];
+        });
+        if(conflictKeys.length && !forceOverride){ conflictData=current; return; }
+        return out;
+      });
+      if(!res.committed){
+        if(conflictData) return {ok:false, conflict:true, remote:conflictData, keys:conflictKeys};
+        return {ok:false, conflict:false, error:new Error('transaction aborted')};
+      }
+      const saved=res.snapshot.val()||withDate;
+      const idx=projectsCache.findIndex(x=>x.id===saved.id);
+      if(idx>=0) projectsCache[idx]=saved; else projectsCache.unshift(saved);
+      ls('projects_cache', projectsCache);
+      _notifyProjectChange();
+      return {ok:true, conflict:false, saved};
+    }catch(e){ return {ok:false, conflict:false, error:e}; }
+  }
   if(forceOverride || !baseVersion){
     // เขียนทับตรง ๆ (กรณีสร้างใหม่ หรือ user กด override หลัง conflict)
     const idx = projectsCache.findIndex(x=>x.id===withDate.id);
@@ -28019,6 +28060,8 @@ async function saveProjectSafe(proj, options){
   }
 }
 
+// JSON เรียงคีย์ (Firebase คืนคีย์เรียง a-z) — ใช้เทียบว่าค่าเปลี่ยนจริงไหม
+function _stableJ(v){ return JSON.stringify(v===undefined?null:v, (k,x)=>(x&&typeof x==='object'&&!Array.isArray(x))?Object.keys(x).sort().reduce((o,kk)=>{ if(x[kk]!==undefined&&x[kk]!==null) o[kk]=x[kk]; return o; },{}):x); }
 function _fieldDiff(local, remote){
   const diffs = [];
   const fields = [
@@ -32696,7 +32739,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261021-05"></script><script src="scene/nd-profile.js?v=20261021-05"></script><script src="scene/nd-plan.js?v=20261021-05"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261021-06"></script><script src="scene/nd-profile.js?v=20261021-06"></script><script src="scene/nd-plan.js?v=20261021-06"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32706,7 +32749,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261021-05';
+var UPD_BUILD = '20261021-06';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
