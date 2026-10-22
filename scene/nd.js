@@ -720,6 +720,10 @@ window.ndMyDocOpen=function(no, type){
   try{
     if(d.type==='wht'){ printWhtDoc(d); return; }
     const s=safe(()=>getStaffById(cu.staffId),null)||{name:d.staffName,nickname:d.staffNickname};
+    // 📄 แบบใหม่ (A4 เต็มหน้า 2 ภาษา) · ถ้าใบเก่ายังไม่มี % ภาษีในใบ ใช้ยอดตามที่บันทึก
+    if(window.GDOC){ const o={vNo:d.docNo, staff:s, items:(d.items||[]), totalAmt:Number(d.amount)||0, date:d.date, note:d.note||'', whtNo:d.whtNo||''};
+      try{ toast('กำลังสร้าง PDF…','info'); }catch(_){}
+      GDOC.voucherPages(o).then(r=>GDOC.save(r.pages,'ใบสำคัญจ่าย_'+d.docNo)).catch(e=>{ console.warn(e); downloadDocHTML(buildMultiVoucherHTML(o), d.docNo); }); return; }
     downloadDocHTML(buildMultiVoucherHTML({vNo:d.docNo, staff:s, items:d.items||[], totalAmt:Number(d.amount)||0, date:d.date, note:d.note||''}), d.docNo);
   }catch(e){ try{ toast('เปิดเอกสารไม่สำเร็จ: '+e.message,'error'); }catch(_){} }
 };

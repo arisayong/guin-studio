@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261022-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261022-05"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -2344,12 +2344,21 @@ body.sidebar-collapsed .main-content{
      </div>
      <!-- ═════ MODE: ตามคน (default — 1 ใบ × หลายงาน) ═════ -->
      <div id="vc-byperson-section">
+      <div id="vc-payreq-box"></div>
       <div style="background:rgba(155,111,255,.06);border:1px solid rgba(155,111,255,.2);border-radius:10px;padding:11px 14px;margin-bottom:12px;font-size:12.5px;color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
        <span style="font-size:17px">💡</span>
        <div>1 ใบสำคัญจ่าย = 1 คน <strong>(รวมหลายงานในใบเดียว)</strong> · เห็นเฉพาะคนที่ <strong style="color:#9B6FFF">staff ยืนยันยอดแล้ว</strong> และ <strong style="color:var(--green)">ยังไม่ได้จ่าย</strong></div>
       </div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;font-size:12.5px">
+       <span style="color:var(--text2);font-weight:600">📎 แนบไปกับอีเมล:</span>
+       <label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" checked disabled> ใบสำคัญจ่าย</label>
+       <label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="vc-att-wht" checked onchange="_vcAttachSet('wht',this.checked)"> ใบ 50 ทวิ <span style="color:var(--text2)">(ระบบออกใบให้เสมอเมื่อมีหักภาษี · ช่องนี้ = แนบไปในอีเมลด้วย)</span></label>
+       <span style="margin-left:auto;color:var(--text2);font-weight:600">🌐 ภาษาเอกสาร:</span>
+       <select id="vc-doc-lang" onchange="window.GDOC&&GDOC.setLang(this.value)" style="padding:4px 8px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:Kanit;font-size:12px"><option value="both">ไทย + English</option><option value="th">ไทย</option><option value="en">English</option></select>
+      </div>
       <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:8px">
        <button class="btn btn-xs" style="background:#00B4FF;color:#fff;border:none;font-weight:700" onclick="issueAndAutoEmailAll()" title="ออกใบสำคัญจ่ายจริง + ส่งอีเมลแนบไฟล์ PDF ให้ทุกคนอัตโนมัติ (ผ่าน Google Apps Script ฟรี) — ไม่ต้องทำทีละคน">📧 ออกใบ + ส่งเมลแนบ PDF ทุกคน</button>
+       <button class="btn btn-xs btn-outline" onclick="openVcHistory()" title="ใบที่ออกแล้วรายวัน · สถานะส่งเมล · ส่งซ้ำ · โหลด ZIP">📅 ประวัติส่งเมล / ส่งซ้ำ</button>
        <button class="btn btn-xs btn-outline" onclick="openMailerSetup()" title="ตั้งค่าระบบส่งเมลแนบ PDF (Google Apps Script)">⚙️</button>
        <button class="btn btn-xs" style="background:#9B6FFF;color:#fff;border:none;font-weight:700" onclick="downloadAllVouchersZip()" title="สร้างไฟล์ PDF แยกรายคน (ตั้งชื่อตามชื่อแต่ละคน) แล้วรวมเป็น ZIP ไฟล์เดียว — แตกออกโยนเข้า Drive ได้เลย">📦 PDF แยกรายคน (ZIP)</button>
        <button class="btn btn-xs" style="background:#1565FF;color:#fff;border:none;font-weight:700" onclick="downloadAllVouchersPreview()" title="รวมใบสำคัญจ่ายของทุกคนที่รอจ่ายเป็นไฟล์เดียว — เปิดแล้วสั่งพิมพ์/บันทึก PDF ได้ทีเดียวทุกคน">📥 โหลดใบทุกคน (พิมพ์รวดเดียว)</button>
@@ -2996,6 +3005,7 @@ body.sidebar-collapsed .main-content{
   </div>
   <div class="modal-foot">
    <button class="btn btn-outline" onclick="closeModal('modal-slip')">ยกเลิก</button>
+   <label style="display:inline-flex;gap:6px;align-items:center;font-size:12.5px;margin-right:auto;cursor:pointer"><input type="checkbox" id="slip-sendmail" checked> 📧 ส่งใบสำคัญจ่าย (+50 ทวิ) ให้ทีมงานทางอีเมล</label>
    <button class="btn btn-blue" onclick="confirmPayment()">✅ ยืนยันจ่ายเงิน</button>
   </div>
  </div>
@@ -9203,6 +9213,7 @@ async function prMarkPaid(staffId){
   if(!rec) return;
   const todo=rec.items.filter(it=>it.w.status!=='paid');
   if(!todo.length){ toast('จ่ายครบแล้ว','info'); return; }
+  if(_guardTransfer(todo.map(it=>_reqItem(rec.staff,it.p,it.w)),'รอบจ่ายรายเดือน '+monthKey)) return;
   const total=todo.reduce((a,it)=>a+(it.w.amount||0),0);
   if(!confirm(`บันทึกว่าจ่ายเงินให้ ${rec.staff.nickname||rec.staff.name} แล้ว\n\n${todo.length} งาน · รวม ${fmtB(total)}\nเดือน ${_thaiMonthLabel(monthKey)}\n\nยืนยัน?`)) return;
   const nowIso=new Date().toISOString();
@@ -9238,14 +9249,15 @@ async function _autoWhtOnPay(staff, items, monthKey){
     gross+=amt; tax+=amt-Math.round(amt*(1-t/100));
   });
   if(tax<=0) return;
-  const payer=ls('wht_payer')||{};
+  await _whtFresh();
+  const payer=window.GDOC?_whtPayer():(ls('wht_payer')||{});   // ข้อมูลบริษัทจากหนังสือรับรอง (ไม่ต้องตั้งเองแล้ว)
   if(!payer.name){ toast('งวดนี้มีหักภาษี '+fmtB(tax)+' แต่ยังไม่ได้ตั้งข้อมูลผู้จ่าย — ตั้งครั้งเดียวที่หน้าเอกสาร แท็บ 🏛️ 50 ทวิ แล้วระบบจะออกใบให้อัตโนมัติ','warn'); return; }
   const yearBE=new Date().getFullYear()+543;
-  const docNo='WHT'+yearBE+'-'+String(getWhtDocs().length+1).padStart(3,'0');
+  const docNo=_whtNextNo();
   const doc={
     id:'WHT'+Date.now(), docNo,
-    payer:{name:payer.name||'', taxid:payer.taxid||'', addr:payer.addr||''},
-    payee:{name:staff.name||staff.nickname||'', taxid:staff.taxId||'', addr:staff.address||'', staffId:staff.id},
+    payer:(window.GDOC?_whtPayer():{name:payer.name||'', taxid:payer.taxid||'', addr:payer.addr||''}),
+    payee:Object.assign(_whtPayeeOf(staff),{staffId:staff.id}),
     incomeType:'402', payDate:new Date().toISOString().split('T')[0],
     amount:gross, tax, taxPct:0, auto:true, payrollMonth:monthKey,
     createdAt:new Date().toISOString(), createdBy:currentUser?.nickname||currentUser?.email||''
@@ -11567,7 +11579,7 @@ async function enterApp(){
     _q(()=>loadCalcDraftsFromFirebase()),
     _q(async()=>{ await loadMgrRequests(); await loadManagerUsers(); await loadMgrSuspended(); await loadTeamLeft(); }),
     ...['tags_master','brief_templates','company_expenses','payroll_profiles','payroll_runs','recruit_rounds','discord_cfg','allocdraft',
-        'announcetpl','wipecode','projposttpl','drivecfg','posttpls','posttplalias'].map(k=>_q(()=>fbLoadKeyed(k))),
+        'announcetpl','wipecode','projposttpl','drivecfg','posttpls','posttplalias','payer_emails','payreqs'].map(k=>_q(()=>fbLoadKeyed(k))),
   ]);
   try{ await _dcMigrateRooms20261020(); }catch(e){ console.warn('discord rooms migrate:', e); }
   try { logLogin(); startIdleWatch(); } catch(e) {}
@@ -17280,20 +17292,53 @@ function openSlipModal(projId,workerId,slot){
   openModal('modal-slip');
 }
 function autoFillSlip(){}
+let _payBusy=false;
 async function confirmPayment(){
-  if(!slipTarget)return;
+  if(!slipTarget||_payBusy)return;
+  _payBusy=true;
+  const t=slipTarget;
+  try{ await _confirmPaymentRun(Object.assign({}, t)); }
+  finally { _payBusy=false;
+    // ปิดเป้าหมายเฉพาะเมื่อจ่ายสำเร็จ และยังเป็นคนเดิม (ถ้าเปิดคนใหม่ระหว่างรอ ไม่ไปลบของคนใหม่)
+    try{ const p=getProjects().find(x=>x.id===t.projId), w=p&&(p.workers||[]).find(x=>x.id===t.workerId&&x.slot===t.slot); if(slipTarget===t && w && w.status==='paid') slipTarget=null; }catch(e){} }
+}
+async function _confirmPaymentRun(slipTarget){
+  if(!canTransfer()){ toast('🔒 บันทึกว่าโอนแล้วได้เฉพาะผู้มีสิทธิ์โอนเงิน','error'); return; }
   const p=getProjects().find(x=>x.id===slipTarget.projId);if(!p)return;
   const w=(p.workers||[]).find(x=>x.id===slipTarget.workerId&&x.slot===slipTarget.slot);if(!w)return;
+  if(w.status==='paid'){ toast('รายการนี้บันทึกว่าโอนแล้ว','info'); closeModal('modal-slip'); return; }
   const s=getStaffById(slipTarget.workerId);
   const amount=parseFloat(document.getElementById('slip-amount').value)||w.amount||0;
   const vNo=nextVoucherNo();
   const paidAtIso = new Date().toISOString();
+  const payDate = _anyDateIso(document.getElementById('slip-date').value||paidAtIso.slice(0,10));
+  const sendMail = !!document.getElementById('slip-sendmail')?.checked;
+  showLoader(true);
+  const slipUrl = await _slipUpload(vNo, s);   // 🧾 เก็บสลิปจริง (เดิมแนบแล้วหาย)
+  showLoader(false);
   const result = await saveProjectMerge(slipTarget.projId, (fresh)=>{
     const fw = (fresh.workers||[]).find(x=>x.id===slipTarget.workerId&&x.slot===slipTarget.slot);
-    if(fw){ fw.status='paid'; fw.voucherNo=vNo; fw.amount=amount; fw.paidAt=paidAtIso; }
+    if(fw){ fw.status='paid'; fw.voucherNo=vNo; fw.amount=amount; fw.paidAt=paidAtIso; if(slipUrl) fw.slipUrl=slipUrl; }
   });
   if(!result.ok){ toast('บันทึกไม่สำเร็จ: '+(result.error?.message||''),'error'); return; }
   closeModal('modal-slip');
+  try{ const f=document.getElementById('slip-file'); if(f) f.value=''; const fn=document.getElementById('slip-fname'); if(fn) fn.textContent=''; }catch(e){}
+  // 📄 ออกใบสำคัญจ่าย (+ 50 ทวิ ถ้ามีหักภาษี) ให้ด้วย — เดิมจ่ายจากคิวแล้วไม่มีใบ ทีมงานเลยไม่เห็นเอกสาร
+  let _rec=null;
+  try{
+    const pre=(w.slot||'').split('-')[0], st=s||{};
+    _rec={ type:'voucher', docNo:vNo, staffId:slipTarget.workerId, staffName:st.name||'', staffLastName:st.lastName||'', staffNickname:st.nickname||'',
+      items:[{projId:p.id, projName:p.name, slot:w.slot, amount, taxPct:parseFloat((p.tax||{})[pre])||0}], amount, totalAmount:amount, multiItem:true,
+      bank:st.bank||'', account:st.account||'', email:st.email||'', date:payDate, note:'', createdAt:paidAtIso, fromQueue:true,
+      emailStatus:(st.email||'').includes('@')?'pending':'noemail', ...(slipUrl?{slipUrl}:{}) };
+    await _vcAutoWht(st, _rec);
+    const saved=getDocsStore('vouchers')||[]; saved.push(_rec); saveDocsStore('vouchers', saved);
+  }catch(e){ console.warn('queue voucher',e); }
+  if(_rec && sendMail && _rec.emailStatus==='pending'){
+    const cfg=getMailerCfg();
+    if(cfg.url&&cfg.secret){ toast('📧 กำลังส่งใบสำคัญจ่ายทางอีเมล…','info'); _vcSendVoucherEmail(_rec).then(ok=>toast(ok?'📧 ส่งใบสำคัญจ่ายแล้ว':'⚠️ ส่งเมลไม่สำเร็จ — ส่งซ้ำได้ที่ "ประวัติส่งเมล"', ok?'success':'warn')).catch(()=>{}); }
+    else toast('ยังไม่ได้ตั้งค่าระบบส่งเมล — ใบสำคัญจ่ายบันทึกแล้ว ส่งทีหลังได้ที่หน้าเอกสาร','warn');
+  }
 
   // Build receipt for display
   const receiptHTML=buildSimpleReceipt({vNo,name:s?.name||'',nickname:s?.nickname||'',projName:p.name,amount,bank:`${s?.bank||''} ${s?.account||''}`,date:thaiToIso(document.getElementById('slip-date').value)||document.getElementById('slip-date').value});
@@ -18287,6 +18332,7 @@ function openPaidRestore(){
     <button class="btn btn-blue btn-sm" onclick="applyPaidRestore()">✅ กู้คืนที่เลือก</button></div>`, 620);
 }
 async function applyPaidRestore(){
+  if(!canTransfer()){ toast('🔒 บันทึกว่าโอนแล้วได้เฉพาะผู้มีสิทธิ์โอนเงิน','error'); return; }
   const c=window._prCands||[], pick=[...document.querySelectorAll('.pr-chk:checked')].map(e=>c[+e.dataset.i]).filter(Boolean);
   if(!pick.length){ toast('ยังไม่ได้เลือกรายการ','warn'); return; }
   const byProj=new Map(); pick.forEach(x=>{ (byProj.get(x.p.id)||byProj.set(x.p.id,[]).get(x.p.id)).push(x); });
@@ -18381,6 +18427,7 @@ async function qMarkPaidManual(projId, workerId, slot){
   const p=getProjects().find(x=>x.id===projId);
   const w=p&&(p.workers||[]).find(x=>x.id===workerId && x.slot===slot);
   const s=getStaffById(workerId);
+  if(p&&w&&_guardTransfer([_reqItem(s,p,w)],'คิวจ่ายเงิน · บันทึกว่าจ่ายเอง')) return;
   const nm=s?(s.nickname||s.name):workerId;
   if(!confirm('บันทึกว่า "'+nm+'" จ่ายเงินไปแล้ว?\n\nยอด '+fmtB(w?w.amount||0:0)+' — ใช้ตอนที่จ่ายเองนอกระบบไปแล้ว\nระบบจะเปลี่ยนเป็น "✅ จ่ายแล้ว" ทันที (ข้ามขั้นอนุมัติ/ใบยืนยัน)\n\n*ยกเลิกได้ภายหลังที่ปุ่ม "↩️ ยกเลิก"')) return;
   const res=await saveProjectMerge(projId,(pp)=>{
@@ -18451,8 +18498,15 @@ async function qPayAll(projId) {
   if(!clientPaid){
     if(!confirm(`⚠️ ลูกค้ายังไม่ได้จ่ายเงินโปรเจกต์นี้\n\nแน่ใจจะจ่ายทีมก่อนไหม?`)) return;
   }
-  const readyWorkers = (p.workers||[]).filter(w => w.status === 'approved');
-  if(readyWorkers.length === 0){ toast('ไม่มีคนที่พร้อมจ่าย','info'); return; }
+  // เดิม: วนเปิดหน้าต่างอัปสลิปทีละคน (ไม่ได้จ่ายจริง) และนับเฉพาะ "approved" — เปลี่ยนเป็นคนที่ยืนยันยอดแล้ว + พาไปหน้าออกใบหลายคน
+  const ready = (p.workers||[]).filter(w => w && w.status!=='paid' && canPayWorker(w));
+  if(!ready.length){ toast('ไม่มีคนที่ยืนยันยอดแล้วและรอโอน','info'); return; }
+  if(!canTransfer()){ _askPayRequest(ready.map(w=>_reqItem(getStaffById(w.id),p,w)),'คิวจ่ายเงิน · '+p.name); return; }
+  nav('docs');
+  setTimeout(()=>{ try{ switchDocsMain('worker', document.querySelector('#docs-main-tabs .tab')); }catch(e){}
+    toast(`💸 ${ready.length} คนของ "${p.name}" อยู่ในรายการใบสำคัญจ่ายแล้ว — โอนตามยอด แล้วกด "ออกใบ & ส่ง Email ทุกคน"`,'info'); },350);
+  return;
+  const readyWorkers = ready;
   if(!confirm(`💸 จ่ายเงินทีมทั้งหมด ${readyWorkers.length} คน ในโปรเจกต์ "${p.name}"?\n\nยอดรวม: ${fmtB(readyWorkers.reduce((a,w)=>a+(w.amount||0),0))}\n\n(ระบบจะออกใบสำคัญจ่ายให้แต่ละคน)`)) return;
   let successCount = 0;
   for (const w of readyWorkers) {
@@ -19746,6 +19800,7 @@ async function sendSelectedFromCart(){
 // ✅ ทำเครื่องหมาย "จ่ายไปแล้ว" หลายรายการจากกล่องทีเดียว
 //    ใช้กรณีจ่ายเงินจริงไปแล้วแต่สถานะหลุด (เช่น record ถูกแก้ชื่อ/รวมร่าง) — ไม่ส่งใบยืนยัน ไม่ออกใบใหม่
 async function markSelectedPaidFromCart(){
+  if(!canTransfer()){ toast('🔒 บันทึกว่าโอนแล้วได้เฉพาะผู้มีสิทธิ์โอนเงิน — ใช้ "ขอให้โอน" ในหน้าเอกสารแทน','warn'); return; }
   const selectedKeys = Array.from(document.querySelectorAll('[data-cart-item]'))
     .filter(el => el.checked)
     .map(el => el.dataset.cartItem);
@@ -20189,6 +20244,7 @@ function qPay(projId, workerId, slot) {
       return;
     }
   }
+  if(!canTransfer()){ const p0=getProjects().find(x=>x.id===projId), w0=p0&&(p0.workers||[]).find(x=>x.id===workerId&&x.slot===slot); if(p0&&w0) _askPayRequest([_reqItem(getStaffById(workerId),p0,w0)],'คิวจ่ายเงิน'); return; }
   slipTarget = { projId, workerId, slot };
   const p = getProjects().find(x => x.id === projId);
   const w = p?.workers.find(x => x.id === workerId && x.slot === slot);
@@ -22852,6 +22908,10 @@ async function issueWht(){
 }
 function printWhtDoc(json){
   let d; try{ d=typeof json==='string'?JSON.parse(json):json; }catch(e){ return; }
+  if(window.GDOC && !d._old){ showLoader(true);
+    GDOC.whtPages(d).then(pg=>GDOC.save(pg,'หนังสือรับรอง50ทวิ_'+(d.docNo||''))).then(()=>toast('📄 ดาวน์โหลด 50 ทวิ แล้ว (ฉบับที่ 1 + 2)','success'))
+      .catch(e=>{ console.warn('GDOC wht',e); printWhtDoc(Object.assign({},d,{_old:true})); }).finally(()=>showLoader(false));
+    return; }
   const incomeLabel=WHT_INCOME_LABEL[d.incomeType]||WHT_INCOME_LABEL['402'];
   const payDateTH=(function(){ try{ const dt=new Date(d.payDate); return dt.getDate()+' '+['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'][dt.getMonth()]+' '+(dt.getFullYear()+543); }catch(e){ return d.payDate; } })();
   const fmtN=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -23428,9 +23488,18 @@ async function _docSavePdf(html, fname, fallback){
   }catch(e){ console.warn('docSavePdf',e); toast('สร้าง PDF ไม่สำเร็จ — เปิดหน้าพิมพ์แทน (เลือก "บันทึกเป็น PDF")','warn'); try{ fallback&&fallback(); }catch(_){} }
   finally{ showLoader(false); }
 }
+// 📄 ใบเสนอราคา / ใบแจ้งหนี้ / ใบเสร็จ แบบใหม่ (ช่องทางชำระจากบัญชีรับเงินที่เลือก)
+function _gdSalesData(d){ const o=Object.assign({}, d||{});
+  try{ const all=getPaymentAccounts(); const ids=o.payAccountIds||[]; const picks=ids.length?all.filter(a=>ids.includes(a.id)):all.filter(a=>a.isDefault);
+    if(picks.length) o.payText=picks.map(a=>{ const b=a.bankCode==='other'?(a.customBankName||'ธนาคาร'):getBankPreset(a.bankCode).name; return esc(b)+' · '+esc(a.accountNumber||'')+' · '+esc(a.accountHolder||''); }).join('<br>'); }catch(e){}
+  return o; }
+async function _gdSales(kind, d, fname, fallback){
+  if(window.GDOC){ showLoader(true); try{ await GDOC.save(await GDOC.salesPages(kind, _gdSalesData(d)), fname); toast('📄 ดาวน์โหลด PDF แล้ว','success'); return; }catch(e){ console.warn('GDOC sales',e); } finally{ showLoader(false); } }
+  return fallback(); }
 function downloadQuotation() {
   const data = getQuotationData();
   if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
+  if(window.GDOC) return _gdSales('quotation', data, (data.docNo||'quotation')+'_'+data.client, ()=>{ const h=buildQuotationHTML(data); return _docSavePdf(h, data.docNo||'quotation', ()=>_docPrintWindowQuotation(h, data.docNo||'quotation')); });
   const html = buildQuotationHTML(data);
   const fname = (data.docNo||'quotation')+'_'+data.client;
   return _docSavePdf(html, fname, ()=>_docPrintWindowQuotation(html, fname));
@@ -24045,14 +24114,9 @@ async function downloadAllVouchersZip(){
   for(const [wid,{s,works}] of entries){
     done++;
     _vcProgress('run',{title:'📦 กำลังสร้าง PDF แยกรายคน', sub:`กำลังทำของ ${esc(s.nickname||s.name||'')}`, done:done, total:total});
-    const html=buildMultiVoucherHTML({
-      vNo:'(ตัวอย่าง)', staff:s,
-      items: works.map(({w,p})=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
-      totalAmt: works.reduce((a,{w})=>a+(w.amount||0),0),
-      date, note:'',
-    });
+    const vo={ vNo:'(ตัวอย่าง)', staff:s, items:_vcItemsSnap(works), totalAmt:works.reduce((a,{w})=>a+(w.amount||0),0), date, note:'' };
     try{
-      const blob=await _vcHtmlToPdfBlob(html);   // 1 ใบ = 1 หน้าพอดี ภาษาไทยครบ
+      const blob=await _vcVoucherBlob(vo);   // แบบใหม่ A4 เต็มหน้า (โหลดไม่ได้ = แบบเดิม)
       // ตั้งชื่อไฟล์ = ชื่อจริง(+นามสกุล) · กันชื่อซ้ำ
       const full=((s.name||'')+(s.lastName?(' '+s.lastName):'')).trim() || s.nickname || wid;
       let base=('ใบสำคัญจ่าย_'+full).replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_').slice(0,80);
@@ -24192,6 +24256,7 @@ function _vcProgress(state, o){
 }
 
 async function issueAndAutoEmailAll(){
+  if(!canTransfer()){ const items=[]; _vcGatherPendingByPerson().forEach(({s,works})=>works.forEach(({w,p})=>items.push(_reqItem(s,p,w)))); _askPayRequest(items,'หน้าเอกสาร · ออกใบ & ส่งเมลทุกคน'); return; }
   const cfg=getMailerCfg();
   if(!cfg.url||!cfg.secret){
     if(confirm('ยังไม่ได้ตั้งค่าระบบส่งเมลแนบ PDF — เปิดหน้าตั้งค่าเลยไหม?')) openMailerSetup();
@@ -24228,9 +24293,10 @@ async function issueAndAutoEmailAll(){
     const hasEmail=!!(s.email && s.email.includes('@'));
     const saved=getDocsStore('vouchers')||[];
     const rec={ type:'voucher', docNo:vNo, staffId:wid, staffName:s.name, staffLastName:s.lastName||'', staffNickname:s.nickname,
-      items: works.map(({w,p})=>({projId:p.id, projName:p.name, slot:w.slot, amount:w.amount||0})),
+      items: _vcItemsSnap(works),
       amount:totalAmt, totalAmount:totalAmt, multiItem:true, bank:s.bank||'', account:s.account||'', email:s.email||'', date, note:'', createdAt:nowIso,
       emailStatus: hasEmail?'pending':'noemail' };
+    await _vcAutoWht(s, rec);   // 🏛️ มีหักภาษี → ออก 50 ทวิ คู่ใบนี้
     saved.push(rec);
     saveDocsStore('vouchers', saved);
     issued++;
@@ -24238,12 +24304,8 @@ async function issueAndAutoEmailAll(){
     _vcProgress('run',{title:'📧 กำลังส่งเมลแนบ PDF', sub:`กำลังทำของ ${esc(s.nickname||s.name||'')}`, done:done, total:total});
     if(hasEmail){
       try{
-        const html=buildMultiVoucherHTML({ vNo, staff:s, items:works.map(({w,p})=>({projName:p.name,slot:w.slot,amount:w.amount||0})), totalAmt, date, note:'' });
-        const blob=await _vcHtmlToPdfBlob(html);   // 1 ใบ = 1 หน้าพอดี ภาษาไทยครบ
-        const b64=await _blobToBase64(blob);
-        const full=((s.name||'')+(s.lastName?(' '+s.lastName):'')).trim()||s.nickname||wid;
-        const pdfName=('ใบสำคัญจ่าย_'+full).replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_').slice(0,80)+'.pdf';
-        await _mailerSend({ to:s.email, subject:'ใบสำคัญจ่าย '+vNo+' — Guin Home Studio', htmlBody:_mailerBody(s,works,totalAmt,date,vNo), pdfBase64:b64, pdfName });
+        const files=await _vcMailFiles(rec, s);
+        await _mailerSend({ to:s.email, subject:'ใบสำคัญจ่าย '+vNo+' — Guin Home Studio', htmlBody:_mailerBody(s,works,totalAmt,date,vNo)+_vcMailNote(files,rec), pdfBase64:files[0].b64, pdfName:files[0].name, attachments:files });
         rec.emailStatus='sent'; rec.emailSentAt=new Date().toISOString();
         sent++;
       }catch(e){ console.warn('auto email fail:', wid, e); rec.emailStatus='failed'; rec.emailError=String((e&&e.message)||e); failSend++; }
@@ -24261,6 +24323,121 @@ async function issueAndAutoEmailAll(){
 /* ══════════════════════════════════════════════════════════
    📅 ย้อนหลังรายวัน + สถานะส่งเมล — ดู/โหลด/ส่งซ้ำ ใบที่ออกไปแล้ว
    ══════════════════════════════════════════════════════════ */
+// 💳 ผู้มีสิทธิ์โอนเงิน — เจ้าของเท่านั้น · แอดมินคนอื่น "ส่งคำขอโอน" ได้ แต่บันทึกว่าโอน/ออกใบสำคัญจ่ายไม่ได้
+//   (การออกใบสำคัญจ่าย = บันทึกว่าโอนแล้ว จึงล็อกด้วยสิทธิ์เดียวกัน) · รายชื่อเก็บที่ misc/payer_emails
+const _PAYER_DEFAULT=['penguinstudiovoice@gmail.com','haruyami231@gmail.com'];
+function _payers(){ const l=ls('payer_emails'); return (Array.isArray(l)&&l.length?l:_PAYER_DEFAULT).map(x=>String(x).trim().toLowerCase()).filter(Boolean); }
+function canTransfer(){ return currentUser?.role==='admin' && _payers().includes(String(currentUser?.email||'').toLowerCase()); }
+async function _loadPayInfo(){ try{ const v=await fbLoadKeyed('payer_emails'); if(Array.isArray(v)&&v.length) ls('payer_emails',v); }catch(e){} try{ const r=await fbLoadKeyed('payreqs'); if(Array.isArray(r)) ls('payreqs',r); }catch(e){} }
+function editPayers(){
+  if(!canTransfer()){ toast('เฉพาะผู้มีสิทธิ์โอนเงินเท่านั้น','error'); return; }
+  const v=prompt('อีเมลผู้มีสิทธิ์โอนเงิน (คั่นด้วย ,)\nคนอื่นที่เป็นแอดมินจะส่งได้แค่ "คำขอโอน"', _payers().join(', '));
+  if(v==null) return;
+  const list=[...new Set(v.split(/[,\s]+/).map(x=>x.trim().toLowerCase()).filter(x=>x.includes('@')))];
+  const me=String(currentUser?.email||'').toLowerCase();
+  if(!list.includes(me)){ toast('ต้องมีอีเมลของคุณเองอยู่ในรายชื่อ (กันล็อกตัวเองออก)','error'); return; }
+  ls('payer_emails',list); fbSaveKeyed('payer_emails',list); toast('บันทึกผู้มีสิทธิ์โอนเงินแล้ว','success'); try{ _renderPayReqs(); }catch(e){}
+}
+const _payReqs=()=>ls('payreqs')||[];
+function _savePayReqs(a){ ls('payreqs',a); try{ fbSaveKeyed('payreqs',a); }catch(e){} }
+// items: [{staffId, staffName, projId, projName, slot, amount}]
+function _askPayRequest(items, from){
+  items=(items||[]).filter(x=>x&&x.staffId);
+  if(!items.length){ toast('ไม่มีรายการที่ต้องโอน','info'); return; }
+  const total=items.reduce((a,x)=>a+(+x.amount||0),0), ppl=[...new Set(items.map(x=>x.staffName||x.staffId))];
+  if(!confirm(`🔒 คุณไม่มีสิทธิ์โอนเงิน\n\nส่ง "คำขอโอน" ให้เจ้าของ?\n${ppl.length} คน · ${items.length} งาน · ${fmtB(total)}\n${ppl.slice(0,8).join(', ')}${ppl.length>8?' …':''}`)) return;
+  let note=''; try{ note=prompt('หมายเหตุถึงผู้โอน (ไม่ใส่ก็ได้)','')||''; }catch(e){}
+  const r={ id:'PRQ'+Date.now(), at:new Date().toISOString(), by:currentUser?.nickname||currentUser?.email||'', byEmail:currentUser?.email||'', from:from||'', note, items, total };
+  const a=_payReqs(); a.unshift(r); _savePayReqs(a.slice(0,200));
+  try{ addNotificationToAdmins({type:'payment', title:'📨 ขอให้โอนเงิน', text:`${r.by} ขอโอน ${ppl.length} คน · ${fmtB(total)}${note?' · '+note:''}`}); }catch(e){}
+  toast('📨 ส่งคำขอโอนแล้ว — ผู้มีสิทธิ์โอนจะเห็นในหน้าเอกสาร','success'); try{ _renderPayReqs(); }catch(e){}
+}
+function _guardTransfer(items, from){ if(canTransfer()) return false; _askPayRequest(items, from); return true; }
+const _reqItem=(s,p,w)=>({staffId:w.id, staffName:(s&&(s.nickname||s.name))||w.id, projId:p.id, projName:p.name, slot:w.slot, amount:w.amount||0});
+function _payReqDone(it){ const p=getProjects().find(x=>x.id===it.projId); const w=p&&(p.workers||[]).find(x=>x&&x.id===it.staffId&&x.slot===it.slot); return !w || w.status==='paid'; }
+function _renderPayReqs(){
+  const box=document.getElementById('vc-payreq-box'); if(!box) return;
+  const reqs=_payReqs().filter(r=>!r.closed); const me=canTransfer();
+  const rows=reqs.map(r=>{ const done=r.items.filter(_payReqDone).length, all=r.items.length, ok=done===all;
+    const ppl=[...new Set(r.items.map(x=>x.staffName))];
+    return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--border2);font-size:12.5px">
+      <span>${ok?'✅':'📨'}</span><div style="flex:1;min-width:200px"><b>${esc(r.by)}</b> ขอโอน ${ppl.length} คน · <b>${fmtB(r.total)}</b> <span style="color:var(--text2)">· ${esc(r.from||'')} · ${esc(String(r.at).slice(0,10))}</span>
+       <div style="color:var(--text2)">${esc(ppl.join(', '))}${r.note?' · 📝 '+esc(r.note):''}</div></div>
+      <span style="color:${ok?'var(--green)':'var(--orange)'};font-weight:700">${ok?'โอนครบแล้ว':'โอนแล้ว '+done+'/'+all}</span>
+      ${(me||r.byEmail===currentUser?.email)?`<button class="btn btn-xs btn-outline" onclick="_closePayReq('${escJs(r.id)}')">${ok?'เก็บ':'ยกเลิกคำขอ'}</button>`:''}</div>`; }).join('');
+  box.innerHTML=`<div style="margin-bottom:12px;padding:10px 14px;background:rgba(255,158,0,.06);border:1px solid rgba(255,158,0,.25);border-radius:10px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:13px">💳 ${me?'คุณเป็นผู้มีสิทธิ์โอนเงิน':'🔒 คุณส่งได้แค่คำขอโอน (โอน/ออกใบได้เฉพาะเจ้าของ)'}</b>
+     <span style="color:var(--text2);font-size:12px">คำขอที่รอ ${reqs.filter(r=>!r.items.every(_payReqDone)).length}</span>
+     ${me?'<button class="btn btn-xs btn-outline" style="margin-left:auto" onclick="editPayers()">⚙️ ผู้มีสิทธิ์โอน</button>':''}</div>
+    ${rows||'<div style="font-size:12px;color:var(--text2);margin-top:4px">ไม่มีคำขอโอน</div>'}</div>`;
+}
+function _closePayReq(id){ const a=_payReqs(); const r=a.find(x=>x.id===id); if(r){ r.closed=true; r.closedAt=new Date().toISOString(); _savePayReqs(a); } _renderPayReqs(); }
+// เลขใบสำคัญจ่ายถัดไป "ดูเฉยๆ" (ไม่จองเลข) — ใช้กับหน้าตัวอย่าง กันเลขข้าม
+function _peekVoucherNo(){ const n=Math.max(voucherSeq||0, parseInt(ls('voucher_seq')||'0',10)||0, _maxVoucherSeqInStore())+1; return `GS-${new Date().getFullYear()+543}-${_todayDDMM()}-${String(n).padStart(4,'0')} (ตัวอย่าง)`; }
+// 🧾 สลิปโอนเงิน (จากช่องอัปสลิปในคิวจ่าย) → บีบรูป → Google Drive (โฟลเดอร์สลิปเดิม) · คืนลิงก์
+async function _slipUpload(vNo, s){
+  const f=document.getElementById('slip-file')?.files?.[0]; if(!f) return '';
+  const raw=await new Promise(res=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=()=>res(''); r.readAsDataURL(f); });
+  let data=raw, ext=(f.name.split('.').pop()||'jpg').toLowerCase();
+  if(/^data:image\//.test(raw)){ data=await new Promise(res=>{ const im=new Image(); im.onload=()=>{ const k=Math.min(1,1600/Math.max(im.width,im.height)); const c=document.createElement('canvas'); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k); c.getContext('2d').drawImage(im,0,0,c.width,c.height); res(c.toDataURL('image/jpeg',0.82)); }; im.onerror=()=>res(raw); im.src=raw; }); ext='jpg'; }
+  const name=(vNo+'_'+((s&&(s.nickname||s.name))||'')).replace(/[\\\/:*?"<>|\s]+/g,'_')+'.'+ext;
+  try{ return (await uploadToDrive('slip', name, data))||''; }catch(e){ return ''; }
+}
+// 📄 ใบสำคัญจ่ายแบบใหม่ (scene/nd-docpdf.js · A4 เต็มหน้า 2 ภาษา) — โหลดไม่ได้ = ใช้แบบเดิม
+//   รายการเก็บ % หัก ณ ที่จ่ายไว้ในใบ (taxPct) → ใบเก่าพิมพ์ซ้ำ/ทีมงานเปิดดู ได้ยอดตรงเดิมเสมอ
+function _vcItemsSnap(works){ return (works||[]).map(({w,p})=>{ const pre=(w.slot||'').split('-')[0]; return {projId:p.id, projName:p.name, slot:w.slot, amount:w.amount||0, taxPct:parseFloat((p.tax||{})[pre])||0}; }); }
+function _vcConfirmedAt(staffId, items){ let t=''; (items||[]).forEach(it=>{ try{ const p=getProjects().find(x=>x.id===it.projId); const w=p&&(p.workers||[]).find(x=>x&&x.id===staffId&&x.slot===it.slot); const c=w&&w.confirmRespondedAt; if(c&&String(c)>t) t=String(c); }catch(e){} }); return t; }
+async function _vcVoucherBlob(o){ if(window.GDOC){ try{ return await GDOC.voucherBlob(o); }catch(e){ console.warn('GDOC voucher → แบบเดิม',e); } } return _vcHtmlToPdfBlob(buildMultiVoucherHTML(o)); }
+function _voucherStaffOf(v){ return v.staffId ? (getStaffById(v.staffId) || {name:v.staffName,lastName:v.staffLastName,nickname:v.staffNickname,bank:v.bank,account:v.account,email:v.email}) : {name:v.staffName,lastName:v.staffLastName,nickname:v.staffNickname,bank:v.bank,account:v.account,email:v.email}; }
+function _voucherOpts(v){ return { vNo:v.docNo, staff:_voucherStaffOf(v), items:(v.items||[]).map(it=>({projId:it.projId, projName:it.projName, slot:it.slot, amount:it.amount, taxPct:it.taxPct})), totalAmt:v.totalAmount||v.amount||0, date:v.date, note:v.note||'', confirmedAt:_vcConfirmedAt(v.staffId, v.items), whtNo:v.whtNo||'' }; }
+// 📎 ตั้งค่าแนบไฟล์ไปกับอีเมลใบสำคัญจ่าย (จำไว้) — ตอนนี้: 50 ทวิ
+function _vcAttach(){ const st=Object.assign({wht:true}, ls('vc_attach')||{}); return st; }   // ค่าจากช่องติ๊ก (บันทึกทันทีที่ติ๊ก)
+function _vcAttachSet(k,v){ const st=ls('vc_attach')||{wht:true}; st[k]=!!v; ls('vc_attach',st); }
+// 🔢 เลข 50 ทวิ: WT-<พ.ศ.>-<เดือน>-<ลำดับ 4 หลัก> · ต่อจากเลขมากสุดที่มีอยู่ (ไม่นับจากจำนวนใบ → ลบใบแล้วไม่ชนเลขเดิม)
+// วันที่จากช่องในเว็บ (YYYY-MM-DD หรือ วว/ดด/ปปปป ค.ศ./พ.ศ.) → YYYY-MM-DD
+function _anyDateIso(v){ const s=String(v||'').trim(); let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m){ let y=+m[1]; if(y>2400) y-=543; return y+'-'+m[2]+'-'+m[3]; } m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m){ let y=+m[3]; if(y>2400) y-=543; return y+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0'); } return new Date().toISOString().slice(0,10); }
+function _whtNextNo(date){ const d=new Date(_anyDateIso(date)+'T12:00:00'); const pre='WT-'+(d.getFullYear()+543)+'-'+String(d.getMonth()+1).padStart(2,'0')+'-';
+  let mx=0; (getWhtDocs()||[]).forEach(x=>{ const m=String(x.docNo||'').startsWith(pre)?String(x.docNo).slice(pre.length).match(/^\d+/):null; if(m) mx=Math.max(mx,+m[0]); });
+  return pre+String(mx+1).padStart(4,'0'); }
+function _whtPayer(){ const c=window.GDOC?GDOC.company():null; return c?{name:c.th, taxid:c.tax, addr:c.ath}:(ls('wht_payer')||{}); }
+function _whtPayeeOf(s){ const P=Object.assign({}, (s&&s.profile)||{}, s||{});
+  const addr=P.address||[P.addr, P.moo?('หมู่ '+P.moo):'', P.sub, P.dist, P.prov, P.zip].filter(Boolean).join(' ');
+  return { name:((P.name||'')+(P.lastName?' '+P.lastName:'')).trim()||P.nickname||'', taxid:P.taxId||P.taxid||P.idCard||P.citizenId||'', addr, staffId:P.id||'' }; }
+// 🔄 ดึง 50 ทวิ ล่าสุดจากเซิร์ฟเวอร์มารวมกับในเครื่อง (ตามรหัสใบ) ก่อนออกเลข/บันทึก — กันทับใบที่เครื่องอื่นออก
+let _whtFreshAt=0;
+async function _whtFresh(){
+  if(Date.now()-_whtFreshAt<20000) return; _whtFreshAt=Date.now();
+  const loc=(getWhtDocs()||[]).slice();
+  try{ const r=await fbLoadKeyed('wht_docs'); const m=new Map();
+    [...(Array.isArray(r)?r:[]), ...loc].forEach(d=>{ if(d){ const k=d.id||d.docNo; if(k&&!m.has(k)) m.set(k,d); } });
+    ls('wht_docs',[...m.values()].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))); }catch(e){ ls('wht_docs',loc); }
+}
+// 🏛️ ออก 50 ทวิ คู่กับใบสำคัญจ่าย (เฉพาะใบที่มีหักภาษี · ใบละครั้ง) → ใส่เลขไว้ใน rec.whtNo
+async function _vcAutoWht(s, rec){
+  try{
+    const items=rec.items||[]; let gross=0, tax=0;
+    items.forEach(it=>{ const a=+it.amount||0, t=+it.taxPct||0; gross+=a; tax+=a-Math.round(a*(1-t/100)); });
+    if(tax<=0) return null;
+    await _whtFresh();
+    const all=getWhtDocs()||[]; const ex=all.find(d=>d.voucherNo===rec.docNo); if(ex){ rec.whtNo=ex.docNo; return ex; }
+    const doc={ id:'WHT'+Date.now()+Math.random().toString(36).slice(2,5), docNo:_whtNextNo(rec.date), payer:_whtPayer(), payee:Object.assign(_whtPayeeOf(s),{staffId:rec.staffId}),
+      incomeType:'402', payDate:_anyDateIso(rec.date), amount:gross, tax, taxPct:Math.round(tax/gross*1000)/10, auto:true, voucherNo:rec.docNo,
+      createdAt:new Date().toISOString(), createdBy:currentUser?.nickname||currentUser?.email||'' };
+    all.unshift(doc); await saveWhtDocs(all); rec.whtNo=doc.docNo; try{ renderWhtRecent(); }catch(e){}
+    return doc;
+  }catch(e){ console.warn('auto 50 ทวิ',e); return null; }
+}
+// ไฟล์แนบอีเมลของใบสำคัญจ่าย 1 ใบ: ใบสำคัญจ่าย (+ 50 ทวิ ถ้าติ๊กไว้และมีใบ)
+async function _vcMailFiles(v, s){
+  const full=((s.name||'')+(s.lastName?(' '+s.lastName):'')).trim()||s.nickname||v.docNo;
+  const clean=x=>x.replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_').slice(0,80);
+  const files=[{b64:await _blobToBase64(await _vcVoucherBlob(_voucherOpts(v))), name:clean('ใบสำคัญจ่าย_'+full)+'.pdf'}];
+  if(v.whtNo && _vcAttach().wht && window.GDOC){ const w=(getWhtDocs()||[]).find(d=>d.docNo===v.whtNo);
+    if(w){ try{ files.push({b64:await _blobToBase64(await GDOC.whtBlob(w)), name:clean('หนังสือรับรอง50ทวิ_'+full)+'.pdf'}); }catch(e){ console.warn('50 ทวิ PDF',e); } } }
+  return files; }
+function _vcMailNote(files, v){ const st='font-family:Kanit,Arial,sans-serif;font-size:14px;color:#222';
+  return (files.length>1?`<p style="${st}">📎 แนบ: ใบสำคัญจ่าย และหนังสือรับรองการหักภาษี ณ ที่จ่าย (50 ทวิ) — เก็บไว้ใช้ยื่นภาษีปลายปี</p>`:'')
+    +(v&&v.slipUrl?`<p style="${st}">🧾 สลิปโอนเงิน: <a href="${esc(v.slipUrl)}">เปิดดูสลิป</a></p>`:''); }
 // สร้าง HTML ใบจาก voucher record (ใช้ข้อมูล staff ล่าสุดถ้ามี)
 function _voucherPdfHtml(v){
   const s = v.staffId ? (getStaffById(v.staffId) || {name:v.staffName,lastName:v.staffLastName,nickname:v.staffNickname,bank:v.bank,account:v.account}) : {name:v.staffName,lastName:v.staffLastName,nickname:v.staffNickname,bank:v.bank,account:v.account};
@@ -24424,12 +24601,9 @@ async function _vcSendVoucherEmail(v){
   const email = s.email || v.email;
   if(!email || !email.includes('@')){ _vcSetVoucherEmailStatus(v.docNo,'noemail'); return false; }
   try{
-    const blob=await _vcHtmlToPdfBlob(_voucherPdfHtml(v));
-    const b64=await _blobToBase64(blob);
-    const full=((s.name||'')+(s.lastName?(' '+s.lastName):'')).trim()||s.nickname||v.docNo;
-    const pdfName=('ใบสำคัญจ่าย_'+full).replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_').slice(0,80)+'.pdf';
+    const files=await _vcMailFiles(v, s);
     const works=(v.items||[]).map(it=>({w:{slot:it.slot,amount:it.amount}, p:{name:it.projName}}));
-    await _mailerSend({ to:email, subject:'ใบสำคัญจ่าย '+v.docNo+' — Guin Home Studio', htmlBody:_mailerBody(s, works, v.totalAmount||v.amount||0, v.date, v.docNo), pdfBase64:b64, pdfName });
+    await _mailerSend({ to:email, subject:'ใบสำคัญจ่าย '+v.docNo+' — Guin Home Studio', htmlBody:_mailerBody(s, works, v.totalAmount||v.amount||0, v.date, v.docNo)+_vcMailNote(files,v), pdfBase64:files[0].b64, pdfName:files[0].name, attachments:files });
     _vcSetVoucherEmailStatus(v.docNo,'sent');
     return true;
   }catch(e){ _vcSetVoucherEmailStatus(v.docNo,'failed', String((e&&e.message)||e)); return false; }
@@ -24543,7 +24717,7 @@ async function _vcDownloadDayZip(k){
   for(const v of vs){
     done++; _vcProgress('run',{title:'📦 กำลังทำ ZIP ทั้งวัน', sub:(v.staffNickname||v.staffName||''), done, total:vs.length});
     try{
-      const blob=await _vcHtmlToPdfBlob(_voucherPdfHtml(v));
+      const blob=await _vcVoucherBlob(_voucherOpts(v));
       const full=((v.staffName||'')+(v.staffLastName?(' '+v.staffLastName):'')).trim()||v.staffNickname||v.docNo;
       let base=('ใบสำคัญจ่าย_'+full).replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_').slice(0,80);
       let name=base, kk=2; while(used.has(name)){ name=base+'_'+kk; kk++; } used.add(name);
@@ -24593,6 +24767,9 @@ function downloadAllVouchersPreview(){
 }
 
 function renderVcByPerson(){
+  try{ _renderPayReqs(); if(!window._payInfoLoaded){ window._payInfoLoaded=true; _loadPayInfo().then(()=>{ try{ _renderPayReqs(); }catch(e){} }); } }catch(e){}
+  try{ const a=document.getElementById('vc-att-wht'); if(a&&!a.dataset.init){ a.checked=(ls('vc_attach')||{wht:true}).wht!==false; a.dataset.init='1'; }
+       const l=document.getElementById('vc-doc-lang'); if(l&&window.GDOC) l.value=GDOC.lang(); }catch(e){}
   try { renderVcFinanceSummary(); } catch(e){}
   const listEl = document.getElementById('vc-byperson-list');
   if(!listEl) return;
@@ -24924,6 +25101,7 @@ function previewPersonVoucher(staffId){
 
 // 👁️ STEP 1: เปิด Preview Modal — ยังไม่ commit ใด ๆ · admin ตรวจก่อน
 function issuePersonVoucher(staffId){
+  if(!canTransfer()){ const sel=_vcByPersonSelected.get(staffId)||new Set(); const its=_vcGetPersonItems(staffId).filter(it=>sel.has(`${it.p.id}|${it.w.slot}`)); _askPayRequest(its.map(it=>_reqItem(it.s,it.p,it.w)),'หน้าเอกสาร · ออกใบรายคน'); return; }
   const items = _vcGetPersonItems(staffId);
   const sel = _vcByPersonSelected.get(staffId) || new Set();
   const selectedItems = items.filter(it => sel.has(`${it.p.id}|${it.w.slot}`));
@@ -25011,10 +25189,7 @@ async function _vcCommitIssueVoucher(staffId){
     staffName: s.name,
     staffLastName: s.lastName || '',
     staffNickname: s.nickname,
-    items: selectedItems.map(it => ({
-      projId: it.p.id, projName: it.p.name,
-      slot: it.w.slot, amount: it.w.amount||0,
-    })),
+    items: _vcItemsSnap(selectedItems.map(it=>({w:it.w, p:it.p}))),
     amount: totalAmt,
     totalAmount: totalAmt,
     multiItem: true,
@@ -25024,6 +25199,7 @@ async function _vcCommitIssueVoucher(staffId){
     date, note,
     createdAt: nowIso,
   });
+  await _vcAutoWht(s, saved[saved.length-1]);   // 🏛️ มีหักภาษี → ออก 50 ทวิ คู่ใบนี้
   saveDocsStore('vouchers', saved);
   _vcByPersonSelected.delete(staffId);
   // 3. รายงานผลการออกใบ
@@ -25560,7 +25736,7 @@ function downloadVouchers() {
   const byPerson = _vcGroupSelectedByPerson(selected);
   for(const [wid, {s, works}] of byPerson){
     const html = buildMultiVoucherHTML({
-      vNo: nextVoucherNo(), staff:s,
+      vNo: _peekVoucherNo(), staff:s,
       items: works.map(({w,p})=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
       totalAmt: works.reduce((a,{w})=>a+(w.amount||0),0),
       date, note,
@@ -25570,6 +25746,7 @@ function downloadVouchers() {
 }
 // STEP 1: ตรวจสอบใบก่อนออกจริง (เหมือนโหมด "ตามคน") — ยังไม่บันทึก/ยังไม่ส่ง
 function issueAndSendVouchers() {
+  if(!canTransfer()){ _askPayRequest(getSelectedVcWorkers().map(x=>_reqItem(x.s,x.p,x.w)),'หน้าเอกสาร · ตามโปรเจกต์'); return; }
   const selected = getSelectedVcWorkers();
   if (!selected.length){toast('กรุณาเลือกทีมงาน','error');return;}
   // รวมงานของแต่ละคนเป็น 1 ใบ — ใบเดียวกัน รวมข้ามโปรเจกต์ได้
@@ -25641,11 +25818,12 @@ async function _vcCommitIssueVouchersByProj() {
     const saved = getDocsStore('vouchers') || [];
     saved.push({
       type:'voucher', docNo:vNo, staffId:wid, staffName:s.name, staffLastName:s.lastName||'', staffNickname:s.nickname,
-      items: works.map(({w,p})=>({projId:p.id, projName:p.name, slot:w.slot, amount:w.amount||0})),
+      items: _vcItemsSnap(works),
       amount: totalAmt, totalAmount: totalAmt, multiItem:true,
       bank:s.bank||'', account:s.account||'', email:s.email||'',
       date, note, createdAt: nowIso,
     });
+    await _vcAutoWht(s, saved[saved.length-1]);
     saveDocsStore('vouchers', saved);
     issuedVNos.push(vNo);
   }
@@ -25673,10 +25851,11 @@ function saveDocsStore(type,data){ls('docs_'+type,data);if(_fbDatabase)_fbDataba
 function _staffDocKey(no){ return String(no||'').replace(/[.#$\[\]\/]/g,'_'); }
 function _staffDocOf(d){
   const items = (d.multiItem && Array.isArray(d.items) && d.items.length)
-    ? d.items.map(it=>({ projId:String(it.projId||''), projName:String(it.projName||''), slot:String(it.slot||''), amount:Number(it.amount)||0 }))
+    ? d.items.map(it=>Object.assign({ projId:String(it.projId||''), projName:String(it.projName||''), slot:String(it.slot||''), amount:Number(it.amount)||0 }, it.taxPct!=null?{taxPct:Number(it.taxPct)||0}:{}))
     : [{ projId:String(d.projId||''), projName:String(d.projName||''), slot:String(d.slot||''), amount:Number(d.amount)||0 }];
   const rec={ type:'voucher', docNo:String(d.docNo), date:String(d.date||''), note:String(d.note||''), items,
     amount:Number(d.totalAmount||d.amount)||0, staffName:String(d.staffName||''), staffNickname:String(d.staffNickname||''), createdAt:String(d.createdAt||'') };
+  if(d.whtNo) rec.whtNo=String(d.whtNo);
   if(d.cancelled || d.status==='cancelled' || d.voided) rec.cancelled=true;
   return rec;
 }
@@ -25968,6 +26147,14 @@ function _buildDocHTMLByNo(type, docNo){
   }catch(e){ return ''; }
 }
 function downloadDocByNo(type, docNo){
+  if(window.GDOC){
+    const st={quotation:'quotations',invoice:'invoices',receipt:'receipts'}[type];
+    if(st){ const d=(getDocsStore(st)||[]).find(x=>x.docNo===docNo); if(d) return _gdSales(type, d, docNo+'_'+(d.client||''), ()=>downloadDocHTML(_buildDocHTMLByNo(type, docNo), docNo)); }
+    else { const v=(getDocsStore('vouchers')||[]).find(x=>x.docNo===docNo);
+      if(v && v.multiItem && Array.isArray(v.items) && v.items.length){ showLoader(true);
+        return GDOC.voucherPages(_voucherOpts(v)).then(r=>GDOC.save(r.pages,'ใบสำคัญจ่าย_'+docNo)).then(()=>toast('📄 ดาวน์โหลด PDF แล้ว','success'))
+          .catch(e=>{ console.warn(e); downloadDocHTML(_buildDocHTMLByNo(type, docNo), docNo); }).finally(()=>showLoader(false)); } }
+  }
   const html=_buildDocHTMLByNo(type, docNo);
   if(!html){ toast('ไม่พบข้อมูลเอกสาร '+docNo,'warn'); return; }
   downloadDocHTML(html, docNo);
@@ -26167,7 +26354,7 @@ function buildBillingVoucherHTML(staffId) {
     : billingCycleSelected===0 ? 'ทั้งเดือน '+TM[billingMonthSelected]+' '+(billingYearSelected+543)
     : billingCycleSelected===1 ? '1–15 '+TM[billingMonthSelected]+' '+(billingYearSelected+543)
     : '16–สิ้นเดือน '+TM[billingMonthSelected]+' '+(billingYearSelected+543);
-  const vNo = nextVoucherNo();
+  const vNo = _peekVoucherNo();   // หน้าดู/พิมพ์ของหน้าเก่า — ไม่จองเลขจริง (เดิมกดดูทีละครั้งเลขข้ามไปเรื่อยๆ)
   const issueDate = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
   // ดึง catLabel จาก slot ของ worker ใน project (ไม่ใช่ category ใน staff db)
   const SLOT_LABELS = {dub:'🎤 Dubbing',adp:'✍️ Adaptation',mix:'🎧 Mix',qc:'✅ QC',sub:'🎬 Sub & Video',trn:'🌐 นักแปล',mgr:'🗂️ Manager'};
@@ -29788,6 +29975,7 @@ function saveAndSendInvoice(){
 function downloadInvoice(){
   const data = getInvoiceData();
   if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
+  if(window.GDOC) return _gdSales('invoice', data, (data.docNo||'invoice')+'_'+data.client, ()=>{ const h=buildInvoiceHTML(data); return _docSavePdf(h, data.docNo||'invoice', ()=>_docPrintWindowInvoice(h, data.docNo||'invoice')); });
   const html = buildInvoiceHTML(data);
   const fname = (data.docNo||'invoice')+'_'+data.client;
   return _docSavePdf(html, fname, ()=>_docPrintWindowInvoice(html, fname));
@@ -32759,7 +32947,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261022-01"></script><script src="scene/nd-profile.js?v=20261022-01"></script><script src="scene/nd-plan.js?v=20261022-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261022-05"></script><script src="scene/nd-profile.js?v=20261022-05"></script><script src="scene/nd-plan.js?v=20261022-05"></script><script src="scene/nd-docpdf.js?v=20261022-05"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32769,7 +32957,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261022-01';
+var UPD_BUILD = '20261022-05';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
