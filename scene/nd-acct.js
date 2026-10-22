@@ -228,7 +228,18 @@ async function detect(){
   document.querySelectorAll('.nd-acct-nav').forEach(w=>{ w.style.display=(cu.role!=='admin'&&cu.acct)?'':'none'; });
   return true; }
 // เช็กตลอด (ถามฐานข้อมูลแค่ครั้งเดียวต่อบัญชี) — เมนูถูกสร้างใหม่/สลับบัญชี ก็ยังขึ้นถูก
-setInterval(()=>{ ensurePage(); detect(); }, 2500);
+setInterval(()=>{ try{ ensurePage(); }catch(e){ console.warn('nd-acct page',e); } detect().catch(e=>console.warn('nd-acct detect',e)); }, 2500);
+// 🔍 ตรวจสิทธิ์นักบัญชี: เปิดเว็บด้วย ?acct=debug → กล่องแสดงค่าที่ระบบเห็นจริง (ใช้ตอนเมนูไม่ขึ้น)
+if(/[?&]acct=debug/.test(location.search)) setTimeout(async function dbg(){
+  const cu=safe(()=>currentUser,null), db=safe(()=>_fbDatabase,null); let val='—', err='';
+  if(cu&&cu.uid&&db){ try{ val=JSON.stringify((await db.ref('admin_config/accountants/'+cu.uid).get()).val()); }catch(e){ err=e.message; } }
+  let all=''; if(db){ try{ all=JSON.stringify((await db.ref('admin_config/accountants').get()).val()); }catch(e){ all='อ่านทั้งหมดไม่ได้: '+e.message; } }
+  const navs=[...document.querySelectorAll('.nd-acct-nav')].map(w=>(w.closest('[id$="-nav"]')||{}).id+':'+getComputedStyle(w).display).join(', ');
+  let box=$('acct-dbg'); if(!box){ box=document.createElement('div'); box.id='acct-dbg'; box.style.cssText='position:fixed;right:12px;bottom:12px;z-index:99999;background:#111;color:#0f0;font:12px monospace;padding:10px 12px;border-radius:10px;max-width:440px;white-space:pre-wrap;word-break:break-all;box-shadow:0 6px 24px #000'; document.body.appendChild(box); }
+  box.textContent=['🧾 acct debug (build '+(window.UPD_BUILD||'?')+')',
+    'user: '+(cu?(cu.email+' · role='+cu.role+' · uid='+cu.uid):'ยังไม่ล็อกอิน'), 'db: '+(db?'ok':'none'),
+    'ค่าของบัญชีนี้: '+val+(err?' · error: '+err:''), 'ทั้งหมด: '+all, 'cu.acct: '+(cu&&cu.acct), 'เมนู: '+(navs||'ไม่พบ .nd-acct-nav')].join('\n');
+  setTimeout(dbg, 4000); }, 6000);
 document.addEventListener('DOMContentLoaded', ensurePage);
 window.addEventListener('load', ensurePage);
 })();
