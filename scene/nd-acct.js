@@ -156,7 +156,7 @@ function render(){ const b=$('nd-acct-body'); if(!b||!D) return; const C=compute
   // 4 รายรับ & 50 ทวิลูกค้า
   const cw=A.clientWht||{};
   const s4=`${C.clients.length?`<table><tr><th>ลูกค้า</th><th>งาน</th><th class="r">รับเงิน</th><th class="r">ถูกหัก</th><th>50 ทวิ จากลูกค้า</th></tr>${C.clients.map(c=>{ const g=cw[c.client]||{}; return `<tr><td><b>${E(c.client)}</b></td><td class="ac-mut">${E([...c.codes].join(', '))}</td><td class="r">${B(c.amount)}</td><td class="r">${B(c.wht)}</td><td>${!c.wht?'<span class="ac-mut">ไม่หัก</span>':g.got?`✅ ได้รับ${g.url?` · <a href="${E(g.url)}" target="_blank">เปิด</a>`:''}`:`<span class="ac-pill ac-o">รอ</span> <button class="btn btn-xs btn-outline" onclick="ACCT.clientWht('${E(encodeURIComponent(c.client))}')">📎 แนบ/ได้รับแล้ว</button>`}</td></tr>`; }).join('')}</table>`:'<div class="ac-mut">ไม่มีงวดรับเงินที่ลงวันรับเงินในเดือนนี้</div>'}
-    <div class="ac-mut" style="margin-top:6px">ใบแจ้งหนี้ ${C.invoices.length} · ใบเสร็จ ${C.receipts.length} ใบในเดือนนี้ (เปิด/โหลดได้ที่หน้าเอกสาร › ประวัติเอกสาร)</div>`;
+    <div class="ac-mut" style="margin-top:6px">ใบแจ้งหนี้ ${C.invoices.length} · ใบเสร็จ ${C.receipts.length} ใบในเดือนนี้</div>`;
   const s4wait=C.clients.filter(c=>c.wht&&!(cw[c.client]||{}).got).length;
   // 5 ค่าใช้จ่าย
   const ef=A.expFiles||{};
@@ -192,7 +192,7 @@ function render(){ const b=$('nd-acct-body'); if(!b||!D) return; const C=compute
     <div class="ac-st"><div class="ac-sh" style="cursor:default"><div class="ac-ic">📤</div><div><b>7. ส่งบริษัทบัญชี & ปิดเดือน</b><small>${A.closedAt?'ปิดเดือนแล้ว โดย '+E(A.closedBy||'')+' · '+E(String(A.closedAt).slice(0,10)):'กดได้เมื่อติ๊ก "ตรวจแล้ว" ครบ 6 ขั้น'}</small></div>
      ${A.closedAt?P('✓ ปิดแล้ว','ac-g'):`<button class="btn btn-sm ${allOk?'btn-green':'btn-outline'}" ${allOk?'':'disabled style="opacity:.5"'} onclick="ACCT.close()">📤 ส่งแล้ว + ปิดเดือน</button>`}<span></span></div></div>
    </div>
-   <div class="ac-mut" style="margin-bottom:20px">💡 โหลดเอกสารย้อนหลังทุกใบได้ที่ <a href="javascript:void 0" onclick="nav('docs')">หน้าเอกสาร › ประวัติเอกสาร</a> (แอดมิน) · นักบัญชีโหลดได้จากปุ่มในแต่ละขั้น</div>`;
+   <div style="height:20px"></div>`;
 }
 
 /* ── ไฟล์ ── */
