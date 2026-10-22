@@ -219,8 +219,11 @@ window.ACCT={
 /* ── สิทธิ์นักบัญชี + เมนู ── */
 async function detect(){
   const cu=safe(()=>currentUser,null), db=safe(()=>_fbDatabase,null); if(!cu) return false;
-  if(cu.role!=='admin' && cu.uid && db && cu._acctChecked!==cu.uid){ cu._acctChecked=cu.uid;
-    try{ const v=(await db.ref('admin_config/accountants/'+cu.uid).get()).val(); cu.acct=v===true; }catch(e){ cu.acct=false; } }
+  // ถามฐานข้อมูลครั้งแรก แล้วทุก 60 วินาที (แอดมินติ๊กให้ระหว่างเปิดเว็บอยู่ ก็ขึ้นเองไม่ต้องรีเฟรช)
+  if(cu.role!=='admin' && cu.uid && db && (cu._acctChecked!==cu.uid || Date.now()-(cu._acctAt||0)>60000)){ cu._acctChecked=cu.uid; cu._acctAt=Date.now();
+    const was=!!cu.acct;
+    try{ const v=(await db.ref('admin_config/accountants/'+cu.uid).get()).val(); cu.acct=v===true; }catch(e){ console.warn('🧾 เช็กสิทธิ์นักบัญชีไม่ได้:', e&&e.message); }
+    if(cu.acct && !was) safe(()=>toast('🧾 บัญชีนี้มีสิทธิ์นักบัญชี — เมนู "งานบัญชี" อยู่ใต้ "เอกสารของฉัน"','success'),null); }
   // เมนู "งานบัญชี" ของทีมงาน/เมเนเจอร์ที่เป็นนักบัญชี (แอดมินมีในกลุ่มบัญชีอยู่แล้ว)
   document.querySelectorAll('.nd-acct-nav').forEach(w=>{ w.style.display=(cu.role!=='admin'&&cu.acct)?'':'none'; });
   return true; }

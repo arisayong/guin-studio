@@ -115,7 +115,11 @@ window.ndRelinkAcct=async function(){
 window.ndpSetAcct=async function(cb){
   const db=FB(); if(!db||!ST.acct||!CU()||CU().role!=='admin'){ cb.checked=!cb.checked; return; }
   cb.disabled=true;
-  try{ await db.ref('admin_config/accountants/'+ST.acct.uid).set(cb.checked?true:null); $('ndp-acct-wrap')?.classList.toggle('on',cb.checked);
+  try{ // ทุกบัญชีล็อกอินที่เป็นของคนนี้ (ผูกรหัสสมาชิก หรืออีเมลตรงกัน) ได้สิทธิ์ด้วย
+    const em=String((ST.staff&&ST.staff.email)||'').trim().toLowerCase(), uc=ls('mgr_users_cache')||{}, upd={};
+    upd[ST.acct.uid]=cb.checked?true:null;
+    Object.entries(uc).forEach(([uid,u])=>{ if(u && u.role!=='admin' && (u.staffId===ST.staff.id || (em && String(u.email||'').trim().toLowerCase()===em))) upd[uid]=cb.checked?true:null; });
+    await db.ref('admin_config/accountants').update(upd); $('ndp-acct-wrap')?.classList.toggle('on',cb.checked);
     try{ logAudit('staff.acct', ST.staff&&(ST.staff.nickname||ST.staff.name)||'', cb.checked?'ตั้งเป็นนักบัญชี':'ยกเลิกสิทธิ์นักบัญชี'); }catch(e){}
     toast(cb.checked?'🧾 ตั้งเป็นนักบัญชีแล้ว — ให้เขารีเฟรชหน้าเว็บ 1 ครั้ง':'ยกเลิกสิทธิ์นักบัญชีแล้ว','success');
   }catch(e){ cb.checked=!cb.checked; toast('บันทึกไม่สำเร็จ: '+e.message,'error'); }
