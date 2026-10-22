@@ -56,7 +56,7 @@ const grp = (key, page, ic, label, items) =>
      <div class="nav-item" onclick="nav('${page}')" data-tip="${esc(label)}">${svg(ic)}<span class="nd-lb">${esc(label)}</span><span class="nav-badge nd-grp-badge hidden"></span><svg class="nd-chev" viewBox="0 0 24 24" data-grp-toggle="1"><path d="${P.chev}"/></svg></div>
      <div class="nd-sub"><div>${items}</div></div></div>`;
 const FIN = [['queue','payq','คิวจ่ายเงิน','จ่ายเงินทีม · ใบยืนยันยอด','queue-badge'],['payroll','payroll','รอบจ่ายรายเดือน','รวมยอดรายเดือนของแต่ละคน'],
-             ['profit','profit','สรุปการเงิน','รายรับ รายจ่าย กำไร'],['docs','docs','เอกสาร','ใบแจ้งหนี้ ใบเสร็จ ใบสำคัญจ่าย 50 ทวิ'],['payment','payment','บัญชีรับเงิน','บัญชี/QR ท้ายใบแจ้งหนี้']];
+             ['profit','profit','สรุปการเงิน','รายรับ รายจ่าย กำไร'],['docs','docs','เอกสาร','ใบแจ้งหนี้ ใบเสร็จ ใบสำคัญจ่าย 50 ทวิ'],['payment','payment','บัญชีรับเงิน','บัญชี/QR ท้ายใบแจ้งหนี้'],['nd-acct','docs','งานบัญชี','เช็กงานบัญชีรายเดือน · ติดตามนักบัญชี']];
 function buildNav(){
   const a=$('admin-nav'), s=$('staff-nav'), m=$('manager-nav');
   if(!a||!s||!m) return;
@@ -70,7 +70,7 @@ function buildNav(){
   s.innerHTML = item('home','home','หน้าแรก') + sec('ของฉัน')
     + item('my-calendar','track','ปฏิทินงาน') + item('my-dashboard','money','งานของฉัน')
     + item('confirm-amount','confirm','ยืนยันยอด',badge('ca-badge-staff'))
-    + item('nd-docs','docs','เอกสารของฉัน') + sec('อื่น ๆ') + item('nd-settings','settings','ตั้งค่า');   // 🔔 แจ้งเตือน = ปุ่มกระดิ่งท้ายเมนูอย่างเดียว (มี "ดูทั้งหมด")
+    + item('nd-docs','docs','เอกสารของฉัน') + `<div id="nd-acct-nav" style="display:none">${item('nd-acct','docs','งานบัญชี')}</div>` + sec('อื่น ๆ') + item('nd-settings','settings','ตั้งค่า');   // 🔔 แจ้งเตือน = ปุ่มกระดิ่งท้ายเมนูอย่างเดียว (มี "ดูทั้งหมด")
   m.innerHTML = item('home','home','หน้าแรก') + sec('งาน')
     + item('availability','queueAvail','ลงคิว') + item('assign','assign','มอบหมายงาน')
     + item('nd-plan','plan','วางแผนงาน')

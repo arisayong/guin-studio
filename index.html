@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261022-05"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261023-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -8739,10 +8739,12 @@ function calcPayrollTotal(staffId, monthKey, projectAmt){
   const entry=getPayrollEntry(monthKey, staffId);
   const base = (prof.payType==='salary'||prof.payType==='hybrid') ? (parseFloat(prof.baseSalary)||0) : 0;
   const allow= (prof.payType==='salary'||prof.payType==='hybrid') ? (parseFloat(prof.allowance)||0) : 0;
-  const work = (prof.payType==='salary') ? 0 : (projectAmt||0);   // เงินเดือนล้วน = ไม่บวกค่างานซ้ำ
+  // ตั้งเป็น "เงินเดือนประจำ" แต่ยังไม่ได้ใส่จำนวนเงินเดือน → นับตามค่างานไปก่อน (เดิมขึ้น ฿0 ทั้งที่มีงานค้างจ่าย)
+  const noBase = prof.payType==='salary' && !(parseFloat(prof.baseSalary)>0);
+  const work = (prof.payType==='salary' && !noBase) ? 0 : (projectAmt||0);   // เงินเดือนล้วน = ไม่บวกค่างานซ้ำ
   const bonus=parseFloat(entry.bonus)||0;
   const deduct=parseFloat(entry.deduction)||0;
-  return { prof, entry, base, allow, work, bonus, deduct, net: work+base+allow+bonus-deduct };
+  return { prof, entry, base, allow, work, bonus, deduct, noBase, net: work+base+allow+bonus-deduct };
 }
 // เดือนของงาน = เดือนที่ "รับงาน/เริ่มงาน" (ตามที่ตกลงกับเจ้าของระบบ 2026-08-02)
 //   ลำดับ: วันเริ่มงาน → วันที่ของโปรเจกต์ → วันที่สร้างในระบบ → เดทไลน์ (ท้ายสุด เผื่อของเก่าไม่มีวันเริ่ม)
@@ -8885,7 +8887,7 @@ function renderPayrollMonth(){
           ${(e.pay.base||e.pay.allow||e.pay.bonus||e.pay.deduct)?`<div style="font-size:10.5px;color:var(--text2);margin-top:2px">
             ${e.pay.work?'ค่างาน '+fmtB(e.pay.work):''}${e.pay.base?' + เงินเดือน '+fmtB(e.pay.base):''}${e.pay.allow?' + เบี้ยเลี้ยง '+fmtB(e.pay.allow):''}${e.pay.bonus?' + โบนัส '+fmtB(e.pay.bonus):''}${e.pay.deduct?' − หัก '+fmtB(e.pay.deduct):''}
           </div>`:''}
-          ${e.pay.prof.payType!=='project'?`<div style="font-size:10px;color:var(--text2);margin-top:2px">${PAY_TYPES[e.pay.prof.payType].icon} ${PAY_TYPES[e.pay.prof.payType].label}</div>`:''}
+          ${e.pay.prof.payType!=='project'?`<div style="font-size:10px;color:var(--text2);margin-top:2px">${PAY_TYPES[e.pay.prof.payType].icon} ${PAY_TYPES[e.pay.prof.payType].label}</div>`:''}${e.pay.noBase?`<div style="font-size:10px;color:var(--orange);margin-top:2px">⚠️ ยังไม่ได้ใส่เงินเดือน — นับตามค่างานไปก่อน (กด "ประเภทจ่าย/โบนัส")</div>`:''}
         </div>
       </div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
@@ -24354,7 +24356,7 @@ function _askPayRequest(items, from){
 }
 function _guardTransfer(items, from){ if(canTransfer()) return false; _askPayRequest(items, from); return true; }
 const _reqItem=(s,p,w)=>({staffId:w.id, staffName:(s&&(s.nickname||s.name))||w.id, projId:p.id, projName:p.name, slot:w.slot, amount:w.amount||0});
-function _payReqDone(it){ const p=getProjects().find(x=>x.id===it.projId); const w=p&&(p.workers||[]).find(x=>x&&x.id===it.staffId&&x.slot===it.slot); return !w || w.status==='paid'; }
+function _payReqDone(it){ if(it.kind) return !!it.done; const p=getProjects().find(x=>x.id===it.projId); const w=p&&(p.workers||[]).find(x=>x&&x.id===it.staffId&&x.slot===it.slot); return !w || w.status==='paid'; }
 function _renderPayReqs(){
   const box=document.getElementById('vc-payreq-box'); if(!box) return;
   const reqs=_payReqs().filter(r=>!r.closed); const me=canTransfer();
@@ -24364,6 +24366,7 @@ function _renderPayReqs(){
       <span>${ok?'✅':'📨'}</span><div style="flex:1;min-width:200px"><b>${esc(r.by)}</b> ขอโอน ${ppl.length} คน · <b>${fmtB(r.total)}</b> <span style="color:var(--text2)">· ${esc(r.from||'')} · ${esc(String(r.at).slice(0,10))}</span>
        <div style="color:var(--text2)">${esc(ppl.join(', '))}${r.note?' · 📝 '+esc(r.note):''}</div></div>
       <span style="color:${ok?'var(--green)':'var(--orange)'};font-weight:700">${ok?'โอนครบแล้ว':'โอนแล้ว '+done+'/'+all}</span>
+      ${me&&!ok&&r.items.some(x=>x.kind)?`<button class="btn btn-xs" style="background:var(--green);color:#012a1c;border:none;font-weight:700" onclick="_donePayReq('${escJs(r.id)}')">✓ โอนแล้ว</button>`:''}
       ${(me||r.byEmail===currentUser?.email)?`<button class="btn btn-xs btn-outline" onclick="_closePayReq('${escJs(r.id)}')">${ok?'เก็บ':'ยกเลิกคำขอ'}</button>`:''}</div>`; }).join('');
   box.innerHTML=`<div style="margin-bottom:12px;padding:10px 14px;background:rgba(255,158,0,.06);border:1px solid rgba(255,158,0,.25);border-radius:10px">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:13px">💳 ${me?'คุณเป็นผู้มีสิทธิ์โอนเงิน':'🔒 คุณส่งได้แค่คำขอโอน (โอน/ออกใบได้เฉพาะเจ้าของ)'}</b>
@@ -24371,6 +24374,7 @@ function _renderPayReqs(){
      ${me?'<button class="btn btn-xs btn-outline" style="margin-left:auto" onclick="editPayers()">⚙️ ผู้มีสิทธิ์โอน</button>':''}</div>
     ${rows||'<div style="font-size:12px;color:var(--text2);margin-top:4px">ไม่มีคำขอโอน</div>'}</div>`;
 }
+function _donePayReq(id){ if(!canTransfer()) return; const a=_payReqs(); const r=a.find(x=>x.id===id); if(r){ r.items.forEach(x=>{ if(x.kind){ x.done=true; x.doneAt=new Date().toISOString(); x.doneBy=currentUser?.nickname||''; } }); _savePayReqs(a); } _renderPayReqs(); }
 function _closePayReq(id){ const a=_payReqs(); const r=a.find(x=>x.id===id); if(r){ r.closed=true; r.closedAt=new Date().toISOString(); _savePayReqs(a); } _renderPayReqs(); }
 // เลขใบสำคัญจ่ายถัดไป "ดูเฉยๆ" (ไม่จองเลข) — ใช้กับหน้าตัวอย่าง กันเลขข้าม
 function _peekVoucherNo(){ const n=Math.max(voucherSeq||0, parseInt(ls('voucher_seq')||'0',10)||0, _maxVoucherSeqInStore())+1; return `GS-${new Date().getFullYear()+543}-${_todayDDMM()}-${String(n).padStart(4,'0')} (ตัวอย่าง)`; }
@@ -32947,7 +32951,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261022-05"></script><script src="scene/nd-profile.js?v=20261022-05"></script><script src="scene/nd-plan.js?v=20261022-05"></script><script src="scene/nd-docpdf.js?v=20261022-05"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261023-01"></script><script src="scene/nd-profile.js?v=20261023-01"></script><script src="scene/nd-plan.js?v=20261023-01"></script><script src="scene/nd-docpdf.js?v=20261023-01"></script><script src="scene/nd-acct.js?v=20261023-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32957,7 +32961,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261022-05';
+var UPD_BUILD = '20261023-01';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
