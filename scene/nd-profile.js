@@ -112,12 +112,22 @@ window.ndRelinkAcct=async function(){
     toast('🔗 ผูกบัญชีใหม่แล้ว','success'); open('admin', ST.staff.id);
   }catch(e){ toast('ผูกไม่สำเร็จ: '+e.message,'error'); }
 };
+window.ndpSetAcct=async function(cb){
+  const db=FB(); if(!db||!ST.acct||!CU()||CU().role!=='admin'){ cb.checked=!cb.checked; return; }
+  cb.disabled=true;
+  try{ await db.ref('admin_config/accountants/'+ST.acct.uid).set(cb.checked?true:null); $('ndp-acct-wrap')?.classList.toggle('on',cb.checked);
+    try{ logAudit('staff.acct', ST.staff&&(ST.staff.nickname||ST.staff.name)||'', cb.checked?'ตั้งเป็นนักบัญชี':'ยกเลิกสิทธิ์นักบัญชี'); }catch(e){}
+    toast(cb.checked?'🧾 ตั้งเป็นนักบัญชีแล้ว — ให้เขารีเฟรชหน้าเว็บ 1 ครั้ง':'ยกเลิกสิทธิ์นักบัญชีแล้ว','success');
+  }catch(e){ cb.checked=!cb.checked; toast('บันทึกไม่สำเร็จ: '+e.message,'error'); }
+  cb.disabled=false;
+};
 function rolesHTML(){
   if(ST.mode==='admin'){
     const acc=ST.acct, isMgr=acc&&acc.role==='manager';
     return `<div class="ndp-card"><div class="ndp-ch"><h3>โรล / ตำแหน่งงาน</h3><span class="muted">แอดมินเปลี่ยนได้ทันที</span></div><div class="ndp-cb">
       <div class="ndp-roles">${CAT_KEYS.map(c=>`<label class="ndp-rchip ${ST.roles.includes(c)?'on':''}" style="--c:${catColor(c)}"><input type="checkbox" data-role="${c}" ${ST.roles.includes(c)?'checked':''}> ${esc(catLabel(c))}</label>`).join('')}</div>
-      ${acc?`<div class="ndp-f" style="margin-top:12px;max-width:320px"><label>บทบาทในระบบ</label><select id="ndp-sysrole"><option value="staff" ${!isMgr?'selected':''}>🎙️ Staff (ทีมงาน)</option><option value="manager" ${isMgr?'selected':''}>🗂️ Manager</option></select></div>`:''}
+      ${acc?`<div class="ndp-f" style="margin-top:12px;max-width:320px"><label>บทบาทในระบบ</label><select id="ndp-sysrole"><option value="staff" ${!isMgr?'selected':''}>🎙️ Staff (ทีมงาน)</option><option value="manager" ${isMgr?'selected':''}>🗂️ Manager</option></select></div>
+        <label class="ndp-rchip" id="ndp-acct-wrap" style="--c:#00B4FF;margin-top:10px;display:inline-flex"><input type="checkbox" id="ndp-acct" disabled onchange="ndpSetAcct(this)"> 🧾 นักบัญชี <small style="opacity:.75;font-weight:400">— เห็นเมนู "งานบัญชี" · ดูข้อมูลการเงินได้ (โอน/แก้ไม่ได้) · มีผลทันที</small></label>`:'<div class="muted" style="margin-top:10px;font-size:12px">🧾 ตั้งเป็นนักบัญชีได้หลังผูกบัญชีผู้ใช้กับทีมงานคนนี้</div>'}
       ${reqNoteHTML()}</div></div>${linkCardHTML()}`;
   }
   const cur=ST.roles, add=ST.pendAdd, del=ST.pendDel;
@@ -196,6 +206,8 @@ function wire(host){
   host.querySelectorAll('[data-role]').forEach(el=>el.addEventListener('change',()=>{ const c=el.dataset.role;
     ST.roles=el.checked?[...new Set([...ST.roles,c])]:ST.roles.filter(x=>x!==c); el.parentElement.classList.toggle('on',el.checked); markDirty(); }));
   $('ndp-sysrole')?.addEventListener('change',markDirty);
+  // 🧾 สถานะนักบัญชี (admin_config/accountants/<uid>)
+  { const cb=$('ndp-acct'), db=FB(); if(cb && ST.acct && db){ db.ref('admin_config/accountants/'+ST.acct.uid).get().then(sn=>{ cb.checked=sn.val()===true; cb.disabled=false; $('ndp-acct-wrap')?.classList.toggle('on',cb.checked); }).catch(()=>{ cb.disabled=false; }); } }
   host.addEventListener('click',e=>{
     const a=e.target.closest('[data-radd]'), d=e.target.closest('[data-rdel]');
     if(a){ const c=a.dataset.radd; ST.pendAdd=ST.pendAdd.includes(c)?ST.pendAdd.filter(x=>x!==c):[...ST.pendAdd,c]; markDirty(); rerenderKeep(host); }
