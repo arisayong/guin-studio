@@ -22,24 +22,34 @@ const SSO_RATE=0.05;
 let MONTH=new Date().toISOString().slice(0,7), D=null, A={}, OPEN=new Set(['s1']), BUSY=false, HIST={};
 
 /* ── ข้อมูล ── */
-async function load(){
-  const db=safe(()=>_fbDatabase,null), out={};
+// ⚡ โหลดพร้อมกันทุกก้อน (เดิมรอทีละก้อน ~12 รอบ) · จำข้อมูลหลักไว้ 5 นาที · สลับเดือนไม่ต้องโหลดใหม่
+let BASE=null, BASE_AT=0, MON_AT=0;
+const K=async k=>{ try{ return await fbLoadKeyed(k); }catch(e){ return null; } };
+async function loadBase(force){
+  if(BASE && !force && Date.now()-BASE_AT<300000) return;
+  const db=safe(()=>_fbDatabase,null), out={vouchers:[],invoices:[],receipts:[],projects:[],priv:{}}, jobs=[];
   if(isAdm() || !db){   // แอดมิน = ใช้ข้อมูลที่โหลดไว้แล้ว · ไม่มีฐานข้อมูล (เดโม่) = ใช้ในเครื่อง
     out.vouchers=arr(safe(()=>getDocsStore('vouchers'),[])); out.invoices=arr(safe(()=>getDocsStore('invoices'),[])); out.receipts=arr(safe(()=>getDocsStore('receipts'),[]));
     out.projects=arr(safe(()=>getProjects(),[]));
-  } else if(db){
-    try{ const d=(await db.ref('docs').get()).val()||{}; out.vouchers=arr(d.vouchers); out.invoices=arr(d.invoices); out.receipts=arr(d.receipts); }catch(e){ out.err='อ่านเอกสารไม่ได้ — แอดมินต้องอัปเดตกฎ Firebase (สิทธิ์นักบัญชี)'; }
-    try{ out.projects=arr((await db.ref('projects').get()).val()); }catch(e){ out.projects=[]; }
-    try{ out.priv=(await db.ref('staffPrivate').get()).val()||{}; }catch(e){ out.priv={}; }
+  } else {
+    jobs.push(db.ref('docs').get().then(sn=>{ const d=sn.val()||{}; out.vouchers=arr(d.vouchers); out.invoices=arr(d.invoices); out.receipts=arr(d.receipts); })
+      .catch(()=>{ out.err='อ่านเอกสารไม่ได้ — แอดมินต้องอัปเดตกฎ Firebase (สิทธิ์นักบัญชี)'; }));
+    const lp=arr(safe(()=>getProjects(),[]));   // เมเนเจอร์มีโปรเจกต์ในเครื่องอยู่แล้ว → ไม่ต้องโหลดซ้ำ
+    if(lp.length) out.projects=lp; else jobs.push(db.ref('projects').get().then(sn=>{ out.projects=arr(sn.val()); }).catch(()=>{}));
+    jobs.push(db.ref('staffPrivate').get().then(sn=>{ out.priv=sn.val()||{}; }).catch(()=>{}));
   }
-  const K=async k=>{ try{ return await fbLoadKeyed(k); }catch(e){ return null; } };
-  out.wht=arr(await K('wht_docs')); out.exp=arr(await K('company_expenses')); out.payroll=(await K('payroll_profiles'))||{};
-  out.cfg=(await K('acct_cfg'))||{};
-  A=(await K('acct_'+MONTH))||{};
-  // ย้อนหลัง 6 เดือน (ตารางติดตาม)
-  HIST={}; for(const k of lastMonths(6)) HIST[k]=k===MONTH?A:((await K('acct_'+k))||{});
-  D=Object.assign({vouchers:[],invoices:[],receipts:[],projects:[],priv:{}}, out);
+  jobs.push(K('wht_docs').then(v=>{ out.wht=arr(v); }), K('company_expenses').then(v=>{ out.exp=arr(v); }),
+            K('payroll_profiles').then(v=>{ out.payroll=v||{}; }), K('acct_cfg').then(v=>{ out.cfg=v||{}; }));
+  await Promise.all(jobs);
+  BASE=out; BASE_AT=Date.now();
 }
+// สถานะงานบัญชี 6 เดือนล่าสุด (ไฟล์เล็ก ดึงพร้อมกัน)
+async function loadMonths(force){
+  if(!force && Object.keys(HIST).length && Date.now()-MON_AT<60000) return;
+  const ks=lastMonths(6); const vals=await Promise.all(ks.map(k=>K('acct_'+k)));
+  HIST={}; ks.forEach((k,i)=>{ HIST[k]=vals[i]||{}; }); MON_AT=Date.now();
+}
+async function load(force){ await Promise.all([loadBase(force), loadMonths(force)]); D=BASE; A=HIST[MONTH]||{}; }
 function lastMonths(n){ const out=[], d=new Date(); d.setDate(1); for(let i=0;i<n;i++){ out.push(d.toISOString().slice(0,7)); d.setMonth(d.getMonth()-1); } return out; }
 async function saveA(){ A.updatedAt=new Date().toISOString(); A.by=me(); HIST[MONTH]=A; try{ await fbSaveKeyed('acct_'+MONTH, A); }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); } }
 const staffOf=id=>{ const s=safe(()=>getStaffById(id),null)||{}; const p=(D.priv||{})[id]||{}; return Object.assign({}, s, s.profile||{}, p, p.profile||{}); };
@@ -108,10 +118,10 @@ function ensurePage(){
   mc.appendChild(d);
   new MutationObserver(()=>{ if(!d.classList.contains('hidden')) open(); }).observe(d,{attributes:true,attributeFilter:['class']});
 }
-async function open(){ const b=$('nd-acct-body'); if(!b) return;
+async function open(force){ const b=$('nd-acct-body'); if(!b) return;
   if(!isAcct()){ b.innerHTML='<div class="ac-mut" style="padding:40px;text-align:center">🔒 สำหรับนักบัญชีและแอดมิน</div>'; return; }
-  if(BUSY) return; BUSY=true; b.innerHTML='<div class="ac-mut" style="padding:30px">กำลังโหลดข้อมูลบัญชี…</div>';
-  try{ await load(); render(); }catch(e){ b.innerHTML='<div class="ac-mut" style="padding:30px">โหลดไม่สำเร็จ: '+E(e.message)+'</div>'; } finally{ BUSY=false; } }
+  if(BUSY) return; BUSY=true; if(!D) b.innerHTML='<div class="ac-mut" style="padding:30px">กำลังโหลดข้อมูลบัญชี…</div>';
+  try{ if(D && !force) render(); await load(force); render(); }catch(e){ b.innerHTML='<div class="ac-mut" style="padding:30px">โหลดไม่สำเร็จ: '+E(e.message)+'</div>'; } finally{ BUSY=false; } }
 const stepDone=k=>!!(A.steps&&A.steps[k]);
 function render(){ const b=$('nd-acct-body'); if(!b||!D) return; const C=compute();
   const chk=(k,lbl)=>`<span class="ac-chk ${stepDone(k)?'on':''}" onclick="ACCT.tick('${k}')">${stepDone(k)?'✅':'⬜'} ${lbl||'ตรวจแล้ว'}${stepDone(k)?` <small class="ac-mut">${E(A.steps[k].by||'')} ${E(String(A.steps[k].at||'').slice(5,10))}</small>`:''}</span>`;
@@ -177,8 +187,8 @@ async function upFile(kind, base){ const f=await pickFile(); if(!f) return null;
 
 window.ACCT={
   tog(k){ OPEN.has(k)?OPEN.delete(k):OPEN.add(k); render(); },
-  async month(k){ MONTH=k; await open(); },
-  async reload(){ await open(); },
+  month(k){ MONTH=k; A=HIST[k]||{}; render(); },
+  async reload(){ await open(true); },
   async tick(k){ A.steps=A.steps||{}; if(A.steps[k]) delete A.steps[k]; else A.steps[k]={by:me(), at:new Date().toISOString()}; await saveA(); render(); },
   async cap(){ let v=null; try{ v=prompt('ฐานค่าจ้างสูงสุดสำหรับคิดประกันสังคม (บาท) — ตามประกาศล่าสุด', D.cfg.ssoCap||15000); }catch(e){} if(v==null) return; const n=parseFloat(v); if(!(n>0)) return; D.cfg.ssoCap=n; try{ await fbSaveKeyed('acct_cfg', D.cfg); }catch(e){} render(); },
   copyMissing(){ const C=compute(); const t=mLabel(MONTH)+' — ข้อมูลที่ยังขาด\n'+C.missing.map(m=>'• '+m.who+': '+m.what).join('\n'); try{ navigator.clipboard.writeText(t); toast('คัดลอกแล้ว','success'); }catch(e){ toast(t,'info'); } },
