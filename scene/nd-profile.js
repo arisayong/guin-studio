@@ -121,6 +121,22 @@ window.ndpSetAcct=async function(cb){
   }catch(e){ cb.checked=!cb.checked; toast('บันทึกไม่สำเร็จ: '+e.message,'error'); }
   cb.disabled=false;
 };
+// 🔗 บัญชี Discord: หลัก 1 + สำรองได้หลายบัญชี (แอดมินตั้งหลัก/ลบสำรองได้ที่นี่)
+function dcListHTML(v){
+  const s=ST.staff||{}, alts=(s.discordAlts||[]).filter(Boolean), adm=ST.mode==='admin';
+  if(!s.discordId && !alts.length) return `<div class="ro">— ยังไม่ผูก —</div>`;
+  const row=(a,main)=>`<div class="ro" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center">${main?'⭐':'↪'} ${esc(a.name||a.id)} <small class="muted">${esc(a.id)}</small>${main?'<small class="muted">· หลัก</small>':(adm?`<button class="btn btn-outline btn-sm" type="button" style="padding:1px 7px;font-size:11px" onclick="ndpDc('main','${esc(a.id)}')">ตั้งเป็นหลัก</button><button class="btn btn-outline btn-sm ndp-danger" type="button" style="padding:1px 7px;font-size:11px" onclick="ndpDc('del','${esc(a.id)}')">ลบ</button>`:'<small class="muted">· สำรอง</small>')}</div>`;
+  return (s.discordId?row({id:s.discordId,name:s.discordName},true):'')+alts.map(a=>row(a,false)).join('')+(alts.length?'<div class="muted" style="font-size:11px;text-align:center">⭐ หลัก = แท็กในโพสต์ + ดึงเข้าห้อง · ↪ สำรอง = จำตอนลงคิว</div>':'');
+}
+window.ndpDc=function(act, id){
+  if(!ST.staff||ST.mode!=='admin') return; const sid=ST.staff.id, a=(ST.staff.discordAlts||[]).find(x=>x&&String(x.id)===String(id));
+  try{
+    if(act==='del'){ if(!confirm('ลบบัญชี Discord สำรอง "'+((a&&a.name)||id)+'" ?')) return; _dcRemoveAlt(sid, id); }
+    else if(act==='main'){ _dcSetLink(sid, id, (a&&a.name)||'', 'main'); }
+    try{ logAudit('staff.edit', ST.staff.nickname||ST.staff.name||'', act==='del'?'ลบ Discord สำรอง':'ตั้ง Discord หลักใหม่'); }catch(e){}
+    toast(act==='del'?'ลบบัญชีสำรองแล้ว':'⭐ ตั้งเป็นบัญชีหลักแล้ว','success'); open('admin', sid);
+  }catch(e){ toast('ไม่สำเร็จ: '+e.message,'error'); }
+};
 function rolesHTML(){
   if(ST.mode==='admin'){
     const acc=ST.acct, isMgr=acc&&acc.role==='manager';
@@ -157,7 +173,7 @@ function sideHTML(){
     ${(ST.edit&&ST.photo)?'<button class="btn btn-outline btn-sm ndp-danger" type="button" id="ndp-photo-del">🗑️ ลบรูป</button>':''}
     <div class="ndp-nick">${esc(v.nickname||v.name||'—')}</div>
     <span class="ndp-stat ${filled?'ok':''}">${filled?'✓ ข้อมูลหลักครบ':'กรอกข้อมูลยังไม่ครบ'}</span>
-    <hr><div class="k">Discord ID</div><div class="ro">${esc(v.discord||'— ยังไม่ผูก —')}</div>
+    <hr><div class="k">Discord</div>${dcListHTML(v)}
     <hr><div class="k">โรล / ตำแหน่งงาน</div><div class="ndp-roles sm">${ST.roles.map(c=>`<span class="ndp-rchip on" style="--c:${catColor(c)}">${esc(catLabel(c))}</span>`).join('')||'<span class="muted">—</span>'}</div>
     <hr><div class="k">อัปเดตล่าสุด</div><div class="ro">${updated?new Date(updated).toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'}):'—'}</div>
     ${ST.mode==='admin'&&ST.staff?`<hr><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">

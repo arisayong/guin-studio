@@ -70,14 +70,14 @@ function buildNav(){
   s.innerHTML = item('home','home','หน้าแรก') + sec('ของฉัน')
     + item('my-calendar','track','ปฏิทินงาน') + item('my-dashboard','money','งานของฉัน')
     + item('confirm-amount','confirm','ยืนยันยอด',badge('ca-badge-staff'))
-    + item('nd-docs','docs','เอกสารของฉัน') + `<div id="nd-acct-nav" style="display:none">${item('nd-acct','docs','งานบัญชี')}</div>` + sec('อื่น ๆ') + item('nd-settings','settings','ตั้งค่า');   // 🔔 แจ้งเตือน = ปุ่มกระดิ่งท้ายเมนูอย่างเดียว (มี "ดูทั้งหมด")
+    + item('nd-docs','docs','เอกสารของฉัน') + `<div class="nd-acct-nav" style="display:none">${item('nd-acct','docs','งานบัญชี')}</div>` + sec('อื่น ๆ') + item('nd-settings','settings','ตั้งค่า');   // 🔔 แจ้งเตือน = ปุ่มกระดิ่งท้ายเมนูอย่างเดียว (มี "ดูทั้งหมด")
   m.innerHTML = item('home','home','หน้าแรก') + sec('งาน')
     + item('availability','queueAvail','ลงคิว') + item('assign','assign','มอบหมายงาน')
     + item('nd-plan','plan','วางแผนงาน')
     + item('projects','projects','โปรเจกต์') + item('track','track','ติดตามงาน') + item('mgr-calc','calc','คำนวนราคา')
     + sec('ของฉัน') + item('confirm-amount','confirm','ยืนยันยอด',badge('ca-badge-mgr'))
     + item('mgr-team','team','จัดการทีม')
-    + item('nd-docs','docs','เอกสารของฉัน') + sec('อื่น ๆ') + item('nd-settings','settings','ตั้งค่า');   // 🔔 แจ้งเตือน = ปุ่มกระดิ่งท้ายเมนูอย่างเดียว (มี "ดูทั้งหมด")
+    + item('nd-docs','docs','เอกสารของฉัน') + `<div class="nd-acct-nav" style="display:none">${item('nd-acct','docs','งานบัญชี')}</div>` + sec('อื่น ๆ') + item('nd-settings','settings','ตั้งค่า');   // 🔔 แจ้งเตือน = ปุ่มกระดิ่งท้ายเมนูอย่างเดียว (มี "ดูทั้งหมด")
   const side=document.querySelector('aside.sidebar'); if(!side) return;
   side.classList.add('nd-side');
   // ปุ่มย่อ/ขยายเมนู (เดสก์ท็อป) — ใช้ฟังก์ชันเดิม toggleMobileMenu (จำค่าไว้ให้ด้วย)

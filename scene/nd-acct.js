@@ -221,9 +221,11 @@ async function detect(){
   const cu=safe(()=>currentUser,null), db=safe(()=>_fbDatabase,null); if(!cu) return false;
   if(cu.role!=='admin' && cu.uid && db && cu._acctChecked!==cu.uid){ cu._acctChecked=cu.uid;
     try{ const v=(await db.ref('admin_config/accountants/'+cu.uid).get()).val(); cu.acct=v===true; }catch(e){ cu.acct=false; } }
-  const w=$('nd-acct-nav'); if(w) w.style.display=(cu.role!=='admin'&&cu.acct)?'':'none';
+  // เมนู "งานบัญชี" ของทีมงาน/เมเนเจอร์ที่เป็นนักบัญชี (แอดมินมีในกลุ่มบัญชีอยู่แล้ว)
+  document.querySelectorAll('.nd-acct-nav').forEach(w=>{ w.style.display=(cu.role!=='admin'&&cu.acct)?'':'none'; });
   return true; }
-let tries=0; const iv=setInterval(async()=>{ ensurePage(); const ok=await detect(); if(ok&&++tries>3) clearInterval(iv); }, 2500);
+// เช็กตลอด (ถามฐานข้อมูลแค่ครั้งเดียวต่อบัญชี) — เมนูถูกสร้างใหม่/สลับบัญชี ก็ยังขึ้นถูก
+setInterval(()=>{ ensurePage(); detect(); }, 2500);
 document.addEventListener('DOMContentLoaded', ensurePage);
 window.addEventListener('load', ensurePage);
 })();

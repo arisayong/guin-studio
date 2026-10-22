@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261023-02"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261023-04"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -4840,10 +4840,63 @@ function _dcTokens(s){
 function _dcInitials(s){
   return [...new Set(_dcCleanName(s).split(' ').filter(t=>t.length===1))];
 }
+// 🔗 Discord หลายบัญชีต่อคน
+//   discordId / discordName = บัญชีหลัก (ใช้แท็กในโพสต์ + ดึงเข้าห้องโปรเจกต์)
+//   discordAlts = [{id, name, at}] บัญชีสำรอง (ใช้จำว่าเป็นคนเดียวกันตอนพิมพ์ลงคิว)
+function _dcAllIds(s){ return [s&&s.discordId, ...(((s&&s.discordAlts)||[]).map(a=>a&&a.id))].filter(Boolean).map(String); }
+function _dcOwnerOf(id, exceptId){ id=String(id||''); if(!id) return null; return (getAllStaff()||[]).find(x=>x&&x.id&&x.id!==exceptId&&_dcAllIds(x).includes(id))||null; }
+// ผูกบัญชี: mode 'main' = เป็นบัญชีหลัก (บัญชีหลักเดิมย้ายไปเป็นสำรอง ไม่หาย) · 'alt' = เพิ่มเป็นบัญชีสำรอง
+function _dcSetLink(staffId, discordId, name, mode){
+  discordId=String(discordId||''); if(!staffId||!discordId) return;
+  // บัญชีนี้เคยผูกกับคนอื่น → เอาออกจากคนนั้นก่อน (1 บัญชี = 1 คน)
+  const seen=new Set();
+  (getAllStaff()||[]).forEach(o=>{ if(!o||!o.id||o.id===staffId||seen.has(o.id)||!_dcAllIds(o).includes(discordId)) return; seen.add(o.id);
+    _updateStaffRecords(o.id, x=>{ x.discordAlts=(x.discordAlts||[]).filter(a=>a&&String(a.id)!==discordId);
+      if(String(x.discordId||'')===discordId){ const nx=x.discordAlts.shift(); if(nx){ x.discordId=nx.id; x.discordName=nx.name||''; } else { delete x.discordId; delete x.discordName; } }
+      if(!x.discordAlts.length) delete x.discordAlts; }); });
+  _updateStaffRecords(staffId, x=>{
+    let alts=(x.discordAlts||[]).filter(a=>a&&String(a.id)!==discordId);
+    if(mode==='alt' && x.discordId && String(x.discordId)!==discordId){ alts.push({id:discordId, name:name||'', at:new Date().toISOString()}); }
+    else { if(x.discordId && String(x.discordId)!==discordId) alts.unshift({id:String(x.discordId), name:x.discordName||'', at:new Date().toISOString()});
+      x.discordId=discordId; x.discordName=name||''; }
+    if(alts.length) x.discordAlts=alts; else delete x.discordAlts; });
+  try{ _allStaffCache=null; }catch(e){} try{ _roleCatCache=null; }catch(e){}
+}
+function _dcRemoveAlt(staffId, discordId){ discordId=String(discordId||'');
+  _updateStaffRecords(staffId, x=>{ x.discordAlts=(x.discordAlts||[]).filter(a=>a&&String(a.id)!==discordId); if(!x.discordAlts.length) delete x.discordAlts; });
+  try{ _allStaffCache=null; }catch(e){} }
+// ถามตอนผูกบัญชีที่ 2: เพิ่มเป็นสำรอง / ตั้งเป็นหลัก / ยกเลิก
+function _dcAskMode(s, name){
+  return new Promise(res=>{
+    const nm=s.nickname||s.name||'', ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:6000;display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.innerHTML=`<div style="background:var(--card);border:1px solid var(--border2);border-radius:16px;max-width:440px;width:100%;padding:18px;font-family:Kanit">
+      <div style="font-weight:800;font-size:15px">🔗 ${esc(nm)} มี Discord หลักอยู่แล้ว</div>
+      <div style="font-size:12.5px;color:var(--text2);margin:6px 0 12px;line-height:1.7">บัญชีหลักตอนนี้: <b style="color:var(--text)">${esc(s.discordName||s.discordId||'')}</b><br>บัญชีที่จะผูก: <b style="color:var(--text)">${esc(name||'')}</b></div>
+      <button class="btn btn-blue" style="width:100%;margin-bottom:6px" data-m="alt">➕ เพิ่มเป็นบัญชีสำรอง <span style="opacity:.8;font-weight:400">(แนะนำ · ใช้จำตอนลงคิว)</span></button>
+      <button class="btn btn-outline" style="width:100%;margin-bottom:6px" data-m="main">⭐ ตั้งเป็นบัญชีหลักแทน <span style="opacity:.8;font-weight:400">(บัญชีเดิมย้ายเป็นสำรอง)</span></button>
+      <button class="btn btn-outline" style="width:100%" data-m="">ยกเลิก</button>
+      <div style="font-size:11.5px;color:var(--text2);margin-top:10px">บัญชีหลัก = ใช้แท็กชื่อในโพสต์และดึงเข้าห้องโปรเจกต์</div></div>`;
+    ov.addEventListener('click',e=>{ const b=e.target.closest('[data-m]'); if(b||e.target===ov){ ov.remove(); res(b?(b.dataset.m||null):null); } });
+    document.body.appendChild(ov);
+  });
+}
+// ผูกแบบถามก่อนถ้ามีบัญชีหลักอยู่แล้ว · คืน true ถ้าผูกแล้ว
+async function _dcLinkAsk(staffId, discordId, name){
+  const s=getStaffById(staffId); if(!s) return false;
+  if(_dcAllIds(s).includes(String(discordId))){ toast('บัญชีนี้ผูกกับ '+(s.nickname||s.name)+' อยู่แล้ว','info'); return false; }
+  let mode='main';
+  if(s.discordId){ mode=await _dcAskMode(s, name); if(!mode) return false; }
+  const other=_dcOwnerOf(discordId, staffId);
+  if(other && !confirm('บัญชีนี้ผูกกับ "'+(other.nickname||other.name)+'" อยู่ — ย้ายมาเป็นของ "'+(s.nickname||s.name)+'" ?')) return false;
+  _dcSetLink(staffId, discordId, name, mode);
+  try{ logAudit('staff.edit', s.nickname||s.name, (mode==='alt'?'เพิ่ม Discord สำรอง: ':'ผูก Discord หลัก: ')+(name||discordId)); }catch(e){}
+  return mode;
+}
 function matchStaffByDiscord(msg){
   const all=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s&&s.id&&isStaffAssignable(s));
-  // 1) เคยผูกไว้แล้ว → ใช้เลย แม่นที่สุด
-  const byId=all.find(s=>s.discordId && s.discordId===msg.authorId);
+  // 1) เคยผูกไว้แล้ว (บัญชีหลักหรือบัญชีสำรอง) → ใช้เลย แม่นที่สุด
+  const byId=msg.authorId?all.find(s=>_dcAllIds(s).includes(String(msg.authorId))):null;
   if(byId) return {staff:byId, how:'linked'};
   const raw=msg.displayName||msg.username;
   const clean=_dcCleanName(raw);
@@ -4908,10 +4961,9 @@ function _dcAutoLink(match, m){
   }catch(e){}
 }
 async function linkDiscordUser(staffId, discordId, discordName){
-  _updateStaffRecords(staffId, s=>{ s.discordId=discordId; s.discordName=discordName||''; });
-  const s=getStaffById(staffId);
-  logAudit('staff.edit', s?(s.nickname||s.name):staffId, 'ผูกบัญชี Discord: '+(discordName||discordId));
-  toast('ผูกบัญชีแล้ว ✅ ครั้งหน้าระบบจะจำเอง','success');
+  if(!staffId){ toast('เลือกคนในทีมก่อน','warn'); return; }
+  const mode=await _dcLinkAsk(staffId, discordId, discordName); if(!mode) return;
+  toast(mode==='alt'?'➕ เพิ่มเป็นบัญชีสำรองแล้ว ✅ ครั้งหน้าระบบจะจำเอง':'ผูกบัญชีแล้ว ✅ ครั้งหน้าระบบจะจำเอง','success');
   await pullFromDiscord(true);
 }
 // ══ 🔗 ผูกบัญชี Discord ทั้งทีมรวดเดียว ══
@@ -5108,7 +5160,7 @@ function blkClearAllLinks(){
   const d=getStaffData(); let n=0;
   Object.keys(d||{}).forEach(cat=>{
     const arr=Array.isArray(d[cat])?d[cat]:Object.values(d[cat]||{});
-    arr.forEach(s=>{ if(s&&(s.discordId||s.discordName)){ delete s.discordId; delete s.discordName; n++; } });
+    arr.forEach(s=>{ if(s&&(s.discordId||s.discordName||s.discordAlts)){ delete s.discordId; delete s.discordName; delete s.discordAlts; n++; } });
     d[cat]=arr;
   });
   if(n) saveStaffData(d);
@@ -5122,20 +5174,19 @@ function blkClearAllLinks(){
 function blkUnlink(staffId){
   const s=getStaffById(staffId);
   if(!confirm('เลิกผูกบัญชี Discord ของ "'+(s?(s.nickname||s.name):'')+'" ?')) return;
-  _updateStaffRecords(staffId, x=>{ delete x.discordId; delete x.discordName; });
+  _updateStaffRecords(staffId, x=>{ const nx=(x.discordAlts||[]).shift(); if(nx){ x.discordId=nx.id; x.discordName=nx.name||''; if(!x.discordAlts.length) delete x.discordAlts; } else { delete x.discordId; delete x.discordName; } });
   _roleCatCache=null;
   try{ logAudit('staff.edit', s?(s.nickname||s.name):staffId, 'เลิกผูกบัญชี Discord'); }catch(e){}
   toast('🔓 เลิกผูกแล้ว','info');
   _renderBulkDiscordLink();
 }
-function blkLinkOne(i){
+async function blkLinkOne(i){
   const r=(window._blkRows||[])[i]; if(!r) return;
   const sid=document.getElementById('blk-sel-'+i)?.value;
   if(!sid){ toast('เลือกคนในทะเบียนก่อน','warn'); return; }
-  _updateStaffRecords(sid, s=>{ s.discordId=r.m.id; s.discordName=r.disp; });
+  const mode=await _dcLinkAsk(sid, r.m.id, r.disp); if(!mode) return;
   const s=getStaffById(sid);
-  try{ logAudit('staff.edit', s?(s.nickname||s.name):sid, 'ผูกบัญชี Discord (ผูกทั้งทีม): '+r.disp); }catch(e){}
-  toast('ผูก '+(s?(s.nickname||s.name):'')+' แล้ว ✅','success');
+  toast((mode==='alt'?'➕ เพิ่ม Discord สำรองให้ ':'ผูก ')+(s?(s.nickname||s.name):'')+' แล้ว ✅','success');
   _renderBulkDiscordLink();
 }
 function blkLinkAllGuessed(){
@@ -32951,7 +33002,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261023-02"></script><script src="scene/nd-profile.js?v=20261023-02"></script><script src="scene/nd-plan.js?v=20261023-02"></script><script src="scene/nd-docpdf.js?v=20261023-02"></script><script src="scene/nd-acct.js?v=20261023-02"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261023-04"></script><script src="scene/nd-profile.js?v=20261023-04"></script><script src="scene/nd-plan.js?v=20261023-04"></script><script src="scene/nd-docpdf.js?v=20261023-04"></script><script src="scene/nd-acct.js?v=20261023-04"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -32961,7 +33012,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261023-02';
+var UPD_BUILD = '20261023-04';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
