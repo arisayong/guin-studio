@@ -19,7 +19,9 @@ const isAcct=()=>isAdm()||safe(()=>!!currentUser.acct,false);
 const me=()=>safe(()=>currentUser.nickname||currentUser.email,'');
 const SSO_RATE=0.05;
 
-let MONTH=new Date().toISOString().slice(0,7), D=null, A={}, OPEN=new Set(['s1']), BUSY=false, HIST={};
+const lk=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');   // เดือนตามเวลาไทยในเครื่อง
+const NOWM=()=>lk(new Date());
+let MONTH=NOWM(), YEAR=+MONTH.slice(0,4), SEL=new Set(), D=null, A={}, OPEN=new Set(['s1']), BUSY=false, HIST={};
 
 /* ── ข้อมูล ── */
 // ⚡ โหลดพร้อมกันทุกก้อน (เดิมรอทีละก้อน ~12 รอบ) · จำข้อมูลหลักไว้ 5 นาที · สลับเดือนไม่ต้องโหลดใหม่
@@ -44,21 +46,27 @@ async function loadBase(force){
   BASE=out; BASE_AT=Date.now();
 }
 // สถานะงานบัญชี 6 เดือนล่าสุด (ไฟล์เล็ก ดึงพร้อมกัน)
+const yearMonths=y=>Array.from({length:12},(_,i)=>y+'-'+String(i+1).padStart(2,'0'));
+const YEAR_AT={};
 async function loadMonths(force){
-  if(!force && Object.keys(HIST).length && Date.now()-MON_AT<60000) return;
-  const ks=lastMonths(6); const vals=await Promise.all(ks.map(k=>K('acct_'+k)));
-  HIST={}; ks.forEach((k,i)=>{ HIST[k]=vals[i]||{}; }); MON_AT=Date.now();
+  if(!force && YEAR_AT[YEAR] && Date.now()-YEAR_AT[YEAR]<60000) return;
+  const ks=yearMonths(YEAR).filter(k=>k<=NOWM()); const vals=await Promise.all(ks.map(k=>K('acct_'+k)));
+  ks.forEach((k,i)=>{ HIST[k]=vals[i]||{}; }); YEAR_AT[YEAR]=Date.now(); MON_AT=Date.now();
 }
+// ปีที่มีข้อมูล (ตั้งแต่ปีแรกที่มีใบสำคัญจ่าย/50 ทวิ ถึงปีนี้)
+function years(){ const now=new Date().getFullYear(); let mn=now;
+  if(D){ [...D.vouchers.map(v=>v.date||v.createdAt), ...D.wht.map(w=>w.payDate), ...D.exp.map(x=>x.date)].forEach(d=>{ const y=+ym(d).slice(0,4); if(y>2000&&y<mn) mn=y; }); }
+  const out=[]; for(let y=now;y>=mn;y--) out.push(y); return out; }
 async function load(force){ await Promise.all([loadBase(force), loadMonths(force)]); D=BASE; A=HIST[MONTH]||{}; }
-function lastMonths(n){ const out=[], d=new Date(); d.setDate(1); for(let i=0;i<n;i++){ out.push(d.toISOString().slice(0,7)); d.setMonth(d.getMonth()-1); } return out; }
+function lastMonths(n){ const out=[], d=new Date(); d.setDate(1); for(let i=0;i<n;i++){ out.push(lk(d)); d.setMonth(d.getMonth()-1); } return out; }
 async function saveA(){ A.updatedAt=new Date().toISOString(); A.by=me(); HIST[MONTH]=A; try{ await fbSaveKeyed('acct_'+MONTH, A); }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); } }
 const staffOf=id=>{ const s=safe(()=>getStaffById(id),null)||{}; const p=(D.priv||{})[id]||{}; return Object.assign({}, s, s.profile||{}, p, p.profile||{}); };
 const taxOfItem=it=>{ if(it.taxPct!=null&&it.taxPct!=='') return +it.taxPct||0; const p=D.projects.find(x=>x.id===it.projId); return p?(parseFloat((p.tax||{})[String(it.slot||'').split('-')[0]])||0):0; };
 function vStats(v){ let g=0,t=0; (v.items&&v.items.length?v.items:[{amount:v.amount}]).forEach(it=>{ const a=+it.amount||0, p=taxOfItem(it); g+=a; t+=a-Math.round(a*(1-p/100)); }); return {gross:g, tax:t, net:g-t}; }
 
 /* ── คำนวณแต่ละขั้น ── */
-function compute(){
-  const M=MONTH, vs=D.vouchers.filter(v=>!v.cancelled&&ym(v.date||v.createdAt)===M);
+function compute(Mx){
+  const M=Mx||MONTH, vs=D.vouchers.filter(v=>!v.cancelled&&ym(v.date||v.createdAt)===M);
   const rounds=[1,2].map(r=>{ const L=vs.filter(v=>((+iso(v.date||v.createdAt).slice(8,10))<=15)===(r===1));
     return {r, list:L, people:new Set(L.map(v=>v.staffId)).size, wht:L.filter(v=>v.whtNo).length, needWht:L.filter(v=>vStats(v).tax>0).length,
       sent:L.filter(v=>v.emailStatus==='sent').length, noMail:L.filter(v=>v.emailStatus==='noemail'||v.emailStatus==='failed').length,
@@ -88,6 +96,13 @@ const CSS=`
 .ac-mo button{font-family:Kanit;border:1px solid var(--border2);background:var(--bg2);color:var(--text);border-radius:10px;padding:5px 12px;cursor:pointer;font-size:12.5px;text-align:center;line-height:1.3}
 .ac-mo button small{display:block;font-size:10px;color:var(--text2)} .ac-mo button.on{background:var(--accent);border-color:var(--accent);color:#fff} .ac-mo button.on small{color:#dfe9ff}
 .ac-mo button.done{border-color:rgba(0,223,160,.45)} .ac-mo button.done small{color:var(--green)}
+.ac-mo{display:grid;grid-template-columns:repeat(12,1fr)} @media(max-width:900px){.ac-mo{grid-template-columns:repeat(6,1fr)}}
+.ac-mo button{position:relative;padding:6px 4px 5px}
+.ac-sel{position:absolute;top:1px;left:4px;font-size:12px;line-height:1;color:var(--text2)} .ac-sel.on{color:var(--green)}
+.ac-yr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px} .ac-yr select{width:auto;padding:5px 30px 5px 10px;margin:0}
+.ac-prog{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:6000;display:flex;align-items:center;justify-content:center}
+.ac-prog>div{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:18px 20px;width:min(420px,92vw);font-family:Kanit}
+.ac-bar{height:8px;border-radius:5px;background:var(--bg2);overflow:hidden;margin:10px 0} .ac-bar i{display:block;height:100%;background:var(--accent);transition:width .2s}
 .ac-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px} @media(max-width:800px){.ac-kpi{grid-template-columns:1fr 1fr}}
 .ac-kpi div{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:10px 12px} .ac-kpi small{color:var(--text2);font-size:11px;display:block} .ac-kpi b{font-size:18px}
 .ac-card{background:var(--card);border:1px solid var(--border2);border-radius:14px;margin-bottom:12px;overflow:hidden}
@@ -156,11 +171,15 @@ function render(){ const b=$('nd-acct-body'); if(!b||!D) return; const C=compute
     ${fileRow('sso',`ประกันสังคม (${C.salaried.length} คน · ลูกจ้าง+นายจ้าง)`,C.t.sso,'')}
     </table><div class="ac-mut" style="margin-top:6px">ภ.ง.ด.1/3/53 ยื่นภายในวันที่ 7 ของเดือนถัดไป (ยื่นออนไลน์ +8 วัน) · ประกันสังคมภายในวันที่ 15 · ภ.ง.ด.53 = ใช้เมื่อจ่ายนิติบุคคลแล้วหัก ณ ที่จ่าย</div>`;
   const allOk=done===steps.length;
-  const trk=isAdm()?`<div class="ac-card"><div style="padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border2)"><b>👑 ติดตามงานบัญชี</b><span class="ac-mut">ขั้นที่นักบัญชีติ๊ก "ตรวจแล้ว" · 6 เดือนล่าสุด</span><button class="btn btn-xs btn-outline" style="margin-left:auto" onclick="ACCT.setAcct()">👤 ตั้งนักบัญชี</button></div>
+  const trk=isAdm()?`<div class="ac-card"><div style="padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border2)"><b>👑 ติดตามงานบัญชี</b><span class="ac-mut">ขั้นที่นักบัญชีติ๊ก "ตรวจแล้ว" · ปี ${YEAR+543}</span><button class="btn btn-xs btn-outline" style="margin-left:auto" onclick="ACCT.setAcct()">👤 ตั้งนักบัญชี</button></div>
     <div style="padding:8px 14px;overflow:auto"><table class="ac-trk" style="width:100%;border-collapse:collapse;font-size:12.5px"><tr><th style="text-align:left">เดือน</th>${['รอบจ่าย','เงินเดือน','ข้อมูลขาด','รายรับ','ค่าใช้จ่าย','ภาษี/สปส.'].map(x=>`<th class="c">${x}</th>`).join('')}<th class="c">ส่งบริษัท/ปิดเดือน</th></tr>
-    ${Object.keys(HIST).map(k=>{ const h=HIST[k]||{}; return `<tr><td>${E(mLabel(k))}</td>${steps.map(s=>`<td class="c">${h.steps&&h.steps[s]?'<span style="color:var(--green)">✓</span>':'<span class="ac-mut">—</span>'}</td>`).join('')}<td class="c">${h.closedAt?'<span style="color:var(--green)">✓ '+E(String(h.closedAt).slice(5,10))+'</span>':'<span class="ac-mut">—</span>'}</td></tr>`; }).join('')}</table></div></div>`:'';
+    ${yearMonths(YEAR).filter(k=>k<=NOWM()).reverse().map(k=>{ const h=HIST[k]||{}; return `<tr><td>${E(mLabel(k))}</td>${steps.map(s=>`<td class="c">${h.steps&&h.steps[s]?'<span style="color:var(--green)">✓</span>':'<span class="ac-mut">—</span>'}</td>`).join('')}<td class="c">${h.closedAt?'<span style="color:var(--green)">✓ '+E(String(h.closedAt).slice(5,10))+'</span>':'<span class="ac-mut">—</span>'}</td></tr>`; }).join('')}</table></div></div>`:'';
   b.innerHTML=`${D.err?`<div class="ac-card" style="padding:12px 14px;border-color:rgba(255,64,64,.4)">⚠️ ${E(D.err)}</div>`:''}
-   <div class="ac-mo">${lastMonths(6).reverse().map(k=>{ const h=HIST[k]||{}, n=steps.filter(s=>h.steps&&h.steps[s]).length; return `<button class="${k===MONTH?'on':''} ${h.closedAt?'done':''}" onclick="ACCT.month('${k}')">${E(mLabel(k))}<small>${h.closedAt?'✓ ปิดแล้ว':n?n+'/6':'—'}</small></button>`; }).join('')}<button onclick="ACCT.reload()" title="โหลดข้อมูลใหม่">🔄</button></div>
+   <div class="ac-yr"><select class="form-input form-select" onchange="ACCT.year(+this.value)">${years().map(y=>`<option value="${y}"${y===YEAR?' selected':''}>ปี ${y+543}</option>`).join('')}</select>
+     <span class="ac-mut">กดเดือน = เปิดดู · ติ๊ก ☐ = เลือกโหลดเอกสาร</span>
+     <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="ACCT.dlYear()">⬇️ เอกสารทั้งปี ${YEAR+543}</button><button class="btn btn-sm ${SEL.size?'btn-blue':'btn-outline'}" ${SEL.size?'':'disabled style="opacity:.5"'} onclick="ACCT.dlSel()">⬇️ เดือนที่ติ๊ก (${SEL.size})</button>${SEL.size?'<button class="btn btn-sm btn-outline" onclick="ACCT.selClear()">ล้าง</button>':''}<button class="btn btn-sm btn-outline" onclick="ACCT.reload()" title="โหลดข้อมูลใหม่">🔄</button></span></div>
+   <div class="ac-mo">${yearMonths(YEAR).map(k=>{ const fut=k>NOWM(), h=HIST[k]||{}, n=steps.filter(s=>h.steps&&h.steps[s]).length;
+      return `<button class="${k===MONTH?'on':''} ${h.closedAt?'done':''}" ${fut?'disabled style="opacity:.35;cursor:default"':`onclick="ACCT.month('${k}')"`}>${fut?'':`<span class="ac-sel ${SEL.has(k)?'on':''}" onclick="event.stopPropagation();ACCT.sel('${k}')">${SEL.has(k)?'☑':'☐'}</span>`}${TM[+k.slice(5,7)-1]}<small>${fut?'—':h.closedAt?'✓ ปิดแล้ว':n?n+'/6':'—'}</small></button>`; }).join('')}</div>
    <div class="ac-kpi"><div><small>รายรับ (รับเงินแล้ว)</small><b style="color:var(--green)">${B(C.t.income)}</b></div><div><small>จ่ายทีมงาน (โอนสุทธิ)</small><b>${B(C.t.team)}</b></div><div><small>ภาษีหัก ณ ที่จ่าย (ต้องนำส่ง)</small><b style="color:var(--orange)">${B(C.t.wht)}</b></div><div><small>ค่าใช้จ่ายบริษัท</small><b>${B(C.t.exp)}</b></div></div>
    ${trk}
    <div class="ac-card">
@@ -185,7 +204,48 @@ async function upFile(kind, base){ const f=await pickFile(); if(!f) return null;
   const name=(base+'_'+f.name).replace(/[\\\/:*?"<>|\s]+/g,'_');
   const url=await safe(()=>uploadToDrive(kind, name, data),Promise.resolve(null)); return {url:url||'', name:f.name}; }
 
+// ── ข้อความ CSV ของ 1 เดือน ──
+function csvPayText(C){ const rows=[['วันที่','เลขที่ใบสำคัญจ่าย','ชื่อเล่น','ชื่อ-นามสกุล','เลขผู้เสียภาษี','ยอดก่อนหัก','หัก ณ ที่จ่าย','โอนสุทธิ','ธนาคาร','เลขบัญชี','เลข 50 ทวิ','ส่งเมล']];
+  C.vs.forEach(v=>{ const s=staffOf(v.staffId), t=vStats(v); rows.push([iso(v.date), v.docNo, s.nickname||v.staffNickname||'', ((s.name||v.staffName||'')+' '+(s.lastName||v.staffLastName||'')).trim(), s.taxId||s.taxid||'', t.gross, t.tax, t.net, v.bank||s.bank||'', v.account||s.account||'', v.whtNo||'', v.emailStatus||'']); });
+  return csv(rows); }
+function csvWhtText(C,k){ const L=k==='pnd1'?C.pnd1:C.pnd3; const rows=[['ลำดับ','เลขประจำตัวผู้เสียภาษี','ชื่อผู้มีเงินได้','ที่อยู่','วันที่จ่าย','ประเภทเงินได้','อัตราภาษี (%)','จำนวนเงินที่จ่าย','ภาษีที่หัก','เงื่อนไข','เลขที่ 50 ทวิ']];
+  L.slice().sort((a,b)=>String(a.payDate).localeCompare(String(b.payDate))).forEach((d,i)=>{ const pe=d.payee||{}; rows.push([i+1, pe.taxid||'', pe.name||'', pe.addr||'', iso(d.payDate), {'401':'40(1)','402':'40(2)','408':'40(8)'}[String(d.incomeType)]||String(d.incomeType||''), d.taxPct||'', +d.amount||0, +d.tax||0, '1 (หัก ณ ที่จ่าย)', d.docNo||'']); });
+  return csv(rows); }
+function csvIncomeText(C){ const rows=[['ลูกค้า','งาน','รับเงิน','ลูกค้าหัก ณ ที่จ่าย','50 ทวิ จากลูกค้า']]; const cw=(HIST[C.month]||{}).clientWht||{};
+  C.clients.forEach(c=>rows.push([c.client,[...c.codes].join(' '),c.amount,c.wht,c.wht?((cw[c.client]||{}).got?'ได้รับแล้ว':'ยังไม่ได้รับ'):'ไม่หัก'])); return csv(rows); }
+function csvExpText(C){ const rows=[['วันที่','รายการ','หมวด','ยอด','ใบเสร็จ']]; const ef=(HIST[C.month]||{}).expFiles||{};
+  C.exp.forEach(x=>rows.push([iso(x.date),x.label||'',x.cat||'',+x.amount||0,(ef[x.id]||{}).url||''])); return csv(rows); }
+// ── 📦 ZIP หลายเดือน: โฟลเดอร์ละเดือน (ใบสำคัญจ่าย + 50 ทวิ เป็น PDF · สรุปเป็น CSV เปิดใน Excel ได้) ──
+let ZIP_STOP=false;
+async function zipMonths(keys, name){
+  if(!window.GDOC){ toast('ตัวสร้าง PDF ยังไม่พร้อม — รีเฟรชหน้าเว็บ','warn'); return; }
+  const Cs=keys.map(k=>Object.assign(compute(k),{month:k}));
+  const total=Cs.reduce((a,C)=>a+C.vs.length+C.wht.length,0);
+  if(!total && !Cs.some(C=>C.clients.length||C.exp.length)){ toast('ไม่มีเอกสารในเดือนที่เลือก','info'); return; }
+  if(total>120 && !confirm('มีเอกสาร '+total+' ใบ — ใช้เวลาประมาณ '+Math.ceil(total*0.6/60)+' นาที (เปิดหน้านี้ค้างไว้ระหว่างสร้าง) · ทำต่อไหม?')) return;
+  ZIP_STOP=false; const ov=document.createElement('div'); ov.className='ac-prog';
+  ov.innerHTML='<div><b>📦 กำลังรวมเอกสาร</b><div class="ac-mut" id="ac-pg-t">เตรียม…</div><div class="ac-bar"><i id="ac-pg-b" style="width:0"></i></div><button class="btn btn-sm btn-outline" onclick="ACCT._stop()">หยุด</button></div>';
+  document.body.appendChild(ov); const T=$('ac-pg-t'), BAR=$('ac-pg-b'); let done=0;
+  const step=t=>{ done++; if(T) T.textContent=t+' ('+done+'/'+total+')'; if(BAR) BAR.style.width=Math.round(done/Math.max(1,total)*100)+'%'; };
+  const clean=x=>String(x).replace(/[\\\/:*?"<>|\s]+/g,'_');
+  try{
+    await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'); const zip=new JSZip();
+    for(const C of Cs){ const fd=zip.folder(clean((+C.month.slice(0,4)+543)+'-'+C.month.slice(5,7)+'_'+TM[+C.month.slice(5,7)-1]));
+      fd.file('สรุปการโอนจ่าย.csv','\ufeff'+csvPayText(C)); fd.file('ใบแนบ_ภงด3.csv','\ufeff'+csvWhtText(C,'pnd3'));
+      if(C.pnd1.length) fd.file('ใบแนบ_ภงด1.csv','\ufeff'+csvWhtText(C,'pnd1'));
+      if(C.clients.length) fd.file('รายรับ_50ทวิลูกค้า.csv','\ufeff'+csvIncomeText(C)); if(C.exp.length) fd.file('ค่าใช้จ่ายบริษัท.csv','\ufeff'+csvExpText(C));
+      for(const v of C.vs){ if(ZIP_STOP) throw new Error('หยุดแล้ว'); const s=staffOf(v.staffId);
+        const o={vNo:v.docNo, staff:Object.assign({name:v.staffName,lastName:v.staffLastName,nickname:v.staffNickname,bank:v.bank,account:v.account},s), items:v.items||[], date:v.date, note:v.note||'', whtNo:v.whtNo||''};
+        const r=await GDOC.voucherPages(o); fd.file('ใบสำคัญจ่าย/'+clean(v.docNo+'_'+(s.nickname||v.staffNickname||''))+'.pdf', await GDOC.toBlob(r.pages)); step(mLabel(C.month)+' · ใบสำคัญจ่าย'); }
+      for(const w of C.wht){ if(ZIP_STOP) throw new Error('หยุดแล้ว'); fd.file('50ทวิ/'+clean(w.docNo+'_'+((w.payee||{}).name||''))+'.pdf', await GDOC.whtBlob(w)); step(mLabel(C.month)+' · 50 ทวิ'); } }
+    if(T) T.textContent='กำลังบีบอัดไฟล์…';
+    const blob=await zip.generateAsync({type:'blob'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=clean(name)+'.zip'; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
+    toast('📦 รวมเอกสาร '+keys.length+' เดือน · '+total+' ไฟล์ PDF + สรุป Excel','success');
+  }catch(e){ toast(e.message==='หยุดแล้ว'?'หยุดรวมเอกสารแล้ว':'รวมเอกสารไม่สำเร็จ: '+e.message, e.message==='หยุดแล้ว'?'info':'error'); }
+  finally{ ov.remove(); }
+}
 window.ACCT={
+  _stop(){ ZIP_STOP=true; },
   tog(k){ OPEN.has(k)?OPEN.delete(k):OPEN.add(k); render(); },
   month(k){ MONTH=k; A=HIST[k]||{}; render(); },
   async reload(){ await open(true); },
@@ -199,20 +259,14 @@ window.ACCT={
   payReq(k, amt){ const L={pnd3:'ภาษีหัก ณ ที่จ่าย ภ.ง.ด.3',pnd1:'ภาษีเงินเดือน ภ.ง.ด.1',sso:'เงินสมทบประกันสังคม'}[k]||k;
     safe(()=>_askPayRequest([{kind:k, staffId:'_'+k, staffName:L+' '+mLabel(MONTH), projId:'', projName:L, slot:'', amount:amt}], 'งานบัญชี · '+mLabel(MONTH)),null); },
   async close(){ if(!confirm('ยืนยันว่าส่งเอกสาร '+mLabel(MONTH)+' ให้บริษัทบัญชีแล้ว และปิดเดือน?')) return; A.closedAt=new Date().toISOString(); A.closedBy=me(); await saveA(); render(); toast('📤 ปิดเดือน '+mLabel(MONTH)+' แล้ว','success'); },
-  async zip(){ const C=compute(); if(!C.vs.length){ toast('ไม่มีใบสำคัญจ่ายในเดือนนี้','info'); return; }
-    if(!window.GDOC){ toast('ตัวสร้าง PDF ยังไม่พร้อม','warn'); return; }
-    showLoader(true); try{ await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'); const zip=new JSZip(); let n=0;
-      for(const v of C.vs){ const s=staffOf(v.staffId); const o={vNo:v.docNo, staff:Object.assign({name:v.staffName,lastName:v.staffLastName,nickname:v.staffNickname,bank:v.bank,account:v.account},s), items:v.items||[], date:v.date, note:v.note||'', whtNo:v.whtNo||''};
-        const r=await GDOC.voucherPages(o); zip.file(('ใบสำคัญจ่าย_'+v.docNo+'_'+(s.nickname||v.staffNickname||'')).replace(/[\\\/:*?"<>|\s]+/g,'_')+'.pdf', await GDOC.toBlob(r.pages)); n++; }
-      for(const w of C.wht){ zip.file(('50ทวิ_'+w.docNo+'_'+((w.payee||{}).name||'')).replace(/[\\\/:*?"<>|\s]+/g,'_')+'.pdf', await GDOC.whtBlob(w)); }
-      const blob=await zip.generateAsync({type:'blob'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='เอกสารจ่ายทีม_'+MONTH+'.zip'; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
-      toast('📦 ใบสำคัญจ่าย '+n+' ใบ + 50 ทวิ '+C.wht.length+' ใบ','success'); }catch(e){ toast('ทำ ZIP ไม่สำเร็จ: '+e.message,'error'); } finally{ showLoader(false); } },
-  csvPay(){ const C=compute(); const rows=[['วันที่','เลขที่ใบสำคัญจ่าย','ชื่อเล่น','ชื่อ-นามสกุล','เลขผู้เสียภาษี','ยอดก่อนหัก','หัก ณ ที่จ่าย','โอนสุทธิ','ธนาคาร','เลขบัญชี','เลข 50 ทวิ','ส่งเมล']];
-    C.vs.forEach(v=>{ const s=staffOf(v.staffId), t=vStats(v); rows.push([iso(v.date), v.docNo, s.nickname||v.staffNickname||'', ((s.name||v.staffName||'')+' '+(s.lastName||v.staffLastName||'')).trim(), s.taxId||s.taxid||'', t.gross, t.tax, t.net, v.bank||s.bank||'', v.account||s.account||'', v.whtNo||'', v.emailStatus||'']); });
-    dl('สรุปการโอนจ่าย_'+MONTH+'.csv', csv(rows)); },
-  csvWht(k){ const C=compute(); const L=k==='pnd1'?C.pnd1:C.pnd3; const rows=[['ลำดับ','เลขประจำตัวผู้เสียภาษี','ชื่อผู้มีเงินได้','ที่อยู่','วันที่จ่าย','ประเภทเงินได้','อัตราภาษี (%)','จำนวนเงินที่จ่าย','ภาษีที่หัก','เงื่อนไข','เลขที่ 50 ทวิ']];
-    L.slice().sort((a,b)=>String(a.payDate).localeCompare(String(b.payDate))).forEach((d,i)=>{ const pe=d.payee||{}; rows.push([i+1, pe.taxid||'', pe.name||'', pe.addr||'', iso(d.payDate), {'401':'40(1)','402':'40(2)','408':'40(8)'}[String(d.incomeType)]||String(d.incomeType||''), d.taxPct||'', +d.amount||0, +d.tax||0, '1 (หัก ณ ที่จ่าย)', d.docNo||'']); });
-    dl((k==='pnd1'?'ใบแนบ_ภงด1_':'ใบแนบ_ภงด3_')+MONTH+'.csv', csv(rows)); },
+  zip(){ zipMonths([MONTH], 'เอกสารบัญชี_'+MONTH); },
+  csvPay(){ dl('สรุปการโอนจ่าย_'+MONTH+'.csv', csvPayText(compute())); },
+  csvWht(k){ dl((k==='pnd1'?'ใบแนบ_ภงด1_':'ใบแนบ_ภงด3_')+MONTH+'.csv', csvWhtText(compute(),k)); },
+  async year(y){ YEAR=y; SEL.clear(); const cur=NOWM(); MONTH=String(y)===cur.slice(0,4)?cur:(y+'-12'); render(); await loadMonths(); A=HIST[MONTH]||{}; render(); },
+  sel(k){ SEL.has(k)?SEL.delete(k):SEL.add(k); render(); },
+  selClear(){ SEL.clear(); render(); },
+  async dlYear(){ await loadMonths(); zipMonths(yearMonths(YEAR).filter(k=>k<=NOWM()), 'เอกสารบัญชี_ปี'+(YEAR+543)); },
+  dlSel(){ const ks=[...SEL].sort(); if(!ks.length) return; zipMonths(ks, 'เอกสารบัญชี_'+(ks.length===1?ks[0]:ks[0]+'_ถึง_'+ks[ks.length-1])); },
   async setAcct(){ if(!isAdm()) return; const db=safe(()=>_fbDatabase,null); if(!db){ toast('ยังไม่ได้เชื่อมฐานข้อมูล','warn'); return; }
     let users={}, cur={}; try{ users=(await db.ref('users').get()).val()||{}; cur=(await db.ref('admin_config/accountants').get()).val()||{}; }catch(e){ toast('อ่านรายชื่อไม่ได้: '+e.message,'error'); return; }
     const list=Object.entries(users).filter(([,u])=>u&&u.staffId).map(([uid,u])=>({uid, name:(u.nickname||'')+' · '+(u.email||''), on:!!cur[uid]}));
