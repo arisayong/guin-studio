@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261023-09"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261024-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -4896,7 +4896,7 @@ async function _dcLinkAsk(staffId, discordId, name){
 function matchStaffByDiscord(msg){
   const all=(typeof getAllStaff==='function'?getAllStaff():[]).filter(s=>s&&s.id&&isStaffAssignable(s));
   // 1) เคยผูกไว้แล้ว (บัญชีหลักหรือบัญชีสำรอง) → ใช้เลย แม่นที่สุด
-  const byId=msg.authorId?all.find(s=>_dcAllIds(s).includes(String(msg.authorId))):null;
+  const byId=msg.authorId?(all.find(s=>_dcAllIds(s).includes(String(msg.authorId)))||_dcOwnerOf(msg.authorId)):null;
   if(byId) return {staff:byId, how:'linked'};
   const raw=msg.displayName||msg.username;
   const clean=_dcCleanName(raw);
@@ -4963,6 +4963,9 @@ function _dcAutoLink(match, m){
 async function linkDiscordUser(staffId, discordId, discordName){
   if(!staffId){ toast('เลือกคนในทีมก่อน','warn'); return; }
   const mode=await _dcLinkAsk(staffId, discordId, discordName); if(!mode) return;
+  // ✅ ผูกแล้ว → เอาออกจากกล่อง "ยังผูกชื่อไม่ได้" ทุกรอบทันที (เดิมรอดึงคำตอบใหม่ ถ้าดึงไม่ผ่านชื่อจะค้างอยู่)
+  try{ const list=getRounds(); let ch=false; list.forEach(rr=>{ const before=(rr.unmatched||[]).length; rr.unmatched=(rr.unmatched||[]).filter(m=>String(m.authorId||'')!==String(discordId)); if(rr.unmatched.length!==before) ch=true; });
+    if(ch){ await saveRounds(list); } renderAvailability(); }catch(e){ console.warn('unmatched cleanup',e); }
   toast(mode==='alt'?'➕ เพิ่มเป็นบัญชีสำรองแล้ว ✅ ครั้งหน้าระบบจะจำเอง':'ผูกบัญชีแล้ว ✅ ครั้งหน้าระบบจะจำเอง','success');
   await pullFromDiscord(true);
 }
@@ -33002,7 +33005,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261023-09"></script><script src="scene/nd-profile.js?v=20261023-09"></script><script src="scene/nd-plan.js?v=20261023-09"></script><script src="scene/nd-docpdf.js?v=20261023-09"></script><script src="scene/nd-acct.js?v=20261023-09"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261024-01"></script><script src="scene/nd-profile.js?v=20261024-01"></script><script src="scene/nd-plan.js?v=20261024-01"></script><script src="scene/nd-docpdf.js?v=20261024-01"></script><script src="scene/nd-acct.js?v=20261024-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33012,7 +33015,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261023-09';
+var UPD_BUILD = '20261024-01';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
