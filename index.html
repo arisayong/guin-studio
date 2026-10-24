@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261024-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261025-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -6856,7 +6856,8 @@ function buildProjPostText(p){
   lines.push('📁 **'+(p.name||'')+'**'+(code?' ('+code+')':''));
   if(p.deadline) lines.push('🏁 เดทไลน์: '+fmtDate(p.deadline));
   if(p.episodes) lines.push('🎬 จำนวนตอน: '+p.episodes+(p.duration?' · ยาว '+p.duration+' นาที':''));
-  if(p.downloadLink) lines.push('🔗 ไฟล์งาน: '+p.downloadLink);
+  { const L=_workLinks(p); if(L.length===1) lines.push('🔗 ไฟล์งาน: '+(L[0].label?L[0].label+' — ':'')+L[0].url);
+    else if(L.length) { lines.push('🔗 ไฟล์งาน:'); L.forEach((x,i)=>lines.push('   '+(i+1)+'. '+(x.label?x.label+' — ':'')+x.url)); } }
   const hasTeam=Object.keys(by).length;
   if(hasTeam){
     lines.push(''); lines.push('👥 ทีม:');
@@ -15982,7 +15983,9 @@ function _assignEditRowHTML(p){
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:8px">${phCards}</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px">
-      <div>${lbl('🔗 Link โหลดงาน')}${inp('ar-link','text',p.downloadLink||'','https://ลิงก์โหลดงาน')}</div>
+      <div style="grid-column:1/-1">${lbl('🔗 ลิงก์งาน <span style="font-weight:400;color:var(--text2)">(ใส่ได้หลายลิงก์ · คำอธิบายไม่บังคับ)</span>')}
+        <div id="ar-wl-box">${(_workLinks(p).length?_workLinks(p):[{}]).map(_wlRowHTML).join('')}</div>
+        <button type="button" class="btn btn-sm btn-outline" onclick="_wlAdd()">＋ เพิ่มลิงก์</button></div>
       <div>${lbl('🔑 Secret key')}${inp('ar-secret','text',p.secretKey||'')}</div>
       <div style="grid-column:1/-1">${lbl('📝 หมายเหตุ')}${inp('ar-note','text',p.note||'')}</div>
     </div>
@@ -15992,6 +15995,23 @@ function _assignEditRowHTML(p){
     </div>
   </div>`;
 }
+// 🔗 ลิงก์งานหลายลิงก์ + คำอธิบาย (ไม่บังคับ) · ลิงก์แรก = downloadLink เดิม
+//    ถ้าลิงก์แรกถูกแก้จากหน้าอื่น (วางแผนงาน/ฟอร์มโปรเจกต์) ใช้ค่าล่าสุดนั้นแทนลิงก์แรก
+function _workLinks(p){
+  const L=(Array.isArray(p&&p.workLinks)?p.workLinks:[]).filter(x=>x&&String(x.url||'').trim()).map(x=>({url:String(x.url).trim(), label:String(x.label||'').trim()}));
+  const dl=String((p&&p.downloadLink)||'').trim();
+  if(!L.length) return dl?[{url:dl,label:''}]:[];
+  if(dl && L[0].url!==dl && !L.some(x=>x.url===dl)) L[0]={url:dl,label:L[0].label};
+  return L;
+}
+function _wlRowHTML(x){ const st='padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;box-sizing:border-box';
+  return `<div class="ar-wl" style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto;gap:6px;margin-bottom:6px">
+    <input class="ar-wl-url" value="${esc(x.url||'')}" placeholder="https://ลิงก์งาน" style="${st}">
+    <input class="ar-wl-lbl" value="${esc(x.label||'')}" placeholder="คำอธิบาย (ไม่ใส่ก็ได้) เช่น ไฟล์วิดีโอ ตอน 1–5" style="${st}">
+    <button type="button" class="btn btn-sm btn-outline" title="ลบลิงก์นี้" onclick="const w=this.closest('.ar-wl'), box=w.parentElement; w.remove(); if(!box.querySelector('.ar-wl')) _wlAdd();">✕</button></div>`; }
+function _wlAdd(){ const b=document.getElementById('ar-wl-box'); if(b){ b.insertAdjacentHTML('beforeend',_wlRowHTML({})); const i=b.querySelectorAll('.ar-wl-url'); i[i.length-1]?.focus(); } }
+function _wlCollect(){ return [...document.querySelectorAll('#ar-wl-box .ar-wl')].map(r=>({url:(r.querySelector('.ar-wl-url')?.value||'').trim(), label:(r.querySelector('.ar-wl-lbl')?.value||'').trim()})).filter(x=>x.url); }
+function _wlLinksHTML(p, style){ const L=_workLinks(p); return L.map((x,i)=>`<a href="${esc(x.url)}" target="_blank" rel="noopener" style="${style||'color:var(--accent2);font-size:12px'}">🔗 ${esc(x.label||(L.length>1?'ลิงก์งาน '+(i+1):'เปิดลิงก์โหลดงาน'))}</a>`).join(' <span style="opacity:.3">·</span> '); }
 // เพิ่ม/ลบ เดทไลน์รอบ 2 ของหน้าที่นั้น — ปุ่มแยกชัดเจน (ลบ = ล้างค่าแล้วซ่อน เซฟแล้วหายจริง)
 function _arPh2Toggle(k, on){
   const w=document.getElementById('ar-ph2wrap-'+k), a=document.getElementById('ar-ph2add-'+k), i=document.getElementById('ar-ph2-'+k);
@@ -16046,7 +16066,8 @@ async function assignSaveRow(projId){
       ? (projId ? ((getProjects().find(x=>x.id===projId)||{}).managerId||currentUser.uid) : currentUser.uid)
       : (g('ar-mgr')?.value||''),
     name:nameFinal,
-    downloadLink:(g('ar-link')?.value||'').trim(),
+    workLinks:_wlCollect(),
+    downloadLink:(_wlCollect()[0]||{}).url||'',
     secretKey:(g('ar-secret')?.value||'').trim(),
     note:(g('ar-note')?.value||'').trim(),
     type:g('ar-type')?.value||'',
@@ -16089,7 +16110,7 @@ async function assignSaveRow(projId){
       budget:calcBudgetTotal(bRate||0, bType, bDur, bQty), budgetRate:bRate||0, budgetType:bType, budgetQty:bQty, duration:bDur||0,
       startDate:today, deadline:vals.deadline, cycle:'', note:vals.note,
       clientCode:vals.clientCode, seq:vals.seq, episodes:vals.episodes,
-      downloadLink:vals.downloadLink, secretKey:vals.secretKey,
+      downloadLink:vals.downloadLink, workLinks:vals.workLinks, secretKey:vals.secretKey,
       managerId:vals.managerId, workers:[], tax:{}, evidenceLogs:[], snapshot:null,
       createdAt:new Date().toISOString(), phases
     };
@@ -16158,7 +16179,7 @@ function renderAssign(){
       return `<div style="padding:4px 10px;background:var(--bg2);border-radius:8px;font-size:11.5px;white-space:nowrap"><span style="color:var(--text2);font-weight:700">${l}</span> · ${_assignDL(p,k)}</div>`;
     }).filter(Boolean).join('');
     const linkRow=[
-      p.downloadLink?`<a href="${esc(p.downloadLink)}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:12px">🔗 เปิดลิงก์โหลดงาน</a>`:'',
+      _wlLinksHTML(p),
       p.secretKey?`<span style="font-size:11px;color:var(--text2)">🔑 <span id="${secId}" data-shown="0" style="font-family:monospace">••••••••</span> <button id="${secId}-b" class="btn btn-sm btn-outline" style="padding:0 6px;font-size:10px" onclick="toggleSecretKey('${secId}-b','${secId}','${escJs(p.secretKey)}')">👁</button></span>`:'',
       (p.note||'').trim()?`<span style="font-size:11.5px;color:var(--text2)">📝 ${esc(p.note)}</span>`:''
     ].filter(Boolean).join(' <span style="opacity:.3">·</span> ');
@@ -17212,9 +17233,9 @@ function renderProjDetail(){
   let _lb=document.getElementById('det-linkbar');
   if(!_lb && sb){ _lb=document.createElement('div'); _lb.id='det-linkbar'; sb.insertAdjacentElement('afterend',_lb); }
   if(_lb){
-    if(p.downloadLink||p.secretKey){
+    if(_workLinks(p).length||p.secretKey){
       _lb.style.cssText='display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:9px 14px;margin:8px 0;background:rgba(0,180,255,.06);border:1px solid rgba(0,180,255,.2);border-radius:9px;font-size:12.5px';
-      _lb.innerHTML=(p.downloadLink?`<a href="${esc(p.downloadLink)}" target="_blank" rel="noopener" style="color:var(--accent2);font-weight:700">🔗 Link โหลดงาน</a>`:'')+
+      _lb.innerHTML=_wlLinksHTML(p,'color:var(--accent2);font-weight:700')+
         (p.secretKey?`<span style="color:var(--text2)">🔑 Secret key: <span id="det-seckey" data-shown="0" style="font-family:monospace">••••••••</span> <button id="det-seckey-b" class="btn btn-sm btn-outline" style="padding:0 7px;font-size:10px" onclick="toggleSecretKey('det-seckey-b','det-seckey','${escJs(p.secretKey)}')">👁</button></span>`:'');
     } else { _lb.style.display='none'; _lb.innerHTML=''; }
   }
@@ -33005,7 +33026,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261024-01"></script><script src="scene/nd-profile.js?v=20261024-01"></script><script src="scene/nd-plan.js?v=20261024-01"></script><script src="scene/nd-docpdf.js?v=20261024-01"></script><script src="scene/nd-acct.js?v=20261024-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261025-01"></script><script src="scene/nd-profile.js?v=20261025-01"></script><script src="scene/nd-plan.js?v=20261025-01"></script><script src="scene/nd-docpdf.js?v=20261025-01"></script><script src="scene/nd-acct.js?v=20261025-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33015,7 +33036,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261024-01';
+var UPD_BUILD = '20261025-01';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;

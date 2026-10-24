@@ -18,6 +18,15 @@ const isAdm=()=>safe(()=>currentUser.role==='admin',false);
 const isAcct=()=>isAdm()||safe(()=>!!currentUser.acct,false);
 const me=()=>safe(()=>currentUser.nickname||currentUser.email,'');
 const SSO_RATE=0.05;
+// 🛡️ ฐานค่าจ้างสูงสุดของประกันสังคม "ตามช่วงเวลา" (acct_cfg.ssoCaps = [{from:'YYYY-MM', cap}])
+//    ค่าตั้งต้น: ถึง ธ.ค. 2568 = 15,000 · ตั้งแต่ ม.ค. 2569 = 17,500 (ตามกฎกระทรวงที่ปรับเพดานค่าจ้าง) · แก้/เพิ่มช่วงใหม่ได้ที่ปุ่ม "แก้"
+function ssoCapFor(M){
+  const cfg=(D&&D.cfg)||{}, L=(Array.isArray(cfg.ssoCaps)?cfg.ssoCaps:[]).filter(x=>x&&x.from&&+x.cap>0).sort((a,b)=>String(a.from).localeCompare(String(b.from)));
+  const hit=L.filter(x=>x.from<=M).pop();
+  if(hit) return {cap:+hit.cap, note:'ใช้ตั้งแต่ '+mLabel(hit.from)};
+  if(+cfg.ssoCap>0 && !L.length) return {cap:+cfg.ssoCap, note:'ค่าที่ตั้งไว้'};
+  return M>='2026-01'?{cap:17500, note:'ค่าตั้งต้น ตั้งแต่ ม.ค. 2569'}:{cap:15000, note:'ค่าตั้งต้น ก่อนปี 2569'};
+}
 
 const lk=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');   // เดือนตามเวลาไทยในเครื่อง
 const NOWM=()=>lk(new Date());
@@ -71,7 +80,7 @@ function compute(Mx){
     return {r, list:L, people:new Set(L.map(v=>v.staffId)).size, wht:L.filter(v=>v.whtNo).length, needWht:L.filter(v=>vStats(v).tax>0).length,
       sent:L.filter(v=>v.emailStatus==='sent').length, noMail:L.filter(v=>v.emailStatus==='noemail'||v.emailStatus==='failed').length,
       net:L.reduce((a,v)=>a+vStats(v).net,0)}; });
-  const salaried=Object.entries(D.payroll||{}).filter(([,p])=>p&&(p.payType==='salary'||p.payType==='hybrid')).map(([id,p])=>{ const s=staffOf(id), base=parseFloat(p.baseSalary)||0, cap=+(D.cfg.ssoCap||15000);
+  const salaried=Object.entries(D.payroll||{}).filter(([,p])=>p&&(p.payType==='salary'||p.payType==='hybrid')).map(([id,p])=>{ const s=staffOf(id), base=parseFloat(p.baseSalary)||0, cap=ssoCapFor(M).cap;
     return {id, name:s.nickname||s.name||id, base, allow:parseFloat(p.allowance)||0, sso:Math.round(Math.min(base,cap)*SSO_RATE)}; });
   const missing=[]; const seen=new Set();
   vs.forEach(v=>{ const s=staffOf(v.staffId), st=vStats(v), n=s.nickname||s.name||v.staffNickname||v.staffId;
@@ -149,7 +158,7 @@ function render(){ const b=$('nd-acct-body'); if(!b||!D) return; const C=compute
   const s1ok=C.vs.length&&C.rounds.every(r=>r.wht>=r.needWht);
   // 2 เงินเดือน
   const s2=C.salaried.length?`<table><tr><th>พนักงาน</th><th class="r">เงินเดือน</th><th class="r">ค่าอื่น</th><th class="r">สปส. ลูกจ้าง 5%</th><th class="r">สปส. นายจ้าง 5%</th></tr>${C.salaried.map(x=>`<tr><td>${E(x.name)}${x.base?'':' <span class="ac-pill ac-o">ยังไม่ใส่เงินเดือน</span>'}</td><td class="r">${B(x.base)}</td><td class="r">${B(x.allow)}</td><td class="r">${B(x.sso)}</td><td class="r">${B(x.sso)}</td></tr>`).join('')}</table>
-    <div class="ac-mut" style="margin-top:6px">ฐานคำนวณประกันสังคมสูงสุด ${B(+(D.cfg.ssoCap||15000))} ${isAcct()?`<a href="javascript:void 0" onclick="ACCT.cap()">แก้</a>`:''} · บันทึกจ่ายจริงที่หน้า "รอบจ่ายรายเดือน"</div>`
+    <div class="ac-mut" style="margin-top:6px">ฐานคำนวณประกันสังคมสูงสุด ${B(ssoCapFor(MONTH).cap)} <span class="ac-mut">(${E(ssoCapFor(MONTH).note)})</span> ${isAcct()?`<a href="javascript:void 0" onclick="ACCT.cap()">แก้</a>`:''} · บันทึกจ่ายจริงที่หน้า "รอบจ่ายรายเดือน"</div>`
     :'<div class="ac-mut">ยังไม่มีพนักงานประเภท "เงินเดือนประจำ/ผสม" — ตั้งได้ที่หน้ารอบจ่ายรายเดือน › ประเภทจ่าย/โบนัส</div>';
   // 3 ข้อมูลที่ขาด
   const s3=C.missing.length?`<table><tr><th>ของใคร</th><th>ขาดอะไร</th></tr>${C.missing.map(m=>`<tr><td>${E(m.who)}</td><td>${E(m.what)}</td></tr>`).join('')}</table><div class="ac-row"><button class="btn btn-sm btn-outline" onclick="ACCT.copyMissing()">📋 คัดลอกรายการ (ส่งให้แอดมิน/ทีมงาน)</button></div>`:'<div class="ac-mut">✅ ข้อมูลครบ</div>';
@@ -250,7 +259,15 @@ window.ACCT={
   month(k){ MONTH=k; A=HIST[k]||{}; render(); },
   async reload(){ await open(true); },
   async tick(k){ A.steps=A.steps||{}; if(A.steps[k]) delete A.steps[k]; else A.steps[k]={by:me(), at:new Date().toISOString()}; await saveA(); render(); },
-  async cap(){ let v=null; try{ v=prompt('ฐานค่าจ้างสูงสุดสำหรับคิดประกันสังคม (บาท) — ตามประกาศล่าสุด', D.cfg.ssoCap||15000); }catch(e){} if(v==null) return; const n=parseFloat(v); if(!(n>0)) return; D.cfg.ssoCap=n; try{ await fbSaveKeyed('acct_cfg', D.cfg); }catch(e){} render(); },
+  // แก้ฐานประกันสังคม = มีผลตั้งแต่เดือนที่เลือกเป็นต้นไป · เดือนก่อนหน้าคงค่าเดิม (ไม่เปลี่ยนย้อนหลัง)
+  async cap(){ let v=null, f=null; const cur=ssoCapFor(MONTH);
+    try{ v=prompt('ฐานค่าจ้างสูงสุดสำหรับคิดประกันสังคม (บาท)', cur.cap); }catch(e){} if(v==null) return; const n=parseFloat(String(v).replace(/,/g,'')); if(!(n>0)){ toast('ใส่ตัวเลขให้ถูกต้อง','warn'); return; }
+    try{ f=prompt('มีผลตั้งแต่เดือนไหน? (เดือน/ปี พ.ศ. เช่น 1/2569) — เดือนก่อนหน้านั้นยังใช้ค่าเดิม',(+MONTH.slice(5,7))+'/'+(+MONTH.slice(0,4)+543)); }catch(e){} if(f==null) return;
+    const m=String(f).trim().match(/^(\d{1,2})\s*\/\s*(\d{4})$/); if(!m||+m[1]<1||+m[1]>12){ toast('รูปแบบเดือนไม่ถูก — พิมพ์เช่น 1/2569','warn'); return; }
+    let y=+m[2]; if(y>2400) y-=543; const from=y+'-'+String(+m[1]).padStart(2,'0');
+    const L=(Array.isArray(D.cfg.ssoCaps)?D.cfg.ssoCaps:[]).filter(x=>x&&x.from!==from); L.push({from, cap:n, by:me(), at:new Date().toISOString()}); L.sort((a,b)=>String(a.from).localeCompare(String(b.from)));
+    D.cfg.ssoCaps=L; delete D.cfg.ssoCap; try{ await fbSaveKeyed('acct_cfg', D.cfg); }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); return; }
+    toast('บันทึกฐาน '+B(n)+' — มีผลตั้งแต่ '+mLabel(from)+' เป็นต้นไป','success'); render(); },
   copyMissing(){ const C=compute(); const t=mLabel(MONTH)+' — ข้อมูลที่ยังขาด\n'+C.missing.map(m=>'• '+m.who+': '+m.what).join('\n'); try{ navigator.clipboard.writeText(t); toast('คัดลอกแล้ว','success'); }catch(e){ toast(t,'info'); } },
   async clientWht(enc){ const c=decodeURIComponent(enc); toast('เลือกไฟล์ 50 ทวิ ที่ลูกค้าส่งมา (หรือกดยกเลิกถ้าแค่จะติ๊กว่าได้รับแล้ว)','info');
     const f=await upFile('wht_client', 'WHT-'+c+'-'+MONTH); A.clientWht=A.clientWht||{}; A.clientWht[c]={got:true, url:(f&&f.url)||'', at:new Date().toISOString(), by:me()}; await saveA(); render(); },
