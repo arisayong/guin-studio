@@ -50,7 +50,7 @@ async function loadBase(force){
     jobs.push(db.ref('staffPrivate').get().then(sn=>{ out.priv=sn.val()||{}; }).catch(()=>{}));
   }
   jobs.push(K('wht_docs').then(v=>{ out.wht=arr(v); }), K('company_expenses').then(v=>{ out.exp=arr(v); }),
-            K('payroll_profiles').then(v=>{ out.payroll=v||{}; }), K('acct_cfg').then(v=>{ out.cfg=v||{}; }));
+            K('payroll_profiles').then(v=>{ out.payroll=v||{}; }), K('acct_cfg').then(v=>{ out.cfg=v||{}; }), K('acct_drive').then(v=>{ out.drive=v||{}; }));
   await Promise.all(jobs);
   BASE=out; BASE_AT=Date.now();
 }
@@ -190,6 +190,12 @@ function render(){ const b=$('nd-acct-body'); if(!b||!D) return; const C=compute
    <div class="ac-mo">${yearMonths(YEAR).map(k=>{ const fut=k>NOWM(), h=HIST[k]||{}, n=steps.filter(s=>h.steps&&h.steps[s]).length;
       return `<button class="${k===MONTH?'on':''} ${h.closedAt?'done':''}" ${fut?'disabled style="opacity:.35;cursor:default"':`onclick="ACCT.month('${k}')"`}>${fut?'':`<span class="ac-sel ${SEL.has(k)?'on':''}" onclick="event.stopPropagation();ACCT.sel('${k}')">${SEL.has(k)?'☑':'☐'}</span>`}${TM[+k.slice(5,7)-1]}<small>${fut?'—':h.closedAt?'✓ ปิดแล้ว':n?n+'/6':'—'}</small></button>`; }).join('')}</div>
    <div class="ac-kpi"><div><small>รายรับ (รับเงินแล้ว)</small><b style="color:var(--green)">${B(C.t.income)}</b></div><div><small>จ่ายทีมงาน (โอนสุทธิ)</small><b>${B(C.t.team)}</b></div><div><small>ภาษีหัก ณ ที่จ่าย (ต้องนำส่ง)</small><b style="color:var(--orange)">${B(C.t.wht)}</b></div><div><small>ค่าใช้จ่ายบริษัท</small><b>${B(C.t.exp)}</b></div></div>
+   ${(()=>{ const dv=drv(), y=dv.years&&dv.years[YEAR], mo=drMonth(MONTH);
+      const openLinks=`${dv.root?`<a class="btn btn-sm btn-outline" href="${E(dv.root.link)}" target="_blank">📁 เปิด Drive บัญชี</a>`:''}${mo?`<a class="btn btn-sm btn-outline" href="${E(mo.link)}" target="_blank">📁 โฟลเดอร์ ${E(mLabel(MONTH))}</a>`:''}`;
+      if(!isAdm()) return dv.root?`<div class="ac-card" style="padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>🗂️ Drive บัญชี</b><span class="ac-mut">ไฟล์ที่ได้รับมา (สลิป · 50 ทวิ ลูกค้า · ใบเสร็จ · ใบเสร็จการยื่น) วางไว้ที่นี่</span><span style="margin-left:auto;display:flex;gap:6px">${openLinks}</span></div>`:'';
+      return `<div class="ac-card" style="padding:10px 14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>🗂️ Drive บัญชี</b>
+        <span class="ac-mut">${dv.root?('เจ้าของไดรฟ์: '+E(dv.owner||'บัญชีที่ตั้งค่า Drive ไว้')+(dv.sharedTo&&dv.sharedTo.length?' · แชร์ให้ '+E(dv.sharedTo.join(', ')):' · ยังไม่ได้แชร์ให้นักบัญชี')):'ยังไม่ได้สร้าง — สร้างในไดรฟ์หลักของแอดมิน (ตัวเดียวกับหน้า 📂 จัดไฟล์งาน)'}</span>
+        <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">${openLinks}<button class="btn btn-sm ${y?'btn-outline':'btn-blue'}" onclick="ACCT.driveSetup()">${y?'🔄 ตรวจโฟลเดอร์ปี '+(YEAR+543):'🗂️ สร้างโฟลเดอร์ปี '+(YEAR+543)}</button>${dv.root?'<button class="btn btn-sm btn-outline" onclick="ACCT.driveShare()">🔗 แชร์ให้นักบัญชี</button>':''}</span></div></div>`; })()}
    ${trk}
    <div class="ac-card">
     ${st('s1','💸','1. รอบจ่ายทีมงาน','มาจาก: หน้าเอกสาร › ใบสำคัญจ่ายทีม (ออกใบ & ส่งเมล)',C.vs.length?P(C.vs.length+' ใบ',s1ok?'ac-g':'ac-o'):P('ยังไม่มีใบ'),s1ok?'':'warn',s1)}
@@ -208,10 +214,62 @@ function render(){ const b=$('nd-acct-body'); if(!b||!D) return; const C=compute
 function dl(name, text){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿'+text],{type:'text/csv;charset=utf-8'})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500); }
 const csv=rows=>rows.map(r=>r.map(c=>{ const s=String(c==null?'':c); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(',')).join('\n');
 function pickFile(){ return new Promise(res=>{ const i=document.createElement('input'); i.type='file'; i.accept='image/*,.pdf'; i.onchange=()=>res(i.files[0]||null); i.click(); }); }
-async function upFile(kind, base){ const f=await pickFile(); if(!f) return null;
-  const data=await new Promise(r=>{ const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.onerror=()=>r(''); fr.readAsDataURL(f); });
-  const name=(base+'_'+f.name).replace(/[\\\/:*?"<>|\s]+/g,'_');
-  const url=await safe(()=>uploadToDrive(kind, name, data),Promise.resolve(null)); return {url:url||'', name:f.name}; }
+/* ── 🗂️ Drive บัญชี (ไดรฟ์หลักของแอดมิน = ตัวเชื่อม "📂 จัดไฟล์งาน" เดิม) ──
+   Guin บัญชี › ปี 2569 › 10 ต.ค. 2569 › 01 สลิปโอนเงิน · 02 50ทวิ จากลูกค้า · 03 ใบเสร็จค่าใช้จ่าย · 04 ใบเสร็จการยื่นภาษี-สปส · 05 Statement ธนาคาร · 06 อื่นๆ
+   เก็บรหัสโฟลเดอร์ที่ misc/acct_drive · ไฟล์เป็นของบัญชี Google ที่ตั้งค่าไว้ (เจ้าของไดรฟ์) เสมอ */
+const DR_ROOT='Guin บัญชี (เอกสารบริษัท)';
+const DR_SUB=['01 สลิปโอนเงิน','02 50ทวิ จากลูกค้า','03 ใบเสร็จค่าใช้จ่าย','04 ใบเสร็จการยื่นภาษี-สปส','05 Statement ธนาคาร','06 อื่นๆ'];
+const KIND_SUB={wht_client:DR_SUB[1], expense:DR_SUB[2], tax:DR_SUB[3]};
+const monName=k=>k.slice(5,7)+' '+mLabel(k);
+const drv=()=>(D&&D.drive)||{};
+const drMonth=k=>{ const y=(drv().years||{})[k.slice(0,4)]; return y&&(y.months||{})[k]; };
+async function saveDrive(){ try{ await fbSaveKeyed('acct_drive', D.drive); }catch(e){ toast('บันทึกข้อมูล Drive ไม่สำเร็จ: '+e.message,'error'); } }
+async function drCall(payload){ if(typeof callDrive!=='function') throw new Error('ยังไม่ได้เชื่อม Google Drive'); return callDrive(payload); }
+// แอดมิน: สร้างโฟลเดอร์หลัก + ปี + 12 เดือน (+ โฟลเดอร์ย่อย) · กดซ้ำได้ ไม่สร้างซ้ำ
+async function driveSetupYear(y){
+  if(!isAdm()) return; showLoader(true);
+  try{
+    D.drive=D.drive||{};
+    if(!D.drive.root){ const r=await drCall({action:'create', parentId:'root', name:DR_ROOT}); D.drive.root={id:r.id, link:r.link}; }
+    try{ const pg=await drCall({action:'ping'}); if(pg&&pg.email) D.drive.owner=pg.email; }catch(e){}
+    const yf=await drCall({action:'create', parentId:D.drive.root.id, name:'ปี '+(y+543)});
+    const tr=await drCall({action:'tree', parentId:yf.id, items:yearMonths(y).map(k=>({name:monName(k), children:DR_SUB}))});
+    const months={}; yearMonths(y).forEach(k=>{ const c=(tr.created||[]).find(x=>x.name===monName(k)); if(c) months[k]={id:c.id, link:c.link, sub:{}}; });
+    D.drive.years=D.drive.years||{}; D.drive.years[y]={id:yf.id, link:yf.link, months}; D.drive.updatedAt=new Date().toISOString();
+    await saveDrive(); toast('🗂️ สร้างโฟลเดอร์ Drive บัญชี ปี '+(y+543)+' แล้ว','success'); render();
+  }catch(e){ toast('สร้างโฟลเดอร์ไม่สำเร็จ: '+e.message+' (ตั้งค่า Drive ที่หน้า 📂 จัดไฟล์งาน › 🔧 ตั้งค่า Drive)','error'); }
+  finally{ showLoader(false); }
+}
+// แอดมิน: แชร์โฟลเดอร์หลักให้ทุกบัญชีที่เป็นนักบัญชี (สิทธิ์แก้ไข)
+async function driveShare(){
+  if(!isAdm()||!drv().root) return; const db=safe(()=>_fbDatabase,null); if(!db) return;
+  let users={}, acc={}; try{ users=(await db.ref('users').get()).val()||{}; acc=(await db.ref('admin_config/accountants').get()).val()||{}; }catch(e){ toast('อ่านรายชื่อนักบัญชีไม่ได้: '+e.message,'error'); return; }
+  const emails=Object.keys(acc).filter(u=>acc[u]===true&&users[u]&&users[u].email).map(u=>users[u].email);
+  if(!emails.length){ toast('ยังไม่มีนักบัญชี — ติ๊ก "🧾 นักบัญชี" ในโปรไฟล์ทีมงานก่อน','warn'); return; }
+  showLoader(true);
+  try{ const r=await drCall({action:'share', folderId:drv().root.id, emails}); D.drive.sharedTo=emails; D.drive.sharedAt=new Date().toISOString(); await saveDrive();
+    toast('🔗 แชร์ให้ '+emails.join(', ')+(r.failed&&r.failed.length?' · ไม่สำเร็จ '+r.failed.length:''),'success'); render(); }
+  catch(e){ toast('แชร์ไม่สำเร็จ: '+e.message,'error'); } finally{ showLoader(false); }
+}
+// อัปไฟล์เข้าโฟลเดอร์ย่อยของเดือน · คืน {url, name}
+async function upFile(kind, base){
+  const mo=drMonth(MONTH), subName=KIND_SUB[kind]||DR_SUB[5];
+  if(!mo){ toast(isAdm()?'ยังไม่มีโฟลเดอร์ Drive ของเดือนนี้ — กด "🗂️ สร้างโฟลเดอร์ปี" ในการ์ด Drive บัญชีก่อน':'แอดมินยังไม่ได้สร้าง Drive บัญชีของเดือนนี้','warn'); return null; }
+  if(!isAdm()){   // นักบัญชี: เปิดโฟลเดอร์ใน Drive แล้ววางไฟล์เอง (โฟลเดอร์แชร์ให้แล้ว) → ติ๊กว่าแนบแล้ว
+    window.open(mo.link,'_blank');
+    return confirm('เปิดโฟลเดอร์ "'+monName(MONTH)+'" ใน Google Drive แล้ว\nวางไฟล์ในโฟลเดอร์ "'+subName+'"\n\nกด OK เมื่อวางไฟล์เรียบร้อย')?{url:mo.link, name:'(วางใน Drive)'}:null; }
+  const f=await pickFile(); if(!f) return null;
+  showLoader(true);
+  try{
+    let sub=(mo.sub||{})[subName];
+    if(!sub){ const r=await drCall({action:'create', parentId:mo.id, name:subName}); sub={id:r.id, link:r.link}; mo.sub=mo.sub||{}; mo.sub[subName]=sub; saveDrive(); }
+    const data=await new Promise(r=>{ const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.onerror=()=>r(''); fr.readAsDataURL(f); });
+    const name=(base+'_'+f.name).replace(/[\\\/:*?"<>|\s]+/g,'_');
+    const up=await drCall({action:'upload', folderId:sub.id, name, mimeType:f.type||'application/octet-stream', b64:String(data).split(',')[1]||''});
+    toast('☁️ อัปขึ้น Drive แล้ว · '+subName,'success'); return {url:up.link||sub.link, name:f.name};
+  }catch(e){ toast('อัปไฟล์ไม่สำเร็จ: '+e.message,'error'); return null; }
+  finally{ showLoader(false); }
+}
 
 // ── ข้อความ CSV ของ 1 เดือน ──
 function csvPayText(C){ const rows=[['วันที่','เลขที่ใบสำคัญจ่าย','ชื่อเล่น','ชื่อ-นามสกุล','เลขผู้เสียภาษี','ยอดก่อนหัก','หัก ณ ที่จ่าย','โอนสุทธิ','ธนาคาร','เลขบัญชี','เลข 50 ทวิ','ส่งเมล']];
@@ -255,6 +313,8 @@ async function zipMonths(keys, name){
 }
 window.ACCT={
   _stop(){ ZIP_STOP=true; },
+  driveSetup(){ return driveSetupYear(YEAR); },
+  driveShare(){ return driveShare(); },
   tog(k){ OPEN.has(k)?OPEN.delete(k):OPEN.add(k); render(); },
   month(k){ MONTH=k; A=HIST[k]||{}; render(); },
   async reload(){ await open(true); },
