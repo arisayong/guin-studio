@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261025-02"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261026-02"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -2139,12 +2139,24 @@ body.sidebar-collapsed .main-content{
      </div>
      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div class="form-group" style="margin:0">
-       <label class="form-label">ลูกค้า / บริษัท *</label>
-       <input class="form-input" id="qt-client" placeholder="ชื่อลูกค้า หรือบริษัท">
+       <label class="form-label" style="display:flex;align-items:center;gap:8px">ลูกค้า / บริษัท * <span style="margin-left:auto;display:flex;gap:6px"><button type="button" class="btn btn-xs btn-outline" onclick="openClientBook('qt')">📇 เลือกจากรายชื่อลูกค้า</button></span></label>
+       <input class="form-input" id="qt-client" list="cli-dl" autocomplete="off" placeholder="พิมพ์ชื่อ — ลูกค้าที่เคยบันทึกไว้จะขึ้นให้เลือก" onchange="_cliFill('qt')">
       </div>
       <div class="form-group" style="margin:0">
        <label class="form-label">Email ลูกค้า</label>
        <input class="form-input" id="qt-email" type="email" placeholder="client@email.com">
+      </div>
+      <div class="form-group" style="margin:0">
+       <label class="form-label">เลขประจำตัวผู้เสียภาษีลูกค้า</label>
+       <input class="form-input" id="qt-ctax" placeholder="13 หลัก (ถ้ามี)" maxlength="20">
+      </div>
+      <div class="form-group" style="margin:0">
+       <label class="form-label">สาขา</label>
+       <input class="form-input" id="qt-cbranch" placeholder="สำนักงานใหญ่ / สาขาที่ 00001">
+      </div>
+      <div class="form-group" style="margin:0;grid-column:1/-1">
+       <label class="form-label">ที่อยู่ลูกค้า</label>
+       <input class="form-input" id="qt-caddr" placeholder="ที่อยู่สำหรับออกเอกสาร">
       </div>
       <div class="form-group" style="margin:0">
        <label class="form-label">วันที่ออกใบ</label>
@@ -2217,12 +2229,24 @@ body.sidebar-collapsed .main-content{
      </div>
      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div class="form-group" style="margin:0">
-       <label class="form-label">ลูกค้า / บริษัท *</label>
-       <input class="form-input" id="inv-client" placeholder="ชื่อลูกค้า หรือบริษัท">
+       <label class="form-label" style="display:flex;align-items:center;gap:8px">ลูกค้า / บริษัท * <span style="margin-left:auto;display:flex;gap:6px"><button type="button" class="btn btn-xs btn-outline" onclick="openClientBook('inv')">📇 เลือกจากรายชื่อลูกค้า</button></span></label>
+       <input class="form-input" id="inv-client" list="cli-dl" autocomplete="off" placeholder="พิมพ์ชื่อ — ลูกค้าที่เคยบันทึกไว้จะขึ้นให้เลือก" onchange="_cliFill('inv')">
       </div>
       <div class="form-group" style="margin:0">
        <label class="form-label">Email ลูกค้า *</label>
        <input class="form-input" id="inv-email" type="email" placeholder="client@email.com">
+      </div>
+      <div class="form-group" style="margin:0">
+       <label class="form-label">เลขประจำตัวผู้เสียภาษีลูกค้า</label>
+       <input class="form-input" id="inv-ctax" placeholder="13 หลัก (ถ้ามี)" maxlength="20">
+      </div>
+      <div class="form-group" style="margin:0">
+       <label class="form-label">สาขา</label>
+       <input class="form-input" id="inv-cbranch" placeholder="สำนักงานใหญ่ / สาขาที่ 00001">
+      </div>
+      <div class="form-group" style="margin:0;grid-column:1/-1">
+       <label class="form-label">ที่อยู่ลูกค้า</label>
+       <input class="form-input" id="inv-caddr" placeholder="ที่อยู่สำหรับออกเอกสาร">
       </div>
       <div class="form-group" style="margin:0">
        <label class="form-label">วันที่ออกใบ</label>
@@ -3994,7 +4018,7 @@ function cancelInvEdit(){
   _invEditingDocNo = null;
   invItems = [];
   _invPayAccountIds = [];
-  ['inv-client','inv-email','inv-date','inv-duedate','inv-vat','inv-note'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=(id==='inv-vat'?'0':''); });
+  ['inv-client','inv-email','inv-ctax','inv-cbranch','inv-caddr','inv-date','inv-duedate','inv-vat','inv-note'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=(id==='inv-vat'?'0':''); });
   const dt = document.getElementById('inv-date'); if(dt) dt.value = isoToThai(new Date().toISOString().split('T')[0]);
   initInvItems(); initInvPayChips(); renderInvDocNoBar();
   toast('ล้างฟอร์มแล้ว — พร้อมสร้างใบใหม่','info');
@@ -4003,7 +4027,7 @@ function cancelQtEdit(){
   if(!confirm('ยกเลิกการแก้ไข + ล้างฟอร์ม สร้างใบใหม่?')) return;
   _qtEditingDocNo = null;
   qtItems = [];
-  ['qt-client','qt-email','qt-date','qt-vat','qt-note'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=(id==='qt-vat'?'0':''); });
+  ['qt-client','qt-email','qt-ctax','qt-cbranch','qt-caddr','qt-date','qt-vat','qt-note'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=(id==='qt-vat'?'0':''); });
   const dt = document.getElementById('qt-date'); if(dt) dt.value = isoToThai(new Date().toISOString().split('T')[0]);
   initQtItems(); renderQtDocNoBar();
   toast('ล้างฟอร์มแล้ว — พร้อมสร้างใบใหม่','info');
@@ -23256,7 +23280,7 @@ function renderQtPPList(q){
   let filtered = projs.filter(p => {
     if(alreadyIds.includes(p.id)) return false;
     // text search
-    if(qq && !((p.name||'').toLowerCase().includes(qq) || (p.client||'').toLowerCase().includes(qq))) return false;
+    if(qq && !(projDisp(p).toLowerCase().includes(qq) || (p.client||'').toLowerCase().includes(qq))) return false;
     // range filter (based on startDate หรือ date)
     const _sd = p.startDate || p.date || p.createdAt;
     if(!_qtppPassRangeFilter(_sd, range)) return false;
@@ -23279,7 +23303,7 @@ function renderQtPPList(q){
       </div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-          <span style="font-weight:700;color:${isSelected?'var(--accent2)':'var(--text)'};font-size:13px">${p.name}</span>
+          ${projCode(p)?`<span style="flex-shrink:0;padding:1px 8px;border-radius:6px;background:rgba(0,180,255,.15);border:1px solid rgba(0,180,255,.4);color:var(--accent2);font-size:12px;font-weight:800">${esc(projCode(p))}</span>`:''}${(p.name&&p.name!==projCode(p))?`<span style="font-weight:700;color:${isSelected?'var(--accent2)':'var(--text)'};font-size:13px">${esc(p.name)}</span>`:(projCode(p)?'':'<span style="font-weight:700;font-size:13px;color:var(--text2)">(ไม่มีชื่อ)</span>')}
           ${sdDisplay?'<span style="font-size:10px;color:var(--orange);background:rgba(255,158,0,.12);padding:2px 8px;border-radius:10px;border:1px solid rgba(255,158,0,.3);white-space:nowrap;font-weight:600" title="วันรับงาน">📅 รับงาน '+sdDisplay+'</span>':'<span style="font-size:10px;color:var(--text2);opacity:.6;padding:2px 8px">— ไม่ระบุวันรับงาน</span>'}
         </div>
         ${p.client?'<div style="font-size:11px;color:var(--text2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 '+p.client+'</div>':''}
@@ -23315,7 +23339,7 @@ function confirmQtPPAdd(){
     const shouldReplace = qtItems.length===1 && !qtItems[0].desc && !qtItems[0].price && !qtItems[0].projId;
     const newItem = {
       projId: p.id,
-      desc: p.name,
+      desc: projDisp(p),
       detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '',
       qty: 1,
       unit: 'งาน',
@@ -23327,7 +23351,7 @@ function confirmQtPPAdd(){
     addedCount++;
   });
   const cli = document.getElementById('qt-client');
-  if(cli && !cli.value && autoFillClient) cli.value = autoFillClient;
+  if(cli && !cli.value && autoFillClient){ cli.value = autoFillClient; _cliFill('qt'); }
   document.getElementById('qt-proj-picker')?.remove();
   window._qtPickSelected = null;
   renderQtItems();
@@ -23438,6 +23462,7 @@ function getQuotationData() {
     docNo: _qtEditingDocNo || generateDocNo('QT'),
     client: document.getElementById('qt-client')?.value.trim()||'',
     email:  document.getElementById('qt-email')?.value.trim()||'',
+    clientTax:document.getElementById('qt-ctax')?.value.trim()||'', clientBranch:document.getElementById('qt-cbranch')?.value.trim()||'', clientAddr:document.getElementById('qt-caddr')?.value.trim()||'',
     projId: projIdsFromItems[0] || '',  // backward compat for buildQuotationHTML
     projIds: projIdsFromItems,
     date:   thaiToIso(document.getElementById('qt-date')?.value)||document.getElementById('qt-date')?.value||new Date().toISOString().split('T')[0],
@@ -25921,7 +25946,72 @@ async function _vcCommitIssueVouchersByProj() {
    SHARED HELPERS
    ══════════════════════ */
 function getDocsStore(key) { return ls('docs_'+key)||[]; }
-function saveDocsStore(type,data){ls('docs_'+type,data);if(_fbDatabase)_fbDatabase.ref('docs/'+type).set(data).catch(()=>{}); if(type==='vouchers') _queueStaffDocsSync(); }
+// 📇 รายชื่อลูกค้า/บริษัท — ใช้ออกใบเสนอราคา/ใบแจ้งหนี้/ใบเสร็จ (แยกจากทีมงาน) · misc/clients
+//    [{id, name, branch, taxId, addr, email, contact, phone, note, updatedAt}]
+function getClients(){ const v=ls('clients'); return Array.isArray(v)?v.filter(Boolean):[]; }
+async function saveClients(a){ ls('clients',a); _cliDatalist(); try{ await fbSaveKeyed('clients',a); }catch(e){} }
+const _cliKey=n=>String(n||'').trim().toLowerCase().replace(/\s+/g,' ');
+function _cliFind(name){ const k=_cliKey(name); return k?getClients().find(c=>_cliKey(c.name)===k):null; }
+function _cliDatalist(){ let dl=document.getElementById('cli-dl'); if(!dl){ dl=document.createElement('datalist'); dl.id='cli-dl'; document.body.appendChild(dl); }
+  dl.innerHTML=getClients().slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'th')).map(c=>`<option value="${esc(c.name)}">${esc([c.branch,c.taxId].filter(Boolean).join(' · '))}</option>`).join(''); }
+function _cliSetForm(pre, c){ const set=(id,v)=>{ const e=document.getElementById(pre+'-'+id); if(e) e.value=v||''; };
+  set('ctax', c.clientTax!=null?c.clientTax:c.taxId); set('cbranch', c.clientBranch!=null?c.clientBranch:c.branch); set('caddr', c.clientAddr!=null?c.clientAddr:c.addr); }
+// เลือกชื่อลูกค้าที่เคยบันทึก → เติมอีเมล/เลขภาษี/สาขา/ที่อยู่ให้ (ไม่ทับช่องที่พิมพ์เองไว้แล้ว)
+function _cliFill(pre){ const c=_cliFind(document.getElementById(pre+'-client')?.value); if(!c) return;
+  const put=(id,v)=>{ const e=document.getElementById(pre+'-'+id); if(e && !e.value.trim() && v) e.value=v; };
+  put('email',c.email); put('ctax',c.taxId); put('cbranch',c.branch); put('caddr',c.addr); }
+// บันทึกเอกสารแล้ว → เพิ่ม/อัปเดตลูกค้าในรายชื่อ (เติมเฉพาะช่องที่ยังว่าง ไม่ทับข้อมูลเดิม)
+function _cliLearn(docs){ const L=getClients(); let ch=false;
+  (docs||[]).forEach(d=>{ if(!d||!String(d.client||'').trim()) return; let c=L.find(x=>_cliKey(x.name)===_cliKey(d.client));
+    if(!c){ c={id:'CL'+Date.now()+Math.random().toString(36).slice(2,6), name:String(d.client).trim(), createdAt:new Date().toISOString()}; L.push(c); ch=true; }
+    [['email','email'],['taxId','clientTax'],['branch','clientBranch'],['addr','clientAddr']].forEach(([k,f])=>{ const v=String(d[f]||'').trim(); if(v && !c[k]){ c[k]=v; ch=true; } }); });
+  if(ch){ L.forEach(c=>{ if(!c.updatedAt) c.updatedAt=new Date().toISOString(); }); saveClients(L); } }
+// 📇 หน้าต่างรายชื่อลูกค้า: ค้นหา · เลือกใส่ฟอร์ม · เพิ่ม/แก้/ลบ
+function openClientBook(pre, editId){
+  document.getElementById('cli-book')?.remove();
+  const ov=document.createElement('div'); ov.id='cli-book';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  const inp='width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;box-sizing:border-box';
+  const draw=(q)=>{ q=String(q||'').trim().toLowerCase(); const L=getClients().filter(c=>!q||[c.name,c.taxId,c.email,c.contact,c.branch].join(' ').toLowerCase().includes(q)).sort((a,b)=>String(a.name).localeCompare(String(b.name),'th'));
+    const ed=editId?getClients().find(c=>c.id===editId)||{}:null;
+    ov.innerHTML=`<div style="background:var(--card);border:1px solid var(--border2);border-radius:16px;width:min(720px,100%);max-height:88vh;overflow:auto;padding:16px;font-family:Kanit">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><b style="font-size:16px">📇 รายชื่อลูกค้า / บริษัท</b><span style="color:var(--text2);font-size:12px">${getClients().length} ราย · แยกจากทีมงาน</span><button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="document.getElementById('cli-book').remove()">ปิด</button></div>
+      ${ed?`<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:12px;margin-bottom:12px">
+        <b>${ed.id?'✏️ แก้ไขลูกค้า':'＋ เพิ่มลูกค้าใหม่'}</b>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <input id="cb-name" style="${inp};grid-column:1/-1" placeholder="ชื่อลูกค้า / บริษัท *" value="${esc(ed.name||'')}">
+          <input id="cb-tax" style="${inp}" placeholder="เลขประจำตัวผู้เสียภาษี" value="${esc(ed.taxId||'')}"><input id="cb-branch" style="${inp}" placeholder="สาขา (เช่น สำนักงานใหญ่)" value="${esc(ed.branch||'')}">
+          <input id="cb-addr" style="${inp};grid-column:1/-1" placeholder="ที่อยู่สำหรับออกเอกสาร" value="${esc(ed.addr||'')}">
+          <input id="cb-email" style="${inp}" placeholder="อีเมล" value="${esc(ed.email||'')}"><input id="cb-contact" style="${inp}" placeholder="ผู้ติดต่อ" value="${esc(ed.contact||'')}">
+          <input id="cb-phone" style="${inp}" placeholder="เบอร์โทร" value="${esc(ed.phone||'')}"><input id="cb-note" style="${inp}" placeholder="หมายเหตุ (เช่น เครดิต 30 วัน)" value="${esc(ed.note||'')}"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn btn-sm btn-outline" onclick="openClientBook('${pre}')">ยกเลิก</button><button class="btn btn-sm btn-blue" onclick="_cliSave('${pre}','${esc(ed.id||'')}')">💾 บันทึกลูกค้า</button></div></div>`
+      :`<div style="display:flex;gap:8px;margin-bottom:10px"><input id="cb-q" style="${inp}" placeholder="🔍 ค้นชื่อ · เลขภาษี · อีเมล" value="${esc(q)}" oninput="window._cbDraw(this.value)"><button class="btn btn-sm btn-blue" style="white-space:nowrap" onclick="openClientBook('${pre}','new')">＋ เพิ่มลูกค้า</button></div>`}
+      ${ed?'':(L.map(c=>`<div style="display:flex;gap:10px;align-items:center;padding:9px 4px;border-top:1px solid var(--border2)">
+        <div style="flex:1;min-width:0"><b>${esc(c.name)}</b>${c.branch?` <span style="font-size:11px;color:var(--text2)">(${esc(c.branch)})</span>`:''}
+          <div style="font-size:11.5px;color:var(--text2)">${esc([c.taxId?'เลขภาษี '+c.taxId:'',c.email,c.contact,c.phone].filter(Boolean).join(' · ')||'— ยังไม่มีข้อมูลเพิ่มเติม —')}</div>
+          ${c.addr?`<div style="font-size:11.5px;color:var(--text2)">${esc(c.addr)}</div>`:''}</div>
+        ${pre?`<button class="btn btn-sm btn-blue" onclick="_cliPick('${pre}','${esc(c.id)}')">ใช้ลูกค้านี้</button>`:''}
+        <button class="btn btn-sm btn-outline" onclick="openClientBook('${pre}','${esc(c.id)}')">✏️</button>
+        <button class="btn btn-sm btn-outline" style="color:var(--red)" onclick="_cliDel('${pre}','${esc(c.id)}')">🗑️</button></div>`).join('')||`<div style="text-align:center;color:var(--text2);padding:24px">${q?'ไม่พบลูกค้า':'ยังไม่มีลูกค้าในรายชื่อ — กด "＋ เพิ่มลูกค้า" หรือออกใบเสนอราคา/ใบแจ้งหนี้ ระบบจะจำให้เอง'}</div>`)}
+    </div>`;
+    const qi=document.getElementById('cb-q'); if(qi && q){ qi.focus(); qi.setSelectionRange(qi.value.length,qi.value.length); } };
+  window._cbDraw=draw; document.body.appendChild(ov); draw('');
+}
+function _cliSave(pre, id){
+  const g=k=>(document.getElementById('cb-'+k)?.value||'').trim(); const name=g('name'); if(!name){ toast('ใส่ชื่อลูกค้า','warn'); return; }
+  const L=getClients(); const dup=L.find(c=>_cliKey(c.name)===_cliKey(name) && c.id!==id); if(dup){ toast('มีลูกค้าชื่อนี้อยู่แล้ว','warn'); return; }
+  let c=id?L.find(x=>x.id===id):null; if(!c){ c={id:'CL'+Date.now(), createdAt:new Date().toISOString()}; L.push(c); }
+  Object.assign(c,{name, taxId:g('tax'), branch:g('branch'), addr:g('addr'), email:g('email'), contact:g('contact'), phone:g('phone'), note:g('note'), updatedAt:new Date().toISOString()});
+  saveClients(L); toast('💾 บันทึกลูกค้าแล้ว','success'); openClientBook(pre);
+}
+function _cliDel(pre, id){ const c=getClients().find(x=>x.id===id); if(!c||!confirm('ลบลูกค้า "'+c.name+'" ออกจากรายชื่อ?\n(เอกสารที่ออกไปแล้วไม่เปลี่ยน)')) return; saveClients(getClients().filter(x=>x.id!==id)); openClientBook(pre); }
+function _cliPick(pre, id){ const c=getClients().find(x=>x.id===id); if(!c) return;
+  const set=(k,v)=>{ const e=document.getElementById(pre+'-'+k); if(e) e.value=v||''; };
+  set('client',c.name); set('email',c.email); set('ctax',c.taxId); set('cbranch',c.branch); set('caddr',c.addr);
+  document.getElementById('cli-book')?.remove(); toast('ใส่ข้อมูล '+c.name+' แล้ว','success'); }
+window.addEventListener('load',()=>{ setTimeout(()=>{ try{ fbLoadKeyed('clients').then(()=>_cliDatalist()).catch(()=>_cliDatalist()); }catch(e){} }, 4000); });
+function saveDocsStore(type,data){ if(type==='quotations'||type==='invoices'||type==='receipts'){ try{ _cliLearn(data); }catch(e){} } ls('docs_'+type,data);if(_fbDatabase)_fbDatabase.ref('docs/'+type).set(data).catch(()=>{}); if(type==='vouchers') _queueStaffDocsSync(); }
 // ══════════════════════════════════════════════
 // 📄 สำเนาใบสำคัญจ่ายให้สต๊าฟเห็น/โหลดของตัวเอง → staffDocs/<staffId>/<docNo>
 //    แอดมินเป็นคนเขียน (อัตโนมัติ: ตอนออก/แก้/ยกเลิกใบ + ตอนเปิดเว็บ = ใบเก่าย้อนหลังด้วย)
@@ -26127,6 +26217,7 @@ function editInvoice(docNo){
   setTimeout(()=>{
     const clientEl = document.getElementById('inv-client'); if(clientEl) clientEl.value = d.client||'';
     const emailEl  = document.getElementById('inv-email');  if(emailEl)  emailEl.value  = d.email||'';
+    _cliSetForm('inv', d);
     const dateEl   = document.getElementById('inv-date');   if(dateEl)   dateEl.value   = d.date ? isoToThai(d.date) : '';
     const dueEl    = document.getElementById('inv-duedate');if(dueEl)    dueEl.value    = d.dueDate ? isoToThai(d.dueDate) : '';
     const vatEl    = document.getElementById('inv-vat');    if(vatEl)    vatEl.value    = d.vat||0;
@@ -26150,6 +26241,7 @@ function editQuotation(docNo){
   setTimeout(()=>{
     const clientEl = document.getElementById('qt-client'); if(clientEl) clientEl.value = d.client||'';
     const emailEl  = document.getElementById('qt-email');  if(emailEl)  emailEl.value  = d.email||'';
+    _cliSetForm('qt', d);
     const dateEl   = document.getElementById('qt-date');   if(dateEl)   dateEl.value   = d.date ? isoToThai(d.date) : '';
     const vatEl    = document.getElementById('qt-vat');    if(vatEl)    vatEl.value    = d.vat||0;
     const noteEl   = document.getElementById('qt-note');   if(noteEl)   noteEl.value   = d.note||'';
@@ -29607,7 +29699,7 @@ function renderInvPPList(q){
   const alreadyIds = invItems.filter(x=>x.projId).map(x=>x.projId);
   let filtered = projs.filter(p => {
     if(alreadyIds.includes(p.id)) return false;
-    if(qq && !((p.name||'').toLowerCase().includes(qq) || (p.client||'').toLowerCase().includes(qq))) return false;
+    if(qq && !(projDisp(p).toLowerCase().includes(qq) || (p.client||'').toLowerCase().includes(qq))) return false;
     const _sd = p.startDate || p.date || p.createdAt;
     if(!_qtppPassRangeFilter(_sd, range)) return false;
     return true;
@@ -29630,7 +29722,7 @@ function renderInvPPList(q){
       </div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-          <span style="font-weight:700;color:${isSelected?'var(--accent2)':'var(--text)'};font-size:13px">${p.name}</span>
+          ${projCode(p)?`<span style="flex-shrink:0;padding:1px 8px;border-radius:6px;background:rgba(0,180,255,.15);border:1px solid rgba(0,180,255,.4);color:var(--accent2);font-size:12px;font-weight:800">${esc(projCode(p))}</span>`:''}${(p.name&&p.name!==projCode(p))?`<span style="font-weight:700;color:${isSelected?'var(--accent2)':'var(--text)'};font-size:13px">${esc(p.name)}</span>`:(projCode(p)?'':'<span style="font-weight:700;font-size:13px;color:var(--text2)">(ไม่มีชื่อ)</span>')}
           ${sdDisplay?'<span style="font-size:10px;color:var(--orange);background:rgba(255,158,0,.12);padding:2px 8px;border-radius:10px;border:1px solid rgba(255,158,0,.3);white-space:nowrap;font-weight:600" title="วันรับงาน">📅 รับงาน '+sdDisplay+'</span>':'<span style="font-size:10px;color:var(--text2);opacity:.6;padding:2px 8px">— ไม่ระบุวันรับงาน</span>'}
         </div>
         ${p.client?'<div style="font-size:11px;color:var(--text2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 '+p.client+'</div>':''}
@@ -29668,7 +29760,7 @@ function confirmInvPPAdd(){
     const shouldReplace = invItems.length===1 && !invItems[0].desc && !invItems[0].price && !invItems[0].projId;
     const newItem = {
       projId: p.id,
-      desc: p.name,
+      desc: projDisp(p),
       detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '',
       qty: 1,
       unit: 'งาน',
@@ -29681,7 +29773,7 @@ function confirmInvPPAdd(){
   });
   // Auto-fill client if empty
   const cli = document.getElementById('inv-client');
-  if(cli && !cli.value && autoFillClient) cli.value = autoFillClient;
+  if(cli && !cli.value && autoFillClient){ cli.value = autoFillClient; _cliFill('inv'); }
   document.getElementById('inv-proj-picker')?.remove();
   window._invPickSelected = null;
   renderInvItems();
@@ -29693,7 +29785,7 @@ function addInvItemFromProject(projId){
   const p = getProjects().find(x=>x.id===projId);
   if(!p){ toast('ไม่พบโปรเจกต์','error'); return; }
   const shouldReplace = invItems.length===1 && !invItems[0].desc && !invItems[0].price && !invItems[0].projId;
-  const newItem = { projId: p.id, desc: p.name, detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '', qty: 1, unit: 'งาน', price: p.budget||0 };
+  const newItem = { projId: p.id, desc: projDisp(p), detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '', qty: 1, unit: 'งาน', price: p.budget||0 };
   if(shouldReplace) invItems[0] = newItem; else invItems.push(newItem);
   const cli = document.getElementById('inv-client');
   if(cli && !cli.value && p?.client) cli.value = p.client;
@@ -29710,6 +29802,7 @@ function getInvoiceData(){
     docNo: _invEditingDocNo || generateDocNo('INV'),
     client: document.getElementById('inv-client')?.value.trim()||'',
     email:  document.getElementById('inv-email')?.value.trim()||'',
+    clientTax:document.getElementById('inv-ctax')?.value.trim()||'', clientBranch:document.getElementById('inv-cbranch')?.value.trim()||'', clientAddr:document.getElementById('inv-caddr')?.value.trim()||'',
     projIds: projIdsFromItems,
     payAccountIds: [..._invPayAccountIds],
     date:   thaiToIso(document.getElementById('inv-date')?.value)||document.getElementById('inv-date')?.value||new Date().toISOString().split('T')[0],
@@ -29851,6 +29944,7 @@ async function _rcpCreate(invDocNo){
     docNo: generateDocNo('RCP'),
     fromInvoice: invDocNo,
     client: inv.client||'', email: inv.email||'',
+    clientTax:inv.clientTax||'', clientBranch:inv.clientBranch||'', clientAddr:inv.clientAddr||'',
     projIds: [...(inv.projIds||[])],
     payAccountIds: [...(inv.payAccountIds||[])],
     items: (inv.items||[]).map(x=>({...x})),
@@ -33026,7 +33120,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261025-02"></script><script src="scene/nd-profile.js?v=20261025-02"></script><script src="scene/nd-plan.js?v=20261025-02"></script><script src="scene/nd-docpdf.js?v=20261025-02"></script><script src="scene/nd-acct.js?v=20261025-02"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261026-02"></script><script src="scene/nd-profile.js?v=20261026-02"></script><script src="scene/nd-plan.js?v=20261026-02"></script><script src="scene/nd-docpdf.js?v=20261026-02"></script><script src="scene/nd-acct.js?v=20261026-02"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33036,7 +33130,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261025-02';
+var UPD_BUILD = '20261026-02';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
