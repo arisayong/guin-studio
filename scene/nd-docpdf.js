@@ -228,7 +228,7 @@ async function salesPages(kind, d){ await prep(); const A=await assets(); LG=(d&
   const qn=x=>(+x.qty||1), r2=n=>Math.round((+n||0)*100)/100, up=x=>FX?(x.fxUnit!=null?+x.fxUnit:r2((+x.price||0)/d.fxRate)):(+x.price||0);   // ราคาต่อหน่วยในสกุลเอกสาร
   const [th,en]=KIND[kind]||KIND.invoice, sub=r2((d.items||[]).reduce((a,x)=>a+qn(x)*up(x),0));
   const vp=+d.vat||0, vat=vp?(FX?r2(sub*vp/100):Math.round(sub*vp/100)):0, grand=FX?r2(sub+vat):(d.total!=null?+d.total:sub+vat), dt=thDate(d.date);
-  const rows=(d.items||[]).map((x,i)=>[String(i+1), E(x.desc||'')+(x.detail?`<div class="sub">${detL(x.detail)}</div>`:''), B(qn(x)).replace(/\.00$/,''), unitL(x.unit), B(up(x)), B(qn(x)*up(x))]);
+  const rows=(d.items||[]).map((x,i)=>[String(i+1), E(x.desc||'')+(x.detail?`<div class="sub">${detL(x.detail)}</div>`:''), (+qn(x)).toLocaleString('en-US',{maximumFractionDigits:2}), unitL(x.unit), B(up(x)), B(qn(x)*up(x))]);
   const fxNote=FX?L('อัตราแลกเปลี่ยน','Exchange rate')+` 1 ${E(CUR)} = ${(+d.fxRate).toLocaleString('en-US',{maximumFractionDigits:4})} THB`+(d.fxDate?` (${thDate(d.fxDate)})`:'')+` · ${L('เทียบเท่า','Equivalent to')} ${B((()=>{ const t=(d.items||[]).reduce((a,x)=>a+qn(x)*(+x.price||0),0); return r2(t+(vp?Math.round(t*vp/100):0)); })())} THB`:'';
   const cols=[['#','No.','c','8mm'],['รายละเอียด','Description'],['จำนวน','Qty','r','16mm'],['หน่วย','Unit','c','16mm'],['ราคาต่อหน่วย'+(FX?' ('+CUR+')':''),'Unit Price'+(FX?' ('+CUR+')':''),'r','25mm'],['จำนวนเงิน'+(FX?' ('+CUR+')':''),'Amount'+(FX?' ('+CUR+')':''),'r','27mm']];
   const copies=kind==='receipt'?[L('ต้นฉบับ','Original'),L('สำเนา','Copy')]:[L('ต้นฉบับ','Original')];

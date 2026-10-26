@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261026-09"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261026-10"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -2170,7 +2170,7 @@ body.sidebar-collapsed .main-content{
        <label class="form-label">สกุลเงินในเอกสาร <span style="font-weight:400;text-transform:none;opacity:.7">(ราคาในรายการพิมพ์เป็นบาท)</span></label>
        <div style="display:flex;gap:6px;align-items:center"><select class="form-input form-select" id="qt-cur" style="width:110px" onchange="_docCurChange('qt')"><option value="THB">฿ THB</option><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="JPY">¥ JPY</option><option value="CNY">¥ CNY</option><option value="HKD">HK$ HKD</option><option value="SGD">S$ SGD</option><option value="TWD">NT$ TWD</option><option value="KRW">₩ KRW</option><option value="AUD">A$ AUD</option><option value="MYR">RM MYR</option></select>
         <span id="qt-fx-box" style="display:none;align-items:center;gap:5px;font-size:12px;color:var(--text2)">1 <b id="qt-fx-code"></b> =<input id="qt-fx" type="number" step="any" min="0" style="width:80px;padding:6px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit" oninput="calcQtTotal()">บาท<button type="button" class="btn btn-xs btn-outline" onclick="_docFxRefresh('qt')" title="ดึงเรทวันนี้">🔄</button></span>
-        <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text2)">🌐 ภาษา<select id="qt-lang" class="form-input form-select" style="width:140px;padding:6px 24px 6px 8px"><option value="both">ไทย + English</option><option value="th">ไทยอย่างเดียว</option><option value="en">English only</option></select></span></div>
+        <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text2)">🌐 ภาษา<select id="qt-lang" onchange="this.dataset.user='1'" class="form-input form-select" style="width:140px;padding:6px 24px 6px 8px"><option value="both">ไทย + English</option><option value="th">ไทยอย่างเดียว</option><option value="en">English only</option></select></span></div>
       </div>
       <div class="form-group" style="margin:0">
        <label class="form-label">หมายเหตุ</label>
@@ -2274,7 +2274,7 @@ body.sidebar-collapsed .main-content{
        <label class="form-label">สกุลเงินในเอกสาร <span style="font-weight:400;text-transform:none;opacity:.7">(ราคาในรายการพิมพ์เป็นบาท)</span></label>
        <div style="display:flex;gap:6px;align-items:center"><select class="form-input form-select" id="inv-cur" style="width:110px" onchange="_docCurChange('inv')"><option value="THB">฿ THB</option><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="JPY">¥ JPY</option><option value="CNY">¥ CNY</option><option value="HKD">HK$ HKD</option><option value="SGD">S$ SGD</option><option value="TWD">NT$ TWD</option><option value="KRW">₩ KRW</option><option value="AUD">A$ AUD</option><option value="MYR">RM MYR</option></select>
         <span id="inv-fx-box" style="display:none;align-items:center;gap:5px;font-size:12px;color:var(--text2)">1 <b id="inv-fx-code"></b> =<input id="inv-fx" type="number" step="any" min="0" style="width:80px;padding:6px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit" oninput="calcInvTotal()">บาท<button type="button" class="btn btn-xs btn-outline" onclick="_docFxRefresh('inv')" title="ดึงเรทวันนี้">🔄</button></span>
-        <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text2)">🌐 ภาษา<select id="inv-lang" class="form-input form-select" style="width:140px;padding:6px 24px 6px 8px"><option value="both">ไทย + English</option><option value="th">ไทยอย่างเดียว</option><option value="en">English only</option></select></span></div>
+        <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text2)">🌐 ภาษา<select id="inv-lang" onchange="this.dataset.user='1'" class="form-input form-select" style="width:140px;padding:6px 24px 6px 8px"><option value="both">ไทย + English</option><option value="th">ไทยอย่างเดียว</option><option value="en">English only</option></select></span></div>
       </div>
 
      </div>
@@ -3991,16 +3991,17 @@ function generateDocNo(prefix){
 // ── DocNo preview bars on forms ──
 // 🔎 เปิดเอกสารเดิมมาแก้ → เทียบราคารายการกับงบโปรเจกต์ปัจจุบัน (ราคาในเอกสารเป็นค่า ณ ตอนที่เพิ่มรายการ ไม่ตามโปรเจกต์อัตโนมัติ)
 function _docPriceDiffs(pre){ const its=pre==='inv'?invItems:qtItems; const P=getProjects(); const r2=n=>Math.round((+n||0)*100)/100;
-  return its.map((x,i)=>{ if(!x.projId) return null; const p=P.find(y=>y.id===x.projId); if(!p) return null; const want=r2(p.budget), have=r2((+x.price||0)*(+x.qty||1));
-    return Math.abs(want-have)>=0.01?{i, name:x.desc||projDisp(p), have, want, p}:null; }).filter(Boolean); }
+  return its.map((x,i)=>{ if(!x.projId) return null; const p=P.find(y=>y.id===x.projId); if(!p) return null; const want=r2(p.budget), have=r2((+x.price||0)*(+x.qty||1)), sh=_projItemShape(p);
+    const shapeDiff=sh.unit!=='งาน' && (Math.abs((+x.qty||1)-sh.qty)>1e-9 || String(x.unit||'')!==sh.unit || Math.abs((+x.price||0)-sh.price)>=0.01);
+    return Math.abs(want-have)>=0.01||shapeDiff?{i, name:x.desc||projDisp(p), have, want, p, sh, shapeOnly:Math.abs(want-have)<0.01}:null; }).filter(Boolean); }
 function _docPriceCheck(pre){ const bar=document.getElementById(pre+'-docno-bar'); if(!bar) return; document.getElementById(pre+'-price-warn')?.remove();
   const D=_docPriceDiffs(pre); if(!D.length) return;
   bar.insertAdjacentHTML('afterend', `<div id="${pre}-price-warn" style="margin:-4px 0 12px;padding:10px 14px;border:1px solid rgba(255,158,0,.45);background:rgba(255,158,0,.08);border-radius:10px;font-size:12.5px">
-    <b style="color:var(--orange)">⚠️ ราคา ${D.length} รายการไม่ตรงกับงบโปรเจกต์ตอนนี้</b> <span style="color:var(--text2)">(เอกสารเก็บราคา ณ ตอนที่เพิ่มรายการ — งบโปรเจกต์ถูกแก้ทีหลัง)</span>
-    <div style="margin:6px 0">${D.map(d=>`• ${esc(d.name)}: ในเอกสาร <b>${fmtB(d.have)}</b> → โปรเจกต์ <b style="color:var(--accent2)">${fmtB(d.want)}</b>`).join('<br>')}</div>
-    <button class="btn btn-xs btn-blue" onclick="_docPriceSync('${pre}')">🔄 อัปเดตราคาตามโปรเจกต์</button> <button class="btn btn-xs btn-outline" onclick="document.getElementById('${pre}-price-warn').remove()">ใช้ราคาเดิม</button></div>`); }
+    <b style="color:var(--orange)">⚠️ ${D.length} รายการไม่ตรงกับข้อมูลโปรเจกต์ตอนนี้</b> <span style="color:var(--text2)">(เอกสารเก็บราคา ณ ตอนที่เพิ่มรายการ — งบโปรเจกต์ถูกแก้ทีหลัง)</span>
+    <div style="margin:6px 0">${D.map(d=>`• ${esc(d.name)}: `+(d.shapeOnly?`แสดงเป็นเรท <b style="color:var(--accent2)">${fmtB(d.sh.price)} × ${d.sh.qty} ${esc(d.sh.unit)}</b> (ยอดเท่าเดิม ${fmtB(d.want)})`:`ในเอกสาร <b>${fmtB(d.have)}</b> → โปรเจกต์ <b style="color:var(--accent2)">${fmtB(d.want)}</b>${d.sh.unit!=='งาน'?` <span style="color:var(--text2)">(${fmtB(d.sh.price)} × ${d.sh.qty} ${esc(d.sh.unit)})</span>`:''}`)).join('<br>')}</div>
+    <button class="btn btn-xs btn-blue" onclick="_docPriceSync('${pre}')">🔄 อัปเดตตามโปรเจกต์</button> <button class="btn btn-xs btn-outline" onclick="document.getElementById('${pre}-price-warn').remove()">ใช้ราคาเดิม</button></div>`); }
 function _docPriceSync(pre){ const its=pre==='inv'?invItems:qtItems;
-  _docPriceDiffs(pre).forEach(d=>{ const x=its[d.i]; const q=+x.qty||1; x.price=Math.round(d.want/q*100)/100; Object.assign(x, _projFxItem(d.p)); });
+  _docPriceDiffs(pre).forEach(d=>{ const x=its[d.i]; Object.assign(x, _projFxItem(d.p), d.sh); });
   document.getElementById(pre+'-price-warn')?.remove(); pre==='inv'?renderInvItems():renderQtItems(); toast('🔄 อัปเดตราคาตามโปรเจกต์แล้ว — กดบันทึกเพื่อเก็บ','success'); }
 
 // 📝 ดราฟที่บันทึกไว้ — โชว์บนหัวฟอร์ม กดเปิดต่อได้เลย (ไม่ต้องไปหาในประวัติเอกสาร)
@@ -23413,7 +23414,8 @@ function confirmQtPPAdd(){
       qty: 1,
       unit: 'งาน',
       price: Math.round((p.budget||0)*100)/100,
-      ..._projFxItem(p)
+      ..._projFxItem(p),
+      ..._projItemShape(p)
     };
     _docFxAdopt('qt', p);
     if(shouldReplace && addedCount===0) qtItems[0] = newItem;
@@ -26084,7 +26086,12 @@ function _pjFxLoad(p){ const c=document.getElementById('pj-cur'); if(!c) return;
 // ยอดรวมของโปรเจกต์เป็นสกุลลูกค้า (คิดแบบเดียวกับงบบาท: เหมา/นาที/หน่วย)
 function projFxTotal(p){ if(!p||!p.budgetCur||p.budgetCur==='THB'||!p.budgetFx) return 0;
   try{ return _r2(calcBudgetTotal(+p.budgetFx, p.budgetType||'flat', +p.duration||0, +p.budgetQty||0)); }catch(e){ return +p.budgetFx||0; } }
-function _projFxItem(p){ const t=projFxTotal(p); return t?{fxCur:p.budgetCur, fxPrice:t, fxBase:p.budget||0}:{}; }
+function _projFxItem(p){ const t=projFxTotal(p); if(!t) return {}; const sh=_projItemShape(p); return {fxCur:p.budgetCur, fxPrice:t, fxBase:p.budget||0, fxUnitP:sh.qty!==1||sh.unit!=='งาน'?+p.budgetFx:t}; }
+// รูปแบบรายการตามวิธีคิดงบ: นาที → จำนวน=ความยาว(นาที) · ชั่วโมง/หน้า/วัน/บท → จำนวนที่กรอก · เหมา → 1 งาน
+function _projItemShape(p){ const r=+p.budgetRate||0, t=p.budgetType||'flat';
+  if(t==='per-minute' && r>0 && +p.duration>0) return {qty:+p.duration, unit:'นาที', price:r};
+  if(BUDGET_QTY_LABEL[t] && r>0 && +p.budgetQty>0) return {qty:+p.budgetQty, unit:BUDGET_QTY_LABEL[t], price:r};
+  return {qty:1, unit:'งาน', price:Math.round((+p.budget||0)*100)/100}; }
 // — ฟอร์มเอกสาร —
 function _docFxGet(pre){ const cur=document.getElementById(pre+'-cur')?.value||'THB', lang=document.getElementById(pre+'-lang')?.value||'both';
   return cur==='THB'?{currency:'THB', fxRate:0, fxDate:'', lang}:{currency:cur, fxRate:parseFloat(document.getElementById(pre+'-fx')?.value)||0, fxDate:(ls('fx_cache')||{}).date||'', lang}; }
@@ -26092,9 +26099,9 @@ function _docFxUI(pre){ const cur=document.getElementById(pre+'-cur')?.value||'T
   const cd=document.getElementById(pre+'-fx-code'); if(cd) cd.textContent=cur; }
 function _docFxSet(pre, d){ const c=document.getElementById(pre+'-cur'); if(!c) return; c.value=(d&&d.currency)||'THB';
   const f=document.getElementById(pre+'-fx'); if(f) f.value=d&&d.fxRate?d.fxRate:'';
-  const lg=document.getElementById(pre+'-lang'); if(lg) lg.value=(d&&d.lang)||(window.GDOC?GDOC.lang():'both'); _docFxUI(pre); }
+  const lg=document.getElementById(pre+'-lang'); if(lg){ lg.value=(d&&d.lang)||(window.GDOC?GDOC.lang():'both'); lg.dataset.user=d&&d.lang?'1':''; } _docFxUI(pre); }
 async function _docCurChange(pre){ _docFxUI(pre); const cur=document.getElementById(pre+'-cur').value;
-  { const lg=document.getElementById(pre+'-lang'); if(lg && cur!=='THB' && lg.value!=='en'){ lg.value='en'; toast('🌐 เอกสารสกุลต่างประเทศ → ตั้งภาษาเป็น English ให้แล้ว (เปลี่ยนได้)','info'); } }
+  { const lg=document.getElementById(pre+'-lang'); if(lg && cur!=='THB' && lg.value!=='en' && !lg.dataset.user){ lg.value='en'; toast('🌐 เอกสารสกุลต่างประเทศ → ตั้งภาษาเป็น English ให้แล้ว (เปลี่ยนได้)','info'); } }
   if(cur!=='THB'){ const its=pre==='qt'?qtItems:invItems; const pj=its.find(x=>x.fxCur===cur&&x.projId); const p=pj&&getProjects().find(x=>x.id===pj.projId);
     const f=document.getElementById(pre+'-fx'); if(p&&p.fxRate){ f.value=p.fxRate; } else await _docFxRefresh(pre, true); }
   pre==='qt'?calcQtTotal():calcInvTotal(); }
@@ -26103,9 +26110,9 @@ async function _docFxRefresh(pre, quiet){ const cur=document.getElementById(pre+
   pre==='qt'?calcQtTotal():calcInvTotal(); }
 // โปรเจกต์ที่ตั้งราคาเป็นสกุลต่างประเทศ → เอกสารที่ยังเป็นบาทเปลี่ยนเป็นสกุลนั้นให้ (ใช้เรทเดียวกับโปรเจกต์)
 function _docFxAdopt(pre, p){ if(!p||!p.budgetCur||p.budgetCur==='THB') return; const c=document.getElementById(pre+'-cur'); if(!c||c.value!=='THB') return;
-  c.value=p.budgetCur; const f=document.getElementById(pre+'-fx'); if(f) f.value=p.fxRate||''; { const lg=document.getElementById(pre+'-lang'); if(lg) lg.value='en'; } _docFxUI(pre); toast('💱 เอกสารนี้ตั้งเป็น '+p.budgetCur+' + ภาษา English ตามโปรเจกต์ (เปลี่ยนได้)','info'); }
+  c.value=p.budgetCur; const f=document.getElementById(pre+'-fx'); if(f) f.value=p.fxRate||''; { const lg=document.getElementById(pre+'-lang'); if(lg && !lg.dataset.user) lg.value='en'; } _docFxUI(pre); toast('💱 เอกสารนี้ตั้งเป็น '+p.budgetCur+' ตามโปรเจกต์'+(document.getElementById(pre+'-lang')?.value==='en'?' + ภาษา English (เปลี่ยนได้)':''),'info'); }
 // ราคาต่อหน่วยเป็นสกุลเอกสาร (รายการจากโปรเจกต์ที่ไม่ถูกแก้ราคา → ใช้ยอดเดิมของลูกค้าตรง ๆ)
-function docFxUnit(x, cur, rate){ const q=+x.qty||1; if(x.fxCur===cur && x.fxPrice && Math.abs((+x.price||0)*q-(+x.fxBase||0))<0.01) return _r2(x.fxPrice/q); return rate?_r2((+x.price||0)/rate):0; }
+function docFxUnit(x, cur, rate){ const q=+x.qty||1; if(x.fxCur===cur && x.fxPrice && Math.abs((+x.price||0)*q-(+x.fxBase||0))<0.01) return x.fxUnitP!=null?+x.fxUnitP:_r2(x.fxPrice/q); return rate?_r2((+x.price||0)/rate):0; }
 function _docFxLine(pre, items, vat){ const g=_docFxGet(pre); if(g.currency==='THB') return '';
   if(!g.fxRate) return '<div style="font-size:12px;color:var(--orange)">⚠️ ใส่เรทเงิน '+g.currency+'</div>';
   const sub=_r2(items.reduce((a,x)=>a+(+x.qty||1)*docFxUnit(x,g.currency,g.fxRate),0)), tot=_r2(sub+_r2(sub*(+vat||0)/100));
@@ -29941,7 +29948,8 @@ function confirmInvPPAdd(){
       qty: 1,
       unit: 'งาน',
       price: Math.round((p.budget||0)*100)/100,
-      ..._projFxItem(p)
+      ..._projFxItem(p),
+      ..._projItemShape(p)
     };
     _docFxAdopt('inv', p);
     if(shouldReplace && addedCount===0) invItems[0] = newItem;
@@ -29963,7 +29971,7 @@ function addInvItemFromProject(projId){
   const p = getProjects().find(x=>x.id===projId);
   if(!p){ toast('ไม่พบโปรเจกต์','error'); return; }
   const shouldReplace = invItems.length===1 && !invItems[0].desc && !invItems[0].price && !invItems[0].projId;
-  const newItem = { projId: p.id, desc: projDisp(p), detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '', qty: 1, unit: 'งาน', price: p.budget||0, ..._projFxItem(p) }; _docFxAdopt('inv', p);
+  const newItem = { projId: p.id, desc: projDisp(p), detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '', qty: 1, unit: 'งาน', price: p.budget||0, ..._projFxItem(p), ..._projItemShape(p) }; _docFxAdopt('inv', p);
   if(shouldReplace) invItems[0] = newItem; else invItems.push(newItem);
   const cli = document.getElementById('inv-client');
   if(cli && !cli.value && p?.client) cli.value = p.client;
@@ -33313,7 +33321,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261026-09"></script><script src="scene/nd-profile.js?v=20261026-09"></script><script src="scene/nd-plan.js?v=20261026-09"></script><script src="scene/nd-docpdf.js?v=20261026-09"></script><script src="scene/nd-acct.js?v=20261026-09"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261026-10"></script><script src="scene/nd-profile.js?v=20261026-10"></script><script src="scene/nd-plan.js?v=20261026-10"></script><script src="scene/nd-docpdf.js?v=20261026-10"></script><script src="scene/nd-acct.js?v=20261026-10"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33323,7 +33331,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261026-09';
+var UPD_BUILD = '20261026-10';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
