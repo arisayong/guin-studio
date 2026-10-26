@@ -69,7 +69,7 @@ const CSS=`
 .gd-tt{text-align:right;padding-right:17mm;padding-top:1mm}
 .gd-tt .th{font-size:21px;font-weight:700;color:${ACC};line-height:1.2}
 .gd-tt .en{font-size:11.5px;color:${ACC};font-weight:600}
-.gd-tt .cp{display:inline-block;margin-top:4px;font-size:10.5px;font-weight:600;color:${ACC};border:1px solid ${ACC};border-radius:3px;padding:0 6px}
+.gd-tt .cp{display:inline-block;margin-top:4px;font-size:10.5px;font-weight:600;line-height:1;color:${ACC};border:1px solid ${ACC};border-radius:3px;padding:1px 7px 5px}.gd-tt .cp.th{padding:2px 7px 4px}.gd-tt .cp.tho{padding:3px 7px 3px}
 .gd-rule{height:1.5px;background:${ACC};margin:4mm 0 3mm}
 .gd-g2{display:grid;grid-template-columns:1fr 80mm;gap:8mm}
 .gd-k{color:${ACC};font-size:10.8px;font-weight:600}
@@ -148,7 +148,7 @@ async function assets(){ const custom=safe(()=>ls('doc_logo'),'');
 const head=(A,th,en,cp,pg)=>{ const c=CO(); return `<div class="gd-corner"><span>${pg}</span></div>
  <div class="gd-hd">${A.logo?`<img class="gd-logo" src="${A.logo}">`:'<span></span>'}<div><div class="n">${E(LG==='en'?c.en:c.th)}</div>${LG==='both'?`<div class="ne">${E(c.en)}</div>`:''}
   <div class="a">${E(LG==='en'?c.aen:c.ath)}${LG==='both'?'<br>'+E(c.aen):''}<br>${L('เลขประจำตัวผู้เสียภาษี','Tax ID')} ${E(c.tax)} (${L1(c.brTh,c.brEn)})${c.tel?' · '+E(c.tel):''}${c.email?' · '+E(c.email):''}</div></div>
-  <div class="gd-tt"><div class="th">${LG==='en'?en:th}</div>${LG==='both'?`<div class="en">${en}</div>`:''}${cp?`<div class="cp">${cp}</div>`:''}</div></div><div class="gd-rule"></div>`; };
+  <div class="gd-tt"><div class="th">${LG==='en'?en:th}</div>${LG==='both'?`<div class="en">${en}</div>`:''}${cp?`<div class="cp${LG==='en'?'':LG==='th'?' tho':' th'}">${cp}</div>`:''}</div></div><div class="gd-rule"></div>`; };
 const party=(th,en,name,lines)=>`<div class="gd-party"><div class="gd-k">${L(th,en)}</div><div class="v">${name}</div><div class="s">${lines.filter(Boolean).join('<br>')}</div></div>`;
 const info=rows=>`<div class="gd-info">${rows.filter(r=>r[2]).map(([th,en,v])=>`<div><span class="gd-k">${L(th,en)}</span><span>${v}</span></div>`).join('')}</div>`;
 const thead=cols=>`<tr>${cols.map(c=>`<th class="${c[2]||''}" style="${c[3]?'width:'+c[3]:''}">${LG==='both'?c[0]+'<br><span class="gd-en">'+c[1]+'</span>':LG==='en'?c[1]:c[0]}</th>`).join('')}</tr>`;

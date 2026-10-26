@@ -90,8 +90,10 @@ function preview(rows){
       <td style="font-size:11px">${[r.contract&&'สัญญา',r.idcopy&&'บัตร',r.bank&&'บัญชี'].filter(Boolean).join(' · ')||'—'}</td></tr>`; };
   const un=res.filter(x=>!x.ids.length).length;
   const ov=document.createElement('div'); ov.id='df-ov'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:4000;display:flex;align-items:center;justify-content:center;padding:14px';
-  ov.innerHTML=`<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;width:min(980px,100%);max-height:90vh;overflow:auto;padding:16px;font-family:Kanit">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="font-size:16px">📋 นำเข้าเอกสารฟรีแลนซ์จากฟอร์ม</b><button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="document.getElementById('df-ov').remove()">ปิด</button></div>
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  ov.innerHTML=`<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;width:min(980px,100%);max-height:90vh;display:flex;flex-direction:column;font-family:Kanit;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border2)"><b style="font-size:16px">📋 นำเข้าเอกสารฟรีแลนซ์จากฟอร์ม</b><button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="document.getElementById('df-ov').remove()">✕ ปิด</button></div>
+    <div style="overflow:auto;padding:12px 16px;flex:1">
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
       <span class="badge" style="padding:6px 10px;border-radius:8px;background:rgba(0,223,160,.12);color:var(--green)">✅ ส่งแล้ว ${hit.size} คน</span>
       <span style="padding:6px 10px;border-radius:8px;background:rgba(255,64,64,.12);color:var(--red)">❌ ยังไม่ส่ง ${miss.length} คน</span>
@@ -102,13 +104,21 @@ function preview(rows){
       <tbody>${res.map((x,i)=>[x,i]).sort((a,b)=>(a[0].ids.length?1:0)-(b[0].ids.length?1:0)).map(([x,i])=>row(x,i)).join('')}</tbody></table>
     <div style="margin-top:12px"><b style="color:var(--red)">❌ ทีมงานที่ยังไม่ส่ง (${miss.length})</b> <span style="font-size:11.5px;color:var(--text2)">· ไม่รวมคนที่ลาออก · กด "ยกเว้น" สำหรับคนที่ไม่ต้องส่ง (เช่น เจ้าของ)</span>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px;margin-top:6px">${miss.map(p=>`<div style="display:flex;gap:6px;align-items:center;padding:6px 8px;border:1px solid var(--border2);border-radius:8px;font-size:12px"><div style="flex:1;min-width:0"><b>${E(p.s.nickname||'')}</b><div style="color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${E(fullName(p.s))}</div></div><label style="font-size:11px;white-space:nowrap"><input type="checkbox" class="df-ex" value="${E(p.id)}"> ยกเว้น</label></div>`).join('')}</div></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="DOCFORM.copyMissing()">📋 คัดลอกรายชื่อคนที่ยังไม่ส่ง</button><button class="btn btn-sm btn-blue" onclick="DOCFORM.apply()">💾 บันทึกเข้าเว็บ + เปิดแจ้งเตือนคนที่ยังไม่ส่ง</button></div></div>`;
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--border2);flex-wrap:wrap;background:var(--card)"><span id="df-cnt" style="margin-right:auto;font-size:12px;color:var(--text2);align-self:center"></span><button class="btn btn-sm btn-outline" onclick="DOCFORM.copyMissing()">📋 คัดลอกรายชื่อคนที่ยังไม่ส่ง</button><button class="btn btn-sm btn-blue" id="df-save" onclick="DOCFORM.apply()">💾 บันทึกเข้าเว็บ + เปิดแจ้งเตือนคนที่ยังไม่ส่ง</button></div></div>`;
   document.getElementById('df-ov')?.remove(); document.body.appendChild(ov);
   res.forEach((x,i)=>{ if(!x.ids.length && x.near && x.near.length===1){ const s=ov.querySelector(`.df-pick[data-i="${i}"]`); if(s) s.value=x.near[0]; } });
   LAST.miss=miss;
+  const cnt=()=>{ const n=ov.querySelectorAll('.df-ex:checked').length; const c=ov.querySelector('#df-cnt'); if(c) c.textContent='ยังไม่ส่ง '+(miss.length-n)+' คน'+(n?' · ยกเว้น '+n:''); };
+  ov.querySelectorAll('.df-ex').forEach(c=>c.addEventListener('change',cnt)); cnt();
 }
 function apply(){
-  if(!LAST) return; const ov=document.getElementById('df-ov'); const over=!!ov.querySelector('#df-over')?.checked;
+  if(!LAST) return; const ov=document.getElementById('df-ov'); if(!ov) return;
+  const btn=ov.querySelector('#df-save'); if(btn){ if(btn.disabled) return; btn.disabled=true; btn.textContent='⏳ กำลังบันทึก…'; }
+  setTimeout(()=>{ try{ applyRun(ov); }catch(e){ console.error('docform apply',e); showLoader(false); if(btn){ btn.disabled=false; btn.textContent='💾 บันทึกเข้าเว็บ + เปิดแจ้งเตือนคนที่ยังไม่ส่ง'; } toast('บันทึกไม่สำเร็จ: '+(e&&e.message||e),'error'); } }, 30);
+}
+function applyRun(ov){
+  const over=!!ov.querySelector('#df-over')?.checked;
   ov.querySelectorAll('.df-pick').forEach(s=>{ const x=LAST.res[+s.dataset.i]; if(x && s.value) { x.ids=[s.value]; x.how='เลือกเอง'; } });
   const ex=new Set([...ov.querySelectorAll('.df-ex:checked')].map(c=>c.value));
   const byId={}; LAST.res.forEach(x=>x.ids.forEach(id=>{ if(!byId[id]||String(byId[id].ts)<String(x.r.ts)) byId[id]=x.r; }));
@@ -124,12 +134,19 @@ function apply(){
       else if(ex.has(s.id)) s.docForm={sent:false, exempt:true, checkedAt:now};
       else if(!(s.docForm&&(s.docForm.sent||s.docForm.exempt)) && statusOf(s)!=='resigned'){ s.docForm={sent:false, checkedAt:now}; nM++; } });
     d[cat]=arr; });
-  saveStaffData(d); try{ fbSaveKeyed('docform_meta',{at:now}); }catch(e){}
+  const exList=new Set(ex); LAST.exSet=exList; ov.remove(); showLoader(true);
+  Promise.resolve(saveStaffData(d)).catch(e=>toast('บันทึกขึ้นระบบไม่สำเร็จ: '+(e&&e.message||e),'error')).finally(()=>showLoader(false));
+  try{ fbSaveKeyed('docform_meta',{at:now}); }catch(e){}
   try{ logAudit('staff.docform','ฟอร์มเอกสาร','นำเข้าเอกสารฟรีแลนซ์ · ส่งแล้ว '+Object.keys(byId).length+' คน'); }catch(e){}
-  ov.remove(); toast('💾 บันทึกแล้ว · ส่งแล้ว '+Object.keys(byId).length+' คน · ยังไม่ส่ง '+new Set(LAST.miss.filter(p=>!byId[p.id]&&!ex.has(p.id)).map(p=>p.id)).size+' คน (ขึ้นแถบแดงให้แล้ว)','success');
+  toast('💾 บันทึกแล้ว · ส่งแล้ว '+Object.keys(byId).length+' คน · ยังไม่ส่ง '+new Set(LAST.miss.filter(p=>!byId[p.id]&&!ex.has(p.id)).map(p=>p.id)).size+' คน (ขึ้นแถบแดงให้แล้ว)','success');
   banner(); try{ renderStatusBox(); }catch(e){}
 }
-function copyMissing(){ const L=(LAST&&LAST.miss)||[]; const t='รายชื่อทีมงานที่ยังไม่ส่งเอกสาร (สัญญา + สำเนาบัตร + สำเนาบัญชี)\nส่งได้ที่ '+FORM_URL+'\n\n'+L.map((p,i)=>(i+1)+'. '+(p.s.nickname||'')+' — '+fullName(p.s)).join('\n');
+// ชื่อจริงอย่างเดียว (ตัดคำนำหน้า + นามสกุล)
+const firstName=s=>String(s.name||'').trim().replace(TITLE,'').trim().split(/\s+/)[0]||'';
+// คัดลอกรายชื่อคนที่ยังไม่ส่ง: ไม่รวมคนที่ติ๊กยกเว้น · คนเดียวกันหลายรายชื่อนับครั้งเดียว · "ชื่อเล่น (ชื่อจริง)"
+function copyMissing(){ const ov=document.getElementById('df-ov'); const ex=ov?new Set([...ov.querySelectorAll('.df-ex:checked')].map(c=>c.value)):(LAST&&LAST.exSet)||new Set();
+  const seen=new Set(); const L=((LAST&&LAST.miss)||[]).filter(p=>!ex.has(p.id)).filter(p=>{ const k=nkey(fullName(p.s))||p.id; if(seen.has(k)) return false; seen.add(k); return true; });
+  const t='รายชื่อทีมงานที่ยังไม่ส่งเอกสาร (สัญญา + สำเนาบัตร + สำเนาบัญชี)\nส่งได้ที่ '+FORM_URL+'\n\n'+L.map((p,i)=>(i+1)+'. '+(p.s.nickname||'')+' ('+firstName(p.s)+')').join('\n');
   navigator.clipboard.writeText(t).then(()=>toast('📋 คัดลอกรายชื่อแล้ว','success'),()=>prompt('คัดลอกข้อความนี้',t)); }
 
 /* ── สถานะในหน้าตั้งค่า (แอดมิน) ── */
