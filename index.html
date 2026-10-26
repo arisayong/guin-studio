@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261026-07"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261026-08"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -17509,7 +17509,7 @@ async function _confirmPaymentRun(slipTarget){
   // Build receipt for display
   const receiptHTML=buildSimpleReceipt({vNo,name:s?.name||'',nickname:s?.nickname||'',projName:p.name,amount,bank:`${s?.bank||''} ${s?.account||''}`,date:thaiToIso(document.getElementById('slip-date').value)||document.getElementById('slip-date').value});
   document.getElementById('receipt-body').innerHTML=receiptHTML;
-  window._lastReceiptCtx={staffId:slipTarget?.workerId,vNo,projName:p.name};
+  _rcpModalReset(); window._lastReceiptCtx={staffId:slipTarget?.workerId,vNo,projName:p.name};
   openModal('modal-receipt');
 
   // Update queue
@@ -17595,6 +17595,7 @@ function emailReceipt(){
 
 /* ── Fix 3: Download receipt as printable HTML file ── */
 function downloadReceiptHTML(){
+  { const c=window._lastReceiptCtx||{}; if(c.sales && window.GDOC){ const d=c.sales.data||{}; return _gdSales(c.sales.kind, d, (d.docNo||c.sales.kind)+'_'+(d.client||''), ()=>downloadDocHTML(document.getElementById('receipt-body').innerHTML, d.docNo||'document')); } }
   const body=document.getElementById('receipt-body');
   // หาเอกสารที่กำลังแสดง (รองรับทุกประเภท: receipt/quotation/invoice/voucher)
   const el = document.getElementById('printable-receipt') || (body ? body.querySelector('[id^="printable-"]') : null);
@@ -23546,10 +23547,11 @@ function previewQuotation() {
   const data = getQuotationData();
   if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
   if(!data.items.length){toast('กรุณาเพิ่มรายการอย่างน้อย 1 รายการ','error');return;}
-  if(data.currency && data.currency!=='THB' && window.GDOC){ GDOC.salesPages('quotation', _gdSalesData(data)).then(pg=>GDOC.open(pg, data.docNo)); return; }
+  if(window.GDOC) return _salesPreview('quotation', data);
+  _rcpModalReset();
   const el = document.getElementById('receipt-body');
   if(el) el.innerHTML = buildQuotationHTML(data);
-  window._lastReceiptCtx = { staffId:null, vNo:data.docNo, type:'quotation', email:data.email };
+  _rcpModalReset(); window._lastReceiptCtx = { staffId:null, vNo:data.docNo, type:'quotation', email:data.email };
   openModal('modal-receipt');
 }
 function saveQuotationDraft() {
@@ -23663,13 +23665,25 @@ async function _docSavePdf(html, fname, fallback){
   finally{ showLoader(false); }
 }
 // 📄 ใบเสนอราคา / ใบแจ้งหนี้ / ใบเสร็จ แบบใหม่ (ช่องทางชำระจากบัญชีรับเงินที่เลือก)
+const _SALES_TITLE={quotation:'📋 ใบเสนอราคา', invoice:'🧾 ใบแจ้งหนี้', receipt:'🧾 ใบเสร็จรับเงิน'};
+function _rcpModalReset(){ const m=document.querySelector('#modal-receipt .modal'); if(m) m.style.width='520px'; const t=document.querySelector('#modal-receipt .modal-title'); if(t) t.textContent='🧾 ใบสำคัญรับเงิน'; }
+async function _salesPreview(kind, data, ctx){
+  window._lastReceiptCtx=Object.assign({staffId:null, vNo:data.docNo, type:kind, email:data.email||''}, ctx||{}, {sales:{kind, data}});
+  const el=document.getElementById('receipt-body'); const m=document.querySelector('#modal-receipt .modal'); const t=document.querySelector('#modal-receipt .modal-title');
+  if(m) m.style.width='min(880px,96vw)'; if(t) t.textContent=_SALES_TITLE[kind]||'เอกสาร';
+  if(el) el.innerHTML='<div style="padding:30px;text-align:center;color:var(--text2)">กำลังสร้างตัวอย่าง…</div>';
+  openModal('modal-receipt');
+  try{ await GDOC.prep(); const pg=await GDOC.salesPages(kind, _gdSalesData(data));
+    if(el) el.innerHTML='<div style="background:#cfd6e0;padding:10px;border-radius:8px;overflow:auto">'+pg.map(x=>'<div class="gd-page" style="margin:0 auto 10px;zoom:.92;box-shadow:0 2px 10px rgba(0,0,0,.2)">'+x+'</div>').join('')+'</div>'; }
+  catch(e){ console.warn('sales preview',e); if(el) el.innerHTML=(kind==='quotation'?buildQuotationHTML:kind==='invoice'?buildInvoiceHTML:buildReceiptDocHTML)(data); }
+}
 function _gdSalesData(d){ const o=Object.assign({}, d||{});
   if(o.currency && o.currency!=='THB' && o.fxRate){ o.items=(o.items||[]).map(x=>Object.assign({}, x, {fxUnit:docFxUnit(x,o.currency,o.fxRate)})); o.fxSym=FX_SYM[o.currency]||''; }
   try{ const all=getPaymentAccounts(); const ids=o.payAccountIds||[]; const picks=ids.length?all.filter(a=>ids.includes(a.id)):all.filter(a=>a.isDefault);
     if(picks.length) o.payText=picks.map(a=>{ const b=a.bankCode==='other'?(a.customBankName||'ธนาคาร'):getBankPreset(a.bankCode).name; return esc(b)+' · '+esc(a.accountNumber||'')+' · '+esc(a.accountHolder||''); }).join('<br>'); }catch(e){}
   return o; }
 async function _gdSales(kind, d, fname, fallback){
-  if(window.GDOC){ showLoader(true); try{ await GDOC.save(await GDOC.salesPages(kind, _gdSalesData(d)), fname); toast('📄 ดาวน์โหลด PDF แล้ว','success'); return; }catch(e){ console.warn('GDOC sales',e); } finally{ showLoader(false); } }
+  if(window.GDOC){ showLoader(true); try{ await GDOC.save(await GDOC.salesPages(kind, _gdSalesData(d)), fname); toast('📄 ดาวน์โหลด PDF แล้ว','success'); return; }catch(e){ console.warn('GDOC sales',e); toast('⚠️ สร้าง PDF แบบทางการไม่สำเร็จ ('+(e&&e.message||e)+') — ใช้แบบสำรองแทน','warn'); } finally{ showLoader(false); } }
   return fallback(); }
 function downloadQuotation() {
   const data = getQuotationData();
@@ -25465,7 +25479,7 @@ function _vcPreviewVoucherInModal(vNo){
   });
   const el = document.getElementById('receipt-body');
   if(el) el.innerHTML = html;
-  window._lastReceiptCtx = {staffId: d.staffId, vNo: d.docNo, type:'voucher', email: d.email||''};
+  _rcpModalReset(); window._lastReceiptCtx = {staffId: d.staffId, vNo: d.docNo, type:'voucher', email: d.email||''};
   openModal('modal-receipt');
 }
 function _vcOpenGmailForVoucher(vNo){
@@ -25902,7 +25916,7 @@ function previewVouchers() {
   }
   const el = document.getElementById('receipt-body');
   if(el) el.innerHTML = `<div style="padding:10px">${html}</div>`;
-  window._lastReceiptCtx = { staffId:null, vNo:'VOUCHERS', type:'voucher', email:'' };
+  _rcpModalReset(); window._lastReceiptCtx = { staffId:null, vNo:'VOUCHERS', type:'voucher', email:'' };
   openModal('modal-receipt');
 }
 function downloadVouchers() {
@@ -26403,23 +26417,29 @@ function repreviewDoc(type, docNo) {
   if(type==='quotation'){
     const d=(getDocsStore('quotations')||[]).find(x=>x.docNo===docNo);
     if(!d){toast('ไม่พบข้อมูล','warn');return;}
+    if(window.GDOC) return _salesPreview('quotation', d);
+    _rcpModalReset();
     const el=document.getElementById('receipt-body');
     if(el) el.innerHTML=buildQuotationHTML(d);
-    window._lastReceiptCtx={staffId:null,vNo:docNo,type:'quotation',email:d.email||''};
+    _rcpModalReset(); window._lastReceiptCtx={staffId:null,vNo:docNo,type:'quotation',email:d.email||''};
     openModal('modal-receipt');
   } else if(type==='invoice'){
     const d=(getDocsStore('invoices')||[]).find(x=>x.docNo===docNo);
     if(!d){toast('ไม่พบข้อมูล','warn');return;}
+    if(window.GDOC) return _salesPreview('invoice', d);
+    _rcpModalReset();
     const el=document.getElementById('receipt-body');
     if(el) el.innerHTML=buildInvoiceHTML(d);
-    window._lastReceiptCtx={staffId:null,vNo:docNo,type:'invoice',email:d.email||''};
+    _rcpModalReset(); window._lastReceiptCtx={staffId:null,vNo:docNo,type:'invoice',email:d.email||''};
     openModal('modal-receipt');
   } else if(type==='receipt'){
     const d=(getDocsStore('receipts')||[]).find(x=>x.docNo===docNo);
     if(!d){toast('ไม่พบข้อมูล','warn');return;}
+    if(window.GDOC) return _salesPreview('receipt', d);
+    _rcpModalReset();
     const el=document.getElementById('receipt-body');
     if(el) el.innerHTML=buildReceiptDocHTML(d);
-    window._lastReceiptCtx={staffId:null,vNo:docNo,type:'receipt',email:d.email||''};
+    _rcpModalReset(); window._lastReceiptCtx={staffId:null,vNo:docNo,type:'receipt',email:d.email||''};
     openModal('modal-receipt');
   } else {
     const d=(getDocsStore('vouchers')||[]).find(x=>x.docNo===docNo);
@@ -26439,7 +26459,7 @@ function repreviewDoc(type, docNo) {
         date: d.date,
         note: d.note || '',
       });
-      window._lastReceiptCtx = {staffId: d.staffId, vNo: docNo, type:'voucher', email: d.email||''};
+      _rcpModalReset(); window._lastReceiptCtx = {staffId: d.staffId, vNo: docNo, type:'voucher', email: d.email||''};
     } else {
       html = buildVoucherHTML(d.projId,d.staffId,d.slot||'',docNo,d.date,'');
     }
@@ -26770,7 +26790,7 @@ function previewBillingVoucher(staffId) {
   const el = document.getElementById('receipt-body');
   if (el) el.innerHTML = html;
   const s = getStaffById(staffId);
-  window._lastReceiptCtx = { staffId, email: s?.email||'', type:'billing-voucher' };
+  _rcpModalReset(); window._lastReceiptCtx = { staffId, email: s?.email||'', type:'billing-voucher' };
   openModal('modal-receipt');
 }
 
@@ -30112,10 +30132,12 @@ async function _rcpCreate(invDocNo){
   saveDocsStore('receipts', arr);
   try{ logAudit('doc.receipt', rcp.client||rcp.docNo, 'ออกใบเสร็จรับเงิน '+rcp.docNo+' ('+fmtB(rcp.total)+') จาก '+invDocNo); }catch(e){}
   document.getElementById('tag-overlay')?.remove();
+  if(window.GDOC) _salesPreview('receipt', rcp); else {
+  _rcpModalReset();
   const el=document.getElementById('receipt-body');
   if(el) el.innerHTML=buildReceiptDocHTML(rcp);
   window._lastReceiptCtx={staffId:null,vNo:rcp.docNo,type:'receipt',email:rcp.email||''};
-  openModal('modal-receipt');
+  openModal('modal-receipt'); }
   try{ renderDocsHistory(); }catch(e){}
   toast('🧾 ออกใบเสร็จ '+rcp.docNo+' แล้ว','success');
 }
@@ -30222,10 +30244,11 @@ function previewInvoice(){
   const data = getInvoiceData();
   if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
   if(!data.items.length){toast('กรุณาเพิ่มรายการ','error');return;}
-  if(data.currency && data.currency!=='THB' && window.GDOC){ GDOC.salesPages('invoice', _gdSalesData(data)).then(pg=>GDOC.open(pg, data.docNo)); return; }
+  if(window.GDOC) return _salesPreview('invoice', data);
+  _rcpModalReset();
   const el = document.getElementById('receipt-body');
   if(el) el.innerHTML = buildInvoiceHTML(data);
-  window._lastReceiptCtx = { staffId:null, vNo:data.docNo, type:'invoice', email:data.email };
+  _rcpModalReset(); window._lastReceiptCtx = { staffId:null, vNo:data.docNo, type:'invoice', email:data.email };
   openModal('modal-receipt');
 }
 function saveInvoiceDraft(){
@@ -33273,7 +33296,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261026-07"></script><script src="scene/nd-profile.js?v=20261026-07"></script><script src="scene/nd-plan.js?v=20261026-07"></script><script src="scene/nd-docpdf.js?v=20261026-07"></script><script src="scene/nd-acct.js?v=20261026-07"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261026-08"></script><script src="scene/nd-profile.js?v=20261026-08"></script><script src="scene/nd-plan.js?v=20261026-08"></script><script src="scene/nd-docpdf.js?v=20261026-08"></script><script src="scene/nd-acct.js?v=20261026-08"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33283,7 +33306,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261026-07';
+var UPD_BUILD = '20261026-08';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
