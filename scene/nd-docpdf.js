@@ -218,7 +218,7 @@ async function whtPages(d){ await prep(); const A=await assets(); LG=safe(()=>ls
 
 // ═══ 📋🧾 ใบเสนอราคา / ใบแจ้งหนี้ / ใบเสร็จรับเงิน (ข้อมูลจากฟอร์มเดิมของเว็บ) ═══
 const KIND={quotation:['ใบเสนอราคา','QUOTATION'], invoice:['ใบแจ้งหนี้ / ใบวางบิล','INVOICE / BILLING NOTE'], receipt:['ใบเสร็จรับเงิน','RECEIPT']};
-async function salesPages(kind, d){ await prep(); const A=await assets(); LG=safe(()=>ls('doc_lang'),'')||'both';
+async function salesPages(kind, d){ await prep(); const A=await assets(); LG=(d&&['both','th','en'].includes(d.lang)?d.lang:'')||safe(()=>ls('doc_lang'),'')||'both';
   const FX=d.currency&&d.currency!=='THB'&&+d.fxRate>0; CUR=FX?d.currency:'THB';
   const qn=x=>(+x.qty||1), r2=n=>Math.round((+n||0)*100)/100, up=x=>FX?(x.fxUnit!=null?+x.fxUnit:r2((+x.price||0)/d.fxRate)):(+x.price||0);   // ราคาต่อหน่วยในสกุลเอกสาร
   const [th,en]=KIND[kind]||KIND.invoice, sub=r2((d.items||[]).reduce((a,x)=>a+qn(x)*up(x),0));

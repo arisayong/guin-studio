@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261026-04"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261026-05"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -2126,7 +2126,7 @@ body.sidebar-collapsed .main-content{
     <div class="section-card">
      <div class="section-title">📋 สร้างใบเสนอราคา</div>
      <!-- DocNo preview bar -->
-     <div id="qt-docno-bar" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;margin-bottom:10px;flex-wrap:wrap"></div>
+     <div id="qt-docno-bar" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;margin-bottom:10px;flex-wrap:wrap"></div>
      <!-- Admin signature widget -->
      <div id="sig-widget" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;margin-bottom:14px">
       <span style="font-size:12px;color:var(--text2);white-space:nowrap;font-weight:600">✍️ ลายเซ็นผู้เสนอราคา:</span>
@@ -2169,7 +2169,8 @@ body.sidebar-collapsed .main-content{
       <div class="form-group" style="margin:0">
        <label class="form-label">สกุลเงินในเอกสาร <span style="font-weight:400;text-transform:none;opacity:.7">(ราคาในรายการพิมพ์เป็นบาท)</span></label>
        <div style="display:flex;gap:6px;align-items:center"><select class="form-input form-select" id="qt-cur" style="width:110px" onchange="_docCurChange('qt')"><option value="THB">฿ THB</option><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="JPY">¥ JPY</option><option value="CNY">¥ CNY</option><option value="HKD">HK$ HKD</option><option value="SGD">S$ SGD</option><option value="TWD">NT$ TWD</option><option value="KRW">₩ KRW</option><option value="AUD">A$ AUD</option><option value="MYR">RM MYR</option></select>
-        <span id="qt-fx-box" style="display:none;align-items:center;gap:5px;font-size:12px;color:var(--text2)">1 <b id="qt-fx-code"></b> =<input id="qt-fx" type="number" step="any" min="0" style="width:80px;padding:6px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit" oninput="calcQtTotal()">บาท<button type="button" class="btn btn-xs btn-outline" onclick="_docFxRefresh('qt')" title="ดึงเรทวันนี้">🔄</button></span></div>
+        <span id="qt-fx-box" style="display:none;align-items:center;gap:5px;font-size:12px;color:var(--text2)">1 <b id="qt-fx-code"></b> =<input id="qt-fx" type="number" step="any" min="0" style="width:80px;padding:6px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit" oninput="calcQtTotal()">บาท<button type="button" class="btn btn-xs btn-outline" onclick="_docFxRefresh('qt')" title="ดึงเรทวันนี้">🔄</button></span>
+        <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text2)">🌐 ภาษา<select id="qt-lang" class="form-input form-select" style="width:140px;padding:6px 24px 6px 8px"><option value="both">ไทย + English</option><option value="th">ไทยอย่างเดียว</option><option value="en">English only</option></select></span></div>
       </div>
       <div class="form-group" style="margin:0">
        <label class="form-label">หมายเหตุ</label>
@@ -2209,7 +2210,7 @@ body.sidebar-collapsed .main-content{
     <div class="section-card">
      <div class="section-title" style="color:var(--accent2)">🧾 สร้างใบแจ้งหนี้</div>
      <!-- DocNo preview bar -->
-     <div id="inv-docno-bar" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;margin-bottom:10px;flex-wrap:wrap"></div>
+     <div id="inv-docno-bar" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;margin-bottom:10px;flex-wrap:wrap"></div>
      <!-- Payment Account selector (for invoice) -->
      <div style="margin-bottom:14px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
@@ -2272,7 +2273,8 @@ body.sidebar-collapsed .main-content{
       <div class="form-group" style="margin:0;grid-column:1/-1">
        <label class="form-label">สกุลเงินในเอกสาร <span style="font-weight:400;text-transform:none;opacity:.7">(ราคาในรายการพิมพ์เป็นบาท)</span></label>
        <div style="display:flex;gap:6px;align-items:center"><select class="form-input form-select" id="inv-cur" style="width:110px" onchange="_docCurChange('inv')"><option value="THB">฿ THB</option><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="JPY">¥ JPY</option><option value="CNY">¥ CNY</option><option value="HKD">HK$ HKD</option><option value="SGD">S$ SGD</option><option value="TWD">NT$ TWD</option><option value="KRW">₩ KRW</option><option value="AUD">A$ AUD</option><option value="MYR">RM MYR</option></select>
-        <span id="inv-fx-box" style="display:none;align-items:center;gap:5px;font-size:12px;color:var(--text2)">1 <b id="inv-fx-code"></b> =<input id="inv-fx" type="number" step="any" min="0" style="width:80px;padding:6px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit" oninput="calcInvTotal()">บาท<button type="button" class="btn btn-xs btn-outline" onclick="_docFxRefresh('inv')" title="ดึงเรทวันนี้">🔄</button></span></div>
+        <span id="inv-fx-box" style="display:none;align-items:center;gap:5px;font-size:12px;color:var(--text2)">1 <b id="inv-fx-code"></b> =<input id="inv-fx" type="number" step="any" min="0" style="width:80px;padding:6px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit" oninput="calcInvTotal()">บาท<button type="button" class="btn btn-xs btn-outline" onclick="_docFxRefresh('inv')" title="ดึงเรทวันนี้">🔄</button></span>
+        <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text2)">🌐 ภาษา<select id="inv-lang" class="form-input form-select" style="width:140px;padding:6px 24px 6px 8px"><option value="both">ไทย + English</option><option value="th">ไทยอย่างเดียว</option><option value="en">English only</option></select></span></div>
       </div>
 
      </div>
@@ -3982,6 +3984,16 @@ function generateDocNo(prefix){
 }
 
 // ── DocNo preview bars on forms ──
+// 📝 ดราฟที่บันทึกไว้ — โชว์บนหัวฟอร์ม กดเปิดต่อได้เลย (ไม่ต้องไปหาในประวัติเอกสาร)
+function _draftStrip(pre){
+  const L=(getDocsStore(pre==='inv'?'invoices':'quotations')||[]).filter(d=>d&&d.isDraft).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  if(!L.length) return '';
+  const fn=pre==='inv'?'editInvoice':'editQuotation';
+  return `<div style="width:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border2)">
+    <span style="font-size:11px;color:var(--orange);font-weight:700">📝 ดราฟที่บันทึกไว้ ${L.length} ใบ:</span>
+    ${L.slice(0,8).map(d=>`<button class="btn btn-xs" style="background:rgba(255,158,0,.1);border:1px solid rgba(255,158,0,.4);color:var(--orange)" onclick="${fn}('${esc(d.docNo)}')" title="เปิดดราฟนี้มาแก้ต่อ">✏️ ${esc(d.docNo)} · ${esc(String(d.client||'').slice(0,24))}${d.total?' · '+fmtB(d.total):''}</button>`).join('')}
+    ${L.length>8?`<button class="btn btn-xs btn-outline" onclick="switchDocsMain('history')">ดูทั้งหมด ›</button>`:''}</div>`;
+}
 function renderInvDocNoBar(){
   const el = document.getElementById('inv-docno-bar'); if(!el) return;
   if(_invEditingDocNo){
@@ -4000,7 +4012,7 @@ function renderInvDocNoBar(){
         <span style="font-size:11px;color:var(--text2);letter-spacing:.5px;font-weight:600">🆕 เลขใบแจ้งหนี้ถัดไป:</span>
         <span style="font-family:monospace;font-size:15px;font-weight:800;color:var(--accent2);letter-spacing:1px">${next}</span>
       </div>
-      <span style="font-size:10px;color:var(--text2);opacity:.75">บันทึกแล้วจะใช้เลขนี้</span>`;
+      <span style="font-size:10px;color:var(--text2);opacity:.75">บันทึกแล้วจะใช้เลขนี้</span>`+_draftStrip(el.id.startsWith('inv')?'inv':'qt');
     el.style.borderColor = 'var(--border2)';
     el.style.background = 'var(--bg2)';
   }
@@ -4023,7 +4035,7 @@ function renderQtDocNoBar(){
         <span style="font-size:11px;color:var(--text2);letter-spacing:.5px;font-weight:600">🆕 เลขใบเสนอราคาถัดไป:</span>
         <span style="font-family:monospace;font-size:15px;font-weight:800;color:var(--accent2);letter-spacing:1px">${next}</span>
       </div>
-      <span style="font-size:10px;color:var(--text2);opacity:.75">บันทึกแล้วจะใช้เลขนี้</span>`;
+      <span style="font-size:10px;color:var(--text2);opacity:.75">บันทึกแล้วจะใช้เลขนี้</span>`+_draftStrip(el.id.startsWith('inv')?'inv':'qt');
     el.style.borderColor = 'var(--border2)';
     el.style.background = 'var(--bg2)';
   }
@@ -26018,13 +26030,15 @@ function projFxTotal(p){ if(!p||!p.budgetCur||p.budgetCur==='THB'||!p.budgetFx) 
   try{ return _r2(calcBudgetTotal(+p.budgetFx, p.budgetType||'flat', +p.duration||0, +p.budgetQty||0)); }catch(e){ return +p.budgetFx||0; } }
 function _projFxItem(p){ const t=projFxTotal(p); return t?{fxCur:p.budgetCur, fxPrice:t, fxBase:p.budget||0}:{}; }
 // — ฟอร์มเอกสาร —
-function _docFxGet(pre){ const cur=document.getElementById(pre+'-cur')?.value||'THB';
-  return cur==='THB'?{currency:'THB', fxRate:0, fxDate:''}:{currency:cur, fxRate:parseFloat(document.getElementById(pre+'-fx')?.value)||0, fxDate:(ls('fx_cache')||{}).date||''}; }
+function _docFxGet(pre){ const cur=document.getElementById(pre+'-cur')?.value||'THB', lang=document.getElementById(pre+'-lang')?.value||'both';
+  return cur==='THB'?{currency:'THB', fxRate:0, fxDate:'', lang}:{currency:cur, fxRate:parseFloat(document.getElementById(pre+'-fx')?.value)||0, fxDate:(ls('fx_cache')||{}).date||'', lang}; }
 function _docFxUI(pre){ const cur=document.getElementById(pre+'-cur')?.value||'THB'; const bx=document.getElementById(pre+'-fx-box'); if(bx) bx.style.display=cur==='THB'?'none':'inline-flex';
   const cd=document.getElementById(pre+'-fx-code'); if(cd) cd.textContent=cur; }
 function _docFxSet(pre, d){ const c=document.getElementById(pre+'-cur'); if(!c) return; c.value=(d&&d.currency)||'THB';
-  const f=document.getElementById(pre+'-fx'); if(f) f.value=d&&d.fxRate?d.fxRate:''; _docFxUI(pre); }
+  const f=document.getElementById(pre+'-fx'); if(f) f.value=d&&d.fxRate?d.fxRate:'';
+  const lg=document.getElementById(pre+'-lang'); if(lg) lg.value=(d&&d.lang)||(window.GDOC?GDOC.lang():'both'); _docFxUI(pre); }
 async function _docCurChange(pre){ _docFxUI(pre); const cur=document.getElementById(pre+'-cur').value;
+  { const lg=document.getElementById(pre+'-lang'); if(lg && cur!=='THB' && lg.value!=='en'){ lg.value='en'; toast('🌐 เอกสารสกุลต่างประเทศ → ตั้งภาษาเป็น English ให้แล้ว (เปลี่ยนได้)','info'); } }
   if(cur!=='THB'){ const its=pre==='qt'?qtItems:invItems; const pj=its.find(x=>x.fxCur===cur&&x.projId); const p=pj&&getProjects().find(x=>x.id===pj.projId);
     const f=document.getElementById(pre+'-fx'); if(p&&p.fxRate){ f.value=p.fxRate; } else await _docFxRefresh(pre, true); }
   pre==='qt'?calcQtTotal():calcInvTotal(); }
@@ -26033,7 +26047,7 @@ async function _docFxRefresh(pre, quiet){ const cur=document.getElementById(pre+
   pre==='qt'?calcQtTotal():calcInvTotal(); }
 // โปรเจกต์ที่ตั้งราคาเป็นสกุลต่างประเทศ → เอกสารที่ยังเป็นบาทเปลี่ยนเป็นสกุลนั้นให้ (ใช้เรทเดียวกับโปรเจกต์)
 function _docFxAdopt(pre, p){ if(!p||!p.budgetCur||p.budgetCur==='THB') return; const c=document.getElementById(pre+'-cur'); if(!c||c.value!=='THB') return;
-  c.value=p.budgetCur; const f=document.getElementById(pre+'-fx'); if(f) f.value=p.fxRate||''; _docFxUI(pre); toast('💱 เอกสารนี้ตั้งเป็น '+p.budgetCur+' ตามโปรเจกต์','info'); }
+  c.value=p.budgetCur; const f=document.getElementById(pre+'-fx'); if(f) f.value=p.fxRate||''; { const lg=document.getElementById(pre+'-lang'); if(lg) lg.value='en'; } _docFxUI(pre); toast('💱 เอกสารนี้ตั้งเป็น '+p.budgetCur+' + ภาษา English ตามโปรเจกต์ (เปลี่ยนได้)','info'); }
 // ราคาต่อหน่วยเป็นสกุลเอกสาร (รายการจากโปรเจกต์ที่ไม่ถูกแก้ราคา → ใช้ยอดเดิมของลูกค้าตรง ๆ)
 function docFxUnit(x, cur, rate){ const q=+x.qty||1; if(x.fxCur===cur && x.fxPrice && Math.abs((+x.price||0)*q-(+x.fxBase||0))<0.01) return _r2(x.fxPrice/q); return rate?_r2((+x.price||0)/rate):0; }
 function _docFxLine(pre, items, vat){ const g=_docFxGet(pre); if(g.currency==='THB') return '';
@@ -30046,7 +30060,7 @@ async function _rcpCreate(invDocNo){
     fromInvoice: invDocNo,
     client: inv.client||'', email: inv.email||'',
     clientTax:inv.clientTax||'', clientBranch:inv.clientBranch||'', clientAddr:inv.clientAddr||'',
-    currency:inv.currency||'THB', fxRate:inv.fxRate||0, fxDate:inv.fxDate||'',
+    currency:inv.currency||'THB', fxRate:inv.fxRate||0, fxDate:inv.fxDate||'', lang:inv.lang||'',
     projIds: [...(inv.projIds||[])],
     payAccountIds: [...(inv.payAccountIds||[])],
     items: (inv.items||[]).map(x=>({...x})),
@@ -30189,7 +30203,7 @@ function saveInvoiceDraft(){
   all.push(saved);
   saveDocsStore('invoices', all);
   _invEditingDocNo = null; try{renderInvDocNoBar();}catch(e){}
-  toast('📝 บันทึกเป็นดราฟแล้ว ('+data.docNo+') — ไปดูที่ "ประวัติเอกสาร"','success');
+  toast('📝 บันทึกเป็นดราฟแล้ว ('+data.docNo+') — กดเปิดต่อได้ที่แถบ "ดราฟที่บันทึกไว้" บนหัวฟอร์ม','success');
   renderDocsHistory();
 }
 
@@ -33223,7 +33237,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261026-04"></script><script src="scene/nd-profile.js?v=20261026-04"></script><script src="scene/nd-plan.js?v=20261026-04"></script><script src="scene/nd-docpdf.js?v=20261026-04"></script><script src="scene/nd-acct.js?v=20261026-04"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261026-05"></script><script src="scene/nd-profile.js?v=20261026-05"></script><script src="scene/nd-plan.js?v=20261026-05"></script><script src="scene/nd-docpdf.js?v=20261026-05"></script><script src="scene/nd-acct.js?v=20261026-05"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33233,7 +33247,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261026-04';
+var UPD_BUILD = '20261026-05';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
