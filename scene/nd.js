@@ -66,7 +66,7 @@ function buildNav(){
     + item('projects','projects','โปรเจกต์',badge('deadline-badge')) + item('track','track','ติดตามงาน',badge('track-badge'))
     + item('calc','calc','คำนวนราคา') + sec('บัญชี')
     + grp('fin','nd-fin','fin','บัญชี',FIN.map(([p,i,l,,b])=>item(p,i,l,b?badge(b):'')).join(''))
-    + sec('ทีมงาน') + item('staff','team','จัดการทีม') + item('nd-price','price','เทมเพลตราคา');
+    + sec('ทีมงาน') + item('staff','team','จัดการทีม') + item('nd-work','profit','สรุปการทำงาน') + item('nd-price','price','เทมเพลตราคา');
   s.innerHTML = item('home','home','หน้าแรก') + sec('ของฉัน')
     + item('my-calendar','track','ปฏิทินงาน') + item('my-dashboard','money','งานของฉัน')
     + item('confirm-amount','confirm','ยืนยันยอด',badge('ca-badge-staff'))
