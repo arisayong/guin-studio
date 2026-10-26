@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261026-05"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261026-06"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -2471,6 +2471,11 @@ body.sidebar-collapsed .main-content{
       <div class="tab" onclick="setDocsHistFilter('receipt',this)">🧾 ใบเสร็จรับเงิน</div>
       <div class="tab" onclick="setDocsHistFilter('voucher',this)">💸 ใบสำคัญจ่าย</div>
      </div>
+     <div class="tabs" id="docs-hist-status" style="margin:0">
+      <div class="tab active" onclick="setDocsHistStatus('all',this)">ทุกสถานะ</div>
+      <div class="tab" onclick="setDocsHistStatus('draft',this)">📝 ดราฟ <span id="docs-draft-count" style="opacity:.7"></span></div>
+      <div class="tab" onclick="setDocsHistStatus('sent',this)">✅ ส่งแล้ว</div>
+     </div>
      <button class="btn btn-sm btn-outline" onclick="openFinanceSummaryDoc()" title="ออกเอกสารสรุปรายรับ-รายจ่าย-กำไร รายเดือน/ไตรมาส/ปี เป็น PDF">🧾 ใบสรุปยอดเงิน</button>
     </div>
     <div id="docs-history-list"></div>
@@ -3986,14 +3991,26 @@ function generateDocNo(prefix){
 // ── DocNo preview bars on forms ──
 // 📝 ดราฟที่บันทึกไว้ — โชว์บนหัวฟอร์ม กดเปิดต่อได้เลย (ไม่ต้องไปหาในประวัติเอกสาร)
 function _draftStrip(pre){
-  const L=(getDocsStore(pre==='inv'?'invoices':'quotations')||[]).filter(d=>d&&d.isDraft).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
-  if(!L.length) return '';
-  const fn=pre==='inv'?'editInvoice':'editQuotation';
-  return `<div style="width:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border2)">
-    <span style="font-size:11px;color:var(--orange);font-weight:700">📝 ดราฟที่บันทึกไว้ ${L.length} ใบ:</span>
-    ${L.slice(0,8).map(d=>`<button class="btn btn-xs" style="background:rgba(255,158,0,.1);border:1px solid rgba(255,158,0,.4);color:var(--orange)" onclick="${fn}('${esc(d.docNo)}')" title="เปิดดราฟนี้มาแก้ต่อ">✏️ ${esc(d.docNo)} · ${esc(String(d.client||'').slice(0,24))}${d.total?' · '+fmtB(d.total):''}</button>`).join('')}
-    ${L.length>8?`<button class="btn btn-xs btn-outline" onclick="switchDocsMain('history')">ดูทั้งหมด ›</button>`:''}</div>`;
+  const n=(getDocsStore(pre==='inv'?'invoices':'quotations')||[]).filter(d=>d&&d.isDraft).length;
+  return n?`<button class="btn btn-xs" style="margin-left:auto;background:rgba(255,158,0,.1);border:1px solid rgba(255,158,0,.4);color:var(--orange);font-weight:700" onclick="openDraftPicker('${pre}')" title="เปิดดราฟที่บันทึกไว้มาแก้ต่อ">📝 ดราฟที่บันทึกไว้ (${n})</button>`:'';
 }
+// หน้าต่างเลือกดราฟ (ค้นหาได้) · ดูทั้งหมด → ประวัติเอกสาร กรองเฉพาะดราฟของประเภทนี้
+function openDraftPicker(pre){
+  document.getElementById('draft-pick')?.remove();
+  const L=(getDocsStore(pre==='inv'?'invoices':'quotations')||[]).filter(d=>d&&d.isDraft).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const fn=pre==='inv'?'editInvoice':'editQuotation', kind=pre==='inv'?'invoice':'quotation';
+  const ov=document.createElement('div'); ov.id='draft-pick'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px'; ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  const rows=q=>{ q=String(q||'').toLowerCase().trim(); const F=L.filter(d=>!q||[d.docNo,d.client].join(' ').toLowerCase().includes(q));
+    return F.map(d=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px solid var(--border2)"><div style="flex:1;min-width:0"><b style="color:var(--orange);font-size:12.5px">${esc(d.docNo)}</b> <span style="font-weight:600">${esc(d.client||'—')}</span><div style="font-size:11px;color:var(--text2)">${fmtDate(d.date||d.createdAt)}${d.currency&&d.currency!=='THB'?' · '+esc(d.currency):''}</div></div><b style="color:var(--accent2);white-space:nowrap">${d.total?fmtB(d.total):'—'}</b><button class="btn btn-sm btn-blue" onclick="document.getElementById('draft-pick').remove();${fn}('${esc(d.docNo)}')">✏️ เปิดแก้ต่อ</button></div>`).join('')||'<div style="padding:20px;text-align:center;color:var(--text2)">ไม่พบดราฟ</div>'; };
+  ov.innerHTML=`<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;width:min(620px,100%);max-height:80vh;display:flex;flex-direction:column;padding:14px;font-family:Kanit">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><b>📝 ดราฟ${pre==='inv'?'ใบแจ้งหนี้':'ใบเสนอราคา'}ที่บันทึกไว้ (${L.length})</b><button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="document.getElementById('draft-pick').remove()">ปิด</button></div>
+    <input id="draft-pick-q" placeholder="🔍 ค้นเลขที่ / ชื่อลูกค้า" style="padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;margin-bottom:6px" oninput="document.getElementById('draft-pick-list').innerHTML=window._dpRows(this.value)">
+    <div id="draft-pick-list" style="overflow:auto;flex:1">${rows('')}</div>
+    <div style="text-align:right;margin-top:8px"><button class="btn btn-sm btn-outline" onclick="document.getElementById('draft-pick').remove();_openDraftHistory('${kind}')">ดูในประวัติเอกสาร ›</button></div></div>`;
+  window._dpRows=rows; document.body.appendChild(ov); setTimeout(()=>document.getElementById('draft-pick-q')?.focus(),50);
+}
+function _openDraftHistory(kind){ const t=document.querySelector('#docs-main-tabs .tab[onclick*="history"]'); switchDocsMain('history', t||undefined);
+  setTimeout(()=>{ const ft=[...document.querySelectorAll('#docs-history .tabs:not(#docs-hist-status) .tab')].find(x=>x.getAttribute('onclick')?.includes("'"+kind+"'")); setDocsHistFilter(kind, ft||null); setDocsHistStatus('draft'); },50); }
 function renderInvDocNoBar(){
   const el = document.getElementById('inv-docno-bar'); if(!el) return;
   if(_invEditingDocNo){
@@ -22825,6 +22842,8 @@ function myExportPDF(){
 // ══════════════════════════════════════════════
 
 let docsHistFilter = 'all';
+let docsHistStatus = 'all';   // all | draft | sent
+function setDocsHistStatus(f, el){ docsHistStatus=f; document.querySelectorAll('#docs-hist-status .tab').forEach(t=>t.classList.remove('active')); if(el) el.classList.add('active'); else { const t=[...document.querySelectorAll('#docs-hist-status .tab')][({all:0,draft:1,sent:2})[f]||0]; if(t) t.classList.add('active'); } renderDocsHistory(); }
 let qtItems = []; // [{desc, qty, unit, price}]
 let vcSelectedWorkers = new Set(); // keys "projId|workerId|slot" (รองรับหลายโปรเจกต์)
 let vcSelectedProjs = new Set();   // projId ที่ติ๊กเลือกในโหมด "ตามโปรเจกต์"
@@ -26236,7 +26255,7 @@ body{font-family:'Kanit',sans-serif;background:#fff;padding:20px;-webkit-print-c
    ══════════════════════ */
 function setDocsHistFilter(f, el) {
   docsHistFilter = f;
-  document.querySelectorAll('#docs-history .tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#docs-history .tabs:not(#docs-hist-status) .tab').forEach(t=>t.classList.remove('active'));
   if(el)el.classList.add('active');
   renderDocsHistory();
 }
@@ -26248,7 +26267,9 @@ function renderDocsHistory() {
   const invoices   = (getDocsStore('invoices')||[]).map(d=>({...d,type:'invoice'}));
   const receipts   = (getDocsStore('receipts')||[]).map(d=>({...d,type:'receipt'}));
   let all = [...quotations,...invoices,...receipts,...vouchers].sort((a,b)=>b.createdAt?.localeCompare(a.createdAt||'')||0);
+  { const dc=document.getElementById('docs-draft-count'); if(dc){ const n=all.filter(d=>d.isDraft&&(docsHistFilter==='all'||d.type===docsHistFilter)).length; dc.textContent=n?'('+n+')':''; } }
   if(docsHistFilter!=='all') all=all.filter(d=>d.type===docsHistFilter);
+  if(docsHistStatus==='draft') all=all.filter(d=>d.isDraft); else if(docsHistStatus==='sent') all=all.filter(d=>!d.isDraft);
   if(q) all=all.filter(d=>(d.docNo||'').toLowerCase().includes(q)||(d.client||d.staffName||'').toLowerCase().includes(q)||(d.projName||'').toLowerCase().includes(q));
   if(!all.length){el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2);background:var(--card);border:1px dashed var(--border2);border-radius:var(--r)">ยังไม่มีเอกสาร</div>';return;}
   const typeInfo = {
@@ -33237,7 +33258,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261026-05"></script><script src="scene/nd-profile.js?v=20261026-05"></script><script src="scene/nd-plan.js?v=20261026-05"></script><script src="scene/nd-docpdf.js?v=20261026-05"></script><script src="scene/nd-acct.js?v=20261026-05"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261026-06"></script><script src="scene/nd-profile.js?v=20261026-06"></script><script src="scene/nd-plan.js?v=20261026-06"></script><script src="scene/nd-docpdf.js?v=20261026-06"></script><script src="scene/nd-acct.js?v=20261026-06"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33247,7 +33268,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261026-05';
+var UPD_BUILD = '20261026-06';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
