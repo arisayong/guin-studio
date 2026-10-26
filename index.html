@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261026-02"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261026-04"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -2166,7 +2166,12 @@ body.sidebar-collapsed .main-content{
        <label class="form-label">VAT (%)</label>
        <input class="form-input" id="qt-vat" type="number" placeholder="0" min="0" max="100" value="0" oninput="calcQtTotal()">
       </div>
-      <div class="form-group" style="margin:0;grid-column:span 2">
+      <div class="form-group" style="margin:0">
+       <label class="form-label">สกุลเงินในเอกสาร <span style="font-weight:400;text-transform:none;opacity:.7">(ราคาในรายการพิมพ์เป็นบาท)</span></label>
+       <div style="display:flex;gap:6px;align-items:center"><select class="form-input form-select" id="qt-cur" style="width:110px" onchange="_docCurChange('qt')"><option value="THB">฿ THB</option><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="JPY">¥ JPY</option><option value="CNY">¥ CNY</option><option value="HKD">HK$ HKD</option><option value="SGD">S$ SGD</option><option value="TWD">NT$ TWD</option><option value="KRW">₩ KRW</option><option value="AUD">A$ AUD</option><option value="MYR">RM MYR</option></select>
+        <span id="qt-fx-box" style="display:none;align-items:center;gap:5px;font-size:12px;color:var(--text2)">1 <b id="qt-fx-code"></b> =<input id="qt-fx" type="number" step="any" min="0" style="width:80px;padding:6px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit" oninput="calcQtTotal()">บาท<button type="button" class="btn btn-xs btn-outline" onclick="_docFxRefresh('qt')" title="ดึงเรทวันนี้">🔄</button></span></div>
+      </div>
+      <div class="form-group" style="margin:0">
        <label class="form-label">หมายเหตุ</label>
        <input class="form-input" id="qt-note" placeholder="เงื่อนไข / โน้ตพิเศษ">
       </div>
@@ -2264,6 +2269,12 @@ body.sidebar-collapsed .main-content{
        <label class="form-label">หมายเหตุ / เงื่อนไขการชำระ</label>
        <input class="form-input" id="inv-note" placeholder="เช่น โอน 15 วัน, บัญชี SCB xxx">
       </div>
+      <div class="form-group" style="margin:0;grid-column:1/-1">
+       <label class="form-label">สกุลเงินในเอกสาร <span style="font-weight:400;text-transform:none;opacity:.7">(ราคาในรายการพิมพ์เป็นบาท)</span></label>
+       <div style="display:flex;gap:6px;align-items:center"><select class="form-input form-select" id="inv-cur" style="width:110px" onchange="_docCurChange('inv')"><option value="THB">฿ THB</option><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="JPY">¥ JPY</option><option value="CNY">¥ CNY</option><option value="HKD">HK$ HKD</option><option value="SGD">S$ SGD</option><option value="TWD">NT$ TWD</option><option value="KRW">₩ KRW</option><option value="AUD">A$ AUD</option><option value="MYR">RM MYR</option></select>
+        <span id="inv-fx-box" style="display:none;align-items:center;gap:5px;font-size:12px;color:var(--text2)">1 <b id="inv-fx-code"></b> =<input id="inv-fx" type="number" step="any" min="0" style="width:80px;padding:6px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit" oninput="calcInvTotal()">บาท<button type="button" class="btn btn-xs btn-outline" onclick="_docFxRefresh('inv')" title="ดึงเรทวันนี้">🔄</button></span></div>
+      </div>
+
      </div>
 
      <!-- Multi-project picker removed — projects now go directly into line items below -->
@@ -2707,14 +2718,19 @@ body.sidebar-collapsed .main-content{
         onchange="document.getElementById('pj-deadline').value=isoToThai(this.value);document.getElementById('pj-deadline').style.borderColor='rgba(0,223,160,.4)'">
       <span onclick="const p=document.getElementById('pj-deadline-pk');p.showPicker?p.showPicker():p.click()" style="position:absolute;right:7px;cursor:pointer;font-size:14px;user-select:none">📅</span>
      </div><input class="form-input" id="pj-deadline-time" type="text" inputmode="numeric" maxlength="5" placeholder="--:--" autocomplete="off" onfocus="this.dataset.v=this.value" onchange="_tmFix(this)" style="width:84px;flex-shrink:0;text-align:center" title="เวลาส่งลูกค้า — พิมพ์ได้เลย เช่น 2359"></div></div>
-    <div class="s3 form-group"><label class="form-label">Budget จากลูกค้า</label>
+    <div class="s3 form-group"><label class="form-label" style="display:flex;align-items:center;gap:6px">Budget จากลูกค้า <select id="pj-cur" onchange="_pjCurChange()" title="สกุลเงินที่ลูกค้าจ่าย — ไม่ใช่บาท ระบบแปลงเป็นบาทให้อัตโนมัติ" style="margin-left:auto;padding:2px 4px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--accent2);font-family:Kanit;font-size:11px;font-weight:700"><option value="THB">฿ THB</option><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="JPY">¥ JPY</option><option value="CNY">¥ CNY</option><option value="HKD">HK$ HKD</option><option value="SGD">S$ SGD</option><option value="TWD">NT$ TWD</option><option value="KRW">₩ KRW</option><option value="AUD">A$ AUD</option><option value="MYR">RM MYR</option></select></label>
      <div style="display:flex;gap:5px">
       <select class="form-input form-select" id="pj-budget-type" style="width:92px;padding:7px 24px 7px 8px" onchange="toggleBudgetQty();calcProjSummary()" title="เหมา/โปรเจกต์ = ยอดรวม · นาที = คูณนาทีหนัง · ชั่วโมง/หน้า/วัน/บท = คูณจำนวนที่กรอก">
        <option value="flat">เหมา</option><option value="per-minute">นาที</option><option value="per-hour">ชั่วโมง</option><option value="per-page">หน้า</option><option value="per-day">วัน</option><option value="per-episode">บท</option><option value="per-project">โปรเจกต์</option>
       </select>
+      <input class="form-input" id="pj-budget-fx" type="number" placeholder="ราคาสกุลลูกค้า" min="0" step="any" onwheel="this.blur()" oninput="_pjFxCalc()" style="display:none;flex:1;min-width:0">
       <input class="form-input" id="pj-budget" type="number" placeholder="0" min="0" step="any" data-price onwheel="this.blur()" oninput="calcProjSummary()" style="flex:1;min-width:0">
       <input class="form-input" id="pj-budget-qty" type="number" placeholder="จำนวน" min="0" step="any" onwheel="this.blur()" oninput="calcProjSummary()" style="display:none;width:72px;text-align:center" title="จำนวน (ชั่วโมง/หน้า/วัน/บท)">
      </div>
+     <div id="pj-fx-row" style="display:none;font-size:11.5px;color:var(--text2);margin-top:4px;align-items:center;gap:6px;flex-wrap:wrap">
+      <span id="pj-fx-thb" style="color:var(--accent2);font-weight:700;width:100%"></span>
+      <span style="white-space:nowrap">1 <b id="pj-fx-code">USD</b> =</span><input id="pj-fxrate" type="number" step="any" min="0" oninput="_pjFxCalc()" style="width:76px;padding:3px 6px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px"><span>฿</span>
+      <button type="button" class="btn btn-xs btn-outline" onclick="_pjFxRefresh()" title="ดึงเรทวันนี้">🔄</button><span id="pj-fx-date" style="opacity:.7;white-space:nowrap"></span></div>
      <div id="pj-budget-calc" style="font-size:11px;color:var(--text2);margin-top:3px;display:none"></div></div>
     <div class="s3 form-group" id="pj-client-row"><label class="form-label">ชื่อ / URL ลูกค้า</label><input class="form-input" id="pj-client" placeholder="ชื่อลูกค้า หรือ link"></div>
 
@@ -4018,6 +4034,7 @@ function cancelInvEdit(){
   _invEditingDocNo = null;
   invItems = [];
   _invPayAccountIds = [];
+  _docFxSet('inv',{});
   ['inv-client','inv-email','inv-ctax','inv-cbranch','inv-caddr','inv-date','inv-duedate','inv-vat','inv-note'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=(id==='inv-vat'?'0':''); });
   const dt = document.getElementById('inv-date'); if(dt) dt.value = isoToThai(new Date().toISOString().split('T')[0]);
   initInvItems(); initInvPayChips(); renderInvDocNoBar();
@@ -4027,6 +4044,7 @@ function cancelQtEdit(){
   if(!confirm('ยกเลิกการแก้ไข + ล้างฟอร์ม สร้างใบใหม่?')) return;
   _qtEditingDocNo = null;
   qtItems = [];
+  _docFxSet('qt',{});
   ['qt-client','qt-email','qt-ctax','qt-cbranch','qt-caddr','qt-date','qt-vat','qt-note'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=(id==='qt-vat'?'0':''); });
   const dt = document.getElementById('qt-date'); if(dt) dt.value = isoToThai(new Date().toISOString().split('T')[0]);
   initQtItems(); renderQtDocNoBar();
@@ -15661,7 +15679,8 @@ async function openNewProject(){
   document.getElementById('proj-modal-title').textContent='โปรเจกต์ใหม่';
   const _metaEl = document.getElementById('proj-modal-meta');
   if(_metaEl){ _metaEl.textContent=''; _metaEl.style.display='none'; }
-  ['pj-name','pj-client','pj-budget','pj-budget-qty','pj-duration','pj-note','pj-clientcode','pj-seq','pj-episodes','pj-downloadlink','pj-secretkey'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['pj-name','pj-client','pj-budget','pj-budget-qty','pj-duration','pj-note','pj-clientcode','pj-seq','pj-episodes','pj-downloadlink','pj-secretkey','pj-budget-fx','pj-fxrate'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  { const _c=document.getElementById('pj-cur'); if(_c){ _c.value='THB'; _pjCurUI(); } }
   // 🔒 เมเนเจอร์ต้องไม่เห็น/ไม่กรอกชื่อลูกค้า (แอดมินเห็นปกติ)
   { const _cr=document.getElementById('pj-client-row'); if(_cr) _cr.style.display=(currentUser?.role==='manager')?'none':''; }
   { const _ap=document.getElementById('pj-advancepaid'); if(_ap) _ap.checked=false; }
@@ -16625,6 +16644,7 @@ async function saveProject(){
     budgetRate:parseFloat(document.getElementById('pj-budget').value)||0,
     budgetType:document.getElementById('pj-budget-type')?.value||'flat',
     budgetQty:parseFloat(document.getElementById('pj-budget-qty')?.value)||0,
+    ..._pjFxSave(),
     duration:dur,
     startDate:thaiToIso(document.getElementById('pj-start').value)||document.getElementById('pj-start').value,
     deadline:thaiToIso(document.getElementById('pj-deadline').value)||document.getElementById('pj-deadline').value,
@@ -17151,6 +17171,7 @@ async function openEditProject(id){
     document.getElementById('pj-budget').value=p.budget||'';
   }
   const _bqEl=document.getElementById('pj-budget-qty');if(_bqEl)_bqEl.value=p.budgetQty||'';
+  _pjFxLoad(p);
   toggleBudgetQty();
   document.getElementById('pj-duration').value=p.duration||'';
   document.getElementById('pj-note').value=p.note||'';
@@ -23150,6 +23171,7 @@ function calcQtTotal() {
   if (el) el.innerHTML = vat>0
     ? `<div style="font-size:13px;color:var(--text2);margin-bottom:2px">ก่อน VAT: ${fmtB(subtotal)}</div><div style="font-size:13px;color:var(--text2);">VAT ${vat}%: ${fmtB(vatAmt)}</div><div style="font-size:24px;font-weight:800;color:var(--accent2)">${fmtB(total)}</div>`
     : `<div style="font-size:24px;font-weight:800;color:var(--accent2)">${fmtB(total)}</div>`;
+  if(el) el.insertAdjacentHTML('beforeend', _docFxLine('qt', qtItems, vat));
   return total;
 }
 
@@ -23343,8 +23365,10 @@ function confirmQtPPAdd(){
       detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '',
       qty: 1,
       unit: 'งาน',
-      price: p.budget||0
+      price: p.budget||0,
+      ..._projFxItem(p)
     };
+    _docFxAdopt('qt', p);
     if(shouldReplace && addedCount===0) qtItems[0] = newItem;
     else qtItems.push(newItem);
     if(!autoFillClient && p.client) autoFillClient = p.client;
@@ -23462,6 +23486,7 @@ function getQuotationData() {
     docNo: _qtEditingDocNo || generateDocNo('QT'),
     client: document.getElementById('qt-client')?.value.trim()||'',
     email:  document.getElementById('qt-email')?.value.trim()||'',
+    ..._docFxGet('qt'),
     clientTax:document.getElementById('qt-ctax')?.value.trim()||'', clientBranch:document.getElementById('qt-cbranch')?.value.trim()||'', clientAddr:document.getElementById('qt-caddr')?.value.trim()||'',
     projId: projIdsFromItems[0] || '',  // backward compat for buildQuotationHTML
     projIds: projIdsFromItems,
@@ -23475,6 +23500,7 @@ function previewQuotation() {
   const data = getQuotationData();
   if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
   if(!data.items.length){toast('กรุณาเพิ่มรายการอย่างน้อย 1 รายการ','error');return;}
+  if(data.currency && data.currency!=='THB' && window.GDOC){ GDOC.salesPages('quotation', _gdSalesData(data)).then(pg=>GDOC.open(pg, data.docNo)); return; }
   const el = document.getElementById('receipt-body');
   if(el) el.innerHTML = buildQuotationHTML(data);
   window._lastReceiptCtx = { staffId:null, vNo:data.docNo, type:'quotation', email:data.email };
@@ -23592,6 +23618,7 @@ async function _docSavePdf(html, fname, fallback){
 }
 // 📄 ใบเสนอราคา / ใบแจ้งหนี้ / ใบเสร็จ แบบใหม่ (ช่องทางชำระจากบัญชีรับเงินที่เลือก)
 function _gdSalesData(d){ const o=Object.assign({}, d||{});
+  if(o.currency && o.currency!=='THB' && o.fxRate){ o.items=(o.items||[]).map(x=>Object.assign({}, x, {fxUnit:docFxUnit(x,o.currency,o.fxRate)})); o.fxSym=FX_SYM[o.currency]||''; }
   try{ const all=getPaymentAccounts(); const ids=o.payAccountIds||[]; const picks=ids.length?all.filter(a=>ids.includes(a.id)):all.filter(a=>a.isDefault);
     if(picks.length) o.payText=picks.map(a=>{ const b=a.bankCode==='other'?(a.customBankName||'ธนาคาร'):getBankPreset(a.bankCode).name; return esc(b)+' · '+esc(a.accountNumber||'')+' · '+esc(a.accountHolder||''); }).join('<br>'); }catch(e){}
   return o; }
@@ -25946,6 +25973,74 @@ async function _vcCommitIssueVouchersByProj() {
    SHARED HELPERS
    ══════════════════════ */
 function getDocsStore(key) { return ls('docs_'+key)||[]; }
+// 💱 สกุลเงินต่างประเทศ — ยอดในระบบเก็บเป็นบาทเสมอ (บัญชี/กำไร/คิวจ่ายใช้บาท) · เก็บสกุล+เรทไว้คู่กัน
+//    โปรเจกต์: budgetCur, budgetFx (ราคาที่พิมพ์เป็นสกุลลูกค้า), fxRate (1 หน่วย = ? บาท), fxDate
+//    เอกสาร:  currency, fxRate, fxDate · รายการจากโปรเจกต์พก fxCur/fxPrice/fxBase (ยอดตรงตามที่ลูกค้าตกลง ไม่เพี้ยนจากปัดเศษ)
+const FX_SYM={THB:'฿',USD:'$',EUR:'€',GBP:'£',JPY:'¥',CNY:'¥',HKD:'HK$',SGD:'S$',TWD:'NT$',KRW:'₩',AUD:'A$',MYR:'RM'};
+const _r2=n=>Math.round((+n||0)*100)/100;
+const fmtFx=(n,c)=>(FX_SYM[c]||c+' ')+(+n||0).toLocaleString('en-US',{minimumFractionDigits:(c==='JPY'||c==='KRW')?0:2,maximumFractionDigits:(c==='JPY'||c==='KRW')?0:2});
+// เรทวันนี้ (THB ต่อ 1 หน่วย) · แคชวันละครั้ง · ดึงไม่ได้ → ใช้เรทล่าสุดที่เคยได้
+async function fxRateOf(cur){ if(!cur||cur==='THB') return 1;
+  const today=new Date().toLocaleDateString('en-CA'); let c=ls('fx_cache')||{};
+  if(c.date!==today||!c.rates||!c.rates[cur]){ try{ const r=await fetch('https://open.er-api.com/v6/latest/THB').then(x=>x.json()); if(r&&r.rates){ c={date:today, rates:r.rates}; ls('fx_cache',c); } }catch(e){} }
+  const per=c.rates&&c.rates[cur]; return per?Math.round(1/per*10000)/10000:0; }
+const _fxDateTxt=()=>{ const c=ls('fx_cache')||{}; return c.date?'เรท ณ '+c.date.split('-').reverse().join('/'):''; };
+// — ฟอร์มโปรเจกต์ —
+function _pjCurUI(){ const cur=document.getElementById('pj-cur')?.value||'THB', fx=cur!=='THB';
+  const a=document.getElementById('pj-budget-fx'), b=document.getElementById('pj-budget'), row=document.getElementById('pj-fx-row');
+  if(a) a.style.display=fx?'':'none'; if(b) b.style.display=fx?'none':''; if(row) row.style.display=fx?'flex':'none';
+  const cd=document.getElementById('pj-fx-code'); if(cd) cd.textContent=cur; if(a) a.placeholder='ราคาเป็น '+cur; }
+async function _pjCurChange(){ const cur=document.getElementById('pj-cur').value; _pjCurUI();
+  const a=document.getElementById('pj-budget-fx'), b=document.getElementById('pj-budget');
+  if(cur==='THB'){ calcProjSummary(); return; }
+  if(a && !a.value && b && b.value){ /* เปลี่ยนจากบาท → ใช้ตัวเลขเดิมเป็นราคาสกุลใหม่ */ a.value=b.value; }
+  await _pjFxRefresh(); }
+async function _pjFxRefresh(){ const cur=document.getElementById('pj-cur')?.value; if(!cur||cur==='THB') return;
+  const r=await fxRateOf(cur); const f=document.getElementById('pj-fxrate');
+  if(r){ if(f) f.value=r; const d=document.getElementById('pj-fx-date'); if(d) d.textContent=_fxDateTxt(); }
+  else toast('ดึงเรทไม่ได้ — พิมพ์เรทเองในช่อง "1 '+cur+' = ? บาท"','warn');
+  _pjFxCalc(); }
+function _pjFxCalc(){ const cur=document.getElementById('pj-cur')?.value||'THB'; if(cur==='THB') return;
+  const v=parseFloat(document.getElementById('pj-budget-fx')?.value)||0, r=parseFloat(document.getElementById('pj-fxrate')?.value)||0;
+  const b=document.getElementById('pj-budget'); if(b) b.value=v&&r?_r2(v*r):'';
+  const t=document.getElementById('pj-fx-thb'); if(t) t.textContent=v&&r?'≈ '+fmtB(_r2(v*r))+' (บาท)'+(document.getElementById('pj-budget-type')?.value!=='flat'?' ต่อหน่วย':''):(r?'':'⚠️ ใส่เรท');
+  calcProjSummary(); }
+function _pjFxSave(){ const cur=document.getElementById('pj-cur')?.value||'THB';
+  if(cur==='THB') return {budgetCur:'THB', budgetFx:0, fxRate:0, fxDate:''};
+  return {budgetCur:cur, budgetFx:parseFloat(document.getElementById('pj-budget-fx')?.value)||0, fxRate:parseFloat(document.getElementById('pj-fxrate')?.value)||0, fxDate:(ls('fx_cache')||{}).date||''}; }
+function _pjFxLoad(p){ const c=document.getElementById('pj-cur'); if(!c) return; const cur=(p&&p.budgetCur)||'THB'; c.value=cur;
+  const a=document.getElementById('pj-budget-fx'), f=document.getElementById('pj-fxrate');
+  if(a) a.value=cur!=='THB'&&p.budgetFx?p.budgetFx:''; if(f) f.value=cur!=='THB'&&p.fxRate?p.fxRate:'';
+  const d=document.getElementById('pj-fx-date'); if(d) d.textContent=p&&p.fxDate?'เรท ณ '+String(p.fxDate).split('-').reverse().join('/'):'';
+  _pjCurUI(); if(cur!=='THB') _pjFxCalc(); }
+// ยอดรวมของโปรเจกต์เป็นสกุลลูกค้า (คิดแบบเดียวกับงบบาท: เหมา/นาที/หน่วย)
+function projFxTotal(p){ if(!p||!p.budgetCur||p.budgetCur==='THB'||!p.budgetFx) return 0;
+  try{ return _r2(calcBudgetTotal(+p.budgetFx, p.budgetType||'flat', +p.duration||0, +p.budgetQty||0)); }catch(e){ return +p.budgetFx||0; } }
+function _projFxItem(p){ const t=projFxTotal(p); return t?{fxCur:p.budgetCur, fxPrice:t, fxBase:p.budget||0}:{}; }
+// — ฟอร์มเอกสาร —
+function _docFxGet(pre){ const cur=document.getElementById(pre+'-cur')?.value||'THB';
+  return cur==='THB'?{currency:'THB', fxRate:0, fxDate:''}:{currency:cur, fxRate:parseFloat(document.getElementById(pre+'-fx')?.value)||0, fxDate:(ls('fx_cache')||{}).date||''}; }
+function _docFxUI(pre){ const cur=document.getElementById(pre+'-cur')?.value||'THB'; const bx=document.getElementById(pre+'-fx-box'); if(bx) bx.style.display=cur==='THB'?'none':'inline-flex';
+  const cd=document.getElementById(pre+'-fx-code'); if(cd) cd.textContent=cur; }
+function _docFxSet(pre, d){ const c=document.getElementById(pre+'-cur'); if(!c) return; c.value=(d&&d.currency)||'THB';
+  const f=document.getElementById(pre+'-fx'); if(f) f.value=d&&d.fxRate?d.fxRate:''; _docFxUI(pre); }
+async function _docCurChange(pre){ _docFxUI(pre); const cur=document.getElementById(pre+'-cur').value;
+  if(cur!=='THB'){ const its=pre==='qt'?qtItems:invItems; const pj=its.find(x=>x.fxCur===cur&&x.projId); const p=pj&&getProjects().find(x=>x.id===pj.projId);
+    const f=document.getElementById(pre+'-fx'); if(p&&p.fxRate){ f.value=p.fxRate; } else await _docFxRefresh(pre, true); }
+  pre==='qt'?calcQtTotal():calcInvTotal(); }
+async function _docFxRefresh(pre, quiet){ const cur=document.getElementById(pre+'-cur')?.value; if(!cur||cur==='THB') return;
+  const r=await fxRateOf(cur); if(r){ document.getElementById(pre+'-fx').value=r; if(!quiet) toast('💱 เรทวันนี้ 1 '+cur+' = '+r+' บาท','info'); } else toast('ดึงเรทไม่ได้ — พิมพ์เรทเอง','warn');
+  pre==='qt'?calcQtTotal():calcInvTotal(); }
+// โปรเจกต์ที่ตั้งราคาเป็นสกุลต่างประเทศ → เอกสารที่ยังเป็นบาทเปลี่ยนเป็นสกุลนั้นให้ (ใช้เรทเดียวกับโปรเจกต์)
+function _docFxAdopt(pre, p){ if(!p||!p.budgetCur||p.budgetCur==='THB') return; const c=document.getElementById(pre+'-cur'); if(!c||c.value!=='THB') return;
+  c.value=p.budgetCur; const f=document.getElementById(pre+'-fx'); if(f) f.value=p.fxRate||''; _docFxUI(pre); toast('💱 เอกสารนี้ตั้งเป็น '+p.budgetCur+' ตามโปรเจกต์','info'); }
+// ราคาต่อหน่วยเป็นสกุลเอกสาร (รายการจากโปรเจกต์ที่ไม่ถูกแก้ราคา → ใช้ยอดเดิมของลูกค้าตรง ๆ)
+function docFxUnit(x, cur, rate){ const q=+x.qty||1; if(x.fxCur===cur && x.fxPrice && Math.abs((+x.price||0)*q-(+x.fxBase||0))<0.01) return _r2(x.fxPrice/q); return rate?_r2((+x.price||0)/rate):0; }
+function _docFxLine(pre, items, vat){ const g=_docFxGet(pre); if(g.currency==='THB') return '';
+  if(!g.fxRate) return '<div style="font-size:12px;color:var(--orange)">⚠️ ใส่เรทเงิน '+g.currency+'</div>';
+  const sub=_r2(items.reduce((a,x)=>a+(+x.qty||1)*docFxUnit(x,g.currency,g.fxRate),0)), tot=_r2(sub+_r2(sub*(+vat||0)/100));
+  return `<div style="font-size:15px;font-weight:800;color:var(--green);margin-top:2px">≈ ${fmtFx(tot,g.currency)} <span style="font-size:11px;font-weight:400;color:var(--text2)">ในเอกสาร · 1 ${g.currency} = ${g.fxRate} บาท</span></div>`; }
+
 // 📇 รายชื่อลูกค้า/บริษัท — ใช้ออกใบเสนอราคา/ใบแจ้งหนี้/ใบเสร็จ (แยกจากทีมงาน) · misc/clients
 //    [{id, name, branch, taxId, addr, email, contact, phone, note, updatedAt}]
 function getClients(){ const v=ls('clients'); return Array.isArray(v)?v.filter(Boolean):[]; }
@@ -26217,7 +26312,7 @@ function editInvoice(docNo){
   setTimeout(()=>{
     const clientEl = document.getElementById('inv-client'); if(clientEl) clientEl.value = d.client||'';
     const emailEl  = document.getElementById('inv-email');  if(emailEl)  emailEl.value  = d.email||'';
-    _cliSetForm('inv', d);
+    _cliSetForm('inv', d); _docFxSet('inv', d);
     const dateEl   = document.getElementById('inv-date');   if(dateEl)   dateEl.value   = d.date ? isoToThai(d.date) : '';
     const dueEl    = document.getElementById('inv-duedate');if(dueEl)    dueEl.value    = d.dueDate ? isoToThai(d.dueDate) : '';
     const vatEl    = document.getElementById('inv-vat');    if(vatEl)    vatEl.value    = d.vat||0;
@@ -26241,7 +26336,7 @@ function editQuotation(docNo){
   setTimeout(()=>{
     const clientEl = document.getElementById('qt-client'); if(clientEl) clientEl.value = d.client||'';
     const emailEl  = document.getElementById('qt-email');  if(emailEl)  emailEl.value  = d.email||'';
-    _cliSetForm('qt', d);
+    _cliSetForm('qt', d); _docFxSet('qt', d);
     const dateEl   = document.getElementById('qt-date');   if(dateEl)   dateEl.value   = d.date ? isoToThai(d.date) : '';
     const vatEl    = document.getElementById('qt-vat');    if(vatEl)    vatEl.value    = d.vat||0;
     const noteEl   = document.getElementById('qt-note');   if(noteEl)   noteEl.value   = d.note||'';
@@ -28208,6 +28303,7 @@ function _getCurrentFormSnapshot(){
       budget: get('pj-budget'),
       budgetType: get('pj-budget-type') || 'flat',
       budgetQty: get('pj-budget-qty'),
+      budgetCur: get('pj-cur')||'THB', budgetFx: get('pj-budget-fx'), fxRate: get('pj-fxrate'),
       managerFee: get('pj-manager-fee'),
       duration: get('pj-duration'),
       startDate: get('pj-start'),
@@ -28271,6 +28367,7 @@ function _applyDraft(snap){
   set('pj-budget', snap.budget);
   set('pj-budget-type', snap.budgetType);
   set('pj-budget-qty', snap.budgetQty);
+  try{ _pjFxLoad({budgetCur:snap.budgetCur, budgetFx:snap.budgetFx, fxRate:snap.fxRate}); }catch(e){}
   set('pj-manager-fee', snap.managerFee);
   try{ toggleBudgetQty(); }catch(e){}
   set('pj-duration', snap.duration);
@@ -29554,6 +29651,7 @@ function calcInvTotal(){
   if(el) el.innerHTML = vat>0
     ? `<div style="font-size:13px;color:var(--text2);margin-bottom:2px">ก่อน VAT: ${fmtB(subtotal)}</div><div style="font-size:13px;color:var(--text2);">VAT ${vat}%: ${fmtB(vatAmt)}</div><div style="font-size:24px;font-weight:800;color:var(--red)">${fmtB(total)}</div>`
     : `<div style="font-size:24px;font-weight:800;color:var(--red)">${fmtB(total)}</div>`;
+  if(el) el.insertAdjacentHTML('beforeend', _docFxLine('inv', invItems, vat));
   return total;
 }
 // Replaces old _invProjIds chips system — projects now go directly into invItems as line items
@@ -29764,8 +29862,10 @@ function confirmInvPPAdd(){
       detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '',
       qty: 1,
       unit: 'งาน',
-      price: p.budget||0
+      price: p.budget||0,
+      ..._projFxItem(p)
     };
+    _docFxAdopt('inv', p);
     if(shouldReplace && addedCount===0) invItems[0] = newItem;
     else invItems.push(newItem);
     if(!autoFillClient && p.client) autoFillClient = p.client;
@@ -29785,7 +29885,7 @@ function addInvItemFromProject(projId){
   const p = getProjects().find(x=>x.id===projId);
   if(!p){ toast('ไม่พบโปรเจกต์','error'); return; }
   const shouldReplace = invItems.length===1 && !invItems[0].desc && !invItems[0].price && !invItems[0].projId;
-  const newItem = { projId: p.id, desc: projDisp(p), detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '', qty: 1, unit: 'งาน', price: p.budget||0 };
+  const newItem = { projId: p.id, desc: projDisp(p), detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '', qty: 1, unit: 'งาน', price: p.budget||0, ..._projFxItem(p) }; _docFxAdopt('inv', p);
   if(shouldReplace) invItems[0] = newItem; else invItems.push(newItem);
   const cli = document.getElementById('inv-client');
   if(cli && !cli.value && p?.client) cli.value = p.client;
@@ -29802,6 +29902,7 @@ function getInvoiceData(){
     docNo: _invEditingDocNo || generateDocNo('INV'),
     client: document.getElementById('inv-client')?.value.trim()||'',
     email:  document.getElementById('inv-email')?.value.trim()||'',
+    ..._docFxGet('inv'),
     clientTax:document.getElementById('inv-ctax')?.value.trim()||'', clientBranch:document.getElementById('inv-cbranch')?.value.trim()||'', clientAddr:document.getElementById('inv-caddr')?.value.trim()||'',
     projIds: projIdsFromItems,
     payAccountIds: [..._invPayAccountIds],
@@ -29945,6 +30046,7 @@ async function _rcpCreate(invDocNo){
     fromInvoice: invDocNo,
     client: inv.client||'', email: inv.email||'',
     clientTax:inv.clientTax||'', clientBranch:inv.clientBranch||'', clientAddr:inv.clientAddr||'',
+    currency:inv.currency||'THB', fxRate:inv.fxRate||0, fxDate:inv.fxDate||'',
     projIds: [...(inv.projIds||[])],
     payAccountIds: [...(inv.payAccountIds||[])],
     items: (inv.items||[]).map(x=>({...x})),
@@ -30070,6 +30172,7 @@ function previewInvoice(){
   const data = getInvoiceData();
   if(!data.client){toast('กรุณากรอกชื่อลูกค้า','error');return;}
   if(!data.items.length){toast('กรุณาเพิ่มรายการ','error');return;}
+  if(data.currency && data.currency!=='THB' && window.GDOC){ GDOC.salesPages('invoice', _gdSalesData(data)).then(pg=>GDOC.open(pg, data.docNo)); return; }
   const el = document.getElementById('receipt-body');
   if(el) el.innerHTML = buildInvoiceHTML(data);
   window._lastReceiptCtx = { staffId:null, vNo:data.docNo, type:'invoice', email:data.email };
@@ -33120,7 +33223,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261026-02"></script><script src="scene/nd-profile.js?v=20261026-02"></script><script src="scene/nd-plan.js?v=20261026-02"></script><script src="scene/nd-docpdf.js?v=20261026-02"></script><script src="scene/nd-acct.js?v=20261026-02"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261026-04"></script><script src="scene/nd-profile.js?v=20261026-04"></script><script src="scene/nd-plan.js?v=20261026-04"></script><script src="scene/nd-docpdf.js?v=20261026-04"></script><script src="scene/nd-acct.js?v=20261026-04"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33130,7 +33233,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261026-02';
+var UPD_BUILD = '20261026-04';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
