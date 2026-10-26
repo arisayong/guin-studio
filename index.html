@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261026-06"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261026-07"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -3989,6 +3989,20 @@ function generateDocNo(prefix){
 }
 
 // ── DocNo preview bars on forms ──
+// 🔎 เปิดเอกสารเดิมมาแก้ → เทียบราคารายการกับงบโปรเจกต์ปัจจุบัน (ราคาในเอกสารเป็นค่า ณ ตอนที่เพิ่มรายการ ไม่ตามโปรเจกต์อัตโนมัติ)
+function _docPriceDiffs(pre){ const its=pre==='inv'?invItems:qtItems; const P=getProjects(); const r2=n=>Math.round((+n||0)*100)/100;
+  return its.map((x,i)=>{ if(!x.projId) return null; const p=P.find(y=>y.id===x.projId); if(!p) return null; const want=r2(p.budget), have=r2((+x.price||0)*(+x.qty||1));
+    return Math.abs(want-have)>=0.01?{i, name:x.desc||projDisp(p), have, want, p}:null; }).filter(Boolean); }
+function _docPriceCheck(pre){ const bar=document.getElementById(pre+'-docno-bar'); if(!bar) return; document.getElementById(pre+'-price-warn')?.remove();
+  const D=_docPriceDiffs(pre); if(!D.length) return;
+  bar.insertAdjacentHTML('afterend', `<div id="${pre}-price-warn" style="margin:-4px 0 12px;padding:10px 14px;border:1px solid rgba(255,158,0,.45);background:rgba(255,158,0,.08);border-radius:10px;font-size:12.5px">
+    <b style="color:var(--orange)">⚠️ ราคา ${D.length} รายการไม่ตรงกับงบโปรเจกต์ตอนนี้</b> <span style="color:var(--text2)">(เอกสารเก็บราคา ณ ตอนที่เพิ่มรายการ — งบโปรเจกต์ถูกแก้ทีหลัง)</span>
+    <div style="margin:6px 0">${D.map(d=>`• ${esc(d.name)}: ในเอกสาร <b>${fmtB(d.have)}</b> → โปรเจกต์ <b style="color:var(--accent2)">${fmtB(d.want)}</b>`).join('<br>')}</div>
+    <button class="btn btn-xs btn-blue" onclick="_docPriceSync('${pre}')">🔄 อัปเดตราคาตามโปรเจกต์</button> <button class="btn btn-xs btn-outline" onclick="document.getElementById('${pre}-price-warn').remove()">ใช้ราคาเดิม</button></div>`); }
+function _docPriceSync(pre){ const its=pre==='inv'?invItems:qtItems;
+  _docPriceDiffs(pre).forEach(d=>{ const x=its[d.i]; const q=+x.qty||1; x.price=Math.round(d.want/q*100)/100; Object.assign(x, _projFxItem(d.p)); });
+  document.getElementById(pre+'-price-warn')?.remove(); pre==='inv'?renderInvItems():renderQtItems(); toast('🔄 อัปเดตราคาตามโปรเจกต์แล้ว — กดบันทึกเพื่อเก็บ','success'); }
+
 // 📝 ดราฟที่บันทึกไว้ — โชว์บนหัวฟอร์ม กดเปิดต่อได้เลย (ไม่ต้องไปหาในประวัติเอกสาร)
 function _draftStrip(pre){
   const n=(getDocsStore(pre==='inv'?'invoices':'quotations')||[]).filter(d=>d&&d.isDraft).length;
@@ -4063,7 +4077,7 @@ function cancelInvEdit(){
   _invEditingDocNo = null;
   invItems = [];
   _invPayAccountIds = [];
-  _docFxSet('inv',{});
+  _docFxSet('inv',{}); document.getElementById('inv-price-warn')?.remove();
   ['inv-client','inv-email','inv-ctax','inv-cbranch','inv-caddr','inv-date','inv-duedate','inv-vat','inv-note'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=(id==='inv-vat'?'0':''); });
   const dt = document.getElementById('inv-date'); if(dt) dt.value = isoToThai(new Date().toISOString().split('T')[0]);
   initInvItems(); initInvPayChips(); renderInvDocNoBar();
@@ -4073,7 +4087,7 @@ function cancelQtEdit(){
   if(!confirm('ยกเลิกการแก้ไข + ล้างฟอร์ม สร้างใบใหม่?')) return;
   _qtEditingDocNo = null;
   qtItems = [];
-  _docFxSet('qt',{});
+  _docFxSet('qt',{}); document.getElementById('qt-price-warn')?.remove();
   ['qt-client','qt-email','qt-ctax','qt-cbranch','qt-caddr','qt-date','qt-vat','qt-note'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=(id==='qt-vat'?'0':''); });
   const dt = document.getElementById('qt-date'); if(dt) dt.value = isoToThai(new Date().toISOString().split('T')[0]);
   initQtItems(); renderQtDocNoBar();
@@ -16569,9 +16583,10 @@ function removeFromSlot(cat,slot,i){if(formSlots[cat]&&formSlots[cat][slot])form
 // Budget: flat/per-project = คงที่ · per-minute = ×ความยาว · per-hour/page/day/episode = ×จำนวนที่กรอก
 const BUDGET_QTY_LABEL = { 'per-hour':'ชั่วโมง', 'per-page':'หน้า', 'per-day':'วัน', 'per-episode':'บท' };
 function calcBudgetTotal(rate, type, dur, qty){
-  if(type==='per-minute') return dur>0 ? rate*dur : rate;
-  if(BUDGET_QTY_LABEL[type]) return rate*(qty||0);
-  return rate; // flat / per-project
+  const r2=n=>Math.round((+n||0)*100)/100;
+  if(type==='per-minute') return r2(dur>0 ? rate*dur : rate);
+  if(BUDGET_QTY_LABEL[type]) return r2(rate*(qty||0));
+  return r2(rate); // flat / per-project
 }
 function toggleBudgetQty(){
   const t=document.getElementById('pj-budget-type')?.value||'flat';
@@ -23396,7 +23411,7 @@ function confirmQtPPAdd(){
       detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '',
       qty: 1,
       unit: 'งาน',
-      price: p.budget||0,
+      price: Math.round((p.budget||0)*100)/100,
       ..._projFxItem(p)
     };
     _docFxAdopt('qt', p);
@@ -26359,7 +26374,7 @@ function editInvoice(docNo){
     renderInvPayChips();
     calcInvTotal();
     try{renderInvDocNoBar();}catch(e){}
-    toast('✏️ โหลดเอกสาร '+docNo+' มาแก้ไข — แก้แล้วกดบันทึกใหม่ (เลขเดิม)','info');
+    toast('✏️ โหลดเอกสาร '+docNo+' มาแก้ไข — แก้แล้วกดบันทึกใหม่ (เลขเดิม)','info'); _docPriceCheck('inv');
   }, 100);
 }
 
@@ -26380,7 +26395,7 @@ function editQuotation(docNo){
     renderQtItems();
     calcQtTotal();
     try{renderQtDocNoBar();}catch(e){}
-    toast('✏️ โหลดเอกสาร '+docNo+' มาแก้ไข — แก้แล้วกดบันทึกใหม่ (เลขเดิม)','info');
+    toast('✏️ โหลดเอกสาร '+docNo+' มาแก้ไข — แก้แล้วกดบันทึกใหม่ (เลขเดิม)','info'); _docPriceCheck('qt');
   }, 100);
 }
 
@@ -29897,7 +29912,7 @@ function confirmInvPPAdd(){
       detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '',
       qty: 1,
       unit: 'งาน',
-      price: p.budget||0,
+      price: Math.round((p.budget||0)*100)/100,
       ..._projFxItem(p)
     };
     _docFxAdopt('inv', p);
@@ -33258,7 +33273,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261026-06"></script><script src="scene/nd-profile.js?v=20261026-06"></script><script src="scene/nd-plan.js?v=20261026-06"></script><script src="scene/nd-docpdf.js?v=20261026-06"></script><script src="scene/nd-acct.js?v=20261026-06"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261026-07"></script><script src="scene/nd-profile.js?v=20261026-07"></script><script src="scene/nd-plan.js?v=20261026-07"></script><script src="scene/nd-docpdf.js?v=20261026-07"></script><script src="scene/nd-acct.js?v=20261026-07"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33268,7 +33283,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261026-06';
+var UPD_BUILD = '20261026-07';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
