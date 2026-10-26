@@ -83,16 +83,19 @@ function preview(rows){
   const hit=new Set(); res.forEach(x=>x.ids.forEach(i=>hit.add(i)));
   const act=P.filter(p=>statusOf(p.s)!=='resigned');
   const miss=act.filter(p=>!hit.has(p.id) && !(p.s.docForm&&p.s.docForm.exempt));
-  const opts=P.slice().sort((a,b)=>String(a.s.nickname).localeCompare(String(b.s.nickname),'th')).map(p=>`<option value="${E(p.id)}">${E(p.s.nickname||'')} · ${E(fullName(p.s))}</option>`).join('');
+  const lab=p=>(p.s.nickname||'')+' · '+fullName(p.s)+(p.cats.length?' ['+p.cats.map(c=>safe(()=>CATS[c].label,c)).join('/')+']':'');
+  const labMap={}; P.forEach(p=>{ labMap[lab(p)]=p.id; });
+  const opts=Object.keys(labMap).sort((a,b)=>a.localeCompare(b,'th')).map(l=>`<option value="${E(l)}"></option>`).join('');
   const row=(x,i)=>{ const r=x.r; const who=x.ids.map(id=>{ const p=P.find(q=>q.id===id); return p?E(p.s.nickname||'')+' · '+E(fullName(p.s)):id; }).join('<br>');
     return `<tr><td>${E(r.nick)}</td><td>${E(r.th||'—')}${r.bad?' <span style="color:var(--orange)">(กรอกเลขบัตรในช่องชื่อ)</span>':''}<div style="font-size:11px;color:var(--text2)">${E(r.email)}</div></td>
-      <td>${x.ids.length?`✅ ${who}<div style="font-size:11px;color:var(--text2)">จับคู่ด้วย${x.how}</div>`:`<select class="df-pick" data-i="${i}" style="max-width:240px;padding:5px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit"><option value="">— ไม่ผูก —</option>${opts}</select>${x.near?'<div style="font-size:11px;color:var(--orange)">ชื่อใกล้เคียง — เลือกไว้ให้แล้ว ตรวจก่อนบันทึก</div>':''}`}</td>
+      <td>${x.ids.length?`✅ ${who}<div style="font-size:11px;color:var(--text2)">จับคู่ด้วย${x.how}</div>`:`<input class="df-pick" data-i="${i}" list="df-dl" autocomplete="off" placeholder="🔍 พิมพ์ชื่อเล่น / ชื่อจริง เพื่อค้นหา (เว้นว่าง = ไม่ผูก)" style="width:100%;max-width:300px;padding:6px 8px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12.5px"><div class="df-pick-ok" style="font-size:11px;margin-top:2px"></div>${x.near?'<div style="font-size:11px;color:var(--orange)">ชื่อใกล้เคียง — เลือกไว้ให้แล้ว ตรวจก่อนบันทึก</div>':''}`}</td>
       <td style="font-size:11px">${[r.contract&&'สัญญา',r.idcopy&&'บัตร',r.bank&&'บัญชี'].filter(Boolean).join(' · ')||'—'}</td></tr>`; };
   const un=res.filter(x=>!x.ids.length).length;
   const ov=document.createElement('div'); ov.id='df-ov'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:4000;display:flex;align-items:center;justify-content:center;padding:14px';
   ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
   ov.innerHTML=`<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;width:min(980px,100%);max-height:90vh;display:flex;flex-direction:column;font-family:Kanit;overflow:hidden">
     <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border2)"><b style="font-size:16px">📋 นำเข้าเอกสารฟรีแลนซ์จากฟอร์ม</b><button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="document.getElementById('df-ov').remove()">✕ ปิด</button></div>
+    <datalist id="df-dl">${opts}</datalist>
     <div style="overflow:auto;padding:12px 16px;flex:1">
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
       <span class="badge" style="padding:6px 10px;border-radius:8px;background:rgba(0,223,160,.12);color:var(--green)">✅ ส่งแล้ว ${hit.size} คน</span>
@@ -107,7 +110,10 @@ function preview(rows){
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--border2);flex-wrap:wrap;background:var(--card)"><span id="df-cnt" style="margin-right:auto;font-size:12px;color:var(--text2);align-self:center"></span><button class="btn btn-sm btn-outline" onclick="DOCFORM.copyMissing()">📋 คัดลอกรายชื่อคนที่ยังไม่ส่ง</button><button class="btn btn-sm btn-blue" id="df-save" onclick="DOCFORM.apply()">💾 บันทึกเข้าเว็บ + เปิดแจ้งเตือนคนที่ยังไม่ส่ง</button></div></div>`;
   document.getElementById('df-ov')?.remove(); document.body.appendChild(ov);
-  res.forEach((x,i)=>{ if(!x.ids.length && x.near && x.near.length===1){ const s=ov.querySelector(`.df-pick[data-i="${i}"]`); if(s) s.value=x.near[0]; } });
+  LAST.labMap=labMap;
+  const chk=inp=>{ const ok=inp.nextElementSibling; const v=inp.value.trim(); if(!ok) return; ok.textContent=!v?'':labMap[v]?'✅ ผูกกับคนนี้':'⚠️ ยังไม่ตรงกับรายชื่อ — เลือกจากรายการที่ขึ้น'; ok.style.color=labMap[v]?'var(--green)':'var(--orange)'; };
+  ov.querySelectorAll('.df-pick').forEach(inp=>{ inp.addEventListener('input',()=>chk(inp)); inp.addEventListener('change',()=>chk(inp)); });
+  res.forEach((x,i)=>{ if(!x.ids.length && x.near && x.near.length===1){ const s=ov.querySelector(`.df-pick[data-i="${i}"]`); const p=P.find(q=>q.id===x.near[0]); if(s&&p){ s.value=lab(p); chk(s); } } });
   LAST.miss=miss;
   const cnt=()=>{ const n=ov.querySelectorAll('.df-ex:checked').length; const c=ov.querySelector('#df-cnt'); if(c) c.textContent='ยังไม่ส่ง '+(miss.length-n)+' คน'+(n?' · ยกเว้น '+n:''); };
   ov.querySelectorAll('.df-ex').forEach(c=>c.addEventListener('change',cnt)); cnt();
@@ -119,7 +125,7 @@ function apply(){
 }
 function applyRun(ov){
   const over=!!ov.querySelector('#df-over')?.checked;
-  ov.querySelectorAll('.df-pick').forEach(s=>{ const x=LAST.res[+s.dataset.i]; if(x && s.value) { x.ids=[s.value]; x.how='เลือกเอง'; } });
+  ov.querySelectorAll('.df-pick').forEach(s=>{ const x=LAST.res[+s.dataset.i]; const id=(LAST.labMap||{})[s.value.trim()]; if(x && id){ x.ids=[id]; x.how='เลือกเอง'; } });
   const ex=new Set([...ov.querySelectorAll('.df-ex:checked')].map(c=>c.value));
   const byId={}; LAST.res.forEach(x=>x.ids.forEach(id=>{ if(!byId[id]||String(byId[id].ts)<String(x.r.ts)) byId[id]=x.r; }));
   const now=new Date().toISOString(), d=getStaffData(); let nS=0, nM=0;
