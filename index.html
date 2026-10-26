@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261026-14"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261026-15"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -1419,6 +1419,10 @@ body.sidebar-collapsed .main-content{
     <div class="section-card" style="margin-bottom:14px">
      <div class="set-head"><span class="set-ico">🩺</span><div><div class="set-title">ตรวจสอบข้อมูลทีมงาน</div><div class="set-sub">ใช้เมื่อทีมงานเห็นงานไม่ครบ · ชื่อซ้ำ · หรือขึ้นว่าบัญชียังไม่ผูกกับข้อมูลทีม — กดสแกนดูผลก่อนเสมอ ยังไม่แก้อะไรจนกว่าจะยืนยัน</div></div></div>
 
+     <div class="set-toolrow">
+      <div style="flex:1;min-width:190px"><div class="set-toolname">💾 พื้นที่เก็บข้อมูลในเบราว์เซอร์</div><div class="set-toolsub">เว็บเก็บสำเนาข้อมูลไว้ในเครื่องเพื่อให้เปิดเร็ว (จุได้ราว 5MB) · ถ้าเต็ม กดล้างสำเนาที่ดาวน์โหลดใหม่ได้ ข้อมูลจริงบนระบบไม่หาย</div><div id="ls-usage" class="set-toolres" style="margin-top:4px"></div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="lsUsageShow()">ดูการใช้พื้นที่</button><button class="btn btn-sm btn-blue" onclick="lsCleanCache()">🧹 ล้างสำเนา + โหลดใหม่</button></div>
+     </div>
      <div class="set-toolrow">
       <div style="flex:1;min-width:190px"><div class="set-toolname">📋 เอกสารฟรีแลนซ์ (สัญญา · สำเนาบัตร · สำเนาบัญชี)</div><div class="set-toolsub">ดึงคำตอบจากฟอร์ม → จับคู่ด้วยชื่อจริง-นามสกุล → เติมเลขบัตร/ที่อยู่/ลิงก์เอกสารเข้าโปรไฟล์ · คนที่ยังไม่ส่งจะเห็นแถบแดงบนหัวเว็บ</div><div id="docform-status"></div></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-blue" onclick="DOCFORM.fromSheet()">🔄 ดึงจากชีทฟอร์ม</button><button class="btn btn-sm btn-outline" onclick="DOCFORM.fromCSV()">📄 อัปโหลด CSV</button></div>
@@ -3936,16 +3940,32 @@ function _cleanStaffRec(s){
 }
 // แคชสำรองในหน่วยความจำ — ใช้เมื่อ localStorage เต็ม
 const _lsMem={}; let _lsFullWarned=false;
+// 🗑️ คีย์เก่าที่ไม่มีโค้ดไหนอ่านแล้ว (สำเนาโปรเจกต์ทั้งก้อน 2 ชุด ซ้ำกับ projects_cache) — ไม่เขียนอีก + ลบทิ้งตอนเปิดเว็บ
+const _LS_DEAD=['projects','projects_v3'];
+try{ _LS_DEAD.forEach(k=>localStorage.removeItem('guin3_'+k)); }catch(e){}
 function ls(k,v){
+  if(v!==undefined && _LS_DEAD.includes(k)){ window.dispatchEvent(new CustomEvent('guindatachange',{detail:{key:k}})); return; }
   if(v===undefined){ if(Object.prototype.hasOwnProperty.call(_lsMem,k)){ try{ return JSON.parse(_lsMem[k]); }catch{ return null; } } try{return JSON.parse(localStorage.getItem('guin3_'+k))}catch{return null}}
   if(k==='staff_v3' && _staffPriv) v=_staffMergePriv(v);   // 🔒 รวมข้อมูลส่วนตัว (แอดมิน/เจ้าตัว) กลับเข้าทะเบียนในเครื่อง
   const _sv=JSON.stringify(v);
   try{ localStorage.setItem('guin3_'+k,_sv); delete _lsMem[k]; }
   catch(e){   // 💾 พื้นที่เก็บในเบราว์เซอร์เต็ม (~5MB) → เก็บไว้ในหน่วยความจำแทน งานไม่สะดุด (ข้อมูลจริงอยู่บน Firebase)
     _lsMem[k]=_sv; try{ localStorage.removeItem('guin3_'+k); }catch(_){}   // ลบสำเนาเก่าในเครื่อง กันเปิดใหม่แล้วได้ข้อมูลเก่า
-    if(!_lsFullWarned){ _lsFullWarned=true; console.warn('localStorage full:',k,e); try{ toast('💾 พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม — ระบบใช้งานต่อได้ตามปกติ (ข้อมูลบันทึกขึ้นระบบแล้ว)','info'); }catch(_){} } }
+    if(!_lsFullWarned){ _lsFullWarned=true; console.warn('localStorage full:',k,e); try{ toast('💾 พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม — ใช้งานต่อได้ตามปกติ · ถ้าอยากเคลียร์: ⚙️ ตั้งค่า › เครื่องมือ › 🧹 ล้างสำเนา','info'); }catch(_){} } }
   window.dispatchEvent(new CustomEvent('guindatachange',{detail:{key:k}}));
 }
+// 💾 การใช้พื้นที่ localStorage · ล้างเฉพาะสำเนาที่โหลดกลับจาก Firebase ได้ (ฉบับร่าง/ตะกร้า/ตั้งค่าในเครื่องไม่แตะ)
+const _LS_REFETCH=['projects_cache','staff_v3','docs_vouchers','docs_quotations','docs_invoices','docs_receipts','docs_history','wht_docs','trk_cards_v3','mgr_users_cache','audit_local','backup_history','fx_cache','payroll_runs','company_expenses','clients'];
+function lsUsage(){ const L=[]; let tot=0; try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i), v=localStorage.getItem(k)||''; const b=(k.length+v.length)*2; tot+=b; L.push({k, b}); } }catch(e){}
+  return {tot, L:L.sort((a,b)=>b.b-a.b)}; }
+function lsUsageShow(){ const el=document.getElementById('ls-usage'); if(!el) return; const u=lsUsage(), mb=b=>(b/1048576).toFixed(2)+' MB', lim=5*1048576;
+  el.innerHTML=`<div style="font-size:12.5px;margin-bottom:6px">ใช้ไป <b style="color:${u.tot>lim*.9?'var(--red)':'var(--accent2)'}">${mb(u.tot)}</b> จากประมาณ 5 MB</div><div style="height:8px;border-radius:4px;background:var(--bg2);overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${Math.min(100,u.tot/lim*100)}%;background:${u.tot>lim*.9?'var(--red)':'var(--accent2)'}"></div></div>`+
+    u.L.slice(0,12).map(x=>{ const k=x.k.replace(/^guin3_/,''); const re=_LS_REFETCH.includes(k); return `<div style="display:flex;gap:8px;font-size:12px;padding:2px 0"><span style="flex:1;font-family:monospace">${esc(k)}</span><span style="color:${re?'var(--green)':'var(--text2)'}">${re?'🔄 โหลดใหม่ได้':'เก็บในเครื่อง'}</span><b style="width:70px;text-align:right">${mb(x.b)}</b></div>`; }).join(''); }
+function lsCleanCache(){ if(!_fbDatabase){ toast('ยังไม่ได้เชื่อมต่อระบบ — ล้างตอนนี้ไม่ได้ (กันข้อมูลหาย)','warn'); return; }
+  const u=lsUsage(); const rm=u.L.filter(x=>_LS_REFETCH.includes(x.k.replace(/^guin3_/,'')));
+  const sz=rm.reduce((a,x)=>a+x.b,0);
+  if(!confirm('ล้างสำเนาข้อมูลในเบราว์เซอร์ '+(sz/1048576).toFixed(2)+' MB แล้วโหลดหน้าใหม่?\n\n• ข้อมูลจริงบนระบบไม่หาย — เว็บจะดาวน์โหลดกลับมาให้เอง\n• ฉบับร่าง / ตะกร้า / การตั้งค่าในเครื่อง ไม่ถูกลบ')) return;
+  rm.forEach(x=>{ try{ localStorage.removeItem(x.k); }catch(e){} }); toast('🧹 ล้างแล้ว กำลังโหลดใหม่…','success'); setTimeout(()=>location.reload(), 600); }
 let voucherSeq=parseInt(ls('voucher_seq')||'0');
 async function nextVoucherNoAsync(){
   const _today = _todayDDMM();
@@ -31011,7 +31031,7 @@ async function confirmRestore(){
   try {
     const d = data.data;
     // Restore to localStorage
-    if(d.projects)        ls('projects_v3', d.projects);
+    if(d.projects)        ls('projects_cache', d.projects);
     if(d.staff)           ls('staff_v3', d.staff);
     if(d.paymentAccounts) ls('payment_accounts_v1', d.paymentAccounts);
     if(d.docs_invoices)   ls('docs_invoices', d.docs_invoices);
@@ -33331,7 +33351,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261026-14"></script><script src="scene/nd-profile.js?v=20261026-14"></script><script src="scene/nd-plan.js?v=20261026-14"></script><script src="scene/nd-docform.js?v=20261026-14"></script><script src="scene/nd-docpdf.js?v=20261026-14"></script><script src="scene/nd-acct.js?v=20261026-14"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261026-15"></script><script src="scene/nd-profile.js?v=20261026-15"></script><script src="scene/nd-plan.js?v=20261026-15"></script><script src="scene/nd-docform.js?v=20261026-15"></script><script src="scene/nd-docpdf.js?v=20261026-15"></script><script src="scene/nd-acct.js?v=20261026-15"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33341,7 +33361,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261026-14';
+var UPD_BUILD = '20261026-15';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
