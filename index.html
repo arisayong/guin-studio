@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261026-13"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261026-14"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -3934,10 +3934,16 @@ function _cleanStaffRec(s){
   if(typeof o.email==='string') o.email=cleanStr(o.email,120);
   return o;
 }
+// แคชสำรองในหน่วยความจำ — ใช้เมื่อ localStorage เต็ม
+const _lsMem={}; let _lsFullWarned=false;
 function ls(k,v){
-  if(v===undefined){try{return JSON.parse(localStorage.getItem('guin3_'+k))}catch{return null}}
+  if(v===undefined){ if(Object.prototype.hasOwnProperty.call(_lsMem,k)){ try{ return JSON.parse(_lsMem[k]); }catch{ return null; } } try{return JSON.parse(localStorage.getItem('guin3_'+k))}catch{return null}}
   if(k==='staff_v3' && _staffPriv) v=_staffMergePriv(v);   // 🔒 รวมข้อมูลส่วนตัว (แอดมิน/เจ้าตัว) กลับเข้าทะเบียนในเครื่อง
-  localStorage.setItem('guin3_'+k,JSON.stringify(v));
+  const _sv=JSON.stringify(v);
+  try{ localStorage.setItem('guin3_'+k,_sv); delete _lsMem[k]; }
+  catch(e){   // 💾 พื้นที่เก็บในเบราว์เซอร์เต็ม (~5MB) → เก็บไว้ในหน่วยความจำแทน งานไม่สะดุด (ข้อมูลจริงอยู่บน Firebase)
+    _lsMem[k]=_sv; try{ localStorage.removeItem('guin3_'+k); }catch(_){}   // ลบสำเนาเก่าในเครื่อง กันเปิดใหม่แล้วได้ข้อมูลเก่า
+    if(!_lsFullWarned){ _lsFullWarned=true; console.warn('localStorage full:',k,e); try{ toast('💾 พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม — ระบบใช้งานต่อได้ตามปกติ (ข้อมูลบันทึกขึ้นระบบแล้ว)','info'); }catch(_){} } }
   window.dispatchEvent(new CustomEvent('guindatachange',{detail:{key:k}}));
 }
 let voucherSeq=parseInt(ls('voucher_seq')||'0');
@@ -33325,7 +33331,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261026-13"></script><script src="scene/nd-profile.js?v=20261026-13"></script><script src="scene/nd-plan.js?v=20261026-13"></script><script src="scene/nd-docform.js?v=20261026-13"></script><script src="scene/nd-docpdf.js?v=20261026-13"></script><script src="scene/nd-acct.js?v=20261026-13"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261026-14"></script><script src="scene/nd-profile.js?v=20261026-14"></script><script src="scene/nd-plan.js?v=20261026-14"></script><script src="scene/nd-docform.js?v=20261026-14"></script><script src="scene/nd-docpdf.js?v=20261026-14"></script><script src="scene/nd-acct.js?v=20261026-14"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33335,7 +33341,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261026-13';
+var UPD_BUILD = '20261026-14';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
