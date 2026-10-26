@@ -179,6 +179,8 @@ function sideHTML(){
     <span class="ndp-stat ${filled?'ok':''}">${filled?'✓ ข้อมูลหลักครบ':'กรอกข้อมูลยังไม่ครบ'}</span>
     <hr><div class="k">Discord</div>${dcListHTML(v)}
     <hr><div class="k">โรล / ตำแหน่งงาน</div><div class="ndp-roles sm">${ST.roles.map(c=>`<span class="ndp-rchip on" style="--c:${catColor(c)}">${esc(catLabel(c))}</span>`).join('')||'<span class="muted">—</span>'}</div>
+    ${ST.mode==='admin'&&ST.staff?(()=>{ const st=ST.staff, df=st.docForm||null; const L=[['📄 สัญญา','docContract'],['🪪 สำเนาบัตร','docIdCopy'],['🏦 สำเนาบัญชี','docBankCopy']].filter(([,k])=>st[k]);
+      return `<hr><div class="k">เอกสารฟรีแลนซ์</div><div class="ro">${df&&df.sent?'✅ ส่งแล้ว'+(df.at?' · '+new Date(df.at).toLocaleDateString('th-TH',{dateStyle:'medium'}):''):df&&df.exempt?'— ยกเว้น':df?'<span style="color:#FF6060">❌ ยังไม่ส่ง</span>':'<span class="muted">ยังไม่ได้ตรวจ</span>'}</div>${L.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">${L.map(([l,k])=>`<a class="btn btn-outline btn-sm" href="${esc(st[k])}" target="_blank" rel="noopener">${l}</a>`).join('')}</div>`:''}`; })():''}
     <hr><div class="k">อัปเดตล่าสุด</div><div class="ro">${updated?new Date(updated).toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'}):'—'}</div>
     ${ST.mode==='admin'&&ST.staff?`<hr><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">
       <button class="btn btn-outline btn-sm" type="button" style="border-color:rgba(255,64,64,.35);color:#FF6060" onclick="teamWarn('${esc(ST.staff.id)}')">✉️ ออกใบเตือน</button>

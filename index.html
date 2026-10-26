@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261026-10"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261026-11"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -1419,6 +1419,10 @@ body.sidebar-collapsed .main-content{
     <div class="section-card" style="margin-bottom:14px">
      <div class="set-head"><span class="set-ico">🩺</span><div><div class="set-title">ตรวจสอบข้อมูลทีมงาน</div><div class="set-sub">ใช้เมื่อทีมงานเห็นงานไม่ครบ · ชื่อซ้ำ · หรือขึ้นว่าบัญชียังไม่ผูกกับข้อมูลทีม — กดสแกนดูผลก่อนเสมอ ยังไม่แก้อะไรจนกว่าจะยืนยัน</div></div></div>
 
+     <div class="set-toolrow">
+      <div style="flex:1;min-width:190px"><div class="set-toolname">📋 เอกสารฟรีแลนซ์ (สัญญา · สำเนาบัตร · สำเนาบัญชี)</div><div class="set-toolsub">ดึงคำตอบจากฟอร์ม → จับคู่ด้วยชื่อจริง-นามสกุล → เติมเลขบัตร/ที่อยู่/ลิงก์เอกสารเข้าโปรไฟล์ · คนที่ยังไม่ส่งจะเห็นแถบแดงบนหัวเว็บ</div><div id="docform-status"></div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-blue" onclick="DOCFORM.fromSheet()">🔄 ดึงจากชีทฟอร์ม</button><button class="btn btn-sm btn-outline" onclick="DOCFORM.fromCSV()">📄 อัปโหลด CSV</button></div>
+     </div>
      <div class="set-toolrow">
       <div style="flex:1;min-width:190px"><div class="set-toolname">👥 สมาชิกซ้ำ</div><div class="set-toolsub">คนเดียวกันมีหลายรายชื่อ (อีเมล/เบอร์/ชื่อตรงกัน) → รวมเป็นรายการเดียว</div></div>
       <button class="btn btn-sm btn-outline" onclick="findDuplicateStaff()">สแกน</button>
@@ -4230,7 +4234,7 @@ function getStaffById(id){return getAllStaff().find(s=>s.id===id)}
 // ══════════════════════════════════════════════
 var _staffPriv = null;      // { staffId: {bank, account, ..., profile:{taxId, addr, ...}} }
 var _privSplitOn = false;   // true = ทะเบียนทีมบน Firebase ไม่เก็บข้อมูลส่วนตัวแล้ว
-const _PRIV_TOP=['bank','account','accName','promptpay','qrUrl','payType','taxId','addr','moo','sub','dist','prov','zip','birth','adminPhoto','adminPhotoAt'];
+const _PRIV_TOP=['bank','account','accName','promptpay','qrUrl','payType','taxId','addr','moo','sub','dist','prov','zip','birth','adminPhoto','adminPhotoAt','docContract','docIdCopy','docBankCopy'];
 const _PRIV_PF=['bank','account','accName','promptpay','qrUrl','payType','taxId','addr','moo','sub','dist','prov','zip','birth'];
 const _privHas=v=>v!==undefined && v!==null && v!=='';
 // 📞 เบอร์โทรให้เมเนเจอร์เห็นได้ — หลายคนเก็บเบอร์ไว้ในช่อง "เบอร์ / พร้อมเพย์" (ข้อมูลส่วนตัว เมเนเจอร์อ่านไม่ได้)
@@ -33321,7 +33325,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261026-10"></script><script src="scene/nd-profile.js?v=20261026-10"></script><script src="scene/nd-plan.js?v=20261026-10"></script><script src="scene/nd-docpdf.js?v=20261026-10"></script><script src="scene/nd-acct.js?v=20261026-10"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261026-11"></script><script src="scene/nd-profile.js?v=20261026-11"></script><script src="scene/nd-plan.js?v=20261026-11"></script><script src="scene/nd-docform.js?v=20261026-11"></script><script src="scene/nd-docpdf.js?v=20261026-11"></script><script src="scene/nd-acct.js?v=20261026-11"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33331,7 +33335,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261026-10';
+var UPD_BUILD = '20261026-11';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
