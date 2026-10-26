@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261026-15"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261026-16"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -1421,7 +1421,7 @@ body.sidebar-collapsed .main-content{
 
      <div class="set-toolrow">
       <div style="flex:1;min-width:190px"><div class="set-toolname">💾 พื้นที่เก็บข้อมูลในเบราว์เซอร์</div><div class="set-toolsub">เว็บเก็บสำเนาข้อมูลไว้ในเครื่องเพื่อให้เปิดเร็ว (จุได้ราว 5MB) · ถ้าเต็ม กดล้างสำเนาที่ดาวน์โหลดใหม่ได้ ข้อมูลจริงบนระบบไม่หาย</div><div id="ls-usage" class="set-toolres" style="margin-top:4px"></div></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="lsUsageShow()">ดูการใช้พื้นที่</button><button class="btn btn-sm btn-blue" onclick="lsCleanCache()">🧹 ล้างสำเนา + โหลดใหม่</button></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="lsUsageShow()">ดูการใช้พื้นที่</button><button class="btn btn-sm btn-blue" onclick="lsCleanCache()">🧹 ล้างที่เลือก + โหลดใหม่</button></div>
      </div>
      <div class="set-toolrow">
       <div style="flex:1;min-width:190px"><div class="set-toolname">📋 เอกสารฟรีแลนซ์ (สัญญา · สำเนาบัตร · สำเนาบัญชี)</div><div class="set-toolsub">ดึงคำตอบจากฟอร์ม → จับคู่ด้วยชื่อจริง-นามสกุล → เติมเลขบัตร/ที่อยู่/ลิงก์เอกสารเข้าโปรไฟล์ · คนที่ยังไม่ส่งจะเห็นแถบแดงบนหัวเว็บ</div><div id="docform-status"></div></div>
@@ -3954,17 +3954,34 @@ function ls(k,v){
     if(!_lsFullWarned){ _lsFullWarned=true; console.warn('localStorage full:',k,e); try{ toast('💾 พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม — ใช้งานต่อได้ตามปกติ · ถ้าอยากเคลียร์: ⚙️ ตั้งค่า › เครื่องมือ › 🧹 ล้างสำเนา','info'); }catch(_){} } }
   window.dispatchEvent(new CustomEvent('guindatachange',{detail:{key:k}}));
 }
-// 💾 การใช้พื้นที่ localStorage · ล้างเฉพาะสำเนาที่โหลดกลับจาก Firebase ได้ (ฉบับร่าง/ตะกร้า/ตั้งค่าในเครื่องไม่แตะ)
-const _LS_REFETCH=['projects_cache','staff_v3','docs_vouchers','docs_quotations','docs_invoices','docs_receipts','docs_history','wht_docs','trk_cards_v3','mgr_users_cache','audit_local','backup_history','fx_cache','payroll_runs','company_expenses','clients'];
-function lsUsage(){ const L=[]; let tot=0; try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i), v=localStorage.getItem(k)||''; const b=(k.length+v.length)*2; tot+=b; L.push({k, b}); } }catch(e){}
-  return {tot, L:L.sort((a,b)=>b.b-a.b)}; }
-function lsUsageShow(){ const el=document.getElementById('ls-usage'); if(!el) return; const u=lsUsage(), mb=b=>(b/1048576).toFixed(2)+' MB', lim=5*1048576;
-  el.innerHTML=`<div style="font-size:12.5px;margin-bottom:6px">ใช้ไป <b style="color:${u.tot>lim*.9?'var(--red)':'var(--accent2)'}">${mb(u.tot)}</b> จากประมาณ 5 MB</div><div style="height:8px;border-radius:4px;background:var(--bg2);overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${Math.min(100,u.tot/lim*100)}%;background:${u.tot>lim*.9?'var(--red)':'var(--accent2)'}"></div></div>`+
-    u.L.slice(0,12).map(x=>{ const k=x.k.replace(/^guin3_/,''); const re=_LS_REFETCH.includes(k); return `<div style="display:flex;gap:8px;font-size:12px;padding:2px 0"><span style="flex:1;font-family:monospace">${esc(k)}</span><span style="color:${re?'var(--green)':'var(--text2)'}">${re?'🔄 โหลดใหม่ได้':'เก็บในเครื่อง'}</span><b style="width:70px;text-align:right">${mb(x.b)}</b></div>`; }).join(''); }
-function lsCleanCache(){ if(!_fbDatabase){ toast('ยังไม่ได้เชื่อมต่อระบบ — ล้างตอนนี้ไม่ได้ (กันข้อมูลหาย)','warn'); return; }
-  const u=lsUsage(); const rm=u.L.filter(x=>_LS_REFETCH.includes(x.k.replace(/^guin3_/,'')));
-  const sz=rm.reduce((a,x)=>a+x.b,0);
-  if(!confirm('ล้างสำเนาข้อมูลในเบราว์เซอร์ '+(sz/1048576).toFixed(2)+' MB แล้วโหลดหน้าใหม่?\n\n• ข้อมูลจริงบนระบบไม่หาย — เว็บจะดาวน์โหลดกลับมาให้เอง\n• ฉบับร่าง / ตะกร้า / การตั้งค่าในเครื่อง ไม่ถูกลบ')) return;
+// 💾 การใช้พื้นที่ localStorage (เบราว์เซอร์จำกัด ~5.2 ล้านตัวอักษรต่อเว็บ) · ล้างได้ 3 กลุ่ม — ไม่แตะฉบับร่าง/ตะกร้า/ตั้งค่าในเครื่อง
+const _LS_LIMIT=5242880;
+const _LS_REFETCH=['projects_cache','staff_v3','docs_vouchers','docs_quotations','docs_invoices','docs_receipts','docs_history','wht_docs','trk_cards_v3','mgr_users_cache','audit_local','backup_history','fx_cache','payroll_runs','payroll_profiles','company_expenses','clients','payment_accounts_v1','admin_signature','mgr_requests','payreqs','discord_cfg'];
+const _LS_BACKUP=['_bulk_merge_backup_','_merge_dup_backup_','_rescue_backup_','audit_backup_'];
+function _lsGroup(k){ k=k.replace(/^guin3_/,'');
+  if(_LS_REFETCH.includes(k)) return 'refetch';
+  if(_LS_BACKUP.some(p=>k.startsWith(p))) return 'backup';
+  const m=k.match(/^billing_(doc|slip)_.+_(\d{4})_(\d{1,2})_\d+$/);
+  if(m){ const now=new Date(), age=(now.getFullYear()-(+m[2]))*12+(now.getMonth()+1-(+m[3])); return age>=2?'oldbill':'bill'; }
+  return 'local'; }
+const _LS_GLABEL={refetch:['🔄 สำเนาข้อมูลจากระบบ','ลบได้ เปิดเว็บใหม่จะโหลดกลับมาเอง','var(--green)'], backup:['🗄️ แบ็กอัพชั่วคราว (ตอนรวมรายชื่อซ้ำ ฯลฯ)','ลบได้ ข้อมูลจริงอยู่บนระบบแล้ว','var(--green)'],
+  oldbill:['📎 ไฟล์แนบใบวางบิลเดือนเก่า','ลบได้ ไฟล์จริงอัปขึ้น Drive แล้ว · ลบแค่ตัวอย่างในเครื่อง','var(--orange)'], bill:['📎 ไฟล์แนบใบวางบิลเดือนนี้','เก็บไว้','var(--text2)'], local:['⚙️ ฉบับร่าง / ตั้งค่าในเครื่อง','เก็บไว้ ไม่ลบ','var(--text2)']};
+function lsUsage(){ const L=[]; let tot=0; try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i), v=localStorage.getItem(k)||''; const n=k.length+v.length; tot+=n; L.push({k, n, g:_lsGroup(k)}); } }catch(e){}
+  return {tot, L:L.sort((a,b)=>b.n-a.n)}; }
+function lsUsageShow(){ const el=document.getElementById('ls-usage'); if(!el) return; const u=lsUsage(), pct=Math.min(100,Math.round(u.tot/_LS_LIMIT*100)), mb=n=>(n*2/1048576).toFixed(2)+' MB';
+  const G={}; u.L.forEach(x=>{ (G[x.g]=G[x.g]||{n:0,c:0}); G[x.g].n+=x.n; G[x.g].c++; });
+  const col=pct>=90?'var(--red)':pct>=70?'var(--orange)':'var(--green)';
+  el.innerHTML=`<div style="font-size:12.5px;margin-bottom:6px">ใช้ไป <b style="color:${col}">${pct}%</b> ของพื้นที่ที่เบราว์เซอร์ให้ <span style="color:var(--text2)">(${mb(u.tot)})</span>${pct>=90?' — <b style="color:var(--red)">ใกล้เต็ม แนะนำให้ล้าง</b>':''}</div>
+    <div style="height:8px;border-radius:4px;background:var(--bg2);overflow:hidden;margin-bottom:10px"><div style="height:100%;width:${pct}%;background:${col}"></div></div>
+    ${['refetch','backup','oldbill','bill','local'].filter(g=>G[g]).map(g=>{ const [t,d,c]=_LS_GLABEL[g], can=['refetch','backup','oldbill'].includes(g);
+      return `<label style="display:flex;gap:8px;align-items:center;font-size:12.5px;padding:5px 0;border-top:1px solid var(--border2)">${can?`<input type="checkbox" class="ls-g" value="${g}" checked>`:'<span style="width:13px"></span>'}<span style="flex:1"><b>${t}</b> <span style="color:${c}">· ${d}</span> <span style="color:var(--text2)">(${G[g].c} รายการ)</span></span><b style="width:76px;text-align:right">${Math.round(G[g].n/_LS_LIMIT*100)}%</b></label>`; }).join('')}
+    <details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px;color:var(--text2)">รายการที่ใหญ่ที่สุด</summary>${u.L.slice(0,15).map(x=>`<div style="display:flex;gap:8px;font-size:11.5px;padding:1px 0"><span style="flex:1;font-family:monospace">${esc(x.k.replace(/^guin3_/,''))}</span><span style="color:var(--text2)">${_LS_GLABEL[x.g][0]}</span><b style="width:60px;text-align:right">${mb(x.n)}</b></div>`).join('')}</details>`; }
+function lsCleanCache(){
+  const el=document.getElementById('ls-usage'); if(!el || !el.querySelector('.ls-g')){ lsUsageShow(); toast('เลือกกลุ่มที่จะล้าง แล้วกด 🧹 อีกครั้ง','info'); return; }
+  const gs=[...el.querySelectorAll('.ls-g:checked')].map(c=>c.value); if(!gs.length){ toast('ยังไม่ได้เลือกกลุ่มที่จะล้าง','warn'); return; }
+  if(gs.includes('refetch') && !_fbDatabase){ toast('ยังไม่ได้เชื่อมต่อระบบ — ล้างสำเนาข้อมูลตอนนี้ไม่ได้ (กันข้อมูลหาย)','warn'); return; }
+  const rm=lsUsage().L.filter(x=>gs.includes(x.g)); const pct=Math.round(rm.reduce((a,x)=>a+x.n,0)/_LS_LIMIT*100);
+  if(!confirm('ล้างข้อมูลในเบราว์เซอร์ '+rm.length+' รายการ (คืนพื้นที่ประมาณ '+pct+'%) แล้วโหลดหน้าใหม่?\n\n• ข้อมูลจริงบนระบบไม่หาย\n• ฉบับร่าง / ตะกร้า / การตั้งค่าในเครื่อง ไม่ถูกลบ')) return;
   rm.forEach(x=>{ try{ localStorage.removeItem(x.k); }catch(e){} }); toast('🧹 ล้างแล้ว กำลังโหลดใหม่…','success'); setTimeout(()=>location.reload(), 600); }
 let voucherSeq=parseInt(ls('voucher_seq')||'0');
 async function nextVoucherNoAsync(){
@@ -33351,7 +33368,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261026-15"></script><script src="scene/nd-profile.js?v=20261026-15"></script><script src="scene/nd-plan.js?v=20261026-15"></script><script src="scene/nd-docform.js?v=20261026-15"></script><script src="scene/nd-docpdf.js?v=20261026-15"></script><script src="scene/nd-acct.js?v=20261026-15"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261026-16"></script><script src="scene/nd-profile.js?v=20261026-16"></script><script src="scene/nd-plan.js?v=20261026-16"></script><script src="scene/nd-docform.js?v=20261026-16"></script><script src="scene/nd-docpdf.js?v=20261026-16"></script><script src="scene/nd-acct.js?v=20261026-16"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33361,7 +33378,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261026-15';
+var UPD_BUILD = '20261026-16';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
