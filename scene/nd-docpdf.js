@@ -39,7 +39,12 @@ function fxText(n,c){ const [m,s]=CURN[c]||[c,'Cents']; const w=engText(Math.flo
 const words=n=>CUR!=='THB'?fxText(n,CUR):LG==='th'?bahtText(n):LG==='en'?engText(n):bahtText(n)+'<br><span class="gd-en">'+engText(n)+'</span>';
 // วันที่ → วว/ดด/ปปปป(พ.ศ.) · รับได้ทั้ง 2026-10-22 และ 22/10/2026 หรือ 22/10/2569 (ช่องวันที่ในเว็บมีหลายแบบ)
 const isoOf=d=>{ const s=String(d||'').trim(); let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m){ let y=+m[1]; if(y>2400) y-=543; return `${y}-${m[2]}-${m[3]}`; } m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m){ let y=+m[3]; if(y>2400) y-=543; return `${y}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`; } return ''; };
-const thDate=d=>{ const i=isoOf(d); if(!i) return E(d||''); const [y,mo,da]=i.split('-'); return `${da}/${mo}/${+y+543}`; };
+const thDate=d=>{ const i=isoOf(d); if(!i) return E(d||''); const [y,mo,da]=i.split('-'); return `${da}/${mo}/${LG==='en'?+y:+y+543}`; };
+// หน่วย / รายละเอียดที่ระบบเติมให้ (ภาษาไทย) → อังกฤษ ในเอกสารภาษาอังกฤษ
+const UNIT_EN={'งาน':'Job','ชิ้น':'Piece','ตอน':'Episode','นาที':'Minute','ชั่วโมง':'Hour','ชม.':'Hour','หน้า':'Page','วัน':'Day','เรื่อง':'Title','บท':'Script','เดือน':'Month','ครั้ง':'Time','โปรเจกต์':'Project','ชุด':'Set','รายการ':'Item','คน':'Person','เสียง':'Voice','ไฟล์':'File'};
+const unitL=u=>{ u=String(u||'').trim(); const en=UNIT_EN[u]; return !en||LG==='th'?E(u):LG==='en'?en:E(u)+'<br><span class="gd-en">'+en+'</span>'; };
+const detEn=t=>String(t||'').replace(/ความยาว\s*([\d.,]+)\s*นาที/g,'Duration $1 min').replace(/([\d.,]+)\s*ตอน/g,'$1 episodes').replace(/([\d.,]+)\s*นาที/g,'$1 min');
+const detL=t=>{ if(!t) return ''; const en=detEn(t); return LG==='th'||en===t?E(t):LG==='en'?E(en):E(t)+' <span class="gd-en">/ '+E(en)+'</span>'; };
 
 // ── CSS (ใส่ครั้งเดียว · ทุกคลาสขึ้นต้น gd- ไม่ชนกับเว็บ) ──
 const CSS=`
@@ -223,7 +228,7 @@ async function salesPages(kind, d){ await prep(); const A=await assets(); LG=(d&
   const qn=x=>(+x.qty||1), r2=n=>Math.round((+n||0)*100)/100, up=x=>FX?(x.fxUnit!=null?+x.fxUnit:r2((+x.price||0)/d.fxRate)):(+x.price||0);   // ราคาต่อหน่วยในสกุลเอกสาร
   const [th,en]=KIND[kind]||KIND.invoice, sub=r2((d.items||[]).reduce((a,x)=>a+qn(x)*up(x),0));
   const vp=+d.vat||0, vat=vp?(FX?r2(sub*vp/100):Math.round(sub*vp/100)):0, grand=FX?r2(sub+vat):(d.total!=null?+d.total:sub+vat), dt=thDate(d.date);
-  const rows=(d.items||[]).map((x,i)=>[String(i+1), E(x.desc||'')+(x.detail?`<div class="sub">${E(x.detail)}</div>`:''), B(qn(x)).replace(/\.00$/,''), E(x.unit||''), B(up(x)), B(qn(x)*up(x))]);
+  const rows=(d.items||[]).map((x,i)=>[String(i+1), E(x.desc||'')+(x.detail?`<div class="sub">${detL(x.detail)}</div>`:''), B(qn(x)).replace(/\.00$/,''), unitL(x.unit), B(up(x)), B(qn(x)*up(x))]);
   const fxNote=FX?L('อัตราแลกเปลี่ยน','Exchange rate')+` 1 ${E(CUR)} = ${(+d.fxRate).toLocaleString('en-US',{maximumFractionDigits:4})} THB`+(d.fxDate?` (${thDate(d.fxDate)})`:'')+` · ${L('เทียบเท่า','Equivalent to')} ${B((()=>{ const t=(d.items||[]).reduce((a,x)=>a+qn(x)*(+x.price||0),0); return r2(t+(vp?Math.round(t*vp/100):0)); })())} THB`:'';
   const cols=[['#','No.','c','8mm'],['รายละเอียด','Description'],['จำนวน','Qty','r','16mm'],['หน่วย','Unit','c','16mm'],['ราคาต่อหน่วย'+(FX?' ('+CUR+')':''),'Unit Price'+(FX?' ('+CUR+')':''),'r','25mm'],['จำนวนเงิน'+(FX?' ('+CUR+')':''),'Amount'+(FX?' ('+CUR+')':''),'r','27mm']];
   const copies=kind==='receipt'?[L('ต้นฉบับ','Original'),L('สำเนา','Copy')]:[L('ต้นฉบับ','Original')];
