@@ -7,7 +7,8 @@
            s.docContract / s.docIdCopy / s.docBankCopy (ลิงก์เอกสาร · แยกไป staffPrivate ตามระบบเดิม)
    ══════════════════════════════════════════════════════════════ */
 (function(){
-const FORM_URL='https://forms.gle/nFFKRsLx7yeRMPrx9';
+const FORM_URL='https://forms.gle/nFFKRsLx7yeRMPrx9';   // ฟอร์มเอกสารของสมาชิกเก่า (Freelance Agreement)
+const REG_URL='https://docs.google.com/forms/d/1h9xZH0D4UavtfTecPLPRJ6r8kbOUFb56xxFsx2twsjA/viewform';   // ฟอร์มสมัครทีมหลัก (สมาชิกใหม่)
 const SHEET_DEF='1ofc8RhVS3zDoI6IczvfhGzlTq2Qp1-Xkhz7i1CICZaw';
 const E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safe=(f,d)=>{ try{ const v=f(); return v==null?d:v; }catch(e){ return d; } };
@@ -168,7 +169,8 @@ function banner(){
   if(u && u.role!=='admin' && u.staffId){
     const mine=safe(()=>getAllStaff(),[]).filter(s=>s.id===u.staffId);
     const need=mine.length && mine.some(s=>s.docForm && s.docForm.sent===false && !s.docForm.exempt) && !mine.some(s=>s.docForm&&(s.docForm.sent||s.docForm.exempt));
-    if(need) html=`⚠️ <b>คุณยังไม่ได้ส่งเอกสารสัญญา / สำเนาบัตรประชาชน / สำเนาบัญชี</b> — กรุณาส่งฟอร์มเอกสารที่ <a href="${FORM_URL}" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline;font-weight:800">${FORM_URL}</a>`;
+    const viaReg=mine.some(s=>s.regForm), url=viaReg?REG_URL:FORM_URL;   // สมัครผ่านฟอร์มใหม่ → ส่งฟอร์มใหม่อีกครั้งให้ครบ
+    if(need) html=`⚠️ <b>คุณยังไม่ได้ส่งเอกสารสัญญา / สำเนาบัตรประชาชน / สำเนาบัญชี</b> — กรุณาส่งฟอร์มเอกสารที่ <a href="${url}" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline;font-weight:800">${viaReg?'ฟอร์มสมัครทีม (กดที่นี่)':url}</a>`;
   } else if(u && u.role==='admin' && !sessionStorage.getItem('df_hide')){
     const n=people().filter(p=>statusOf(p.s)!=='resigned' && p.s.docForm && !p.s.docForm.sent && !p.s.docForm.exempt).length;
     if(n) html=`⚠️ ทีมงาน <b>${n} คน</b> ยังไม่ส่งเอกสารฟรีแลนซ์ <a href="#" onclick="event.preventDefault();DOCFORM.open()" style="color:#fff;text-decoration:underline;font-weight:800">ดูรายชื่อ / ดึงคำตอบล่าสุด</a> <a href="#" onclick="event.preventDefault();sessionStorage.setItem('df_hide','1');DOCFORM.banner()" style="color:#fff;opacity:.75;margin-left:8px">ซ่อน</a>`;
@@ -182,5 +184,5 @@ window.addEventListener('guindatachange', e=>{ if(e.detail&&e.detail.key==='staf
 setInterval(()=>{ banner(); renderStatusBox(); }, 60000); setTimeout(()=>{ banner(); renderStatusBox(); }, 3000);
 document.addEventListener('click', e=>{ if(e.target.closest&&e.target.closest('[onclick*="setpane-tools"],[data-pane="tools"]')) setTimeout(renderStatusBox,100); }, true);
 
-window.DOCFORM={ open:()=>{ const el=document.getElementById('docform-status'); importFromSheet(); }, fromSheet:importFromSheet, fromCSV:importCSV, apply, copyMissing, exempt, banner, renderStatusBox, FORM_URL };
+window.DOCFORM={ REG_URL, open:()=>{ const el=document.getElementById('docform-status'); importFromSheet(); }, fromSheet:importFromSheet, fromCSV:importCSV, apply, copyMissing, exempt, banner, renderStatusBox, FORM_URL };
 })();

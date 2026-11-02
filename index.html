@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261026-19"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261102-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -1422,6 +1422,10 @@ body.sidebar-collapsed .main-content{
      <div class="set-toolrow">
       <div style="flex:1;min-width:190px"><div class="set-toolname">💾 พื้นที่เก็บข้อมูลในเบราว์เซอร์</div><div class="set-toolsub">เว็บเก็บสำเนาข้อมูลไว้ในเครื่องเพื่อให้เปิดเร็ว (จุได้ราว 5MB) · ถ้าเต็ม กดล้างสำเนาที่ดาวน์โหลดใหม่ได้ ข้อมูลจริงบนระบบไม่หาย</div><div id="ls-usage" class="set-toolres" style="margin-top:4px"></div></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="lsUsageShow()">ดูการใช้พื้นที่</button><button class="btn btn-sm btn-blue" onclick="lsCleanCache()">🧹 ล้างที่เลือก + โหลดใหม่</button></div>
+     </div>
+     <div class="set-toolrow">
+      <div style="flex:1;min-width:190px"><div class="set-toolname">📝 ฟอร์มสมัครทีม (Team Registration Form)</div><div class="set-toolsub">คนใหม่เข้าทีมอัตโนมัติพร้อมบัญชีและเอกสาร · คนเดิมเติมเฉพาะช่องว่าง · ถ้าไม่แน่ใจจะรอแอดมินตรวจ</div><div id="regform-status"></div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-blue" onclick="REGFORM.pull()">🔄 ดึงคำตอบตอนนี้</button><button class="btn btn-sm btn-outline" onclick="REGFORM.review()">📝 ดูที่รอตรวจ</button></div>
      </div>
      <div class="set-toolrow">
       <div style="flex:1;min-width:190px"><div class="set-toolname">📋 เอกสารฟรีแลนซ์ (สัญญา · สำเนาบัตร · สำเนาบัญชี)</div><div class="set-toolsub">ดึงคำตอบจากฟอร์ม → จับคู่ด้วยชื่อจริง-นามสกุล → เติมเลขบัตร/ที่อยู่/ลิงก์เอกสารเข้าโปรไฟล์ · คนที่ยังไม่ส่งจะเห็นแถบแดงบนหัวเว็บ</div><div id="docform-status"></div></div>
@@ -2753,7 +2757,7 @@ body.sidebar-collapsed .main-content{
     <div class="s3 form-group"><label class="form-label">🔑 Secret key (ถ้ามี)</label><input class="form-input" id="pj-secretkey" placeholder="เห็นเฉพาะทีมที่เกี่ยวข้อง"></div>
     <div class="s5 form-group"><label class="form-label">🧾 หัก ณ ที่จ่าย (จากค่าจ้างทีม · ค่าเริ่มต้น 3%)</label><div id="pj-ded" class="pj-ded"></div><div id="pj-ded-note" style="font-size:11px;color:var(--text2);margin-top:3px"></div></div>
 
-    <div class="s6 form-group"><label class="form-label">📝 หมายเหตุ (การหัก / เงื่อนไข)</label><input class="form-input" id="pj-note" placeholder="เช่น ลูกค้าหัก 3% ค่าธรรมเนียม"></div>
+    <div class="s6 form-group"><label class="form-label">📝 หมายเหตุ (การหัก / เงื่อนไข)</label><textarea class="form-input note-grow" id="pj-note" rows="2" style="resize:vertical;overflow:hidden;line-height:1.55" placeholder="เช่น ลูกค้าหัก 3% ค่าธรรมเนียม (Enter = ขึ้นบรรทัดใหม่)"></textarea></div>
     <div class="s3 form-group"><label class="form-label">💰 ค่าเหมา Manager</label>
      <div id="pj-manager-fee-wrap" style="display:none;align-items:center;gap:6px">
       <input class="form-input" id="pj-manager-fee" type="number" min="0" step="any" data-price placeholder="0" onwheel="this.blur()" oninput="syncManagerFee()" style="flex:1;min-width:0">
@@ -15365,7 +15369,7 @@ function renderProjList(){
           +((p.duration||p.episodes)?'<div style="font-size:10px;color:var(--text2);margin-top:2px">⏱️ ความยาว '+(p.duration?esc(String(p.duration))+' นาที':'')+((p.duration&&p.episodes)?' · ':'')+(p.episodes?esc(String(p.episodes))+' ตอน':'')+'</div>':'')
           +'<div data-presence-proj="'+pid+'" style="margin-top:2px;display:inline-flex;gap:4px;flex-wrap:wrap">'+presenceBadgeHTML(pid)+'</div>'
           +(roleBadges?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+roleBadges+'</div>':'')
-          +(p.note?'<div style="font-size:10px;color:var(--text2)">📝 '+p.note+'</div>':'')
+          +(p.note?'<div style="font-size:10px;color:var(--text2);white-space:pre-wrap;line-height:1.5">📝 '+_noteHTML(p.note)+'</div>':'')
           +'</td>'
           +'<td style="padding:8px 6px;color:var(--text2)">'+(currentUser?.role==='manager'?'—':(p.client||'—'))+'</td>'
           +(function(){const mi=_projManagerLabel(p);if(mi.isAdmin)
@@ -15435,7 +15439,7 @@ function adminProjDetailHTML(p){
     ${finBlock}
     ${phHTML?`<div style="display:flex;gap:6px;flex-wrap:wrap">${phHTML}</div>`:''}
     <div><div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;letter-spacing:.5px">ผู้ทำงาน (แยกตามโรล)</div><div style="display:flex;flex-direction:column;gap:6px">${workersHTML}</div></div>
-    ${p.note?`<div style="font-size:12px;color:var(--text2);font-style:italic">📝 ${p.note}</div>`:''}
+    ${p.note?`<div style="font-size:12px;color:var(--text2);font-style:italic;white-space:pre-wrap;line-height:1.55">📝 ${_noteHTML(p.note)}</div>`:''}
   </div>`;
 }
 
@@ -16121,7 +16125,7 @@ function _assignEditRowHTML(p){
         <div id="ar-wl-box">${(_workLinks(p).length?_workLinks(p):[{}]).map(_wlRowHTML).join('')}</div>
         <button type="button" class="btn btn-sm btn-outline" onclick="_wlAdd()">＋ เพิ่มลิงก์</button></div>
       <div>${lbl('🔑 Secret key')}${inp('ar-secret','text',p.secretKey||'')}</div>
-      <div style="grid-column:1/-1">${lbl('📝 หมายเหตุ')}${inp('ar-note','text',p.note||'')}</div>
+      <div style="grid-column:1/-1">${lbl('📝 หมายเหตุ <span style="font-weight:400;color:var(--text2)">(Enter = ขึ้นบรรทัดใหม่ · วางจากโน้ตได้)</span>')}<textarea id="ar-note" class="note-grow" rows="2" style="width:100%;min-width:0;box-sizing:border-box;padding:8px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px;line-height:1.55;resize:vertical;overflow:hidden">${esc(p.note||'')}</textarea></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:13px">
       <button class="btn btn-green" style="flex:1" onclick="assignSaveRow('${p.id||''}')">✅ บันทึก${isNew?' — ต่อไปจัดสรรคน':''}</button>
@@ -16131,6 +16135,13 @@ function _assignEditRowHTML(p){
 }
 // 🔗 ลิงก์งานหลายลิงก์ + คำอธิบาย (ไม่บังคับ) · ลิงก์แรก = downloadLink เดิม
 //    ถ้าลิงก์แรกถูกแก้จากหน้าอื่น (วางแผนงาน/ฟอร์มโปรเจกต์) ใช้ค่าล่าสุดนั้นแทนลิงก์แรก
+// 📝 หมายเหตุหลายบรรทัด — กล่องสูงตามข้อความ · แสดงผลเว้นบรรทัดตามที่พิมพ์
+function _noteGrow(t){ if(!t) return; t.style.height='auto'; t.style.height=(t.scrollHeight+2)+'px'; }
+document.addEventListener('input', e=>{ if(e.target&&e.target.matches&&e.target.matches('textarea.note-grow')) _noteGrow(e.target); });
+function _noteGrowAll(root){ (root||document).querySelectorAll('textarea.note-grow').forEach(_noteGrow); }
+// กล่องที่เพิ่งถูกวาด (ฟอร์มมอบหมายงาน / วางแผนงาน) → ขยายตามข้อความเดิมทันที
+try{ new MutationObserver(ms=>{ for(const m of ms) for(const n of m.addedNodes){ if(n.nodeType!==1) continue; if(n.matches&&n.matches('textarea.note-grow')) requestAnimationFrame(()=>_noteGrow(n)); else if(n.querySelector&&n.querySelector('textarea.note-grow')) requestAnimationFrame(()=>_noteGrowAll(n)); } }).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
+const _noteHTML=v=>esc(String(v||'').replace(/\r\n?/g,'\n').trim());   // ใช้คู่กับ white-space:pre-wrap
 function _workLinks(p){
   const L=(Array.isArray(p&&p.workLinks)?p.workLinks:[]).filter(x=>x&&String(x.url||'').trim()).map(x=>({url:String(x.url).trim(), label:String(x.label||'').trim()}));
   const dl=String((p&&p.downloadLink)||'').trim();
@@ -16203,7 +16214,7 @@ async function assignSaveRow(projId){
     workLinks:_wlCollect(),
     downloadLink:(_wlCollect()[0]||{}).url||'',
     secretKey:(g('ar-secret')?.value||'').trim(),
-    note:(g('ar-note')?.value||'').trim(),
+    note:(g('ar-note')?.value||'').replace(/\r\n?/g,'\n').trim(),
     type:g('ar-type')?.value||'',
   };
   // 💰 งบ: เรท + หน่วย + จำนวน/ความยาว → ยอดรวมคำนวนแบบเดียวกับฟอร์มโปรเจกต์
@@ -16315,8 +16326,8 @@ function renderAssign(){
     const linkRow=[
       _wlLinksHTML(p),
       p.secretKey?`<span style="font-size:11px;color:var(--text2)">🔑 <span id="${secId}" data-shown="0" style="font-family:monospace">••••••••</span> <button id="${secId}-b" class="btn btn-sm btn-outline" style="padding:0 6px;font-size:10px" onclick="toggleSecretKey('${secId}-b','${secId}','${escJs(p.secretKey)}')">👁</button></span>`:'',
-      (p.note||'').trim()?`<span style="font-size:11.5px;color:var(--text2)">📝 ${esc(p.note)}</span>`:''
     ].filter(Boolean).join(' <span style="opacity:.3">·</span> ');
+    const noteRow=(p.note||'').trim()?`<div style="margin-top:7px;padding:7px 10px;border-radius:8px;background:rgba(128,150,180,.08);font-size:11.5px;line-height:1.6;color:var(--text2);white-space:pre-wrap;word-break:break-word">📝 ${_noteHTML(p.note)}</div>`:'';
     return `<div style="margin-bottom:10px;padding:12px 15px;background:${overdue?'rgba(255,64,64,.07)':'var(--card)'};border:1px solid ${overdue?'rgba(255,64,64,.3)':'rgba(128,150,180,.22)'};border-left:4px solid ${overdue?'var(--red)':cc};border-radius:11px;box-shadow:0 2px 10px rgba(0,0,0,.25)">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         ${code?`<span style="padding:3px 13px;border-radius:9px;background:${cc}26;color:${cc};font-weight:800;font-size:15px;cursor:pointer;flex:none;letter-spacing:.5px" onclick="openBriefLibrary('${escJs(code)}')" title="เปิดบรีฟงานรหัส ${esc(code)}">${esc(projCode(p)||code)}</span>`:''}
@@ -16337,7 +16348,7 @@ function renderAssign(){
         <span style="opacity:.3">|</span>
         ${dlChips||'<span style="opacity:.45;font-size:11.5px">ยังไม่ตั้งเดทไลน์ราย Role — กด ✏️ แก้ไข เพื่อเติม</span>'}
       </div>
-      ${linkRow?`<div style="margin-top:7px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${linkRow}</div>`:''}
+      ${linkRow?`<div style="margin-top:7px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${linkRow}</div>`:''}${noteRow}
     </div>`;
   }).join('');
   const newRow=_assignAdding?_assignEditRowHTML(window._assignCopySrc||null):'';
@@ -17090,7 +17101,7 @@ async function openViewProject(id){
 
     ${p.note?`<div style="background:rgba(255,158,0,.06);border:1px solid rgba(255,158,0,.25);border-radius:10px;padding:10px 12px;margin-bottom:10px">
       <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700;margin-bottom:3px">📝 หมายเหตุ</div>
-      <div style="font-size:13px">${p.note}</div>
+      <div style="font-size:13px;white-space:pre-wrap;line-height:1.6">${_noteHTML(p.note)}</div>
     </div>`:''}
 
     <div style="font-size:10px;color:var(--text2);margin-top:14px;text-align:right">
@@ -17266,7 +17277,7 @@ async function openEditProject(id){
   _pjFxLoad(p);
   toggleBudgetQty();
   document.getElementById('pj-duration').value=p.duration||'';
-  document.getElementById('pj-note').value=p.note||'';
+  document.getElementById('pj-note').value=p.note||''; setTimeout(()=>_noteGrow(document.getElementById('pj-note')),0);
   document.getElementById('pj-start').value=isoToThai(p.startDate||'');document.getElementById('pj-start-pk').value=p.startDate||'';
   { const _dl=String(p.deadline||''), _d=_dl.slice(0,10);
     document.getElementById('pj-deadline').value=isoToThai(_d);document.getElementById('pj-deadline-pk').value=_d;
@@ -17643,6 +17654,7 @@ function emailReceipt(){
 
 /* ── Fix 3: Download receipt as printable HTML file ── */
 function downloadReceiptHTML(){
+  { const c=window._lastReceiptCtx||{}; if(c.vcList) return _vcSave(c.vcList, c.vcName||'ใบสำคัญจ่าย'); }
   { const c=window._lastReceiptCtx||{}; if(c.sales && window.GDOC){ const d=c.sales.data||{}; return _gdSales(c.sales.kind, d, (d.docNo||c.sales.kind)+'_'+(d.client||''), ()=>downloadDocHTML(document.getElementById('receipt-body').innerHTML, d.docNo||'document')); } }
   const body=document.getElementById('receipt-body');
   // หาเอกสารที่กำลังแสดง (รองรับทุกประเภท: receipt/quotation/invoice/voucher)
@@ -22750,7 +22762,7 @@ function openMyProjDetail(projId, slot){
 
       ${p.note?`<div style="background:rgba(0,180,255,.05);border:1px solid rgba(0,180,255,.2);border-radius:10px;padding:10px 14px;margin-bottom:14px">
         <div style="font-size:10px;color:var(--text2);letter-spacing:1px;font-weight:700;margin-bottom:4px">📝 หมายเหตุจากแอดมิน</div>
-        <div style="font-size:13px">${p.note}</div>
+        <div style="font-size:13px;white-space:pre-wrap;line-height:1.6">${_noteHTML(p.note)}</div>
       </div>`:''}
 
       <div style="margin-bottom:14px">
@@ -24637,7 +24649,26 @@ function _vcItemsSnap(works){ return (works||[]).map(({w,p})=>{ const pre=(w.slo
 function _vcConfirmedAt(staffId, items){ let t=''; (items||[]).forEach(it=>{ try{ const p=getProjects().find(x=>x.id===it.projId); const w=p&&(p.workers||[]).find(x=>x&&x.id===staffId&&x.slot===it.slot); const c=w&&w.confirmRespondedAt; if(c&&String(c)>t) t=String(c); }catch(e){} }); return t; }
 async function _vcVoucherBlob(o){ if(window.GDOC){ try{ return await GDOC.voucherBlob(o); }catch(e){ console.warn('GDOC voucher → แบบเดิม',e); } } return _vcHtmlToPdfBlob(buildMultiVoucherHTML(o)); }
 function _voucherStaffOf(v){ return v.staffId ? (getStaffById(v.staffId) || {name:v.staffName,lastName:v.staffLastName,nickname:v.staffNickname,bank:v.bank,account:v.account,email:v.email}) : {name:v.staffName,lastName:v.staffLastName,nickname:v.staffNickname,bank:v.bank,account:v.account,email:v.email}; }
-function _voucherOpts(v){ return { vNo:v.docNo, staff:_voucherStaffOf(v), items:(v.items||[]).map(it=>({projId:it.projId, projName:it.projName, slot:it.slot, amount:it.amount, taxPct:it.taxPct})), totalAmt:v.totalAmount||v.amount||0, date:v.date, note:v.note||'', confirmedAt:_vcConfirmedAt(v.staffId, v.items), whtNo:v.whtNo||'' }; }
+// ใบเก่าแบบงานเดียวไม่มี items → ประกอบจากฟิลด์เดิม
+function _voucherItems(v){ if(Array.isArray(v.items)&&v.items.length) return v.items; const p=v.projId?getProjects().find(x=>x.id===v.projId):null; return [{projId:v.projId, projName:v.projName||(p&&p.name)||'', slot:v.slot, amount:v.amount||0}]; }
+// 🧾 ใบสำคัญจ่ายแบบทางการ (ตัวเดียวกับที่แนบอีเมล) — ทุกปุ่มดู/โหลดใช้ชุดนี้ · สร้างไม่ได้ค่อยใช้แบบเดิม
+async function _vcRender(el, list){ if(!el) return;
+  const old=()=>{ el.innerHTML=list.map(o=>buildMultiVoucherHTML(o)).join('<div style="height:18px"></div>'); };
+  if(!window.GDOC) return old();
+  el.innerHTML='<div style="padding:30px;text-align:center;color:#555">กำลังสร้างตัวอย่าง…</div>';
+  try{ await GDOC.prep(); const pg=[]; for(const o of list) pg.push(...(await GDOC.voucherPages(o)).pages);
+    el.innerHTML=pg.map(x=>'<div class="gd-page" style="margin:0 auto 10px;zoom:.92;box-shadow:0 2px 10px rgba(0,0,0,.2)">'+x+'</div>').join(''); }
+  catch(e){ console.warn('voucher preview',e); toast('⚠️ สร้างใบแบบทางการไม่สำเร็จ ('+(e&&e.message||e)+') — ใช้แบบสำรองแทน','warn'); old(); } }
+async function _vcSave(list, fname){
+  if(window.GDOC){ showLoader(true); try{ const pg=[]; for(const o of list) pg.push(...(await GDOC.voucherPages(o)).pages); await GDOC.save(pg, fname); toast('📄 ดาวน์โหลด PDF แล้ว','success'); return; }
+    catch(e){ console.warn('voucher save',e); toast('⚠️ สร้าง PDF แบบทางการไม่สำเร็จ ('+(e&&e.message||e)+') — ใช้แบบสำรองแทน','warn'); } finally{ showLoader(false); } }
+  downloadDocHTML(list.map(o=>buildMultiVoucherHTML(o)).join('<div style="page-break-after:always"></div>'), fname); }
+function _vcShowInModal(list, ctx, title){ const m=document.querySelector('#modal-receipt .modal'), t=document.querySelector('#modal-receipt .modal-title');
+  window._lastReceiptCtx=Object.assign({staffId:null, type:'voucher', email:''}, ctx||{}, {vcList:list, vcName:title||'ใบสำคัญจ่าย'});
+  if(m) m.style.width='min(880px,96vw)'; if(t) t.textContent='💸 ใบสำคัญจ่าย'; const el=document.getElementById('receipt-body'); openModal('modal-receipt');
+  if(el){ el.innerHTML='<div id="vc-mbody" style="background:#cfd6e0;padding:10px;border-radius:8px;overflow:auto"></div>'; _vcRender(document.getElementById('vc-mbody'), list); } }
+const _vcFile=(no,s)=>'ใบสำคัญจ่าย_'+no+'_'+String(((s&&s.name)||'').trim()+((s&&s.lastName)?' '+s.lastName.trim():'')||(s&&s.nickname)||'').trim().replace(/\s+/g,'_');
+function _voucherOpts(v){ return { vNo:v.docNo, staff:_voucherStaffOf(v), items:_voucherItems(v).map(it=>({projId:it.projId, projName:it.projName, slot:it.slot, amount:it.amount, taxPct:it.taxPct})), totalAmt:v.totalAmount||v.amount||0, date:v.date, note:v.note||'', confirmedAt:_vcConfirmedAt(v.staffId, _voucherItems(v)), whtNo:v.whtNo||'' }; }
 // 📎 ตั้งค่าแนบไฟล์ไปกับอีเมลใบสำคัญจ่าย (จำไว้) — ตอนนี้: 50 ทวิ
 function _vcAttach(){ const st=Object.assign({wht:true}, ls('vc_attach')||{}); return st; }   // ค่าจากช่องติ๊ก (บันทึกทันทีที่ติ๊ก)
 function _vcAttachSet(k,v){ const st=ls('vc_attach')||{wht:true}; st[k]=!!v; ls('vc_attach',st); }
@@ -24998,20 +25029,8 @@ function downloadAllVouchersPreview(){
   // เรียงยอดมาก→น้อยให้เหมือนลิสต์
   const entries=[...byPerson.entries()].sort((a,b)=>
     b[1].works.reduce((x,{w})=>x+(w.amount||0),0) - a[1].works.reduce((x,{w})=>x+(w.amount||0),0));
-  let html='';
-  entries.forEach(([wid,{s,works}], idx)=>{
-    const voucher = buildMultiVoucherHTML({
-      vNo:'(ตัวอย่าง · ยังไม่ออกจริง)', staff:s,
-      items: works.map(({w,p})=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
-      totalAmt: works.reduce((a,{w})=>a+(w.amount||0),0),
-      date, note:'',
-    });
-    // ขึ้นหน้าใหม่ต่อคน เวลาสั่งพิมพ์/บันทึก PDF (คนสุดท้ายไม่ต้องขึ้นหน้าเปล่า)
-    const brk = idx < entries.length-1 ? ';page-break-after:always' : '';
-    html += `<div style="${brk}">${voucher}</div>`;
-  });
-  downloadDocHTML(html, 'ใบสำคัญจ่าย_ทุกคน_'+byPerson.size+'คน');
-  toast(`📥 รวมใบ ${byPerson.size} คนเป็นไฟล์เดียว — เปิดแล้ว Ctrl+P สั่งพิมพ์/บันทึก PDF ได้ทุกคนทีเดียว`,'success');
+  const list=entries.map(([wid,{s,works}])=>({ vNo:'(ตัวอย่าง · ยังไม่ออกจริง)', staff:s, items:_vcItemsSnap(works), totalAmt:works.reduce((a,{w})=>a+(w.amount||0),0), date, note:'' }));
+  _vcSave(list, 'ใบสำคัญจ่าย_ทุกคน_'+byPerson.size+'คน');
 }
 
 function renderVcByPerson(){
@@ -25338,13 +25357,7 @@ function previewPersonVoucher(staffId){
   const totalAmt = selectedItems.reduce((sum, it) => sum + (it.w.amount||0), 0);
   const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
   const note = document.getElementById('vc-note')?.value.trim() || '';
-  const html = buildMultiVoucherHTML({
-    vNo: 'GS-PREVIEW',
-    staff: s,
-    items: selectedItems.map(it => ({projName: it.p.name, slot: it.w.slot, amount: it.w.amount||0})),
-    totalAmt, date, note,
-  });
-  downloadDocHTML(html, 'preview-voucher-'+(s.nickname||staffId));
+  _vcSave([{ vNo:'GS-PREVIEW', staff:s, items:_vcItemsSnap(selectedItems), totalAmt, date, note }], 'ตัวอย่างใบสำคัญจ่าย_'+(s.nickname||staffId));
 }
 
 // 👁️ STEP 1: เปิด Preview Modal — ยังไม่ commit ใด ๆ · admin ตรวจก่อน
@@ -25359,12 +25372,7 @@ function issuePersonVoucher(staffId){
   const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
   const note = document.getElementById('vc-note')?.value.trim() || '';
   // สร้าง preview HTML
-  const previewHtml = buildMultiVoucherHTML({
-    vNo: 'PREVIEW · ยังไม่ออกจริง',
-    staff: s,
-    items: selectedItems.map(it => ({projName: it.p.name, slot: it.w.slot, amount: it.w.amount||0})),
-    totalAmt, date, note,
-  });
+  const previewList = [{ vNo:'PREVIEW · ยังไม่ออกจริง', staff:s, items:_vcItemsSnap(selectedItems), totalAmt, date, note }];
   // เปิด preview modal
   const old = document.getElementById('vc-preview-modal');
   if(old) old.remove();
@@ -25380,7 +25388,7 @@ function issuePersonVoucher(staffId){
         '</div>'+
         '<button class="btn-close" onclick="_vcClosePreview()" title="ปิด (ไม่บันทึก)">✕</button>'+
       '</div>'+
-      '<div style="flex:1;overflow-y:auto;background:#e5e7eb;padding:14px;border-radius:10px;margin-bottom:12px">'+previewHtml+'</div>'+
+      '<div style="flex:1;overflow-y:auto;background:#e5e7eb;padding:14px;border-radius:10px;margin-bottom:12px" id="vc-prev-body"></div>'+
       '<div style="background:rgba(255,158,0,.1);border:1.5px solid rgba(255,158,0,.4);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:var(--orange);font-weight:600">'+
         '⚠️ <strong>ยังไม่ได้บันทึก</strong> · กดปิดถ้ายอดผิด · กด "ออกจริง" เพื่อทำเครื่องหมาย "จ่ายแล้ว" + ส่งใบ'+
       '</div>'+
@@ -25390,6 +25398,7 @@ function issuePersonVoucher(staffId){
       '</div>'+
     '</div>';
   document.body.appendChild(div);
+  _vcRender(document.getElementById('vc-prev-body'), previewList);
 }
 function _vcClosePreview(){
   const m = document.getElementById('vc-preview-modal');
@@ -25512,32 +25521,12 @@ function _vcCloseSendModal(){
 function _vcDownloadVoucherPDF(vNo){
   const d = (getDocsStore('vouchers')||[]).find(x => x.docNo === vNo);
   if(!d){ toast('ไม่พบใบ','error'); return; }
-  const s = d.staffId ? (getStaffById(d.staffId) || {name:d.staffName, nickname:d.staffNickname, bank:d.bank, account:d.account, promptpay:'', qrUrl:''}) : {name:d.staffName, nickname:d.staffNickname, bank:d.bank, account:d.account, promptpay:'', qrUrl:''};
-  const html = buildMultiVoucherHTML({
-    vNo: d.docNo, staff: s,
-    items: d.items || [{projName: d.projName, slot: d.slot, amount: d.amount}],
-    totalAmt: d.totalAmount || d.amount || 0,
-    date: d.date, note: d.note || '',
-  });
-  // ─ ชื่อไฟล์: ชื่อ_นามสกุล (เต็ม) · fallback ไป nickname ถ้าไม่มีชื่อ ─
-  const fullName = ((s.name||'').trim() + (s.lastName ? ' '+s.lastName.trim() : '')).trim();
-  const fileLabel = (fullName || s.nickname || 'staff').replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_');
-  downloadDocHTML(html, 'voucher-'+vNo+'-'+fileLabel);
+  const o=_voucherOpts(d); return _vcSave([o], _vcFile(vNo,o.staff));
 }
 function _vcPreviewVoucherInModal(vNo){
   const d = (getDocsStore('vouchers')||[]).find(x => x.docNo === vNo);
   if(!d){ toast('ไม่พบใบ','error'); return; }
-  const s = d.staffId ? (getStaffById(d.staffId) || {name:d.staffName, nickname:d.staffNickname, bank:d.bank, account:d.account, promptpay:'', qrUrl:''}) : {name:d.staffName, nickname:d.staffNickname, bank:d.bank, account:d.account, promptpay:'', qrUrl:''};
-  const html = buildMultiVoucherHTML({
-    vNo: d.docNo, staff: s,
-    items: d.items || [{projName: d.projName, slot: d.slot, amount: d.amount}],
-    totalAmt: d.totalAmount || d.amount || 0,
-    date: d.date, note: d.note || '',
-  });
-  const el = document.getElementById('receipt-body');
-  if(el) el.innerHTML = html;
-  _rcpModalReset(); window._lastReceiptCtx = {staffId: d.staffId, vNo: d.docNo, type:'voucher', email: d.email||''};
-  openModal('modal-receipt');
+  const o=_voucherOpts(d); _vcShowInModal([o], {staffId:d.staffId, vNo:d.docNo, email:d.email||''}, _vcFile(vNo,o.staff));
 }
 function _vcOpenGmailForVoucher(vNo){
   const d = (getDocsStore('vouchers')||[]).find(x => x.docNo === vNo);
@@ -25962,19 +25951,8 @@ function previewVouchers() {
   const note = document.getElementById('vc-note')?.value.trim()||'';
   // รวมงานของแต่ละคนเป็น 1 ใบ (รวมข้ามโปรเจกต์) + ใช้ template เดียวกับโหมด "ตามคน"
   const byPerson = _vcGroupSelectedByPerson(selected);
-  let html = '';
-  for(const [wid, {s, works}] of byPerson){
-    html += buildMultiVoucherHTML({
-      vNo:'PREVIEW', staff:s,
-      items: works.map(({w,p})=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
-      totalAmt: works.reduce((a,{w})=>a+(w.amount||0),0),
-      date, note,
-    }) + '<div style="height:20px"></div>';
-  }
-  const el = document.getElementById('receipt-body');
-  if(el) el.innerHTML = `<div style="padding:10px">${html}</div>`;
-  _rcpModalReset(); window._lastReceiptCtx = { staffId:null, vNo:'VOUCHERS', type:'voucher', email:'' };
-  openModal('modal-receipt');
+  const list=[...byPerson.values()].map(({s,works})=>({ vNo:'PREVIEW', staff:s, items:_vcItemsSnap(works), totalAmt:works.reduce((a,{w})=>a+(w.amount||0),0), date, note }));
+  _vcShowInModal(list, {vNo:'VOUCHERS'}, 'ตัวอย่างใบสำคัญจ่าย');
 }
 function downloadVouchers() {
   const selected = getSelectedVcWorkers();
@@ -25983,13 +25961,7 @@ function downloadVouchers() {
   const note = document.getElementById('vc-note')?.value.trim()||'';
   const byPerson = _vcGroupSelectedByPerson(selected);
   for(const [wid, {s, works}] of byPerson){
-    const html = buildMultiVoucherHTML({
-      vNo: _peekVoucherNo(), staff:s,
-      items: works.map(({w,p})=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
-      totalAmt: works.reduce((a,{w})=>a+(w.amount||0),0),
-      date, note,
-    });
-    downloadDocHTML(html, 'voucher-'+(s.nickname||wid));
+    _vcSave([{ vNo:_peekVoucherNo(), staff:s, items:_vcItemsSnap(works), totalAmt:works.reduce((a,{w})=>a+(w.amount||0),0), date, note }], 'ตัวอย่างใบสำคัญจ่าย_'+(s.nickname||wid));
   }
 }
 // STEP 1: ตรวจสอบใบก่อนออกจริง (เหมือนโหมด "ตามคน") — ยังไม่บันทึก/ยังไม่ส่ง
@@ -26002,16 +25974,12 @@ function issueAndSendVouchers() {
   if(!byPerson.size){ toast('ไม่พบข้อมูลทีมงาน','error'); return; }
   const date = document.getElementById('vc-date')?.value || new Date().toISOString().split('T')[0];
   const note = document.getElementById('vc-note')?.value.trim()||'';
-  let previewHtml = '', totalAll = 0;
+  const previewList = []; let totalAll = 0;
   const nPersons = byPerson.size;
   for(const [wid, {s, works}] of byPerson){
     const totalAmt = works.reduce((a,{w})=>a+(w.amount||0),0);
     totalAll += totalAmt;
-    previewHtml += buildMultiVoucherHTML({
-      vNo:'PREVIEW · ยังไม่ออกจริง', staff:s,
-      items: works.map(({w,p})=>({projName:p.name, slot:w.slot, amount:w.amount||0})),
-      totalAmt, date, note,
-    }) + '<div style="height:18px"></div>';
+    previewList.push({ vNo:'PREVIEW · ยังไม่ออกจริง', staff:s, items:_vcItemsSnap(works), totalAmt, date, note });
   }
   const old = document.getElementById('vc-preview-modal'); if(old) old.remove();
   const div = document.createElement('div');
@@ -26026,7 +25994,7 @@ function issueAndSendVouchers() {
         '</div>'+
         '<button class="btn-close" onclick="_vcClosePreview()" title="ปิด (ไม่บันทึก)">✕</button>'+
       '</div>'+
-      '<div style="flex:1;overflow-y:auto;background:#e5e7eb;padding:14px;border-radius:10px;margin-bottom:12px">'+previewHtml+'</div>'+
+      '<div style="flex:1;overflow-y:auto;background:#e5e7eb;padding:14px;border-radius:10px;margin-bottom:12px" id="vc-prev-body"></div>'+
       '<div style="background:rgba(255,158,0,.1);border:1.5px solid rgba(255,158,0,.4);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:var(--orange);font-weight:600">'+
         '⚠️ <strong>ยังไม่ได้บันทึก</strong> · กดปิดถ้ายอดผิด · กด "ออกจริง" เพื่อทำเครื่องหมาย "จ่ายแล้ว" แล้วเปิดหน้าส่งอีเมล (ดาวน์โหลดใบ + แนบไฟล์ + กดส่งใน Gmail เอง) ทีละคน'+
       '</div>'+
@@ -26036,6 +26004,7 @@ function issueAndSendVouchers() {
       '</div>'+
     '</div>';
   document.body.appendChild(div);
+  _vcRender(document.getElementById('vc-prev-body'), previewList);
 }
 
 // STEP 2: Commit จริง — มาร์ค paid + บันทึก voucher + เปิดคิวส่งอีเมลทีละใบ (แนบเอง)
@@ -26506,27 +26475,7 @@ function repreviewDoc(type, docNo) {
   } else {
     const d=(getDocsStore('vouchers')||[]).find(x=>x.docNo===docNo);
     if(!d){toast('ไม่พบข้อมูล','warn');return;}
-    const el=document.getElementById('receipt-body');
-    let html;
-    // 👤 Multi-item voucher (1 ใบ × หลายงาน) — ใช้ template ใหม่
-    if(d.multiItem && Array.isArray(d.items) && d.items.length > 0){
-      const s = d.staffId ? (getStaffById(d.staffId) || {
-        name: d.staffName, nickname: d.staffNickname, bank: d.bank, account: d.account, promptpay: ''
-      }) : { name: d.staffName, nickname: d.staffNickname, bank: d.bank, account: d.account, promptpay: '' };
-      html = buildMultiVoucherHTML({
-        vNo: docNo,
-        staff: s,
-        items: d.items,
-        totalAmt: d.totalAmount || d.amount || 0,
-        date: d.date,
-        note: d.note || '',
-      });
-      _rcpModalReset(); window._lastReceiptCtx = {staffId: d.staffId, vNo: docNo, type:'voucher', email: d.email||''};
-    } else {
-      html = buildVoucherHTML(d.projId,d.staffId,d.slot||'',docNo,d.date,'');
-    }
-    if(el) el.innerHTML = html || '<div style="color:red;padding:20px">ไม่สามารถสร้างใบเสร็จได้ (ข้อมูลไม่ครบ)</div>';
-    openModal('modal-receipt');
+    const o=_voucherOpts(d); _vcShowInModal([o], {staffId:d.staffId, vNo:docNo, email:d.email||''}, _vcFile(docNo,o.staff));
   }
 }
 // สร้าง HTML ของเอกสารจากเลขที่ (ใช้ตรรกะเดียวกับ repreviewDoc) — สำหรับปุ่ม ⬇️ PDF ต่อแถว
@@ -26548,10 +26497,7 @@ function downloadDocByNo(type, docNo){
   if(window.GDOC){
     const st={quotation:'quotations',invoice:'invoices',receipt:'receipts'}[type];
     if(st){ const d=(getDocsStore(st)||[]).find(x=>x.docNo===docNo); if(d) return _gdSales(type, d, docNo+'_'+(d.client||''), ()=>downloadDocHTML(_buildDocHTMLByNo(type, docNo), docNo)); }
-    else { const v=(getDocsStore('vouchers')||[]).find(x=>x.docNo===docNo);
-      if(v && v.multiItem && Array.isArray(v.items) && v.items.length){ showLoader(true);
-        return GDOC.voucherPages(_voucherOpts(v)).then(r=>GDOC.save(r.pages,'ใบสำคัญจ่าย_'+docNo)).then(()=>toast('📄 ดาวน์โหลด PDF แล้ว','success'))
-          .catch(e=>{ console.warn(e); downloadDocHTML(_buildDocHTMLByNo(type, docNo), docNo); }).finally(()=>showLoader(false)); } }
+    else { const v=(getDocsStore('vouchers')||[]).find(x=>x.docNo===docNo); if(v){ const o=_voucherOpts(v); return _vcSave([o], _vcFile(docNo,o.staff)); } }
   }
   const html=_buildDocHTMLByNo(type, docNo);
   if(!html){ toast('ไม่พบข้อมูลเอกสาร '+docNo,'warn'); return; }
@@ -31245,6 +31191,7 @@ async function syncFromSheet(opts){
   // เก็บชุดอีเมลก่อนซิงค์ — ใช้หา "คนใหม่จริง ๆ" (ไม่เชื่อ data.added ของ Apps Script ที่อาจ re-add ทั้งหมด)
   const _emailSetNow = ()=>{ const set=new Set(); const d=getStaffData(); Object.values(d||{}).forEach(arr=>(Array.isArray(arr)?arr:Object.values(arr||{})).forEach(s=>{ const em=(String(s&&s.email||'').toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/)||[])[0]; if(em) set.add(em); })); return set; };
   const _beforeEmails = _emailSetNow();
+  const _regSnap = window.REGFORM ? REGFORM.snap() : {};   // 🛡️ สมาชิกจากฟอร์มใหม่ไม่อยู่ในชีทเก่า — กันหาย
   const _webSnap = _snapWebEdited();   // 🏆 จำค่าที่แก้ในเว็บไว้ก่อน — ชีทเขียนทับแล้วจะคืนค่าให้
   try {
     const res = await fetch(url, {
@@ -31269,6 +31216,7 @@ async function syncFromSheet(opts){
       try{ const sn=await _fbDatabase.ref('staff').get(); if(sn.exists()) ls('staff_v3', sn.val()); _allStaffCache=null; }catch(e){}
       mergedN = await autoDedupStaffByEmail();
     }catch(e){ console.warn('auto-dedup after sync:', e); }
+    try{ const rr=window.REGFORM && REGFORM.restore(_regSnap); if(rr){ await saveStaffData(rr.d); _allStaffCache=null; console.log('🛡️ คืนสมาชิกจากฟอร์มใหม่',rr.n); } }catch(e){ console.warn('reg restore',e); }
     let _webFixed=[];
     try{
       const r=_restoreWebWins(_webSnap); _webFixed=r.fixed;
@@ -31318,9 +31266,7 @@ function startAutoSheetSync(){
   if(_autoSheetSyncTimer) return;   // กันตั้งซ้ำ
   const run = ()=>{
     if(currentUser?.role !== 'admin') return;
-    const url = ls('apps_script_sync_url') || '';
-    const secret = ls('apps_script_sync_secret') || '';
-    if(url && secret){ try{ syncFromSheet({silent:true}); }catch(e){} }
+    try{ window.REGFORM && REGFORM.pull({silent:true}); }catch(e){}
   };
   setTimeout(run, 10000);                            // ครั้งแรก ~10 วิ หลังเข้าระบบ
   _autoSheetSyncTimer = setInterval(run, 10*60*1000); // แล้วทุก 10 นาที
@@ -33368,7 +33314,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261026-19"></script><script src="scene/nd-profile.js?v=20261026-19"></script><script src="scene/nd-plan.js?v=20261026-19"></script><script src="scene/nd-work.js?v=20261026-19"></script><script src="scene/nd-docform.js?v=20261026-19"></script><script src="scene/nd-docpdf.js?v=20261026-19"></script><script src="scene/nd-acct.js?v=20261026-19"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261102-01"></script><script src="scene/nd-profile.js?v=20261102-01"></script><script src="scene/nd-plan.js?v=20261102-01"></script><script src="scene/nd-register.js?v=20261102-01"></script><script src="scene/nd-work.js?v=20261102-01"></script><script src="scene/nd-docform.js?v=20261102-01"></script><script src="scene/nd-docpdf.js?v=20261102-01"></script><script src="scene/nd-acct.js?v=20261102-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33378,7 +33324,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261026-19';
+var UPD_BUILD = '20261102-01';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
