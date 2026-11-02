@@ -673,7 +673,10 @@ function driveHTML(){ const p=S.src, linked=!!p.driveFolderId, ready=drReady();
   if(!ready) return `<div class="pl-card">${head}<div class="pl-cb pl-mut">ยังไม่ได้ตั้งค่าการเชื่อมไดรฟ์ ${isAdm()?'— <a style="cursor:pointer;color:var(--accent2)" onclick="openDriveSetup()">🔧 ตั้งค่า Drive</a>':'— ให้แอดมินตั้งค่า Drive ก่อน'}</div></div>`;
   const people=planIds().map(staff).filter(Boolean), noMail=people.filter(s=>!(s.email||'').trim());
   if(linked){
-    return `<div class="pl-card">${head}<div class="pl-cb pl-2col"><div><div class="pl-tree">📁 <b>${esc(p.driveFolderName||drFolderName())}</b>${DR.folders&&DR.cur===p.driveFolderId?'<br>'+(DR.folders.map(f=>'&nbsp;&nbsp;&nbsp;&nbsp;📁 '+esc(f.name)).join('<br>')||'<span class="pl-mut">(ว่าง)</span>'):''}</div>
+    const ok=DR.done&&DR.done.ok?`<div id="pl-drdone" style="margin:0 14px 2px;scroll-margin:90px;padding:10px 12px;border-radius:10px;background:rgba(0,223,160,.1);border:1px solid rgba(0,223,160,.4);font-size:12.5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:18px">✅</span><div style="flex:1;min-width:200px"><b>สร้างโฟลเดอร์ "${esc(DR.done.name)}" เสร็จแล้ว</b><div class="pl-mut">ใน "${esc(DR.done.where)}" · โฟลเดอร์ย่อย ${DR.done.n} โฟลเดอร์${DR.done.share?' · '+esc(DR.done.share):''}</div></div>
+      <a class="btn btn-sm btn-green" href="${esc(DR.done.link)}" target="_blank" rel="noopener">↗ เปิดในไดรฟ์</a><button class="btn btn-sm btn-outline" onclick="NDP.drDoneClose()">✕</button></div>`:'';
+    return `<div class="pl-card">${head}${ok}<div class="pl-cb pl-2col"><div><div class="pl-tree">📁 <b>${esc(p.driveFolderName||drFolderName())}</b>${DR.folders&&DR.cur===p.driveFolderId?'<br>'+(DR.folders.map(f=>'&nbsp;&nbsp;&nbsp;&nbsp;📁 '+esc(f.name)).join('<br>')||'<span class="pl-mut">(ว่าง)</span>'):''}</div>
        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="NDP.drInside()">🔄 ดูโฟลเดอร์ข้างใน</button><button class="btn btn-outline btn-sm" onclick="NDP.drUnlink()">🔗 เปลี่ยนโฟลเดอร์</button></div>
        <div style="margin-top:12px"><label class="pl-l">📄 ไฟล์บท (ชีทสคริปต์)</label>${p.scriptLink?`<div style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn btn-outline btn-sm" href="${esc(p.scriptLink)}" target="_blank" rel="noopener">↗ เปิด ${esc(p.scriptName||'ไฟล์บท')}</a><button class="btn btn-outline btn-sm" onclick="NDP.drScript()">＋ สร้างอีกไฟล์</button></div>`
          :drCfg().scriptTplId?`<button class="btn btn-green btn-sm" onclick="NDP.drScript()">📄 สร้างไฟล์บท Script/CV_${esc(drCode())}</button><div class="pl-mut" style="margin-top:4px">ก๊อปจากไฟล์บทต้นฉบับ ไว้ในโฟลเดอร์งานนี้</div>`
@@ -696,7 +699,8 @@ function driveHTML(){ const p=S.src, linked=!!p.driveFolderId, ready=drReady();
        <div class="pl-mut" style="margin:4px 0">1 บรรทัด = 1 โฟลเดอร์ · ขึ้นต้น "-" = โฟลเดอร์ย่อยของบรรทัดบน · {รหัส} = รหัสงาน</div>
        <div style="display:flex;gap:6px;flex-wrap:wrap">${tplKey!=='role'?`<button class="btn btn-outline btn-sm" onclick="NDP.drSaveTpl('over')">💾 บันทึกทับ</button>`:''}<button class="btn btn-outline btn-sm" onclick="NDP.drSaveTpl('new')">📄 บันทึกเป็นเทมเพลตรหัส ${esc(PCODE()||'…')}</button></div>`
       :`<div class="pl-tree" style="margin-top:8px">📁 <b>${esc(drFolderName())}</b><br>${items.map(it=>`&nbsp;&nbsp;&nbsp;&nbsp;📁 ${esc(it.name)}${(it.children||[]).map(c=>'<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;📁 '+esc(c)).join('')}`).join('<br>')||'<span class="pl-mut">(ไม่มีโฟลเดอร์ย่อย)</span>'}</div>`}
-     <button class="btn btn-green" style="width:100%;margin-top:10px" ${cur&&cur!=='root'?'':'disabled title="เลือกที่วางก่อน"'} onclick="NDP.drCreate()">📂 สร้างตามเทมเพลต + เพิ่มสิทธิ์ทีม</button>
+     ${DR.done&&!DR.done.ok?`<div style="margin-top:10px;padding:9px 12px;border-radius:9px;background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.35);font-size:12.5px">❌ สร้างไม่สำเร็จ: ${esc(DR.done.err)}</div>`:''}
+     <button class="btn btn-green" style="width:100%;margin-top:10px" ${DR.creating?'disabled':cur&&cur!=='root'?'':'disabled title="เลือกที่วางก่อน"'} onclick="NDP.drCreate()">${DR.creating?esc(DR.creating):'📂 สร้างตามเทมเพลต + เพิ่มสิทธิ์ทีม'}</button>
      <div class="pl-mut" style="margin-top:6px">🔐 เพิ่มสิทธิ์เงียบ ๆ เฉพาะคนในแผนที่อีเมลยังไม่มีสิทธิ์ · ไม่แจ้งเตือน</div></div></div></div>`; }
 async function drList(id){ DR.err=''; DR.loading=id; if(DR.listOf!==id && DR.folders) DR.folders=DR.folders.map(f=>({...f, _old:1})); render(); try{ const d=await callDrive({action:'list', parentId:id}); if(DR.cur===id){ DR.folders=d.folders||[]; DR.listOf=id; } }catch(e){ if(DR.cur===id) DR.err=String(e.message||e); } if(DR.loading===id) DR.loading=''; render(); }
 function drShareEmails(){ const ids=[...planIds()]; const m=mgrStaff(S.mgrId); if(m) ids.push(m.id);
@@ -706,7 +710,8 @@ async function drShare(folderId, quiet){
   try{ const d=await callDrive({action:'share', folderId, emails});
     await saveProjectMerge(S.id, f=>{ f.driveSharedAt=new Date().toISOString(); });
     const fl=(d.failed||[]).length;
-    say('🔐 เพิ่มสิทธิ์ '+((d.added||[]).length)+' คน · มีสิทธิ์อยู่แล้ว '+((d.already||[]).length)+(fl?' · ไม่สำเร็จ '+fl:''), fl?'warn':'success');
+    const msg='🔐 เพิ่มสิทธิ์ '+((d.added||[]).length)+' คน · มีสิทธิ์อยู่แล้ว '+((d.already||[]).length)+(fl?' · ไม่สำเร็จ '+fl:'');
+    if(!quiet) say(msg, fl?'warn':'success'); return msg;
   }catch(e){ say(/ไม่รู้จัก|unknown/i.test(e.message)?'Apps Script ไดรฟ์ยังเป็นเวอร์ชันเก่า — วางโค้ด AppsScript-จัดไฟล์ไดรฟ์.gs ล่าสุดแล้ว Deploy ใหม่ก่อน':'เพิ่มสิทธิ์ไม่สำเร็จ: '+e.message,'error'); }
 }
 
@@ -1066,6 +1071,10 @@ function edGrow(t){ const y=window.scrollY, mc=$('main-content'), my=mc?mc.scrol
 function goTo(id){ const el=$('pl-s-'+id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
 
 /* ── วาดหน้า ── */
+// 📌 จำการ์ดที่ผู้ใช้กดล่าสุด (หัวข้อ h3) — render แล้วเลื่อนจอให้การ์ดนั้นอยู่ที่เดิม
+let ANCHOR='';
+document.addEventListener('pointerdown', e=>{ const c=e.target.closest&&e.target.closest('#nd-plan-body .pl-card'); ANCHOR=c?((c.querySelector('h3')||{}).textContent||''):''; }, true);
+const cardTop=t=>{ if(!t) return null; const h=[...document.querySelectorAll('#nd-plan-body .pl-card h3')].find(x=>x.textContent===t); return h?h.closest('.pl-card').getBoundingClientRect().top:null; };
 function render(){ const pg=$('nd-plan-body'); if(!pg) return;
   if(!['admin','manager'].includes(role())){ pg.innerHTML='<div class="pl-mut" style="padding:40px;text-align:center">🔒 สำหรับแอดมิน/เมเนเจอร์</div>'; return; }
   const projs=myProjects(); if(!S || !projs.find(p=>p.id===S.id)) loadProject(projs[0]&&projs[0].id);
@@ -1073,6 +1082,7 @@ function render(){ const pg=$('nd-plan-body'); if(!pg) return;
   const ae=document.activeElement, keepEd=ae&&ae.id==='pl-ed', selS=keepEd?ae.selectionStart:0, selE=keepEd?ae.selectionEnd:0;
   const y=window.scrollY, mc=$('main-content'), my=mc?mc.scrollTop:0;
   pg.style.minHeight=pg.offsetHeight+'px';   // 🧷 ล็อกความสูงไว้ระหว่างวาดใหม่ → จอไม่กระโดด
+  const aTop=cardTop(ANCHOR);
   const flTop=(document.querySelector('#nd-plan-body .pl-fl')||{}).scrollTop||0, flOf=DR.cur;
   pg.innerHTML=`<div class="pl-top">${projPicker(projs)}
      ${dirty?'<span class="pl-dirty">● มีการแก้ไขที่ยังไม่บันทึก</span>':S.draft?`<span class="pl-mut">📝 แบบร่างล่าสุด ${esc(safe(()=>_prTimeAgo(S.draft.at),''))}</span>`:''}<span style="flex:1"></span><button class="btn btn-outline" onclick="NDP.draft()" title="เก็บไว้ก่อน — ยังไม่บันทึกจริง ทีมยังไม่เห็น">📝 บันทึกแบบร่าง</button><button class="btn btn-green" onclick="NDP.save()">✅ บันทึกโปรเจกต์</button></div>
@@ -1082,7 +1092,9 @@ function render(){ const pg=$('nd-plan-body'); if(!pg) return;
    ${(()=>{ const [top,roles]=leftHTML().split('<!--ROLES-->'); return `<div id="pl-s-info" class="pl-anchor"></div>`+top+`<div id="pl-s-roles" class="pl-anchor"></div><div class="pl-grid"><div>${roles}</div><div class="pl-right">${rightHTML()}</div></div>`; })()}<div id="pl-s-drive" class="pl-anchor"></div>${driveHTML()}<div id="pl-s-dc" class="pl-anchor"></div>${dcHTML()}`;
   window.scrollTo(0,y); if(mc) mc.scrollTop=my;
   { const fl=document.querySelector('#nd-plan-body .pl-fl'); if(fl && flOf===DR.cur) fl.scrollTop=flTop; }   // รายการโฟลเดอร์ไม่เด้งกลับบนสุด
-  requestAnimationFrame(()=>{ pg.style.minHeight=''; window.scrollTo(0,y); });
+  const fixAnchor=()=>{ const t=cardTop(ANCHOR); if(aTop!=null && t!=null && Math.abs(t-aTop)>2) window.scrollBy(0,t-aTop); };
+  fixAnchor();
+  setTimeout(()=>{ pg.style.minHeight=''; window.scrollTo(0,y); fixAnchor(); },0);
   if(dd){ const q=$('pl-ddq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
   else if(pjOpen){ const q=$('pl-pjq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
   else if(ae&&ae.id==='pl-pkq'){ const q=$('pl-pkq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
@@ -1343,16 +1355,18 @@ const NDP=window.NDP={
     const name=drFolderName(); if(!name){ say('ตั้งชื่อโฟลเดอร์ก่อน','error'); return; }
     const items=drItems();
     if(!confirm('สร้างโฟลเดอร์ "'+name+'" ใน "'+(DR.path[DR.path.length-1]||{}).name+'" + โฟลเดอร์ย่อย '+items.length+' โฟลเดอร์?')) return;
-    busy(true);
-    try{ const root=await callDrive({action:'create', parentId:parent, name});
-      if(items.length) await callDrive({action:'tree', parentId:root.id, items});
+    const step=t=>{ DR.creating=t; render(); };
+    let shareMsg='';
+    try{ step('⏳ 1/3 สร้างโฟลเดอร์งาน…'); const root=await callDrive({action:'create', parentId:parent, name});
+      if(items.length){ step('⏳ 2/3 สร้างโฟลเดอร์ย่อย '+items.length+' โฟลเดอร์…'); await callDrive({action:'tree', parentId:root.id, items}); }
       await saveProjectMerge(S.id, f=>{ f.driveFolderId=root.id; f.driveFolderLink=root.link||''; f.driveFolderName=root.name||name; if(!f.downloadLink) f.downloadLink=root.link||''; });
       S.src=fresh(); if(!S.link) S.link=S.src.downloadLink||'';
       audit('project.drive', S.name, 'สร้างโฟลเดอร์งานจากหน้าวางแผนงาน ('+items.length+' โฟลเดอร์)');
-      say('📂 สร้างโฟลเดอร์ "'+name+'" แล้ว','success');
-      if(planIds().length){ await drShare(root.id, true); S.src=fresh(); }
-    }catch(e){ say('สร้างไม่สำเร็จ: '+e.message,'error'); }
-    finally{ busy(false); render(); } },
+      if(planIds().length){ step('⏳ 3/3 เพิ่มสิทธิ์ให้ทีม…'); shareMsg=await drShare(root.id, true)||''; S.src=fresh(); }
+      DR.done={ok:true, name:root.name||name, link:root.link||('https://drive.google.com/drive/folders/'+root.id), n:items.length, share:shareMsg, where:(DR.path[DR.path.length-1]||{}).name||''};
+      say('✅ สร้างโฟลเดอร์ "'+name+'" เสร็จแล้ว','success');
+    }catch(e){ DR.done={ok:false, err:String(e.message||e)}; say('สร้างไม่สำเร็จ: '+e.message,'error'); }
+    finally{ DR.creating=''; render(); ANCHOR=''; setTimeout(()=>{ const b=document.getElementById('pl-drdone'); if(b) b.scrollIntoView({block:'center'}); },60); } },
   async drScript(){ const p=fresh(), tid=drCfg().scriptTplId; if(!p.driveFolderId){ say('สร้าง/ผูกโฟลเดอร์งานก่อน','warn'); return; } if(!tid){ say('ยังไม่ได้ตั้งไฟล์บทต้นฉบับ — ตั้งได้ที่ 🔧 ตั้งค่า Drive','warn'); return; }
     let name='Script/CV_'+drCode(); if(p.scriptLink){ const nm=prompt('ชื่อไฟล์บทใหม่:', name+' (2)'); if(!nm||!nm.trim()) return; name=nm.trim(); }
     busy(true); try{ const d=await callDrive({action:'copy', fileId:tid, destId:p.driveFolderId, name});
@@ -1360,6 +1374,7 @@ const NDP=window.NDP={
       S.src=fresh(); audit('project.drive', S.name, 'สร้างไฟล์บท '+name); say('📄 สร้างไฟล์บท '+name+' แล้ว','success'); if(d.link) window.open(d.link,'_blank'); }
     catch(e){ say('สร้างไฟล์บทไม่ได้: '+e.message,'error'); } finally{ busy(false); render(); } },
   async drInside(){ const id=S.src.driveFolderId; DR.cur=id; busy(true); try{ const d=await callDrive({action:'list', parentId:id}); DR.folders=d.folders||[]; }catch(e){ say('โหลดไม่ได้: '+e.message,'error'); } finally{ busy(false); render(); } },
+  drDoneClose(){ DR.done=null; render(); },
   async drUnlink(){ if(!confirm('เลิกผูกโฟลเดอร์นี้กับโปรเจกต์? (โฟลเดอร์ในไดรฟ์ไม่ถูกลบ)')) return;
     await saveProjectMerge(S.id, f=>{ delete f.driveFolderId; delete f.driveFolderLink; delete f.driveFolderName; }); S.src=fresh(); DR=DR0(); render(); },
   async drShare(){ busy(true); try{ await drShare(S.src.driveFolderId); S.src=fresh(); }finally{ busy(false); render(); } },
