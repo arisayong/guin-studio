@@ -685,8 +685,9 @@ function driveHTML(){ const p=S.src, linked=!!p.driveFolderId, ready=drReady();
   return `<div class="pl-card">${head}<div class="pl-cb pl-2col"><div><label class="pl-l">📍 เลือกที่วาง — กดโฟลเดอร์เพื่อเข้าไปดูข้างใน</label>
      <div style="display:flex;gap:6px"><select class="form-input form-select" onchange="NDP.drRoot(this.value)"><option value="">— โฟลเดอร์หลัก —</option>${parents.map(x=>`<option value="${esc(x.id)}"${DR.path[0]&&DR.path[0].id===x.id?' selected':''}>📂 ${esc(x.name)}</option>`).join('')}</select>
       <button class="btn btn-outline btn-sm" title="เปิดดูจากไดรฟ์ทั้งหมด" onclick="NDP.drRoot('root')">🗂️</button></div>
+     <div style="display:flex;gap:6px;margin-top:6px"><input id="pl-drlink" class="form-input" placeholder="🔗 หรือวางลิงก์โฟลเดอร์ Google Drive ที่อยากให้สร้างงานไว้ข้างใน" onkeydown="if(event.key==='Enter'){event.preventDefault();NDP.drPaste(this.value)}" onpaste="setTimeout(()=>NDP.drPaste(this.value),0)"><button class="btn btn-outline btn-sm" onclick="NDP.drPaste(document.getElementById('pl-drlink').value)">ไป</button></div>
      ${cur?`<div class="pl-crumb">${DR.path.map((x,i)=>`${i?'›':''}<a onclick="NDP.drUp(${i})">${esc(x.name)}</a>`).join(' ')}</div>
-      <div class="pl-fl">${DR.err?`<div class="pl-bad" style="cursor:default">โหลดไม่ได้: ${esc(DR.err)}</div>`:DR.folders==null?'<div class="pl-mut" style="cursor:default">กำลังโหลด…</div>':(DR.folders.map((f,i)=>`<div onclick="NDP.drIn(${i})">📁 ${esc(f.name)}</div>`).join('')||'<div class="pl-mut" style="cursor:default">ไม่มีโฟลเดอร์ย่อย</div>')}</div>
+      <div class="pl-fl">${DR.err?`<div class="pl-bad" style="cursor:default">โหลดไม่ได้: ${esc(DR.err)}</div>`:DR.folders==null?'<div class="pl-mut" style="cursor:default">กำลังโหลด…</div>':((DR.loading?'<div class="pl-mut" style="cursor:default">⏳ กำลังโหลด…</div>':'')+DR.folders.map((f,i)=>f._old?`<div style="opacity:.35;pointer-events:none">📁 ${esc(f.name)}</div>`:`<div onclick="NDP.drIn(${i})">📁 ${esc(f.name)}</div>`).join('')||'<div class="pl-mut" style="cursor:default">ไม่มีโฟลเดอร์ย่อย</div>')}</div>
       <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="NDP.drNew()">＋ โฟลเดอร์ใหม่ที่นี่</button>${cur!=='root'?`<button class="btn btn-outline btn-sm" onclick="NDP.drLink()">🔗 ใช้ "${esc(here)}" เป็นโฟลเดอร์งาน</button>`:''}</div>
       <div class="pl-mut" style="margin-top:6px">จะสร้างไว้ใน: <b>${esc(here)}</b></div>`:`<div class="pl-mut" style="margin-top:8px">${parents.length?'เลือกโฟลเดอร์หลักก่อน':'ยังไม่มีโฟลเดอร์หลัก — กด 🗂️ เพื่อเปิดดูไดรฟ์'}</div>`}</div>
     <div><label class="pl-l">🧩 เทมเพลตโครงโฟลเดอร์</label><div style="display:flex;gap:6px"><select class="form-input form-select" onchange="NDP.drTpl(this.value)">${drTplOptions().map(([v,l])=>`<option value="${esc(v)}"${v===tplKey?' selected':''}>${esc(l)}</option>`).join('')}</select><button class="btn btn-outline btn-sm" onclick="NDP.drEdit()">${DR.edit?'✕ ปิด':'✏️ แก้'}</button></div>
@@ -697,7 +698,7 @@ function driveHTML(){ const p=S.src, linked=!!p.driveFolderId, ready=drReady();
       :`<div class="pl-tree" style="margin-top:8px">📁 <b>${esc(drFolderName())}</b><br>${items.map(it=>`&nbsp;&nbsp;&nbsp;&nbsp;📁 ${esc(it.name)}${(it.children||[]).map(c=>'<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;📁 '+esc(c)).join('')}`).join('<br>')||'<span class="pl-mut">(ไม่มีโฟลเดอร์ย่อย)</span>'}</div>`}
      <button class="btn btn-green" style="width:100%;margin-top:10px" ${cur&&cur!=='root'?'':'disabled title="เลือกที่วางก่อน"'} onclick="NDP.drCreate()">📂 สร้างตามเทมเพลต + เพิ่มสิทธิ์ทีม</button>
      <div class="pl-mut" style="margin-top:6px">🔐 เพิ่มสิทธิ์เงียบ ๆ เฉพาะคนในแผนที่อีเมลยังไม่มีสิทธิ์ · ไม่แจ้งเตือน</div></div></div></div>`; }
-async function drList(id){ DR.folders=null; DR.err=''; render(); try{ const d=await callDrive({action:'list', parentId:id}); if(DR.cur===id) DR.folders=d.folders||[]; }catch(e){ if(DR.cur===id) DR.err=String(e.message||e); } render(); }
+async function drList(id){ DR.err=''; DR.loading=id; if(DR.listOf!==id && DR.folders) DR.folders=DR.folders.map(f=>({...f, _old:1})); render(); try{ const d=await callDrive({action:'list', parentId:id}); if(DR.cur===id){ DR.folders=d.folders||[]; DR.listOf=id; } }catch(e){ if(DR.cur===id) DR.err=String(e.message||e); } if(DR.loading===id) DR.loading=''; render(); }
 function drShareEmails(){ const ids=[...planIds()]; const m=mgrStaff(S.mgrId); if(m) ids.push(m.id);
   return [...new Set(ids.map(staff).filter(Boolean).map(s=>String(s.email||'').trim().toLowerCase()).filter(e=>/@/.test(e)))]; }
 async function drShare(folderId, quiet){
@@ -1071,6 +1072,8 @@ function render(){ const pg=$('nd-plan-body'); if(!pg) return;
   if(!S){ pg.innerHTML='<div class="pl-mut" style="padding:40px;text-align:center">ยังไม่มีโปรเจกต์ — สร้างที่หน้า 📋 มอบหมายงาน ก่อน</div>'; return; }
   const ae=document.activeElement, keepEd=ae&&ae.id==='pl-ed', selS=keepEd?ae.selectionStart:0, selE=keepEd?ae.selectionEnd:0;
   const y=window.scrollY, mc=$('main-content'), my=mc?mc.scrollTop:0;
+  pg.style.minHeight=pg.offsetHeight+'px';   // 🧷 ล็อกความสูงไว้ระหว่างวาดใหม่ → จอไม่กระโดด
+  const flTop=(document.querySelector('#nd-plan-body .pl-fl')||{}).scrollTop||0, flOf=DR.cur;
   pg.innerHTML=`<div class="pl-top">${projPicker(projs)}
      ${dirty?'<span class="pl-dirty">● มีการแก้ไขที่ยังไม่บันทึก</span>':S.draft?`<span class="pl-mut">📝 แบบร่างล่าสุด ${esc(safe(()=>_prTimeAgo(S.draft.at),''))}</span>`:''}<span style="flex:1"></span><button class="btn btn-outline" onclick="NDP.draft()" title="เก็บไว้ก่อน — ยังไม่บันทึกจริง ทีมยังไม่เห็น">📝 บันทึกแบบร่าง</button><button class="btn btn-green" onclick="NDP.save()">✅ บันทึกโปรเจกต์</button></div>
    ${(()=>{ const ed=safe(()=>getOtherAdminsOnProject(S.id),[]).filter(u=>u&&u.action==='editing'); return ed.length?`<div class="pl-pres">👁️ <b>${esc(ed.map(u=>u.nickname).join(', '))}</b> กำลังเปิดแก้งานนี้อยู่ — ถ้าเขาบันทึกก่อน ระบบจะเตือนตอนคุณกดบันทึก</div>`:''; })()}
@@ -1078,6 +1081,8 @@ function render(){ const pg=$('nd-plan-body'); if(!pg) return;
    ${jumpBar()}
    ${(()=>{ const [top,roles]=leftHTML().split('<!--ROLES-->'); return `<div id="pl-s-info" class="pl-anchor"></div>`+top+`<div id="pl-s-roles" class="pl-anchor"></div><div class="pl-grid"><div>${roles}</div><div class="pl-right">${rightHTML()}</div></div>`; })()}<div id="pl-s-drive" class="pl-anchor"></div>${driveHTML()}<div id="pl-s-dc" class="pl-anchor"></div>${dcHTML()}`;
   window.scrollTo(0,y); if(mc) mc.scrollTop=my;
+  { const fl=document.querySelector('#nd-plan-body .pl-fl'); if(fl && flOf===DR.cur) fl.scrollTop=flTop; }   // รายการโฟลเดอร์ไม่เด้งกลับบนสุด
+  requestAnimationFrame(()=>{ pg.style.minHeight=''; window.scrollTo(0,y); });
   if(dd){ const q=$('pl-ddq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
   else if(pjOpen){ const q=$('pl-pjq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
   else if(ae&&ae.id==='pl-pkq'){ const q=$('pl-pkq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
@@ -1313,6 +1318,12 @@ const NDP=window.NDP={
   drRoot(id){ if(!id){ DR.cur=''; DR.path=[]; render(); return; } const x=id==='root'?{id:'root',name:'ไดรฟ์ของฉัน'}:drParents().find(p=>p.id===id); if(!x) return; DR.path=[{id:x.id,name:x.name}]; DR.cur=x.id; drList(x.id); },
   drIn(i){ const f=(DR.folders||[])[i]; if(!f) return; DR.path.push({id:f.id,name:f.name}); DR.cur=f.id; drList(f.id); },
   drUp(i){ DR.path=DR.path.slice(0,i+1); DR.cur=DR.path[i].id; drList(DR.cur); },
+  // 🔗 วางลิงก์โฟลเดอร์ → เปิดโฟลเดอร์นั้นเป็นที่วาง (สร้างงานไว้ข้างใน หรือใช้เป็นโฟลเดอร์งานเลยก็ได้)
+  async drPaste(v){ const raw=String(v||'').trim(); if(!raw) return; const m=raw.match(/folders\/([-\w]{20,})/)||raw.match(/[?&]id=([-\w]{20,})/)||raw.match(/^([-\w]{25,})$/);
+    if(!m){ say('ลิงก์นี้ไม่ใช่โฟลเดอร์ Google Drive — คัดลอกลิงก์จากแถบที่อยู่ตอนเปิดโฟลเดอร์ (…/drive/folders/…)','warn'); return; }
+    const id=m[1]; let name='📎 โฟลเดอร์จากลิงก์';
+    try{ const r=await callDrive({action:'info', id}); if(r&&r.name) name=r.name; }catch(e){ /* สคริปต์รุ่นเก่ายังไม่มี info — ใช้ชื่อกลางไปก่อน */ }
+    DR.path=[{id,name}]; DR.cur=id; const i=document.getElementById('pl-drlink'); if(i) i.value=''; drList(id); },
   async drNew(){ const nm=prompt('ชื่อโฟลเดอร์ใหม่ (สร้างใน "'+((DR.path[DR.path.length-1]||{}).name||'')+'"):'); if(!nm||!nm.trim()) return;
     busy(true); try{ const d=await callDrive({action:'create', parentId:DR.cur, name:nm.trim()}); DR.path.push({id:d.id,name:d.name||nm.trim()}); DR.cur=d.id; say('📁 สร้างโฟลเดอร์แล้ว','success'); busy(false); drList(d.id); }
     catch(e){ say('สร้างไม่ได้: '+e.message,'error'); } finally{ busy(false); } },
