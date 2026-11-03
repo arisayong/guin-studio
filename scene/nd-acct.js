@@ -220,13 +220,13 @@ function pickFile(){ return new Promise(res=>{ const i=document.createElement('i
 const DR_ROOT='Guin บัญชี (เอกสารบริษัท)';
 const DR_SUB=['01 สลิปโอนเงิน','02 50ทวิ จากลูกค้า','03 ใบเสร็จค่าใช้จ่าย','04 ใบเสร็จการยื่นภาษี-สปส','05 Statement ธนาคาร','06 อื่นๆ'];
 const KIND_SUB={wht_client:DR_SUB[1], expense:DR_SUB[2], tax:DR_SUB[3]};
-const monName=k=>safe(()=>acctMonthName(k), k.slice(5,7)+' '+mLabel(k));   // "10 ต.ค." — ไม่มีปี (อยู่ในโฟลเดอร์ปีแล้ว)
+const monName=k=>safe(()=>acctMonthName(k), k.slice(5,7)+' '+mLabel(k));   // "ตุลาคม" — ชื่อเดือนอย่างเดียว (อยู่ในโฟลเดอร์ปีแล้ว)
 const drv=()=>(D&&D.drive)||{};
 const drMonth=k=>{ const y=(drv().years||{})[k.slice(0,4)]; return y&&(y.months||{})[k]; };
 async function saveDrive(){ try{ await fbSaveKeyed('acct_drive', D.drive); }catch(e){ toast('บันทึกข้อมูล Drive ไม่สำเร็จ: '+e.message,'error'); } }
 async function drCall(payload){ if(typeof callDrive!=='function') throw new Error('ยังไม่ได้เชื่อม Google Drive'); return callDrive(payload); }
 // แอดมิน: สร้างโฟลเดอร์หลัก + ปี (เดือน/หัวข้อสร้างเองตอนมีไฟล์อัป) · กดซ้ำ = จัดโฟลเดอร์เดิมให้เป็นแบบใหม่
-//    เปลี่ยนชื่อเดือนเดิม "11 พ.ย. 2569" → "11 พ.ย." · หัวข้อที่สร้างไว้ล่วงหน้าแต่ยังว่าง → ย้ายลงถังขยะ (กู้คืนได้ 30 วัน)
+//    เปลี่ยนชื่อเดือนเดิม "11 พ.ย. 2569" → "พฤศจิกายน" · หัวข้อที่สร้างไว้ล่วงหน้าแต่ยังว่าง → ย้ายลงถังขยะ (กู้คืนได้ 30 วัน)
 async function driveSetupYear(y){
   if(!isAdm()) return; showLoader(true);
   try{
