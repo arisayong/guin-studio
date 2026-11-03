@@ -195,7 +195,7 @@ function render(){ const b=$('nd-acct-body'); if(!b||!D) return; const C=compute
       if(!isAdm()) return dv.root?`<div class="ac-card" style="padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>🗂️ Drive บัญชี</b><span class="ac-mut">ไฟล์ที่ได้รับมา (สลิป · 50 ทวิ ลูกค้า · ใบเสร็จ · ใบเสร็จการยื่น) วางไว้ที่นี่</span><span style="margin-left:auto;display:flex;gap:6px">${openLinks}</span></div>`:'';
       return `<div class="ac-card" style="padding:10px 14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>🗂️ Drive บัญชี</b>
         <span class="ac-mut">${dv.root?('เจ้าของไดรฟ์: '+E(dv.owner||'บัญชีที่ตั้งค่า Drive ไว้')+(dv.sharedTo&&dv.sharedTo.length?' · แชร์ให้ '+E(dv.sharedTo.join(', ')):' · ยังไม่ได้แชร์ให้นักบัญชี')):'ยังไม่ได้สร้าง — สร้างในไดรฟ์หลักของแอดมิน (ตัวเดียวกับหน้า 📂 จัดไฟล์งาน)'}</span>
-        <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">${openLinks}<button class="btn btn-sm ${y?'btn-outline':'btn-blue'}" onclick="ACCT.driveSetup()">${y?'🔄 ตรวจโฟลเดอร์ปี '+(YEAR+543):'🗂️ สร้างโฟลเดอร์ปี '+(YEAR+543)}</button>${dv.root?'<button class="btn btn-sm btn-outline" onclick="ACCT.driveShare()">🔗 แชร์ให้นักบัญชี</button>':''}</span></div></div>`; })()}
+        <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">${openLinks}<button class="btn btn-sm ${y?'btn-outline':'btn-blue'}" onclick="ACCT.driveSetup()">${y?'🧹 จัดโฟลเดอร์ปี '+(YEAR+543)+' ให้เป็นแบบใหม่':'🗂️ สร้างโฟลเดอร์ปี '+(YEAR+543)}</button>${dv.root?'<button class="btn btn-sm btn-outline" onclick="ACCT.driveShare()">🔗 แชร์ให้นักบัญชี</button>':''}</span></div></div>`; })()}
    ${trk}
    <div class="ac-card">
     ${st('s1','💸','1. รอบจ่ายทีมงาน','มาจาก: หน้าเอกสาร › ใบสำคัญจ่ายทีม (ออกใบ & ส่งเมล)',C.vs.length?P(C.vs.length+' ใบ',s1ok?'ac-g':'ac-o'):P('ยังไม่มีใบ'),s1ok?'':'warn',s1)}
@@ -220,23 +220,30 @@ function pickFile(){ return new Promise(res=>{ const i=document.createElement('i
 const DR_ROOT='Guin บัญชี (เอกสารบริษัท)';
 const DR_SUB=['01 สลิปโอนเงิน','02 50ทวิ จากลูกค้า','03 ใบเสร็จค่าใช้จ่าย','04 ใบเสร็จการยื่นภาษี-สปส','05 Statement ธนาคาร','06 อื่นๆ'];
 const KIND_SUB={wht_client:DR_SUB[1], expense:DR_SUB[2], tax:DR_SUB[3]};
-const monName=k=>k.slice(5,7)+' '+mLabel(k);
+const monName=k=>safe(()=>acctMonthName(k), k.slice(5,7)+' '+mLabel(k));   // "10 ต.ค." — ไม่มีปี (อยู่ในโฟลเดอร์ปีแล้ว)
 const drv=()=>(D&&D.drive)||{};
 const drMonth=k=>{ const y=(drv().years||{})[k.slice(0,4)]; return y&&(y.months||{})[k]; };
 async function saveDrive(){ try{ await fbSaveKeyed('acct_drive', D.drive); }catch(e){ toast('บันทึกข้อมูล Drive ไม่สำเร็จ: '+e.message,'error'); } }
 async function drCall(payload){ if(typeof callDrive!=='function') throw new Error('ยังไม่ได้เชื่อม Google Drive'); return callDrive(payload); }
-// แอดมิน: สร้างโฟลเดอร์หลัก + ปี + 12 เดือน (+ โฟลเดอร์ย่อย) · กดซ้ำได้ ไม่สร้างซ้ำ
+// แอดมิน: สร้างโฟลเดอร์หลัก + ปี (เดือน/หัวข้อสร้างเองตอนมีไฟล์อัป) · กดซ้ำ = จัดโฟลเดอร์เดิมให้เป็นแบบใหม่
+//    เปลี่ยนชื่อเดือนเดิม "11 พ.ย. 2569" → "11 พ.ย." · หัวข้อที่สร้างไว้ล่วงหน้าแต่ยังว่าง → ย้ายลงถังขยะ (กู้คืนได้ 30 วัน)
 async function driveSetupYear(y){
   if(!isAdm()) return; showLoader(true);
   try{
     D.drive=D.drive||{};
     if(!D.drive.root){ const r=await drCall({action:'create', parentId:'root', name:DR_ROOT}); D.drive.root={id:r.id, link:r.link}; }
     try{ const pg=await drCall({action:'ping'}); if(pg&&pg.email) D.drive.owner=pg.email; }catch(e){}
+    D.drive.years=D.drive.years||{}; const old=D.drive.years[y]||{};
     const yf=await drCall({action:'create', parentId:D.drive.root.id, name:'ปี '+(y+543)});
-    const tr=await drCall({action:'tree', parentId:yf.id, items:yearMonths(y).map(k=>({name:monName(k), children:DR_SUB}))});
-    const months={}; yearMonths(y).forEach(k=>{ const c=(tr.created||[]).find(x=>x.name===monName(k)); if(c) months[k]={id:c.id, link:c.link, sub:{}}; });
-    D.drive.years=D.drive.years||{}; D.drive.years[y]={id:yf.id, link:yf.link, months}; D.drive.updatedAt=new Date().toISOString();
-    await saveDrive(); toast('🗂️ สร้างโฟลเดอร์ Drive บัญชี ปี '+(y+543)+' แล้ว','success'); render();
+    const yr=D.drive.years[y]={id:yf.id, link:yf.link, months:old.months||{}};
+    let ren=0, trashed=0, oldScript=false;
+    for(const [k,mo] of Object.entries(yr.months)){ if(!mo||!mo.id) continue;
+      if(mo.name!==monName(k)){ try{ await drCall({action:'rename', id:mo.id, name:monName(k)}); mo.name=monName(k); ren++; }catch(e){ oldScript=true; } }
+      for(const n of DR_SUB){ const sf=(mo.sub||{})[n]; if(sf&&sf.files) continue;
+        try{ const r=await drCall({action:'trashEmpty', parentId:mo.id, name:n}); if(r&&r.trashed){ trashed++; if(mo.sub) delete mo.sub[n]; } }catch(e){ oldScript=true; break; } } }
+    D.drive.updatedAt=new Date().toISOString();
+    await saveDrive();
+    toast('🗂️ Drive บัญชี ปี '+(y+543)+' พร้อมแล้ว'+(ren?' · เปลี่ยนชื่อเดือน '+ren:'')+(trashed?' · เก็บหัวข้อว่าง '+trashed+' โฟลเดอร์ลงถังขยะ':'')+(oldScript?' · ⚠️ อัปเดต Apps Script จัดไฟล์ไดรฟ์ ก่อน จึงจะจัดโฟลเดอร์เดิมได้':''), oldScript?'warn':'success'); render();
   }catch(e){ toast('สร้างโฟลเดอร์ไม่สำเร็จ: '+e.message+' (ตั้งค่า Drive ที่หน้า 📂 จัดไฟล์งาน › 🔧 ตั้งค่า Drive)','error'); }
   finally{ showLoader(false); }
 }
@@ -254,19 +261,18 @@ async function driveShare(){
 // อัปไฟล์เข้าโฟลเดอร์ย่อยของเดือน · คืน {url, name}
 async function upFile(kind, base){
   const mo=drMonth(MONTH), subName=KIND_SUB[kind]||DR_SUB[5];
-  if(!mo){ toast(isAdm()?'ยังไม่มีโฟลเดอร์ Drive ของเดือนนี้ — กด "🗂️ สร้างโฟลเดอร์ปี" ในการ์ด Drive บัญชีก่อน':'แอดมินยังไม่ได้สร้าง Drive บัญชีของเดือนนี้','warn'); return null; }
+  if(!mo && !isAdm()){ toast('ยังไม่มีโฟลเดอร์ของเดือนนี้ใน Drive บัญชี — แจ้งแอดมิน (โฟลเดอร์จะถูกสร้างเมื่อแอดมินอัปไฟล์ครั้งแรก)','warn'); return null; }
   if(!isAdm()){   // นักบัญชี: เปิดโฟลเดอร์ใน Drive แล้ววางไฟล์เอง (โฟลเดอร์แชร์ให้แล้ว) → ติ๊กว่าแนบแล้ว
     window.open(mo.link,'_blank');
     return confirm('เปิดโฟลเดอร์ "'+monName(MONTH)+'" ใน Google Drive แล้ว\nวางไฟล์ในโฟลเดอร์ "'+subName+'"\n\nกด OK เมื่อวางไฟล์เรียบร้อย')?{url:mo.link, name:'(วางใน Drive)'}:null; }
   const f=await pickFile(); if(!f) return null;
   showLoader(true);
   try{
-    let sub=(mo.sub||{})[subName];
-    if(!sub){ const r=await drCall({action:'create', parentId:mo.id, name:subName}); sub={id:r.id, link:r.link}; mo.sub=mo.sub||{}; mo.sub[subName]=sub; saveDrive(); }
     const data=await new Promise(r=>{ const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.onerror=()=>r(''); fr.readAsDataURL(f); });
     const name=(base+'_'+f.name).replace(/[\\\/:*?"<>|\s]+/g,'_');
-    const up=await drCall({action:'upload', folderId:sub.id, name, mimeType:f.type||'application/octet-stream', b64:String(data).split(',')[1]||''});
-    toast('☁️ อัปขึ้น Drive แล้ว · '+subName,'success'); return {url:up.link||sub.link, name:f.name};
+    const up=await acctUpload(name, data, MONTH, subName, f.type||'application/octet-stream');   // เดือน/หัวข้อยังไม่มี → สร้างให้ตอนนี้
+    D.drive=(await fbLoadKeyed('acct_drive'))||D.drive;
+    toast('☁️ อัปขึ้น Drive แล้ว · '+monName(MONTH)+' › '+subName,'success'); return {url:up.url, name:f.name};
   }catch(e){ toast('อัปไฟล์ไม่สำเร็จ: '+e.message,'error'); return null; }
   finally{ showLoader(false); }
 }
