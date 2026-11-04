@@ -112,6 +112,30 @@ window.ndRelinkAcct=async function(){
     toast('🔗 ผูกบัญชีใหม่แล้ว','success'); open('admin', ST.staff.id);
   }catch(e){ toast('ผูกไม่สำเร็จ: '+e.message,'error'); }
 };
+// 👔 ยศพนักงานบริษัท: ติ๊กแล้วถึงเลือกหน้าที่ย่อยได้ (เมเนเจอร์ / บัญชี)
+//    เก็บ s.employee ในทะเบียนทีม + admin_config/employees/<uid> ของทุกบัญชีที่ผูกกับคนนี้ (ใช้เปิดปฏิทินทีม)
+//    ตั้งเป็นพนักงาน → การจ่ายเงินเปลี่ยนเป็น "เงินเดือนประจำ" (ถ้ายังเป็นรายโปรเจกต์) · ยกเลิก → ถอนสิทธิ์บัญชี/เมเนเจอร์ด้วย
+function _empUids(){ const em=String((ST.staff&&ST.staff.email)||'').trim().toLowerCase(), uc=ls('mgr_users_cache')||{}, out=new Set(); if(ST.acct) out.add(ST.acct.uid);
+  Object.entries(uc).forEach(([uid,u])=>{ if(u && u.role!=='admin' && (u.staffId===ST.staff.id || (em && String(u.email||'').trim().toLowerCase()===em))) out.add(uid); }); return [...out]; }
+window.ndpSetEmp=async function(cb){
+  const db=FB(); if(!CU()||CU().role!=='admin'||!ST.staff){ cb.checked=!cb.checked; return; }
+  const on=cb.checked, sid=ST.staff.id, nm=ST.staff.nickname||ST.staff.name||'';
+  if(!on && !confirm('ยกเลิกพนักงานบริษัทของ "'+nm+'"?\n\n• ถอนสิทธิ์นักบัญชี + เมเนเจอร์ (กลับเป็นทีมงานทั่วไป)\n• เข้าปฏิทินทีมไม่ได้แล้ว\n• การจ่ายเงินไม่เปลี่ยน (แก้เองที่หน้ารอบจ่ายรายเดือน)')){ cb.checked=true; return; }
+  cb.disabled=true;
+  try{
+    safe(()=>_updateStaffRecords(sid, s=>{ s.employee=on; s.employeeAt=on?nowIso():''; }));
+    ST.staff.employee=on;
+    if(db){ const upd={}; _empUids().forEach(u=>upd[u]=on?true:null); if(Object.keys(upd).length) await db.ref('admin_config/employees').update(upd);
+      if(!on){ await db.ref('admin_config/accountants').update(Object.fromEntries(Object.keys(upd).map(u=>[u,null]))); const a=$('ndp-acct'); if(a){ a.checked=false; $('ndp-acct-wrap')?.classList.remove('on'); }
+        const sr=$('ndp-sysrole'); if(sr && sr.value==='manager'){ sr.value='staff'; try{ await applyStaffRole(sid,'staff'); }catch(e){} } } }
+    if(on){ const pp=safe(()=>getPayProfile(sid),null); if(pp && pp.payType==='project' && confirm('ตั้งการจ่ายเงินของ "'+nm+'" เป็น "เงินเดือนประจำ" เลยไหม?\n(ใส่ยอดเงินเดือนได้ที่หน้า รอบจ่ายรายเดือน › ประเภทจ่าย/โบนัส)')){
+        const all=getPayrollProfiles(); all[sid]={...(all[sid]||{}), payType:'salary'}; await savePayrollProfiles(all); } }
+    $('ndp-emp-wrap')?.classList.toggle('on',on); const sub=$('ndp-emp-sub'); if(sub) sub.style.display=on?'':'none';
+    try{ logAudit('staff.employee', nm, on?'ตั้งเป็นพนักงานบริษัท':'ยกเลิกพนักงานบริษัท'); }catch(e){}
+    toast(on?'👔 ตั้งเป็นพนักงานบริษัทแล้ว — เลือกหน้าที่ต่อได้เลย (เขารีเฟรชเว็บ 1 ครั้งเพื่อเห็นปฏิทินทีม)':'ยกเลิกพนักงานบริษัทแล้ว','success');
+  }catch(e){ cb.checked=!on; toast('บันทึกไม่สำเร็จ: '+e.message,'error'); }
+  cb.disabled=false;
+};
 window.ndpSetAcct=async function(cb){
   const db=FB(); if(!db||!ST.acct||!CU()||CU().role!=='admin'){ cb.checked=!cb.checked; return; }
   cb.disabled=true;
@@ -146,8 +170,11 @@ function rolesHTML(){
     const acc=ST.acct, isMgr=acc&&acc.role==='manager';
     return `<div class="ndp-card"><div class="ndp-ch"><h3>โรล / ตำแหน่งงาน</h3><span class="muted">แอดมินเปลี่ยนได้ทันที</span></div><div class="ndp-cb">
       <div class="ndp-roles">${CAT_KEYS.map(c=>`<label class="ndp-rchip ${ST.roles.includes(c)?'on':''}" style="--c:${catColor(c)}"><input type="checkbox" data-role="${c}" ${ST.roles.includes(c)?'checked':''}> ${esc(catLabel(c))}</label>`).join('')}</div>
-      ${acc?`<div class="ndp-f" style="margin-top:12px;max-width:320px"><label>บทบาทในระบบ</label><select id="ndp-sysrole"><option value="staff" ${!isMgr?'selected':''}>🎙️ Staff (ทีมงาน)</option><option value="manager" ${isMgr?'selected':''}>🗂️ Manager</option></select></div>
+      <label class="ndp-rchip ${ST.staff&&ST.staff.employee?'on':''}" id="ndp-emp-wrap" style="--c:#FFB020;margin-top:14px;display:inline-flex"><input type="checkbox" id="ndp-emp" ${ST.staff&&ST.staff.employee?'checked':''} onchange="ndpSetEmp(this)"> 👔 พนักงานบริษัท <small style="opacity:.75;font-weight:400">— รับเงินเดือนจากบริษัท · เข้าปฏิทินทีมได้</small></label>
+      <div id="ndp-emp-sub" style="display:${ST.staff&&ST.staff.employee?'':'none'};margin-top:6px;padding:10px 12px;border-left:3px solid #FFB020;background:rgba(255,176,32,.06);border-radius:8px"><div class="muted" style="font-size:12px;margin-bottom:2px">หน้าที่ของพนักงานคนนี้</div>
+      ${acc?`<div class="ndp-f" style="margin-top:8px;max-width:320px"><label>บทบาทในระบบ</label><select id="ndp-sysrole"><option value="staff" ${!isMgr?'selected':''}>🎙️ Staff (ทีมงาน)</option><option value="manager" ${isMgr?'selected':''}>🗂️ Manager</option></select></div>
         <label class="ndp-rchip" id="ndp-acct-wrap" style="--c:#00B4FF;margin-top:10px;display:inline-flex"><input type="checkbox" id="ndp-acct" disabled onchange="ndpSetAcct(this)"> 🧾 นักบัญชี <small style="opacity:.75;font-weight:400">— เห็นเมนู "งานบัญชี" · ดูข้อมูลการเงินได้ (โอน/แก้ไม่ได้) · มีผลทันที</small></label>`:'<div class="muted" style="margin-top:10px;font-size:12px">🧾 ตั้งเป็นนักบัญชีได้หลังผูกบัญชีผู้ใช้กับทีมงานคนนี้</div>'}
+      </div>
       ${reqNoteHTML()}</div></div>${linkCardHTML()}`;
   }
   const cur=ST.roles, add=ST.pendAdd, del=ST.pendDel;

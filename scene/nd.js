@@ -60,21 +60,21 @@ const FIN = [['queue','payq','คิวจ่ายเงิน','จ่าย�
 function buildNav(){
   const a=$('admin-nav'), s=$('staff-nav'), m=$('manager-nav');
   if(!a||!s||!m) return;
-  a.innerHTML = item('home','home','หน้าแรก') + sec('งาน')
+  a.innerHTML = item('home','home','หน้าแรก') + item('nd-cal','track','ติดตามงาน',badge('track-badge')) + sec('งาน')
     + item('availability','queueAvail','ลงคิว') + item('assign','assign','มอบหมายงาน')
     + item('nd-plan','plan','วางแผนงาน')
-    + item('projects','projects','โปรเจกต์',badge('deadline-badge')) + item('track','track','ติดตามงาน',badge('track-badge'))
+    + item('projects','projects','โปรเจกต์',badge('deadline-badge'))
     + item('calc','calc','คำนวนราคา') + sec('บัญชี')
     + grp('fin','nd-fin','fin','บัญชี',FIN.map(([p,i,l,,b])=>item(p,i,l,b?badge(b):'')).join(''))
     + sec('ทีมงาน') + item('staff','team','จัดการทีม') + item('nd-work','profit','สรุปการทำงาน') + item('nd-price','price','เทมเพลตราคา');
-  s.innerHTML = item('home','home','หน้าแรก') + sec('ของฉัน')
+  s.innerHTML = item('home','home','หน้าแรก') + `<div class="nd-emp-nav" style="display:none">${item('nd-cal','track','ติดตามงาน')}</div>` + sec('ของฉัน')
     + item('my-calendar','track','ปฏิทินงาน') + item('my-dashboard','money','งานของฉัน')
     + item('confirm-amount','confirm','ยืนยันยอด',badge('ca-badge-staff'))
     + item('nd-docs','docs','เอกสารของฉัน') + `<div class="nd-acct-nav" style="display:none">${item('nd-acct','docs','งานบัญชี')}</div>` + sec('อื่น ๆ') + item('nd-settings','settings','ตั้งค่า');   // 🔔 แจ้งเตือน = ปุ่มกระดิ่งท้ายเมนูอย่างเดียว (มี "ดูทั้งหมด")
-  m.innerHTML = item('home','home','หน้าแรก') + sec('งาน')
+  m.innerHTML = item('home','home','หน้าแรก') + item('nd-cal','track','ติดตามงาน') + sec('งาน')
     + item('availability','queueAvail','ลงคิว') + item('assign','assign','มอบหมายงาน')
     + item('nd-plan','plan','วางแผนงาน')
-    + item('projects','projects','โปรเจกต์') + item('track','track','ติดตามงาน') + item('mgr-calc','calc','คำนวนราคา')
+    + item('projects','projects','โปรเจกต์') + item('mgr-calc','calc','คำนวนราคา')
     + sec('ของฉัน') + item('confirm-amount','confirm','ยืนยันยอด',badge('ca-badge-mgr'))
     + item('mgr-team','team','จัดการทีม')
     + item('nd-docs','docs','เอกสารของฉัน') + `<div class="nd-acct-nav" style="display:none">${item('nd-acct','docs','งานบัญชี')}</div>` + sec('อื่น ๆ') + item('nd-settings','settings','ตั้งค่า');   // 🔔 แจ้งเตือน = ปุ่มกระดิ่งท้ายเมนูอย่างเดียว (มี "ดูทั้งหมด")
