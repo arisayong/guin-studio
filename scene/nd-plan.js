@@ -1104,6 +1104,10 @@ function render(){ const pg=$('nd-plan-body'); if(!pg) return;
 }
 const rr=()=>{ if(!dirty) safe(()=>claimPresence(S.id,'editing')); dirty=true; render(); };
 const rt=()=>{ S.rolesT=true; rr(); };
+// 🔗 ต่อหน้าที่อัตโนมัติ: ใส่เดดไลน์หน้าที่ไหน → วันเริ่มของหน้าที่ถัดไป (ที่เปิดอยู่) = วันนั้น · ยกเว้นที่ตั้งคาบเกี่ยวเองไว้แล้ว
+const CHAIN=['trn','adp','dub','mix','qc','sub'];
+function chainNext(k,old,v){ const i=CHAIN.indexOf(k); if(i<0||!v) return; const nk=CHAIN.slice(i+1).find(x=>S.roles[x]&&S.roles[x].on&&!S.roles[x].sameAs); if(!nk) return;
+  const n=S.roles[nk]; if(n.start&&n.start!==old) return; n.start=v; say('🔗 '+R[nk][0]+' เริ่มต่อ '+fd(v)+' ให้แล้ว (แก้เองได้ถ้าจะให้คาบเกี่ยว)'); }
 const unfixRole=k=>S.roles[k].slots.forEach(s=>{ delete s.fix; });
 
 /* ── 💲 เทมเพลตราคา (misc/pricetpl = {รหัส:{name, adp, dub:[…], mix, qc, sub, trn}}) ── */
@@ -1153,7 +1157,7 @@ const NDP=window.NDP={
   rndAdd(k){ const r=S.roles[k]; r.rounds=r.rounds||[]; const n=r.rounds.length;
     r.rounds.push({label:n?'รอบ '+(n+2):'Final', date:'', time:''}); rt(); },
   // แก้แถวเดดไลน์: i=-1 = รอบหลัก · i>=0 = รอบถัดไป
-  dlSet(k,i,f,v){ const r=S.roles[k]; if(i<0){ if(f==='label') r.endLabel=v; else if(f==='date') r.end=v; else r.etime=v; } else { r.rounds[i][f==='label'?'label':f==='date'?'date':'time']=v; } rt(); },
+  dlSet(k,i,f,v){ const r=S.roles[k]; if(i<0){ if(f==='label') r.endLabel=v; else if(f==='date'){ const old=r.end||''; r.end=v; chainNext(k,old,v); } else r.etime=v; } else { r.rounds[i][f==='label'?'label':f==='date'?'date':'time']=v; } rt(); },
   stepSet(k,i,v){ const r=S.roles[k]; r.step=r.step||{}; r.step[i]=Math.max(1,parseFloat(v)||1); },
   // ⏩ เลื่อนเวลาส่งทีละ … ชม. (ไม่ต้องเปิดปฏิทิน) · ยังไม่ได้ตั้งวัน = เริ่มจากวันเริ่ม/ตอนนี้
   setHrs(k,i,v){ const r=S.roles[k], h=parseFloat(v); if(!(h>=0)){ render(); return; }

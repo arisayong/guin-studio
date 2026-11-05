@@ -954,7 +954,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261105-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261105-03"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -12131,7 +12131,8 @@ const MANAGER_PAGES=['mgr-home','mgr-projects','mgr-track','mgr-calc','mgr-team'
 // Manager เข้าถึงหน้า admin บางหน้าได้ (track = ติดตามงาน แต่กรองเฉพาะโปรเจกต์ที่ดูแล)
 const MGR_ALLOWED_ADMIN_PAGES=['track','projects','assign'];
 function nav(page){
-  if(page==='payment-history') page='profit';   // ประวัติการจ่ายเงินรวมอยู่ท้ายหน้าสรุปการเงินแล้ว (หน้าเดียวจบ ลดคลิก)
+  if(page==='payment-history') page='profit';
+  if(page==='track') page='nd-cal';   // 📅 ปฏิทินเดิมเลิกใช้ (เจ้าของ 5 พ.ย. 2569) → ไปปฏิทินใหม่   // ประวัติการจ่ายเงินรวมอยู่ท้ายหน้าสรุปการเงินแล้ว (หน้าเดียวจบ ลดคลิก)
   const role=currentUser?.role||'staff';
   if(role!=='admin'&&ADMIN_PAGES.includes(page)&&!(role==='manager'&&MGR_ALLOWED_ADMIN_PAGES.includes(page))){toast('ไม่มีสิทธิ์เข้าถึง 🔒','error');return}
   if(role==='staff'&&MANAGER_PAGES.includes(page)){toast('ไม่มีสิทธิ์เข้าถึง 🔒','error');return}
@@ -15719,12 +15720,31 @@ function onPhaseDateChange(cat, field, value){
   if(field === 'start'){
     formPhases[cat].startDate = value;
   } else if(field === 'deadline'){
+    const _old = formPhases[cat].deadline || '';
     formPhases[cat].deadline = value;
+    _chainNextStart(cat, _old, value);
   } else if(field === 'time'){
     formPhases[cat].submitTime = value;
   } else if(field === 'note'){
     formPhases[cat].note = value;
   }
+}
+
+// 🔗 ต่อหน้าที่อัตโนมัติ (เจ้าของ 5 พ.ย. 2569): ใส่เดดไลน์หน้าที่ไหน → "วันเริ่ม" ของหน้าที่ถัดไปที่เปิดอยู่ = วันนั้น
+//    เติมเฉพาะวันเริ่มที่ยังว่าง หรือที่ต่อกันอยู่เดิม (= เดดไลน์เก่า) · ที่ตั้งให้คาบเกี่ยวเองไว้จะไม่แตะ · ไม่เติมเดดไลน์ให้ (ตามที่ตกลง 20 ต.ค.)
+const PHASE_CHAIN = ['trn','adp','dub','mix','qc','sub'];
+function _chainNextStart(cat, oldIso, newIso){
+  try{
+    const i = PHASE_CHAIN.indexOf(cat); if(i < 0 || !newIso) return;
+    const nx = PHASE_CHAIN.slice(i+1).find(c => typeof activeCats === 'undefined' || !activeCats || activeCats.has(c));
+    if(!nx) return;
+    if(!formPhases[nx]) formPhases[nx] = { startDate:'', deadline:'', submitTime:'', status:'none' };
+    const cur = formPhases[nx].startDate || '';
+    if(cur && cur !== oldIso) return;
+    formPhases[nx].startDate = newIso;
+    const el = document.getElementById('ph-'+nx+'-start');
+    if(el){ el.value = newIso; try{ el.animate([{boxShadow:'0 0 0 2px #65C2F5'},{boxShadow:'0 0 0 0 transparent'}],{duration:900}); }catch(e){} }
+  }catch(e){ console.warn('_chainNextStart:', e); }
 }
 
 // ไล่เติมเดทไลน์เฟสถัดจาก fromCat ทีละ +1 วัน — ข้ามเฟสที่ปิดอยู่ · ไม่ทับเฟสที่มีค่าแล้ว (ใช้ค่านั้นเป็นฐานนับต่อ)
@@ -33430,7 +33450,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261105-01"></script><script src="scene/nd-profile.js?v=20261105-01"></script><script src="scene/nd-plan.js?v=20261105-01"></script><script src="scene/nd-cal.js?v=20261105-01"></script><script src="scene/nd-register.js?v=20261105-01"></script><script src="scene/nd-work.js?v=20261105-01"></script><script src="scene/nd-docform.js?v=20261105-01"></script><script src="scene/nd-docpdf.js?v=20261105-01"></script><script src="scene/nd-acct.js?v=20261105-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261105-03"></script><script src="scene/nd-profile.js?v=20261105-03"></script><script src="scene/nd-plan.js?v=20261105-03"></script><script src="scene/nd-cal.js?v=20261105-03"></script><script src="scene/nd-register.js?v=20261105-03"></script><script src="scene/nd-work.js?v=20261105-03"></script><script src="scene/nd-docform.js?v=20261105-03"></script><script src="scene/nd-docpdf.js?v=20261105-03"></script><script src="scene/nd-acct.js?v=20261105-03"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33440,7 +33460,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261105-01';
+var UPD_BUILD = '20261105-03';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
