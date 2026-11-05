@@ -56,13 +56,13 @@ let PROJ=[];
 
 /* ── Firebase ── */
 const myUid=()=>safe(()=>CU().uid,'');
-const path=k=>k==='team'?'teamcal/events':'privcal/'+myUid()+'/'+(k==='mine'?'events':k==='todo'?'todos':'tags');
+const path=k=>k==='team'?'teamcal/events':k==='ttags'?'teamcal/tags':'privcal/'+myUid()+'/'+(k==='mine'?'events':k==='todo'?'todos':'tags');
 function attach(){ if(D.live) return; D.live=true; const db=DB();
-  if(!db){ ['team','mine','todo','tags'].forEach(k=>{ D[k]=safe(()=>JSON.parse(localStorage.getItem('guin3_cal_'+k)),null)||(k==='tags'?null:{}); }); return; }
-  ['team','mine','todo','tags'].forEach(k=>{ try{ db.ref(path(k)).on('value', sn=>{ D[k]=sn.val()||(k==='tags'?null:{}); D['err_'+k]=''; if(visible()) render(); }, e=>{ D['err_'+k]=String(e&&e.message||e); if(visible()) render(); }); }catch(e){} }); }
-async function put(k, obj, id){ const db=DB(); if(k==='tags') D.tags=obj; else D[k][id]=obj;
+  if(!db){ ['team','mine','todo','tags','ttags'].forEach(k=>{ D[k]=safe(()=>JSON.parse(localStorage.getItem('guin3_cal_'+k)),null)||(/tags/.test(k)?null:{}); }); return; }
+  ['team','mine','todo','tags','ttags'].forEach(k=>{ try{ db.ref(path(k)).on('value', sn=>{ D[k]=sn.val()||(/tags/.test(k)?null:{}); D['err_'+k]=''; if(visible()) render(); }, e=>{ D['err_'+k]=String(e&&e.message||e); if(visible()) render(); }); }catch(e){} }); }
+async function put(k, obj, id){ const db=DB(); if(/tags/.test(k)) D[k]=obj; else D[k][id]=obj;
   if(!db){ try{ localStorage.setItem('guin3_cal_'+k, JSON.stringify(D[k])); }catch(e){} return; }
-  try{ await db.ref(path(k)+(k==='tags'?'':'/'+id)).set(obj); }catch(e){ safe(()=>toast('บันทึกไม่สำเร็จ: '+e.message+(k==='team'?' (ต้องวาง Firebase Rules v6)':''),'error')); throw e; } }
+  try{ await db.ref(path(k)+(/tags/.test(k)?'':'/'+id)).set(obj); }catch(e){ safe(()=>toast('บันทึกไม่สำเร็จ: '+e.message+(k==='team'?' (ต้องวาง Firebase Rules v6)':''),'error')); throw e; } }
 async function del(k, id){ const db=DB(); delete D[k][id]; if(!db){ try{ localStorage.setItem('guin3_cal_'+k, JSON.stringify(D[k])); }catch(e){} return; }
   try{ await db.ref(path(k)+'/'+id).remove(); }catch(e){ safe(()=>toast('ลบไม่สำเร็จ: '+e.message,'error')); } }
 async function projects(force){ if(role()==='admin'||role()==='manager'||!DB()) return safe(()=>getProjects(),[])||[];
@@ -70,6 +70,12 @@ async function projects(force){ if(role()==='admin'||role()==='manager'||!DB()) 
   try{ const sn=await DB().ref('projects').get(); D.proj=Object.values(sn.val()||{}).filter(Boolean); D.projAt=Date.now(); }catch(e){ D.proj=safe(()=>getProjects(),[])||[]; }
   return D.proj; }
 const tags=()=>D.tags||DEF_TAGS;
+// 🏷️ แท็กทีม: ทุกคนในทีมเพิ่ม/แก้/เลือกสีได้ · มีแท็กย่อยได้ 1 ชั้น (เช่น งาน › พากย์ · งาน › มิกซ์)
+const DEF_TT={meet:{name:'ประชุม / มีตติ้ง',color:'#0487E2'},work:{name:'งาน',color:'#0463CA'},off:{name:'วันหยุด / ลา',color:'#65C2F5'},tax:{name:'ส่งภาษี / บัญชี',color:'#09B1EC'},other:{name:'อื่น ๆ',color:'#7BAAF7'}};
+const TGS=sc=>sc==='team'?(D.ttags||DEF_TT):tags(), TK=sc=>sc==='team'?'ttags':'tags', LK=sc=>sc==='team'?'tt':'tags';
+function tagTree(sc){ const T=TGS(sc), ids=Object.keys(T), top=ids.filter(id=>!T[id].parent||!T[T[id].parent]); return top.map(id=>({id, t:T[id], kids:ids.filter(k=>T[k].parent===id).map(k=>({id:k, t:T[k]}))})); }
+function tagFull(sc,id){ const T=TGS(sc), t=T[id]; if(!t) return ''; const p=t.parent&&T[t.parent]; return (p?p.name+' › ':'')+t.name; }
+function tagOn(sc,id){ const L=ST.L[LK(sc)]||{}, T=TGS(sc), t=T[id]; if(L[id]===false) return false; return !(t&&t.parent&&L[t.parent]===false); }
 
 /* ── แปลงข้อมูลจริง → รายการในปฏิทิน ── */
 const staffNick=id=>{ const s=safe(()=>getStaffById(id),null); return s?(s.nickname||s.name||''):''; };
@@ -91,14 +97,14 @@ const evOf=(k,e)=>({...e, id:(k==='team'?'t:':'m:')+e.id, rid:e.id, kind:'event'
 let EV=[];
 function build(){ EV=PROJ.map(toProj).filter(Boolean).concat(Object.values(D.team).filter(e=>e&&e.start).map(e=>evOf('team',e)), Object.values(D.mine).filter(e=>e&&e.start).map(e=>evOf('mine',e))); }
 function visible_(){ const L=ST.L; return EV.filter(e=>{
-    if(e.scope==='me') return L.me && L.tags[e.tag]!==false;
+    if(e.scope==='me') return L.me && tagOn('me',e.tag);
     if(!L.teamOn) return false;
     if(e.kind==='proj') return L.all || (L.mine && e.mine);
-    return L.events; })
+    return L.events && (!e.cat || !TGS('team')[e.cat] || tagOn('team',e.cat)); })
   .concat(L.me&&L.todo?Object.values(D.todo).filter(t=>t&&t.due).map(t=>({id:'d:'+t.id, rid:t.id, kind:'todo', scope:'me', title:'☑ '+t.text, start:t.due, end:t.due, done:!!t.done})):[]); }
 const findAny=id=>EV.find(x=>x.id===id)||(String(id).startsWith('d:')&&D.todo[id.slice(2)]?{id, rid:id.slice(2), kind:'todo', scope:'me', title:'☑ '+D.todo[id.slice(2)].text, start:D.todo[id.slice(2)].due, end:D.todo[id.slice(2)].due}:null);
 const canEdit=e=>!e?false:e.kind==='todo'||e.scope==='me'?true:e.kind==='proj'?canProj():(isAdm()||!(D.team[e.rid]||{}).by||(D.team[e.rid]||{}).by===myUid());
-const colorOf=e=>e.kind==='todo'?'#FBBC04':e.scope==='me'?((tags()[e.tag]||{}).color||'#8E24AA'):((TEAM_CATS.find(c=>c.id===e.cat)||{}).color||e.color||'#0487E2');
+const colorOf=e=>e.kind==='todo'?'#FBBC04':e.scope==='me'?((tags()[e.tag]||{}).color||'#8E24AA'):((TGS('team')[e.cat]||TEAM_CATS.find(c=>c.id===e.cat)||{}).color||e.color||'#0487E2');
 
 /* ── CSS (ขอบเขต #page-nd-cal + ป๊อปอัปขึ้นต้น .c-) ── */
 const CSS=`
@@ -195,8 +201,7 @@ function side(){ const c=new Date(ST.cur.getFullYear(),ST.cur.getMonth(),1), s=a
   return `<button class="c-create" onclick="NDCAL.add('${TODAY()}')"><b>＋</b> สร้าง</button>
    <div class="c-mini"><div class="c-mini-h"><span>${TMF[c.getMonth()]} ${c.getFullYear()+543}</span><button onclick="NDCAL.nav(-1)">‹</button><button onclick="NDCAL.nav(1)">›</button></div><div class="c-mini-g">${WD.map(w=>`<div class="w">${w[0]}</div>`).join('')}${mini}</div></div>
    <div class="c-grp ${ST.open.me?'':'closed'}">${head('me',L.me,'#9aa0a6','🙋 ปฏิทินของฉัน','(คนอื่นไม่เห็น)',"NDCAL.lay('me',this.checked)")}<div class="c-gb"><div class="c-sub ${L.me?'':'off'}">
-     ${Object.entries(T).map(([id,t])=>row(L.tags[id]!==false,t.color,E(t.name),`NDCAL.lay('tag:${id}',this.checked)`,`<span class="c-act"><button title="แก้ชื่อ/สี" onclick="event.preventDefault();NDCAL.tagEdit('${id}')">✎</button><button title="ลบแท็ก" onclick="event.preventDefault();NDCAL.tagDel('${id}')">✕</button></span>`)).join('')}
-     <div class="c-addtag" onclick="NDCAL.tagAdd()">＋ เพิ่มแท็ก</div>
+     ${tagRows('me')}
      ${row(L.todo,'#FBBC04','☑ To-do',"NDCAL.lay('todo',this.checked)")}
      ${todos.map(t=>`<div class="c-todo ${t.done?'done':''}"><input type="checkbox" ${t.done?'checked':''} onchange="NDCAL.todoDone('${E(t.id)}',this.checked)"><span style="flex:1;min-width:0;word-break:break-word">${E(t.text)}${t.due?` <small style="color:var(--text2)">· ${thD(t.due)}</small>`:''}</span><button title="ลบ" onclick="NDCAL.todoDel('${E(t.id)}')">✕</button></div>`).join('')}
      <input class="c-tin" id="cl-td" placeholder="＋ เพิ่ม To-do แล้วกด Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();NDCAL.todoAdd(this.value)}">
@@ -204,9 +209,12 @@ function side(){ const c=new Date(ST.cur.getFullYear(),ST.cur.getMonth(),1), s=a
    <div class="c-grp ${ST.open.team?'':'closed'}">${head('team',L.teamOn,'#0487E2','🏢 ปฏิทินทีม','(ทั้งทีมเห็น)',"NDCAL.lay('teamOn',this.checked)")}<div class="c-gb"><div class="c-sub ${L.teamOn?'':'off'}">
      ${row(L.mine,'#0463CA','งานของฉัน',"NDCAL.lay('mine',this.checked)")}<div class="c-note">โปรเจกต์ที่ฉันดูแลหรือมีชื่ออยู่</div>
      ${row(L.all,'#0487E2','งานทั้งทีม',"NDCAL.lay('all',this.checked)")}<div class="c-note">ทุกโปรเจกต์ในบริษัท</div>
-     ${row(L.events,'#65C2F5','เฉพาะอีเวนต์',"NDCAL.lay('events',this.checked)")}<div class="c-note">ประชุม · ใครหยุด · มีตติ้ง · ส่งภาษี · อื่น ๆ</div>
+     ${row(L.events,'#65C2F5','อีเวนต์ / งานทีม',"NDCAL.lay('events',this.checked)")}<div class="c-note">แยกตามแท็ก — เพิ่มแท็ก/แท็กย่อย เลือกสีเองได้</div>
+     <div class="${L.events?'':'c-sub off'}" style="padding-left:14px">${tagRows('team')}</div>
      <div style="display:flex;gap:7px;flex-wrap:wrap;padding:4px 6px">${PH.map(c=>`<span style="font-size:11px;display:inline-flex;gap:5px;align-items:center;color:var(--text2)"><i style="width:9px;height:9px;border-radius:2px;background:${c.color}"></i>${c.name}</span>`).join('')}</div>
    </div></div></div>`; }
+function tagRows(sc){ const L=ST.L[LK(sc)]||{}, ck=(id,t,kid)=>`<label class="c-row" style="${kid?'padding-left:26px;font-size:12.5px':''}"><input type="checkbox" ${L[id]!==false?'checked':''} onchange="NDCAL.lay('${sc}:${id}',this.checked)"><span class="c-ck" style="--c:${E(t.color)}"></span><span>${E(t.name)}</span><span class="c-act">${kid?'':`<button title="เพิ่มแท็กย่อย" onclick="event.preventDefault();NDCAL.tagAdd('${sc}','${id}')">＋</button>`}<button title="แก้ชื่อ/สี" onclick="event.preventDefault();NDCAL.tagEdit('${sc}','${id}')">✎</button><button title="ลบแท็ก" onclick="event.preventDefault();NDCAL.tagDel('${sc}','${id}')">✕</button></span></label>`;
+  return tagTree(sc).map(g=>ck(g.id,g.t)+g.kids.map(k=>ck(k.id,k.t,1)).join('')).join('')+`<div class="c-addtag" onclick="NDCAL.tagAdd('${sc}')">＋ เพิ่มแท็ก${sc==='team'?'ทีม':''}</div>`; }
 function topBar(){ const c=ST.cur, t=ST.view==='week'?(()=>{ const s=addD(c,-c.getDay()), e=addD(s,6); return s.getDate()+' '+TM[s.getMonth()]+' – '+e.getDate()+' '+TM[e.getMonth()]+' '+(e.getFullYear()+543); })():TMF[c.getMonth()]+' '+(c.getFullYear()+543);
   return `<button class="c-btn" onclick="NDCAL.nav(0)">วันนี้</button><button class="c-ib" onclick="NDCAL.nav(-1)">‹</button><button class="c-ib" onclick="NDCAL.nav(1)">›</button><span class="c-ttl">${t}</span>
    <span class="c-seg"><button class="${ST.view==='month'?'on':''}" onclick="NDCAL.view('month')">เดือน</button><button class="${ST.view==='week'?'on':''}" onclick="NDCAL.view('week')">สัปดาห์</button></span>`; }
@@ -313,7 +321,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeFloat(); doc
 function tipAt(e,html){ if(DR&&DR.active) return; tipOff(); TIP=document.createElement('div'); TIP.className='c-tip'; TIP.innerHTML=html; document.body.appendChild(TIP);
   const r=e.currentTarget.getBoundingClientRect(); TIP.style.left=Math.max(8,Math.min(innerWidth-300,r.left))+'px'; TIP.style.top=(r.bottom+6+TIP.offsetHeight>innerHeight?r.top-TIP.offsetHeight-6:r.bottom+6)+'px'; }
 const edLine=(by,at)=>by?`<div style="margin-top:4px">✏️ แก้ล่าสุดโดย <b>${E(by)}</b> <span class="m">· ${ago(at)}</span></div>`:'';
-function catName(it){ return it.kind==='todo'?'To-do':it.scope==='me'?((tags()[it.tag]||{}).name||''):it.kind==='proj'?'งานโปรเจกต์':((TEAM_CATS.find(c=>c.id===it.cat)||{}).name||'อีเวนต์ทีม'); }
+function catName(it){ return it.kind==='todo'?'To-do':it.scope==='me'?tagFull('me',it.tag):it.kind==='proj'?'งานโปรเจกต์':(tagFull('team',it.cat)||(TEAM_CATS.find(c=>c.id===it.cat)||{}).name||'อีเวนต์ทีม'); }
 function whenTxt(it){ return thD(it.kind==='proj'?it.pStart:it.start)+((it.kind==='proj'?it.pEnd:it.end)>(it.kind==='proj'?it.pStart:it.start)?' – '+thD(it.kind==='proj'?it.pEnd:it.end):'')+(it.kind==='proj'?(it.endTime?' · ส่ง '+it.endTime:''):it.time?' · '+it.time+(it.endTime?'–'+it.endTime:''):''); }
 
 /* ── การ์ด / ป๊อปอัป ── */
@@ -358,12 +366,18 @@ function openDlg(it, day, time){ closeFloat(); tipOff(); const isNew=!it, raw=it
    ${isNew||!DLG.team?`<label class="c-teamck"><input type="checkbox" id="c-fteam" ${DLG.team?'checked':''} onchange="NDCAL.dlgTeam(this.checked)"><span><b>📢 เพิ่มในปฏิทินทีม</b><br><span style="color:var(--text2);font-size:12px">ติ๊ก = ทั้งทีมเห็นร่วมกัน · ไม่ติ๊ก = เก็บเป็นของส่วนตัว</span></span></label>`:''}
    <div class="c-ft">${!isNew?`<button class="c-bg" style="color:#f28b82;margin-right:auto" onclick="this.closest('.c-mask').remove();NDCAL.delEv('${E(it.id)}')">ลบ</button>`:''}<button class="c-bg" onclick="this.closest('.c-mask').remove()">ยกเลิก</button><button class="c-bp" onclick="NDCAL.dlgSave()">บันทึก</button></div></div>`;
   document.body.appendChild(m); chips(); setTimeout(()=>{ if(isNew) $('c-ft')?.focus(); safe(()=>_noteGrowAll(m)); },30); }
-function chips(){ const el=$('c-fchips'); if(!el) return; const T=tags();
-  el.innerHTML=DLG.team?TEAM_CATS.map(c=>`<span class="c-chip ${DLG.cat===c.id?'on':''}" style="--c:${c.color}" onclick="NDCAL.dlgPick('cat','${c.id}')"><i></i>${c.name}</span>`).join('')
-   :Object.entries(T).map(([id,t])=>`<span class="c-chip ${DLG.tag===id?'on':''}" style="--c:${t.color}" onclick="NDCAL.dlgPick('tag','${id}')"><i></i>${E(t.name)}</span>`).join('')+`<span class="c-chip" style="--c:#9aa0a6" onclick="NDCAL.tagAdd(true)">＋ แท็กใหม่</span>`; }
-function tagDlg(id){ const T=tags(), t=T[id]; const m=document.createElement('div'); m.className='c-mask'; m.onclick=x=>{ if(x.target===m) m.remove(); };
-  m.innerHTML=`<div class="c-dlg" style="width:min(360px,100%)"><b>แก้แท็ก</b><input class="c-fi" id="c-tgn" style="width:100%;box-sizing:border-box;margin-top:10px" value="${E(t.name)}"><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${PALETTE.map(c=>`<span class="c-pc" data-c="${c}" onclick="document.querySelectorAll('.c-pc').forEach(x=>x.style.outline='');this.style.outline='2px solid var(--text)'" style="width:26px;height:26px;border-radius:50%;background:${c};cursor:pointer;${c===t.color?'outline:2px solid var(--text)':''}"></span>`).join('')}</div>
-   <div class="c-ft"><button class="c-bg" onclick="this.closest('.c-mask').remove()">ยกเลิก</button><button class="c-bp" onclick="NDCAL.tagSave('${id}')">บันทึก</button></div></div>`; document.body.appendChild(m); }
+function chips(){ const el=$('c-fchips'); if(!el) return; const sc=DLG.team?'team':'me', f=DLG.team?'cat':'tag', cur=DLG[f];
+  if(!TGS(sc)[cur]) DLG[f]=Object.keys(TGS(sc))[0];
+  const chip=(id,t,kid)=>`<span class="c-chip ${DLG[f]===id?'on':''}" style="--c:${E(t.color)}${kid?';font-size:11.5px;padding:3px 9px':''}" onclick="NDCAL.dlgPick('${f}','${id}')"><i></i>${kid?'› ':''}${E(t.name)}</span>`;
+  el.innerHTML=tagTree(sc).map(g=>`<span style="display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center">${chip(g.id,g.t)}${g.kids.map(k=>chip(k.id,k.t,1)).join('')}</span>`).join('')+`<span class="c-chip" style="--c:#9aa0a6" onclick="NDCAL.tagAdd('${sc}','',true)">＋ แท็กใหม่</span>`; }
+const PAL2=['#0463CA','#0487E2','#09B1EC','#65C2F5','#B0D6F5','#FFC9BC','#FFE2A8','#CDEDC4','#C2E2F7','#DCD0F6','#F9C6DB'];
+function tagDlg(sc,id){ const T=TGS(sc), t=T[id]||{}, kids=Object.keys(T).some(k=>T[k].parent===id), parents=tagTree(sc).filter(g=>g.id!==id);
+  const m=document.createElement('div'); m.className='c-mask'; m.onclick=x=>{ if(x.target===m) m.remove(); };
+  m.innerHTML=`<div class="c-dlg" style="width:min(400px,100%)"><b>🏷️ แก้แท็ก${sc==='team'?'ทีม':''}</b><input class="c-fi" id="c-tgn" style="width:100%;box-sizing:border-box;margin-top:10px" value="${E(t.name||'')}" placeholder="ชื่อแท็ก">
+   ${kids?'':`<div class="c-fr"><span>อยู่ใต้แท็ก</span><select class="c-fi" id="c-tgp"><option value="">— แท็กหลัก —</option>${parents.map(g=>`<option value="${g.id}"${t.parent===g.id?' selected':''}>${E(g.t.name)}</option>`).join('')}</select></div>`}
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center">${PALETTE.concat(PAL2).map(c=>`<span class="c-pc" data-c="${c}" onclick="document.querySelectorAll('.c-pc').forEach(x=>x.style.outline='');this.style.outline='2px solid var(--text)';document.getElementById('c-tgc').value='${c}'" style="width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;${c===t.color?'outline:2px solid var(--text)':''}"></span>`).join('')}
+    <label title="เลือกสีเอง" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">🎨 <input type="color" id="c-tgc" value="${E(t.color||'#0487E2')}" style="width:34px;height:26px;border:none;background:none;padding:0;cursor:pointer" onclick="document.querySelectorAll('.c-pc').forEach(x=>x.style.outline='')"></label></div>
+   <div class="c-ft"><button class="c-bg" onclick="this.closest('.c-mask').remove()">ยกเลิก</button><button class="c-bp" onclick="NDCAL.tagSave('${sc}','${id}')">บันทึก</button></div></div>`; document.body.appendChild(m); setTimeout(()=>$('c-tgn')?.focus(),30); }
 
 /* ── คำสั่ง ── */
 window.NDCAL={ render, open,
@@ -372,7 +386,7 @@ window.NDCAL={ render, open,
   nav(n){ const c=ST.cur; ST.cur=n===0?(()=>{ const d=new Date(); d.setHours(0,0,0,0); return d; })():ST.view==='week'?addD(c,7*n):new Date(c.getFullYear(),c.getMonth()+n,1); render(); },
   go(k,v){ ST.cur=pd(k); if(v){ ST.view=v; saveST(); } render(); },
   fold(k){ ST.open[k]=!ST.open[k]; saveST(); render(); },
-  lay(k,v){ if(k.startsWith('tag:')) ST.L.tags[k.slice(4)]=v; else ST.L[k]=v; saveST(); render(); },
+  lay(k,v){ const m=k.match(/^(me|team):(.+)$/); if(m){ const lk=LK(m[1]); ST.L[lk]=ST.L[lk]||{}; ST.L[lk][m[2]]=v; } else ST.L[k]=v; saveST(); render(); },
   add(day,time){ openDlg(null, day, time); },
   edit(id){ closeFloat(); openDlg(findAny(id)); },
   dates:projDates,
@@ -387,7 +401,7 @@ window.NDCAL={ render, open,
     if(it.kind==='todo') h=`<div onclick="NDCAL.close();NDCAL.todoDone('${E(it.rid)}',true)">✓ ทำเสร็จแล้ว</div><div class="dang" onclick="NDCAL.close();NDCAL.todoDel('${E(it.rid)}')">🗑️ ลบ To-do</div>`;
     else if(it.kind==='proj') h=canProj()?`<div onclick="NDCAL.dates('${I}')">✏️ แก้วัน / เลื่อนเดดไลน์</div>${canOpenProj()?`<div onclick="NDCAL.goProj('${E(it.pid)}')">📁 แก้ข้อมูลโปรเจกต์ ›</div>`:''}`:`<div onclick="NDCAL.close();NDCAL.card('${I}',${e.clientX},${e.clientY})">👁️ ดูรายละเอียด</div>`;
     else if(!ed) h=`<div onclick="NDCAL.close();NDCAL.card('${I}',${e.clientX},${e.clientY})">👁️ ดูรายละเอียด</div><div style="color:var(--text2);cursor:default">🔒 อีเวนต์ของ ${E(it.byName||'คนอื่น')}</div>`;
-    else { const T=tags(), tg=it.scope==='me'?Object.entries(T).map(([k,t])=>`<div onclick="NDCAL.close();NDCAL.setF('${I}','tag','${k}')"><span class="sw" style="background:${t.color}"></span>${E(t.name)}${it.tag===k?' ✓':''}</div>`).join(''):TEAM_CATS.map(c=>`<div onclick="NDCAL.close();NDCAL.setF('${I}','cat','${c.id}')"><span class="sw" style="background:${c.color}"></span>${c.name}${it.cat===c.id?' ✓':''}</div>`).join('');
+    else { const sc=it.scope==='me'?'me':'team', f=sc==='me'?'tag':'cat', one=(k,t,kid)=>`<div onclick="NDCAL.close();NDCAL.setF('${I}','${f}','${k}')" style="${kid?'padding-left:34px;font-size:12.5px':''}"><span class="sw" style="background:${E(t.color)}"></span>${E(t.name)}${it[f]===k?' ✓':''}</div>`, tg=tagTree(sc).map(g=>one(g.id,g.t)+g.kids.map(k=>one(k.id,k.t,1)).join('')).join('');
       h=`<div onclick="NDCAL.edit('${I}')">✏️ แก้ไข</div><div onclick="NDCAL.close();NDCAL.dup('${I}')">⧉ ทำซ้ำ</div>${it.scope==='me'?`<div onclick="NDCAL.close();NDCAL.toTeam('${I}')">📢 ย้ายไปปฏิทินทีม</div>`:''}<hr>${tg}<hr><div class="dang" onclick="NDCAL.close();NDCAL.delEv('${I}')">🗑️ ลบ</div>`; }
     closeFloat(); tipOff(); const m=document.createElement('div'); m.className='c-ctx'; m.innerHTML=h; document.body.appendChild(m); place(m,e.clientX-8,e.clientY-8); },
   ctxDay(e,k,time){ e.preventDefault(); closeFloat(); tipOff(); const m=document.createElement('div'); m.className='c-ctx';
@@ -421,12 +435,18 @@ window.NDCAL={ render, open,
   async delEv(id){ closeFloat(); const it=findAny(id); if(!it||!canEdit(it)) return; const k=it.scope==='team'?'team':'mine', raw=D[k][it.rid]; await del(k, it.rid); render(); say('ลบ "'+it.title+'" แล้ว', ()=>put(k, raw, raw.id).then(render)); },
   setF(id,f,v){ const it=findAny(id); if(it) saveEv(it,{[f]:v}); },
   async dup(id){ const it=findAny(id), k=it.scope==='team'?'team':'mine', raw=D[k][it.rid], now=new Date().toISOString(); const c={...raw, id:uid(), at:now, upd:now, by:myUid(), byName:ME(), updBy:ME()}; await put(k,c,c.id); render(); say('ทำซ้ำแล้ว'); },
-  async toTeam(id){ const it=findAny(id), raw=D.mine[it.rid]; if(!raw||!confirm('ย้าย "'+raw.title+'" ไปปฏิทินทีม? ทั้งทีมจะเห็น')) return; const c={...raw, id:uid(), cat:'other', by:myUid(), byName:ME(), updBy:ME(), upd:new Date().toISOString()}; delete c.tag; await put('team',c,c.id); await del('mine',raw.id); render(); say('📢 ย้ายไปปฏิทินทีมแล้ว'); },
-  tagAdd(inDlg){ const n=prompt('ชื่อแท็กใหม่:'); if(!n||!n.trim()) return; const T={...tags()}, id='t'+uid(); T[id]={name:n.trim(), color:PALETTE[Object.keys(T).length%PALETTE.length]}; put('tags',T).then(()=>{ if(inDlg){ DLG.tag=id; chips(); } render(); }); },
-  tagEdit(id){ tagDlg(id); },
-  tagSave(id){ const T={...tags()}, c=[...document.querySelectorAll('.c-pc')].find(x=>x.style.outline&&x.style.outline!=='none'); T[id]={name:($('c-tgn').value||'').trim()||T[id].name, color:c?c.dataset.c:T[id].color}; document.querySelector('.c-mask')?.remove(); put('tags',T).then(render); },
-  async tagDel(id){ const T={...tags()}; if(Object.keys(T).length<=1){ say('ต้องมีแท็กอย่างน้อย 1 อัน'); return; } const to=Object.keys(T).find(x=>x!==id), used=Object.values(D.mine).filter(e=>e&&e.tag===id);
-    if(!confirm('ลบแท็ก "'+T[id].name+'"?'+(used.length?'\nงาน '+used.length+' รายการจะย้ายไปแท็ก "'+T[to].name+'"':''))) return; delete T[id]; await put('tags',T); for(const e of used) await put('mine',{...e, tag:to},e.id); render(); },
+  async toTeam(id){ const it=findAny(id), raw=D.mine[it.rid]; if(!raw||!confirm('ย้าย "'+raw.title+'" ไปปฏิทินทีม? ทั้งทีมจะเห็น')) return; const c={...raw, id:uid(), cat:TGS('team').other?'other':Object.keys(TGS('team'))[0], by:myUid(), byName:ME(), updBy:ME(), upd:new Date().toISOString()}; delete c.tag; await put('team',c,c.id); await del('mine',raw.id); render(); say('📢 ย้ายไปปฏิทินทีมแล้ว'); },
+  async tagAdd(sc,parent,inDlg){ sc=sc||'me'; const T={...TGS(sc)}, P=parent&&T[parent]; const n=prompt(P?'ชื่อแท็กย่อยใต้ "'+P.name+'" (เช่น พากย์ · มิกซ์):':'ชื่อแท็กใหม่:'); if(!n||!n.trim()) return;
+    const id='t'+uid(); T[id]={name:n.trim(), color:P?P.color:PALETTE.concat(PAL2)[Object.keys(T).length%22], ...(P?{parent}:{}), by:ME()}; await put(TK(sc),T);
+    if(inDlg){ DLG[sc==='team'?'cat':'tag']=id; chips(); } render(); say('🏷️ เพิ่มแท็ก "'+n.trim()+'" แล้ว — กด ✎ เพื่อเปลี่ยนสี'); },
+  tagEdit(sc,id){ tagDlg(sc,id); },
+  async tagSave(sc,id){ const T={...TGS(sc)}, o=T[id]||{}, pe=$('c-tgp'); T[id]={...o, name:($('c-tgn').value||'').trim()||o.name, color:($('c-tgc')||{}).value||o.color};
+    if(pe){ if(pe.value&&pe.value!==id) T[id].parent=pe.value; else delete T[id].parent; } document.querySelector('.c-mask')?.remove(); await put(TK(sc),T); render(); },
+  async tagDel(sc,id){ const T={...TGS(sc)}; if(Object.keys(T).length<=1){ say('ต้องมีแท็กอย่างน้อย 1 อัน'); return; }
+    const kids=Object.keys(T).filter(k=>T[k].parent===id), to=T[id].parent&&T[T[id].parent]?T[id].parent:Object.keys(T).find(x=>x!==id&&!kids.includes(x)&&!T[x].parent)||Object.keys(T).find(x=>x!==id);
+    const k2=sc==='team'?'team':'mine', f=sc==='team'?'cat':'tag', used=Object.values(D[k2]).filter(e=>e&&e[f]===id);
+    if(!confirm('ลบแท็ก "'+T[id].name+'"?'+(kids.length?'\nแท็กย่อย '+kids.length+' อันจะกลายเป็นแท็กหลัก':'')+(used.length?'\nงาน '+used.length+' รายการจะย้ายไปแท็ก "'+(T[to]||{}).name+'"':''))) return;
+    kids.forEach(k=>{ T[k]={...T[k]}; delete T[k].parent; }); delete T[id]; await put(TK(sc),T); for(const e of used) await put(k2,{...e, [f]:to},e.id); render(); },
   async todoAdd(v,due){ v=String(v||'').trim(); if(!v) return; const t={id:uid(), text:v, done:false, at:new Date().toISOString()}; if(due) t.due=due; await put('todo',t,t.id); render(); if(!due) setTimeout(()=>$('cl-td')?.focus(),0); },
   async todoDone(id,v){ const t=D.todo[id]; if(t){ await put('todo',{...t, done:v, doneAt:v?new Date().toISOString():''},id); render(); } },
   async todoDel(id){ await del('todo',id); render(); },
