@@ -183,7 +183,8 @@ async function voucherPages(o){ await prep(); const A=await assets(); LG=safe(()
   const s=o.staff||{}, full=((s.name||'')+(s.lastName?' '+s.lastName:'')).trim()||s.nickname||'—', sa=staffAddr(s);
   let gross=0, tax=0, unknownTax=false; const rows=(o.items||[]).map((it,i)=>{ const pre=String(it.slot||'').split('-')[0], p=it.projId?safe(()=>getProjects().find(x=>x.id===it.projId),null):null;
     const t=(it.taxPct!=null&&it.taxPct!=='')?(+it.taxPct||0):(p?(parseFloat((p.tax||{})[pre])||0):0), amt=+it.amount||0, tx=amt-Math.round(amt*(1-t/100)); gross+=amt; tax+=tx;
-    const sl=SLOT[pre]||[E(pre),E(pre)]; if(it.taxPct==null&&!p) unknownTax=true; return [String(i+1), E(it.projName||'—')+(t?`<div class="sub">${L('หัก ณ ที่จ่าย','WHT')} ${t}%</div>`:''), L(sl[0],sl[1]), B(amt)]; });
+    const cm=it.slot==='mgr-comm', cw=cm&&p?(p.workers||[]).find(w=>w&&w.slot==='mgr-comm'):null, cp=cm?(it.commPct||(cw&&cw.commPct)||parseFloat(String(cw&&cw.comment||'').match(/([\d.]+)\s*%/)?.[1])||''):'';
+    const sl=cm?['ค่านายหน้า','Commission']:(SLOT[pre]||[E(pre),E(pre)]); if(it.taxPct==null&&!p) unknownTax=true; return [String(i+1), E(it.projName||'—')+(cm?`<div class="sub">+${E(cp)}% ${L('ค่านายหน้า (หางานเข้าบริษัท)','Commission')}</div>`:'')+(t?`<div class="sub">${L('หัก ณ ที่จ่าย','WHT')} ${t}%</div>`:''), L(sl[0],sl[1]), B(amt)]; });
   const net=gross-tax, dt=thDate(o.date), cfm=o.confirmedAt?thDate(String(o.confirmedAt).slice(0,10))+' '+E(String(o.confirmedAt).slice(11,16)):'';
   const cols=[['#','No.','c','8mm'],['รายการ','Description'],['หน้าที่','Role','c','28mm'],['จำนวนเงิน','Amount','r','30mm']];
   const top=pg=>head(A,'ใบสำคัญจ่าย','PAYMENT VOUCHER',L('ต้นฉบับ','Original'),pg)+(pg>1?'':`<div class="gd-g2">${party('จ่ายให้','Paid to',E(full)+(s.nickname?` (${E(s.nickname)})`:''),[E(sa.addr), sa.tax?L('เลขประจำตัวผู้เสียภาษี','Tax ID')+' '+E(sa.tax):''])}

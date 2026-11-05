@@ -10,6 +10,13 @@
 const FORM_URL='https://forms.gle/nFFKRsLx7yeRMPrx9';   // ฟอร์มเอกสารของสมาชิกเก่า (Freelance Agreement)
 const REG_URL='https://docs.google.com/forms/d/1h9xZH0D4UavtfTecPLPRJ6r8kbOUFb56xxFsx2twsjA/viewform';   // ฟอร์มสมัครทีมหลัก (สมาชิกใหม่)
 const SHEET_DEF='1ofc8RhVS3zDoI6IczvfhGzlTq2Qp1-Xkhz7i1CICZaw';
+// 🔒 ฟอร์มเก่าปิดรับคำตอบแล้ว → ไม่ขึ้นแถบแดง · ไม่ดึงคำตอบจากฟอร์มนี้อีก (ใช้ฟอร์มสมัครทีมตัวใหม่แทน)
+//    แอดมินเช็กกับ Google Form อัตโนมัติ (ทุก 6 ชม.) แล้วเก็บผลที่ public/docform_closed ให้ทุกคนเห็นตรงกัน
+let CLOSED=false;
+async function loadClosed(){ try{ const db=_fbDatabase; if(db){ CLOSED=!!(await db.ref('public/docform_closed').get()).val(); } }catch(e){} }
+async function checkForm(){ if(!isAdm()) return; const k='guin3_df_formchk'; if(Date.now()-(+localStorage.getItem(k)||0)<6*36e5) return;
+  try{ const d=await callDrive({action:'formStatus', sheetId:safe(()=>ls('docform_sheet'),'')||SHEET_DEF}); if(!d||!d.ok) return; localStorage.setItem(k, Date.now());
+    const c=d.accepting===false; if(c!==CLOSED){ CLOSED=c; try{ await _fbDatabase.ref('public/docform_closed').set(c?{at:new Date().toISOString()}:null); }catch(e){} banner(); renderStatusBox(); } }catch(e){} }
 const E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safe=(f,d)=>{ try{ const v=f(); return v==null?d:v; }catch(e){ return d; } };
 const isAdm=()=>safe(()=>currentUser.role==='admin',false);
@@ -65,6 +72,7 @@ function match(rows){
 let LAST=null;
 async function importFromSheet(){
   if(!isAdm()) return toast('เฉพาะแอดมิน','error');
+  if(CLOSED) return toast('ฟอร์มเอกสารเก่าปิดรับคำตอบแล้ว — ไม่ต้องดึงอีก (ใช้ฟอร์มสมัครทีมตัวใหม่)','info');
   let id=safe(()=>ls('docform_sheet'),'')||SHEET_DEF;
   showLoader(true);
   try{ const d=await callDrive({action:'readSheet', sheetId:id});
@@ -159,6 +167,7 @@ function copyMissing(){ const ov=document.getElementById('df-ov'); const ex=ov?n
 /* ── สถานะในหน้าตั้งค่า (แอดมิน) ── */
 function renderStatusBox(){ const el=document.getElementById('docform-status'); if(!el) return;
   const P=people().filter(p=>statusOf(p.s)!=='resigned'), sent=P.filter(p=>p.s.docForm&&p.s.docForm.sent), ex=P.filter(p=>p.s.docForm&&p.s.docForm.exempt), miss=P.filter(p=>p.s.docForm&&!p.s.docForm.sent&&!p.s.docForm.exempt), unk=P.filter(p=>!p.s.docForm);
+  if(CLOSED){ el.innerHTML=`<div style="font-size:12.5px;margin-top:6px">🔒 ฟอร์มเอกสารเก่าปิดรับคำตอบแล้ว — ไม่ดึงคำตอบและไม่ขึ้นแถบแดงอีก · ✅ ส่งแล้ว <b>${sent.length}</b> · ❌ ไม่ได้ส่ง ${miss.length}</div>`; return; }
   el.innerHTML=`<div style="font-size:12.5px;margin-top:6px">✅ ส่งแล้ว <b>${sent.length}</b> · ❌ ยังไม่ส่ง <b style="color:var(--red)">${miss.length}</b> · ยกเว้น ${ex.length}${unk.length?` · ยังไม่ได้ตรวจ ${unk.length} (คนที่เพิ่มหลังนำเข้าครั้งล่าสุด — กดดึงใหม่)`:''}</div>
     ${miss.length?`<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12.5px">ดูรายชื่อคนที่ยังไม่ส่ง</summary><div style="font-size:12px;margin-top:6px;line-height:1.8">${miss.map(p=>`<span style="display:inline-block;margin:0 6px 4px 0;padding:2px 8px;border-radius:6px;background:rgba(255,64,64,.1)">${E(p.s.nickname||'')} · ${E(fullName(p.s))} <a href="#" style="color:var(--text2)" onclick="event.preventDefault();DOCFORM.exempt('${E(p.id)}')" title="ไม่ต้องส่ง">ยกเว้น</a></span>`).join('')}</div></details>`:''}`; }
 function exempt(id){ if(!confirm('ยกเว้นคนนี้ไม่ต้องส่งเอกสาร?')) return; try{ _updateStaffRecords(id, s=>{ s.docForm={sent:false, exempt:true, checkedAt:new Date().toISOString()}; }); }catch(e){} renderStatusBox(); banner(); }
@@ -166,14 +175,15 @@ function exempt(id){ if(!confirm('ยกเว้นคนนี้ไม่ต�
 /* ── แถบแดงบนหัวเว็บ ── */
 function banner(){
   const u=safe(()=>currentUser,null); let html='';
+  if(CLOSED){ document.getElementById('df-banner')?.remove(); return; }
   if(u && u.role!=='admin' && u.staffId){
     const mine=safe(()=>getAllStaff(),[]).filter(s=>s.id===u.staffId);
     const need=mine.length && mine.some(s=>s.docForm && s.docForm.sent===false && !s.docForm.exempt) && !mine.some(s=>s.docForm&&(s.docForm.sent||s.docForm.exempt));
     const viaReg=mine.some(s=>s.regForm), url=viaReg?REG_URL:FORM_URL;   // สมัครผ่านฟอร์มใหม่ → ส่งฟอร์มใหม่อีกครั้งให้ครบ
     if(need) html=`⚠️ <b>คุณยังไม่ได้ส่งเอกสารสัญญา / สำเนาบัตรประชาชน / สำเนาบัญชี</b> — กรุณาส่งฟอร์มเอกสารที่ <a href="${url}" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline;font-weight:800">${viaReg?'ฟอร์มสมัครทีม (กดที่นี่)':url}</a>`;
   } else if(u && u.role==='admin' && !sessionStorage.getItem('df_hide')){
-    const n=people().filter(p=>statusOf(p.s)!=='resigned' && p.s.docForm && !p.s.docForm.sent && !p.s.docForm.exempt).length;
-    if(n) html=`⚠️ ทีมงาน <b>${n} คน</b> ยังไม่ส่งเอกสารฟรีแลนซ์ <a href="#" onclick="event.preventDefault();DOCFORM.open()" style="color:#fff;text-decoration:underline;font-weight:800">ดูรายชื่อ / ดึงคำตอบล่าสุด</a> <a href="#" onclick="event.preventDefault();sessionStorage.setItem('df_hide','1');DOCFORM.banner()" style="color:#fff;opacity:.75;margin-left:8px">ซ่อน</a>`;
+    const P=people().filter(p=>statusOf(p.s)!=='resigned'), n=P.filter(p=>p.s.docForm && !p.s.docForm.sent && !p.s.docForm.exempt).length, ok=P.filter(p=>p.s.docForm && p.s.docForm.sent).length;
+    if(n) html=`⚠️ เอกสารฟรีแลนซ์: ✅ ส่งแล้ว <b>${ok} คน</b> · ❌ ยังไม่ส่ง <b>${n} คน</b> <a href="#" onclick="event.preventDefault();DOCFORM.open()" style="color:#fff;text-decoration:underline;font-weight:800">ดูรายชื่อ / ดึงคำตอบล่าสุด</a> <a href="#" onclick="event.preventDefault();sessionStorage.setItem('df_hide','1');DOCFORM.banner()" style="color:#fff;opacity:.75;margin-left:8px">ซ่อน</a>`;
   }
   let b=document.getElementById('df-banner');
   if(!html){ b?.remove(); return; }
@@ -181,7 +191,7 @@ function banner(){
   b.innerHTML=html;
 }
 window.addEventListener('guindatachange', e=>{ if(e.detail&&e.detail.key==='staff_v3') setTimeout(()=>{ banner(); renderStatusBox(); },50); });
-setInterval(()=>{ banner(); renderStatusBox(); }, 60000); setTimeout(()=>{ banner(); renderStatusBox(); }, 3000);
+setInterval(()=>{ banner(); renderStatusBox(); }, 60000); setTimeout(async()=>{ await loadClosed(); banner(); renderStatusBox(); checkForm(); }, 3000);
 document.addEventListener('click', e=>{ if(e.target.closest&&e.target.closest('[onclick*="setpane-tools"],[data-pane="tools"]')) setTimeout(renderStatusBox,100); }, true);
 
 window.DOCFORM={ REG_URL, open:()=>{ const el=document.getElementById('docform-status'); importFromSheet(); }, fromSheet:importFromSheet, fromCSV:importCSV, apply, copyMissing, exempt, banner, renderStatusBox, FORM_URL };

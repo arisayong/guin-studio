@@ -3,7 +3,7 @@
    ─ ซ้าย: 🙋 ปฏิทินของฉัน (แท็ก · To-do · คนอื่นไม่เห็น) · 🏢 ปฏิทินทีม (งานของฉัน · งานทั้งทีม · อีเวนต์)
    ─ โปรเจกต์ = กรอบฟ้าใส 1 กล่อง · ข้างในเป็นช่วงหน้าที่สีพาสเทล (ต่อกัน = เส้นเดียว · คาบเกี่ยว = แยกเส้น) + ชื่อคนรับผิดชอบ
    ─ วัน/เวลาโปรเจกต์อ่าน-เขียน p.startDate · p.deadline · p.phases[*] ชุดเดียวกับหน้าโปรเจกต์/วางแผนงาน (saveProjectMerge)
-   ─ แก้วันโปรเจกต์ได้เฉพาะแอดมิน · อีเวนต์ทีมแก้ได้: คนสร้าง + แอดมิน · ของส่วนตัวแก้ได้คนเดียว
+   ─ แก้วัน/สถานะเสร็จของโปรเจกต์: แอดมิน · เมเนเจอร์ · พนักงาน (Rules v7) · อีเวนต์ทีมแก้ได้: คนสร้าง + แอดมิน · ของส่วนตัวแก้ได้คนเดียว
    ข้อมูล: teamcal/events/<id> · privcal/<uid>/{events,todos,tags}   (Firebase Rules v6)
    ══════════════════════════════════════════════════════════════ */
 (function(){
@@ -14,6 +14,15 @@ const CU=()=>safe(()=>currentUser,null), DB=()=>safe(()=>_fbDatabase,null);
 const role=()=>safe(()=>CU().role,'');
 const canSee=()=>{ const u=CU(); return !!u && (u.role==='admin'||u.role==='manager'||u.acct===true||u.emp===true); };
 const isAdm=()=>role()==='admin';
+// ✏️ แก้วัน/เวลา/สถานะเสร็จของโปรเจกต์ได้: แอดมิน · เมเนเจอร์ · พนักงานบริษัท (ช่วยกันทำงาน — Rules v7 เปิดเฉพาะช่องวัน/สถานะ)
+const canProj=()=>{ const u=CU(); return !!u && (u.role==='admin'||u.role==='manager'||u.emp===true); };
+const canOpenProj=()=>role()==='admin'||role()==='manager';
+// บันทึก: แอดมิน = saveProjectMerge (ทั้งก้อน) · คนอื่น = update เฉพาะช่องที่ Rules v7 อนุญาต
+async function projWrite(pid, apply, fields){ if(isAdm()||!DB()) return await safe(()=>saveProjectMerge(pid, apply), Promise.resolve({ok:false}));
+  const P=PROJ.find(x=>x.id===pid)||{}, me=ME(), up={}; apply(P); P.updatedAt=new Date().toISOString(); P._lastSavedBy=me;
+  fields(P).forEach(k=>{ const v=k.split('/').reduce((o,x)=>o==null?o:o[x],P); up['projects/'+pid+'/'+k]=v===undefined?null:v; });
+  up['projects/'+pid+'/updatedAt']=P.updatedAt; up['projects/'+pid+'/_lastSavedBy']=me;
+  try{ await DB().ref().update(up); safe(()=>_notifyProjectChange()); return {ok:true}; }catch(e){ return {ok:false, error:e}; } }
 const ME=()=>{ const u=CU()||{}; return u.nickname||u.name||u.email||''; };
 const pad=n=>String(n).padStart(2,'0'), ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const pd=s=>{ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); if(!m) return null; let y=+m[1]; if(y>2400) y-=543; return new Date(y,+m[2]-1,+m[3]); };
@@ -73,7 +82,7 @@ function toProj(p){ if(!p||!p.id||p.projStatus==='cancelled') return null;
   const ks=Object.values(phases), pStart=dOnly(p.startDate||p.date)||(ks.map(x=>x.start).sort()[0]||''), pEnd=dOnly(p.deadline)||(ks.map(x=>x.end).sort().pop()||pStart);
   if(!pStart&&!pEnd) return null;
   const it={id:'p:'+p.id, pid:p.id, kind:'proj', scope:'team', title:safe(()=>projDisp(p),p.name||''), pStart:pStart||pEnd, pEnd:pEnd<pStart?pStart:pEnd, endTime:dlTime(p), phases,
-    owner:staffNick(p.managerId), done:p.projStatus==='done'||p.projStatus==='paid', edBy:p._lastSavedBy||'', at:Date.parse(p.updatedAt||'')||0,
+    owner:staffNick(p.managerId), done:p.projStatus==='done'||p.projStatus==='paid', st:p.projStatus||'', edBy:p._lastSavedBy||'', at:Date.parse(p.updatedAt||'')||0,
     mine:!!me&&(p.managerId===me||ws.some(w=>w&&w.id===me))};
   const all=[it.pStart, ...ks.map(x=>x.start)].sort(), ends=[it.pEnd, ...ks.map(x=>x.end)].sort(); it.start=all[0]; it.end=ends[ends.length-1]; return it; }
 const phList=p=>PH.filter(x=>p.phases[x.k]).map(x=>({...x, ...p.phases[x.k]}));
@@ -88,7 +97,7 @@ function visible_(){ const L=ST.L; return EV.filter(e=>{
     return L.events; })
   .concat(L.me&&L.todo?Object.values(D.todo).filter(t=>t&&t.due).map(t=>({id:'d:'+t.id, rid:t.id, kind:'todo', scope:'me', title:'☑ '+t.text, start:t.due, end:t.due, done:!!t.done})):[]); }
 const findAny=id=>EV.find(x=>x.id===id)||(String(id).startsWith('d:')&&D.todo[id.slice(2)]?{id, rid:id.slice(2), kind:'todo', scope:'me', title:'☑ '+D.todo[id.slice(2)].text, start:D.todo[id.slice(2)].due, end:D.todo[id.slice(2)].due}:null);
-const canEdit=e=>!e?false:e.kind==='todo'||e.scope==='me'?true:e.kind==='proj'?isAdm():(isAdm()||!(D.team[e.rid]||{}).by||(D.team[e.rid]||{}).by===myUid());
+const canEdit=e=>!e?false:e.kind==='todo'||e.scope==='me'?true:e.kind==='proj'?canProj():(isAdm()||!(D.team[e.rid]||{}).by||(D.team[e.rid]||{}).by===myUid());
 const colorOf=e=>e.kind==='todo'?'#FBBC04':e.scope==='me'?((tags()[e.tag]||{}).color||'#8E24AA'):((TEAM_CATS.find(c=>c.id===e.cat)||{}).color||e.color||'#0487E2');
 
 /* ── CSS (ขอบเขต #page-nd-cal + ป๊อปอัปขึ้นต้น .c-) ── */
@@ -254,8 +263,8 @@ async function saveProj(pid, m, msg, undo){ const P=PROJ.find(x=>x.id===pid); if
     if(String(p.deadline||'').includes('T')) p.deadline=m.pEnd?(m.pEnd+(m.endTime?'T'+m.endTime:'')):''; else { p.deadline=m.pEnd||''; if(m.endTime) p.deadlineTime=m.endTime; else delete p.deadlineTime; }
     p.phases=p.phases||{}; Object.entries(m.phases).forEach(([k,x])=>{ const o=p.phases[k]||{}; p.phases[k]={...o, startDate:x.start, deadline:x.end, submitTime:x.time||'', status:x.done?'done':(o.status==='done'?'none':(o.status||'none'))}; }); };
   apply(P); render();   // แสดงทันที แล้วค่อยบันทึกขึ้นเซิร์ฟเวอร์
-  const r=await safe(()=>saveProjectMerge(pid, apply), Promise.resolve({ok:false}));
-  if(!r||!r.ok){ safe(()=>toast('บันทึกวันโปรเจกต์ไม่สำเร็จ'+(r&&r.error?': '+r.error.message:''),'error')); PROJ=await projects(true); render(); return; }
+  const r=await projWrite(pid, apply, p=>['startDate','deadline','deadlineTime', ...Object.keys(m.phases).flatMap(k=>['startDate','deadline','submitTime','status'].map(f=>'phases/'+k+'/'+f))]);
+  if(!r||!r.ok){ safe(()=>toast('บันทึกวันโปรเจกต์ไม่สำเร็จ'+(r&&r.error?': '+r.error.message+(isAdm()?'':' (ต้องวาง Firebase Rules v7)'):''),'error')); PROJ=await projects(true); render(); return; }
   if(r.saved){ const i=PROJ.findIndex(x=>x.id===pid); if(i>=0) PROJ[i]=r.saved; } render(); say(msg, undo); }
 const model=it=>JSON.parse(JSON.stringify({pStart:it.pStart, pEnd:it.pEnd, endTime:it.endTime, phases:it.phases}));
 // 🔗 ขยับวันเสร็จหน้าที่ → หน้าที่ถัดไปที่ต่อกันอยู่เลื่อนตามเป็นทอด ๆ (ที่ตั้งคาบเกี่ยวไว้ไม่แตะ)
@@ -275,7 +284,7 @@ function tipOff(){ TIP&&TIP.remove(); TIP=null; }
 function place(el,x,y,w){ el.style.left=Math.max(8,Math.min(x+8,innerWidth-(w||el.offsetWidth)-10))+'px'; el.style.top=Math.max(8,Math.min(y+8,innerHeight-el.offsetHeight-10))+'px'; }
 function say(msg, undo){ if(!msg) return; document.querySelector('.c-toast')?.remove(); clearTimeout(TT); const t=document.createElement('div'); t.className='c-toast'; t.innerHTML=E(msg)+(undo?'<button>เลิกทำ</button>':''); if(undo) t.querySelector('button').onclick=()=>{ t.remove(); undo(); }; document.body.appendChild(t); TT=setTimeout(()=>t.remove(),5000); }
 document.addEventListener('pointermove',e=>{ if(!DR) return;
-  if(!DR.active){ if(Math.hypot(e.clientX-DR.x,e.clientY-DR.y)<5) return; if(!DR.ed){ say(DR.ph||DR.it.kind==='proj'?'🔒 วันของโปรเจกต์แก้ได้เฉพาะแอดมิน':'🔒 แก้ได้เฉพาะคนสร้างและแอดมิน'); DR=null; return; }
+  if(!DR.active){ if(Math.hypot(e.clientX-DR.x,e.clientY-DR.y)<5) return; if(!DR.ed){ say(DR.ph||DR.it.kind==='proj'?'🔒 วันของโปรเจกต์แก้ได้เฉพาะแอดมิน · เมเนเจอร์ · พนักงานบริษัท':'🔒 แก้ได้เฉพาะคนสร้างและแอดมิน'); DR=null; return; }
     if(DR.mode==='proj'){ DR=null; return; }
     DR.active=true; tipOff(); DR.el.classList.add('dragging'); const g=document.createElement('div'); g.className='c-ghost'; const c=DR.color||colorOf(DR.it); g.style.background=c; g.style.color=tcOf(c); g.textContent=DR.it.title; document.body.appendChild(g); DR.g=g; }
   DR.g.style.left=(e.clientX+10)+'px'; DR.g.style.top=(e.clientY+8)+'px';
@@ -314,7 +323,8 @@ function openCard(id,e){ const it=findAny(id); if(!it||it.kind==='todo') return;
    <h3 style="--c:${pj?'#0487E2':colorOf(it)}"><i></i><span>${pj?'📁 ':''}${E(it.title)}</span></h3>
    <div class="ln">${whenTxt(it)}${!pj&&!it.time?' · ทั้งวัน':''}</div><div class="ln">${it.scope==='me'?'🙋 ปฏิทินของฉัน':'🏢 ปฏิทินทีม'} · ${E(catName(it))}</div>
    ${pj?`${it.owner?`<div class="ln">🗂️ เมเนเจอร์ ${E(it.owner)}</div>`:''}${phList(it).map(ph=>`<div class="ln" style="display:flex;gap:6px;align-items:center"><i style="width:9px;height:9px;border-radius:2px;background:${ph.color};flex:none"></i><span>${ph.name} · ${E(ph.who.join(', ')||'ยังไม่มีคน')} · ${thD(ph.start)}${ph.end>ph.start?'–'+thD(ph.end):''}${ph.time?' · เสร็จ '+E(ph.time):''}${ph.done?' ✓':''}</span></div>`).join('')}
-     ${isAdm()?`<div style="display:flex;gap:8px;margin:12px 0 0 23px;flex-wrap:wrap"><button class="c-bp" style="padding:6px 14px" onclick="NDCAL.dates('${E(id)}')">✏️ แก้วัน / เลื่อนเดดไลน์</button><button class="c-bg" style="border:1px solid var(--border2)" onclick="NDCAL.goProj('${E(it.pid)}')">📁 แก้ข้อมูลโปรเจกต์ ›</button></div>`:''}`:''}
+     ${canProj()?`<label style="display:flex;gap:8px;align-items:center;margin:10px 0 0 23px;cursor:pointer;font-weight:600"><input type="checkbox" ${it.done?'checked':''} ${it.st==='paid'?'disabled title="รับเงินแล้ว"':''} onchange="NDCAL.projDone('${E(it.pid)}',this.checked)" style="width:17px;height:17px;accent-color:#0487E2"> ✅ โปรเจกต์นี้เสร็จแล้ว${it.st==='paid'?' (รับเงินแล้ว)':''}</label>`:it.done?'<div class="ln" style="color:#1fb57a">✅ เสร็จแล้ว</div>':''}
+     ${canProj()?`<div style="display:flex;gap:8px;margin:12px 0 0 23px;flex-wrap:wrap"><button class="c-bp" style="padding:6px 14px" onclick="NDCAL.dates('${E(id)}')">✏️ แก้วัน / เลื่อนเดดไลน์</button>${canOpenProj()?`<button class="c-bg" style="border:1px solid var(--border2)" onclick="NDCAL.goProj('${E(it.pid)}')">📁 แก้ข้อมูลโปรเจกต์ ›</button>`:''}</div>`:''}`:''}
    ${it.note?`<div class="ln" style="white-space:pre-wrap;color:var(--text)">${E(it.note)}</div>`:''}<div class="ln">${it.edBy?'✏️ แก้ล่าสุดโดย '+E(it.edBy)+' · '+ago(it.at):''}</div>`;
   document.body.appendChild(c); place(c, e&&e.clientX||innerWidth/2, e&&e.clientY||200, 350); }
 function phPop(id,k,e){ closeFloat(); tipOff(); const p=findAny(id), ph=p.phases[k], P=PH.find(x=>x.k===k), ed=canEdit(p), c=document.createElement('div'); c.className='c-card'; c.style.width='290px';
@@ -322,7 +332,7 @@ function phPop(id,k,e){ closeFloat(); tipOff(); const p=findAny(id), ph=p.phases
    <div class="ln" style="margin-left:0">${E(p.title)}</div><div class="ln" style="margin-left:0">👤 ${E(ph.who.join(', ')||'ยังไม่ได้มอบหมาย')}</div><div class="ln" style="margin-left:0">📅 ${thD(ph.start)}${ph.end>ph.start?' – '+thD(ph.end):''}${ed?' <span style="opacity:.7">(ลากขอบช่วงเพื่อเปลี่ยนวัน)</span>':''}</div>
    <div style="display:flex;gap:8px;align-items:center;margin-top:10px">⏰ ต้องเสร็จ <input type="time" class="c-fi" id="c-pht" value="${E(ph.time||'')}" ${ed?'':'disabled'}> น.</div>
    <label style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12.5px"><input type="checkbox" id="c-phd" ${ph.done?'checked':''} ${ed?'':'disabled'}> หน้าที่นี้เสร็จแล้ว</label>
-   <div style="display:flex;gap:6px;margin-top:12px">${ed?`<button class="c-bp" style="padding:6px 16px" onclick="NDCAL.phSave('${E(id)}','${k}')">บันทึก</button><button class="c-bg" style="margin-left:auto" onclick="NDCAL.goProj('${E(p.pid)}')">แก้ข้อมูลโปรเจกต์ ›</button>`:''}</div>`;
+   <div style="display:flex;gap:6px;margin-top:12px">${ed?`<button class="c-bp" style="padding:6px 16px" onclick="NDCAL.phSave('${E(id)}','${k}')">บันทึก</button>${canOpenProj()?`<button class="c-bg" style="margin-left:auto" onclick="NDCAL.goProj('${E(p.pid)}')">แก้ข้อมูลโปรเจกต์ ›</button>`:''}`:''}</div>`;
   document.body.appendChild(c); place(c, e.clientX, e.clientY, 300); }
 // ✏️ แก้วันโปรเจกต์: วันเริ่ม · วันส่งลูกค้า+เวลา · เลื่อนทั้งโปรเจกต์ · วัน/เวลาแต่ละหน้าที่ (ใส่วันเสร็จ → หน้าที่ถัดไปเริ่มต่อให้)
 function projDates(id){ const p=findAny(id); if(!p||!canEdit(p)) return; closeFloat(); tipOff(); const m=document.createElement('div'); m.className='c-mask'; m.onclick=x=>{ if(x.target===m) m.remove(); };
@@ -332,7 +342,7 @@ function projDates(id){ const p=findAny(id); if(!p||!canEdit(p)) return; closeFl
    <div style="margin-top:12px;font-size:12px;color:var(--text2)">แต่ละหน้าที่</div>
    ${phList(p).map(ph=>`<div class="c-fr" style="margin-top:6px"><i style="width:10px;height:10px;border-radius:3px;background:${ph.color}"></i><b style="width:46px">${ph.name}</b><input type="date" class="c-fi" data-k="${ph.k}" data-f="start" value="${ph.start}">–<input type="date" class="c-fi" data-k="${ph.k}" data-f="end" value="${ph.end}" data-old="${ph.end}" onchange="NDCAL.pdChain(this)"><input type="time" class="c-fi" data-k="${ph.k}" data-f="time" value="${E(ph.time)}" title="ต้องเสร็จกี่โมง"><span style="font-size:11.5px;color:var(--text2)">${E(ph.who.join(', '))}</span></div>`).join('')||'<div style="font-size:12px;color:var(--text2);margin-top:6px">ยังไม่ได้ตั้งวันหน้าที่ — ตั้งที่หน้าโปรเจกต์หรือวางแผนงาน</div>'}
    <div style="font-size:11.5px;color:var(--text2);margin-top:10px">🔗 ใส่วันเสร็จของหน้าที่ไหน หน้าที่ถัดไปจะเริ่มต่อให้อัตโนมัติ (อยากให้คาบเกี่ยว แก้วันเริ่มเองได้)</div>
-   <div class="c-ft"><button class="c-bg" style="margin-right:auto" onclick="NDCAL.goProj('${E(p.pid)}')">📁 แก้ข้อมูลโปรเจกต์ ›</button><button class="c-bg" onclick="this.closest('.c-mask').remove()">ยกเลิก</button><button class="c-bp" onclick="NDCAL.pdSave('${E(id)}')">บันทึก</button></div></div>`;
+   <div class="c-ft">${canOpenProj()?`<button class="c-bg" style="margin-right:auto" onclick="NDCAL.goProj('${E(p.pid)}')">📁 แก้ข้อมูลโปรเจกต์ ›</button>`:''}<button class="c-bg" onclick="this.closest('.c-mask').remove()">ยกเลิก</button><button class="c-bp" onclick="NDCAL.pdSave('${E(id)}')">บันทึก</button></div></div>`;
   document.body.appendChild(m); }
 /* ── เพิ่ม / แก้อีเวนต์ ── */
 let DLG={};
@@ -366,7 +376,7 @@ window.NDCAL={ render, open,
   add(day,time){ openDlg(null, day, time); },
   edit(id){ closeFloat(); openDlg(findAny(id)); },
   dates:projDates,
-  goProj(pid){ closeFloat(); document.querySelector('.c-mask')?.remove(); if(isAdm()) safe(()=>openEditProject(pid)); },
+  goProj(pid){ closeFloat(); document.querySelector('.c-mask')?.remove(); if(canOpenProj()) safe(()=>openEditProject(pid)); },
   down(e,id){ if(e.button!==0) return; const it=findAny(id); if(!it) return; const u=under(e), rz=e.target.dataset.rz, rzb=e.target.dataset.rzb;
     DR={it, el:e.currentTarget, x:e.clientX, y:e.clientY, mode:rz==='L'?'resizeL':rz?'resize':rzb?'resizeT':it.kind==='proj'?'proj':'move', from:u?u.dataset.d:it.start, ed:canEdit(it)}; e.preventDefault(); },
   phDown(e,id,k){ if(e.button!==0) return; e.stopPropagation(); const p=findAny(id), ph=p.phases[k], P=PH.find(x=>x.k===k), u=under(e), h=e.target.dataset.h;
@@ -375,7 +385,7 @@ window.NDCAL={ render, open,
   phTip(e,id,k){ const p=findAny(id), ph=p.phases[k], P=PH.find(x=>x.k===k); tipAt(e,`<b>${P.name} · ${E(p.title)}</b><div class="m">${thD(ph.start)}${ph.end>ph.start?' – '+thD(ph.end):''}${ph.time?' · ต้องเสร็จ '+E(ph.time)+' น.':''}</div><div style="margin-top:3px">👤 ${ph.who.length?'<b>'+ph.who.map(E).join(', ')+'</b>':'<span class="m">ยังไม่ได้มอบหมาย</span>'}</div>${p.owner?`<div class="m">🗂️ เมเนเจอร์ ${E(p.owner)}</div>`:''}${edLine(p.edBy,p.at)}`); },
   ctx(e,id){ const it=findAny(id); if(!it) return; e.preventDefault(); e.stopPropagation(); const ed=canEdit(it), I=E(id); let h;
     if(it.kind==='todo') h=`<div onclick="NDCAL.close();NDCAL.todoDone('${E(it.rid)}',true)">✓ ทำเสร็จแล้ว</div><div class="dang" onclick="NDCAL.close();NDCAL.todoDel('${E(it.rid)}')">🗑️ ลบ To-do</div>`;
-    else if(it.kind==='proj') h=isAdm()?`<div onclick="NDCAL.dates('${I}')">✏️ แก้วัน / เลื่อนเดดไลน์</div><div onclick="NDCAL.goProj('${E(it.pid)}')">📁 แก้ข้อมูลโปรเจกต์ ›</div>`:`<div onclick="NDCAL.close();NDCAL.card('${I}',${e.clientX},${e.clientY})">👁️ ดูรายละเอียด</div>`;
+    else if(it.kind==='proj') h=canProj()?`<div onclick="NDCAL.dates('${I}')">✏️ แก้วัน / เลื่อนเดดไลน์</div>${canOpenProj()?`<div onclick="NDCAL.goProj('${E(it.pid)}')">📁 แก้ข้อมูลโปรเจกต์ ›</div>`:''}`:`<div onclick="NDCAL.close();NDCAL.card('${I}',${e.clientX},${e.clientY})">👁️ ดูรายละเอียด</div>`;
     else if(!ed) h=`<div onclick="NDCAL.close();NDCAL.card('${I}',${e.clientX},${e.clientY})">👁️ ดูรายละเอียด</div><div style="color:var(--text2);cursor:default">🔒 อีเวนต์ของ ${E(it.byName||'คนอื่น')}</div>`;
     else { const T=tags(), tg=it.scope==='me'?Object.entries(T).map(([k,t])=>`<div onclick="NDCAL.close();NDCAL.setF('${I}','tag','${k}')"><span class="sw" style="background:${t.color}"></span>${E(t.name)}${it.tag===k?' ✓':''}</div>`).join(''):TEAM_CATS.map(c=>`<div onclick="NDCAL.close();NDCAL.setF('${I}','cat','${c.id}')"><span class="sw" style="background:${c.color}"></span>${c.name}${it.cat===c.id?' ✓':''}</div>`).join('');
       h=`<div onclick="NDCAL.edit('${I}')">✏️ แก้ไข</div><div onclick="NDCAL.close();NDCAL.dup('${I}')">⧉ ทำซ้ำ</div>${it.scope==='me'?`<div onclick="NDCAL.close();NDCAL.toTeam('${I}')">📢 ย้ายไปปฏิทินทีม</div>`:''}<hr>${tg}<hr><div class="dang" onclick="NDCAL.close();NDCAL.delEv('${I}')">🗑️ ลบ</div>`; }
@@ -386,6 +396,10 @@ window.NDCAL={ render, open,
   card(id,x,y){ openCard(id,{clientX:x,clientY:y}); },
   phSave(id,k){ const p=findAny(id), m=model(p), b4=model(p), ph=m.phases[k]; ph.time=$('c-pht').value; ph.done=$('c-phd').checked; closeFloat();
     if(JSON.stringify(m)!==JSON.stringify(b4)) saveProj(p.pid, m, PH.find(x=>x.k===k).name+(ph.done?' ✓ เสร็จแล้ว':ph.time?' ต้องเสร็จ '+ph.time+' น.':' บันทึกแล้ว'), ()=>saveProj(p.pid,b4,'เลิกทำแล้ว')); },
+  async projDone(pid,v){ if(!canProj()) return; const P=PROJ.find(x=>x.id===pid); if(!P||P.projStatus==='paid') return; const old=P.projStatus||'', nu=v?'done':(old==='done'?'inprogress':old);
+    const r=await projWrite(pid, p=>{ p.projStatus=nu; if(v) p.doneAt=p.doneAt||new Date().toISOString(); }, ()=>['projStatus','doneAt']);
+    if(!r||!r.ok){ safe(()=>toast('บันทึกสถานะไม่สำเร็จ'+(r&&r.error?': '+r.error.message+' (ต้องวาง Firebase Rules v7)':''),'error')); return; } if(r.saved){ const i=PROJ.findIndex(x=>x.id===pid); if(i>=0) PROJ[i]=r.saved; } else P.projStatus=nu;
+    closeFloat(); render(); say(v?'✅ ตั้งเป็นเสร็จแล้ว (หน้าโปรเจกต์เปลี่ยนตาม)':'↩️ กลับเป็นกำลังทำ', ()=>NDCAL.projDone(pid,!v)); },
   pdN(n){ const i=$('pd-n'); i.value=(+i.value||0)+n; },
   pdChain(el){ const rows=[...document.querySelectorAll('.c-mask [data-f="end"]')], i=rows.indexOf(el), old=el.dataset.old, nu=el.value; el.dataset.old=nu; const nx=rows[i+1]; if(!nx||!nu) return;
     const ns=document.querySelector(`.c-mask [data-k="${nx.dataset.k}"][data-f="start"]`); if(ns.value&&ns.value!==old) return;

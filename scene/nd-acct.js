@@ -80,7 +80,7 @@ function compute(Mx){
     return {r, list:L, people:new Set(L.map(v=>v.staffId)).size, wht:L.filter(v=>v.whtNo).length, needWht:L.filter(v=>vStats(v).tax>0).length,
       sent:L.filter(v=>v.emailStatus==='sent').length, noMail:L.filter(v=>v.emailStatus==='noemail'||v.emailStatus==='failed').length,
       net:L.reduce((a,v)=>a+vStats(v).net,0)}; });
-  const salaried=Object.entries(D.payroll||{}).filter(([,p])=>p&&(p.payType==='salary'||p.payType==='hybrid')).map(([id,p])=>{ const s=staffOf(id), base=parseFloat(p.baseSalary)||0, cap=ssoCapFor(M).cap;
+  const salaried=Object.entries(D.payroll||{}).filter(([,p])=>p&&(p.payType==='salary'||p.payType==='hybrid')&&!(p.salaryFrom&&M<p.salaryFrom)).map(([id,p])=>{ const s=staffOf(id), base=parseFloat(p.baseSalary)||0, cap=ssoCapFor(M).cap;
     return {id, name:s.nickname||s.name||id, base, allow:parseFloat(p.allowance)||0, sso:Math.round(Math.min(base,cap)*SSO_RATE)}; });
   const missing=[]; const seen=new Set();
   vs.forEach(v=>{ const s=staffOf(v.staffId), st=vStats(v), n=s.nickname||s.name||v.staffNickname||v.staffId;
@@ -147,6 +147,15 @@ async function open(force){ const b=$('nd-acct-body'); if(!b) return;
   if(BUSY) return; BUSY=true; if(!D) b.innerHTML='<div class="ac-mut" style="padding:30px">กำลังโหลดข้อมูลบัญชี…</div>';
   try{ if(D && !force) render(); await load(force); render(); }catch(e){ b.innerHTML='<div class="ac-mut" style="padding:30px">โหลดไม่สำเร็จ: '+E(e.message)+'</div>'; } finally{ BUSY=false; } }
 const stepDone=k=>!!(A.steps&&A.steps[k]);
+// 💼 ค่าตอบแทนพนักงาน (แอดมินตั้งที่เทมเพลตราคา) + ค่าเมเนเจอร์ / ค่านายหน้าจากโปรเจกต์ที่ส่งงานเดือนนี้
+function empPay(){ const PR=D.payroll||{}, ST=safe(()=>getAllStaff(),[])||[], seen=new Set(), emps=ST.filter(s=>s&&s.id&&(s.employee||s.category==='manager')&&!seen.has(s.id)&&seen.add(s.id));
+  if(!emps.length) return ''; const T={project:'ฟรีแลนซ์ (ต่องาน)', salary:'เงินเดือน', hybrid:'เงินเดือน + ต่องาน'}, nm=id=>{ const s=ST.find(x=>x.id===id); return s?(s.nickname||s.name):id; };
+  const jobs={}; (safe(()=>getProjects(),[])||[]).forEach(p=>{ if(!p||p.projStatus==='cancelled'||String(p.deadline||p.date||'').slice(0,7)!==MONTH) return;
+    (p.workers||[]).forEach(w=>{ if(!w||String(w.slot||'').split('-')[0]!=='mgr') return; (jobs[w.id]=jobs[w.id]||[]).push({p, w}); }); });
+  return `<div style="margin-top:12px"><b>💼 ค่าตอบแทนพนักงาน</b> <span class="ac-mut">(ตั้งโดยเจ้าของ · งานที่ส่ง ${E(mLabel(MONTH))})</span></div>
+   <table><tr><th>พนักงาน</th><th>แบบ</th><th class="r">เงินเดือน</th><th class="r">ค่าเมเนเจอร์/งาน</th><th>งานเดือนนี้</th><th class="r">รวมต่องาน</th></tr>${emps.map(s=>{ const x=PR[s.id]||{}, J=jobs[s.id]||[], tot=J.reduce((a,j)=>a+(+j.w.amount||0),0);
+     return `<tr><td>${E(s.nickname||s.name)}</td><td>${E(T[x.payType||'project']||'')}${x.salaryFrom&&MONTH<x.salaryFrom?` <span class="ac-pill ac-o">เริ่ม ${E(x.salaryFrom)}</span>`:''}</td><td class="r">${x.baseSalary?B(x.baseSalary):'—'}</td><td class="r">${x.jobFee?B(x.jobFee):'—'}</td>
+       <td style="font-size:12px">${J.map(j=>`${E(safe(()=>projDisp(j.p),j.p.name||''))} ${j.w.slot==='mgr-comm'?`<b style="color:#1fb57a">+${E(j.w.commPct||String(j.w.comment||'').replace(/[^\d.]/g,''))}% ค่านายหน้า</b>`:'ค่าเมเนเจอร์'} ${B(j.w.amount)}`).join('<br>')||'—'}</td><td class="r">${tot?B(tot):'—'}</td></tr>`; }).join('')}</table>`; }
 function render(){ const b=$('nd-acct-body'); if(!b||!D) return; const C=compute();
   const chk=(k,lbl)=>`<span class="ac-chk ${stepDone(k)?'on':''}" onclick="ACCT.tick('${k}')">${stepDone(k)?'✅':'⬜'} ${lbl||'ตรวจแล้ว'}${stepDone(k)?` <small class="ac-mut">${E(A.steps[k].by||'')} ${E(String(A.steps[k].at||'').slice(5,10))}</small>`:''}</span>`;
   const st=(k,ic,title,src,pill,cls,body)=>`<div class="ac-st ${stepDone(k)?'ok':cls||''} ${OPEN.has(k)?'open':''}"><div class="ac-sh" onclick="ACCT.tog('${k}')"><div class="ac-ic">${stepDone(k)?'✓':ic}</div><div><b>${title}</b><small>${src}</small></div>${pill}<span class="ac-mut">${OPEN.has(k)?'▾':'▸'}</span></div><div class="ac-sb">${body}<div class="ac-row">${chk(k)}</div></div></div>`;
@@ -199,7 +208,7 @@ function render(){ const b=$('nd-acct-body'); if(!b||!D) return; const C=compute
    ${trk}
    <div class="ac-card">
     ${st('s1','💸','1. รอบจ่ายทีมงาน','มาจาก: หน้าเอกสาร › ใบสำคัญจ่ายทีม (ออกใบ & ส่งเมล)',C.vs.length?P(C.vs.length+' ใบ',s1ok?'ac-g':'ac-o'):P('ยังไม่มีใบ'),s1ok?'':'warn',s1)}
-    ${st('s2','🗓️','2. เงินเดือนพนักงานประจำ','มาจาก: รอบจ่ายรายเดือน',P(C.salaried.length+' คน'),'',s2)}
+    ${st('s2','🗓️','2. เงินเดือนพนักงานประจำ','มาจาก: รอบจ่ายรายเดือน · ค่าตอบแทนพนักงาน (เทมเพลตราคา)',P(C.salaried.length+' คน'),'',s2+empPay())}
     ${st('s3','⚠️','3. ข้อมูลที่ยังขาด','ระบบรวมให้จากข้อ 1',C.missing.length?P('ขาด '+C.missing.length,'ac-o'):P('ครบ','ac-g'),C.missing.length?'warn':'',s3)}
     ${st('s4','💰','4. รายรับ & 50 ทวิ จากลูกค้า','มาจาก: งวดรับเงินในโปรเจกต์ · นับตามชื่อลูกค้า',s4wait?P('รอ 50 ทวิ '+s4wait,'ac-o'):P(C.clients.length+' ลูกค้า'),s4wait?'warn':'',s4)}
     ${st('s5','🧾','5. ค่าใช้จ่ายบริษัท','มาจาก: ค่าใช้จ่ายบริษัท · แนบใบเสร็จ',s5miss?P('ขาดใบเสร็จ '+s5miss,'ac-o'):P(C.exp.length+' รายการ'),s5miss?'warn':'',s5)}

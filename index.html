@@ -101,6 +101,7 @@
 /* Badges / chips อ่านง่ายขึ้น */
 [data-theme="light"] .badge{ filter:saturate(0.9) }
 *{box-sizing:border-box;margin:0;padding:0}
+html{overflow-x:hidden;max-width:100%}   /* 📱 กันหน้ากว้างเกินจอบนมือถือ (หน้าโหลด/ป๊อปอัปเลื่อนไปซ้าย-ขาด) */
 body{font-family:'Kanit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;transition:background-color .25s ease,color .25s ease}
 .hidden{display:none!important}
 ::-webkit-scrollbar{width:4px;height:4px}
@@ -954,7 +955,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261105-03"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261105-06"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -2757,13 +2758,18 @@ body.sidebar-collapsed .main-content{
     <div class="s3 form-group"><label class="form-label">🔑 Secret key (ถ้ามี)</label><input class="form-input" id="pj-secretkey" placeholder="เห็นเฉพาะทีมที่เกี่ยวข้อง"></div>
     <div class="s5 form-group"><label class="form-label">🧾 หัก ณ ที่จ่าย (จากค่าจ้างทีม · ค่าเริ่มต้น 3%)</label><div id="pj-ded" class="pj-ded"></div><div id="pj-ded-note" style="font-size:11px;color:var(--text2);margin-top:3px"></div></div>
 
-    <div class="s6 form-group"><label class="form-label">📝 หมายเหตุ (การหัก / เงื่อนไข)</label><textarea class="form-input note-grow" id="pj-note" rows="2" style="resize:vertical;overflow:hidden;line-height:1.55" placeholder="เช่น ลูกค้าหัก 3% ค่าธรรมเนียม (Enter = ขึ้นบรรทัดใหม่)"></textarea></div>
+    <div class="s6 form-group" style="grid-column:1/-1"><label class="form-label">📝 หมายเหตุ (การหัก / เงื่อนไข)</label><textarea class="form-input note-grow" id="pj-note" rows="2" style="resize:vertical;overflow:hidden;line-height:1.55" placeholder="เช่น ลูกค้าหัก 3% ค่าธรรมเนียม (Enter = ขึ้นบรรทัดใหม่)"></textarea></div>
     <div class="s3 form-group"><label class="form-label">💰 ค่าเหมา Manager</label>
      <div id="pj-manager-fee-wrap" style="display:none;align-items:center;gap:6px">
       <input class="form-input" id="pj-manager-fee" type="number" min="0" step="any" data-price placeholder="0" onwheel="this.blur()" oninput="syncManagerFee()" style="flex:1;min-width:0">
       <span style="font-size:11px;color:var(--text2);white-space:nowrap">฿ / งาน</span>
      </div><div id="pj-manager-fee-none" style="font-size:12px;color:var(--text2);padding:7px 0">— เลือก Manager ก่อน —</div></div>
-    <div class="s3 form-group" id="pj-advance-wrap"><label class="form-label">&nbsp;</label>
+    <div class="s3 form-group" id="pj-comm-wrap"><label class="form-label">💼 ค่านายหน้า (หางานเข้าบริษัท)</label>
+     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:36px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer"><input type="checkbox" id="pj-comm" onchange="_commToggle(this.checked)"> ได้ค่านายหน้า</label>
+      <span id="pj-comm-pct" onclick="_commPct()" title="กดเพื่อแก้ %" style="display:none;cursor:pointer;font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:9px;background:rgba(0,180,255,.15);color:var(--accent2);border:1px solid rgba(0,180,255,.35)">10%</span>
+      <span id="pj-comm-amt" style="font-size:11.5px;color:var(--text2)"></span></div></div>
+    <div id="pj-advance-wrap" style="display:none"><label class="form-label">&nbsp;</label>
      <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;border:1px solid var(--border2);border-radius:9px;padding:6px 9px" title="บริษัทควักเงินสำรองจ่ายทีมไปก่อนแล้ว — จะขึ้นป้ายส้มชัด ๆ ในหน้ารายการโปรเจกต์">
       <input type="checkbox" id="pj-advancepaid"> <span>💸 บริษัท<strong>สำรองจ่าย</strong>ไปก่อนแล้ว</span></label></div>
    </div>
@@ -8923,7 +8929,10 @@ function getPayrollProfiles(){ const v=ls('payroll_profiles'); return (v&&typeof
 async function savePayrollProfiles(v){ ls('payroll_profiles',v); await fbSaveKeyed('payroll_profiles', v); }
 function getPayProfile(staffId){
   const p=getPayrollProfiles()[staffId];
-  return { payType:'project', baseSalary:0, allowance:0, allowanceLabel:'', note:'', ...(p||{}) };
+  const o={ payType:'project', baseSalary:0, allowance:0, allowanceLabel:'', note:'', jobFee:0, ...(p||{}) };
+  const now=new Date(), mk=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  if(o.salaryFrom && o.payType!=='project' && mk<o.salaryFrom){ o.planType=o.payType; o.payType='project'; }   // 🗓️ ยังไม่ถึงเดือนเริ่มเงินเดือน
+  return o;
 }
 // งวดรายเดือน: โบนัส/หัก/หมายเหตุ + สถานะปิดงวด
 function getPayrollRuns(){ const v=ls('payroll_runs'); return (v&&typeof v==='object')?v:{}; }
@@ -15553,7 +15562,7 @@ function adminProjDetailHTML(p){
 // ══════════════════════════════════════════════
 let formDubTiers=[];
 function _dubTierDefaults(){ return [{rate:'',unit:'นาที',qty:0},{rate:'',unit:'นาที',qty:0},{rate:'',unit:'นาที',qty:0}]; }
-function initFormSlots(){formSlots={dub:{main:[],sub:[]},adp:{only:[]},mix:{only:[]},qc:{only:[]},sub:{only:[]},trn:{only:[]},mgr:{only:[]}};activeCats=new Set();formDubTiers=_dubTierDefaults();}
+function initFormSlots(){formSlots={dub:{main:[],sub:[]},adp:{only:[]},mix:{only:[]},qc:{only:[]},sub:{only:[]},trn:{only:[]},mgr:{only:[],comm:[]}};activeCats=new Set();formDubTiers=_dubTierDefaults();}
 
 // ══ 💰 ค่าเหมา Manager ตรงจุดมอบหมาย — กรอกครั้งเดียว ระบบใส่ลงหมวด Manager ให้เอง ══
 function _mgrStaffIdOf(uid){
@@ -15632,6 +15641,9 @@ function syncManagerFee(){
       formSlots.mgr.only = formSlots.mgr.only.filter(w=>w.staffId!==prevId);
     }
     window._mgrFeeStaffId = staffId;
+    if(prevId && !uid && formSlots.mgr.comm) formSlots.mgr.comm=[];   // เปลี่ยนเป็นไม่มีเมเนเจอร์ → ไม่มีค่านายหน้า
+    if(feeEl && staffId && staffId!==prevId && !feeEl.value){ const pf=getPayProfile(staffId); if(!_salActive(pf) && pf.jobFee>0) feeEl.value=pf.jobFee; }
+    _mgrFeeHint(staffId);
     const fee = parseFloat(feeEl?.value)||0;
     if(uid && !staffId && fee>0){
       toast('⚠️ เมเนเจอร์คนนี้ยังไม่ผูกกับรายชื่อทีมงาน — เพิ่มค่าตอบแทนในหมวด Manager ด้านล่างแทน','warn');
@@ -15648,6 +15660,7 @@ function syncManagerFee(){
       }
     }
     try{ renderWorkerList('mgr','only'); calcProjSummary(); }catch(e){}
+    _commUI();
   }catch(e){ console.warn('syncManagerFee:', e); }
 }
 // เติมช่องค่าเหมาตอนเปิดแก้โปรเจกต์ (ดึงจาก entry ในหมวด Manager ของเมเนเจอร์คนนั้น)
@@ -15663,8 +15676,28 @@ function prefillManagerFee(p){
     if(!feeEl) return;
     const entry=(formSlots.mgr&&formSlots.mgr.only||[]).find(w=>w.staffId===staffId);
     feeEl.value = entry ? (entry.amount||'') : '';
+    _mgrFeeHint(staffId); _commUI();
   }catch(e){}
 }
+// 💼 ค่านายหน้า: คนดูแล (Manager) ที่หางานนี้เข้าบริษัท ได้ % ของ Budget (ค่าเริ่มต้น 10% · ตั้งที่เทมเพลตราคา · แก้ต่องานได้)
+//    เก็บเป็นรายการค่าจ้าง slot "mgr-comm" → ขึ้นคิวจ่ายเงิน · หักจากกำไรสุทธิ · ขึ้นใบสำคัญจ่ายเป็น "+10% ค่านายหน้า"
+function _salActive(pf){ return !!pf && pf.payType==='salary'; }
+function _commDefPct(){ const c=ls('comm_cfg'); return (c&&+c.pct>0)?+c.pct:10; }
+function _mgrFeeHint(staffId){ const el=document.getElementById('pj-manager-fee-none'); const w=document.getElementById('pj-manager-fee-wrap'); if(!w) return;
+  let h=document.getElementById('pj-mgrfee-hint'); if(!h){ h=document.createElement('div'); h.id='pj-mgrfee-hint'; h.style.cssText='font-size:10.5px;color:var(--text2);margin-top:3px'; w.parentNode.appendChild(h); }
+  const pf=staffId?getPayProfile(staffId):null; h.textContent=!staffId?'':_salActive(pf)?'🗓️ คนนี้รับเงินเดือนประจำ — ปกติไม่คิดค่าต่องาน':(pf&&pf.jobFee>0?'ค่าเริ่มต้น ฿'+Number(pf.jobFee).toLocaleString()+' จากเทมเพลตราคา (แก้ต่องานได้)':'ตั้งค่าเริ่มต้นได้ที่ เทมเพลตราคา › ค่าตอบแทนพนักงาน'); }
+function _commBudget(){ const dur=parseFloat(document.getElementById('pj-duration')?.value)||0, r=parseFloat(document.getElementById('pj-budget')?.value)||0, t=document.getElementById('pj-budget-type')?.value||'flat', q=parseFloat(document.getElementById('pj-budget-qty')?.value)||0; return calcBudgetTotal(r,t,dur,q)||0; }
+function _commSync(){ try{ if(!formSlots.mgr) formSlots.mgr={only:[]}; if(!formSlots.mgr.comm) formSlots.mgr.comm=[]; const e=formSlots.mgr.comm[0]; if(!e) return;
+  const sid=window._mgrFeeStaffId||(_mgrStaffIdOf(document.getElementById('pj-manager')?.value||'')||'');
+  if(!sid&&!e.staffId) return; const pct=+e.commPct||(parseFloat(String(e.comment||'').match(/([\d.]+)\s*%/)?.[1])||_commDefPct());
+  Object.assign(e,{staffId:sid||e.staffId, commPct:pct, amount:Math.round(_commBudget()*pct/100), unit:'เหมา', qty:0, comment:'ค่านายหน้า '+pct+'%'}); activeCats.add('mgr'); }catch(e){} }
+function _commUI(){ try{ if(!ls('comm_cfg')&&!window._commCfgLoad){ window._commCfgLoad=1; fbLoadKeyed('comm_cfg').catch(()=>{}); }
+  _commSync(); const e=(formSlots.mgr&&formSlots.mgr.comm||[])[0], cb=document.getElementById('pj-comm'), pc=document.getElementById('pj-comm-pct'), am=document.getElementById('pj-comm-amt'); if(!cb) return;
+  const sid=window._mgrFeeStaffId||(e&&e.staffId)||''; cb.checked=!!e; cb.disabled=!sid&&!e; pc.style.display=e?'':'none';
+  if(e){ pc.textContent=e.commPct+'%'; const st=getStaffById(e.staffId); am.innerHTML='= <b style="color:var(--green)">฿'+(e.amount||0).toLocaleString()+'</b> → '+esc(st?(st.nickname||st.name):''); } else am.textContent=sid?'':'— เลือก Manager ก่อน —'; }catch(e){} }
+function _commToggle(v){ if(!formSlots.mgr) formSlots.mgr={only:[]}; formSlots.mgr.comm=v?[{staffId:window._mgrFeeStaffId||'', commPct:_commDefPct(), amount:0, unit:'เหมา', comment:''}]:[]; _commUI(); try{ calcProjSummary(); }catch(e){} }
+function _commPct(){ const e=(formSlots.mgr&&formSlots.mgr.comm||[])[0]; if(!e) return; const v=prompt('ค่านายหน้างานนี้กี่ % ของ Budget?', e.commPct); if(v==null) return; const n=parseFloat(v); if(!(n>=0&&n<=100)){ toast('ใส่ตัวเลข 0–100','warn'); return; }
+  e.commPct=n; e.comment=''; _commUI(); try{ calcProjSummary(); }catch(x){} }
 
 // ══════════════════════════════════════════════════════════
 // PHASES (กำหนดส่งของแต่ละทีมในฟอร์มโปรเจกต์)
@@ -15915,7 +15948,7 @@ async function openNewProject(){
   // ⛔ ค่าเริ่มต้นว่าง "—" (ไม่เติมวันนี้ให้เอง)
   ['pj-start','pj-start-pk','pj-deadline','pj-deadline-pk','pj-deadline-time'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   try{ pjDedInit(null); }catch(e){}
-  { const _aw=document.getElementById('pj-advance-wrap'); if(_aw) _aw.style.display=(currentUser?.role==='manager')?'none':''; }
+  /* 💸 สำรองจ่าย ย้ายไปติ๊กที่หน้าคิวจ่ายเงิน */
   document.querySelectorAll('.cat-toggle-btn').forEach(b=>b.classList.remove('on'));
   ['dub','adp','mix','qc','sub','trn','mgr'].forEach(k=>{const el=document.getElementById('catblock-'+k);if(el)el.classList.add('hidden');});
   ['dub','adp','mix','qc','sub','trn','mgr'].forEach(k=>{const el=document.getElementById(k+'-tax');if(el)el.value='';});
@@ -16792,6 +16825,7 @@ function _autoPhaseNotes(){
 }
 function calcProjSummary(){
   try{ _autoPhaseNotes(); }catch(e){}
+  try{ _commSync(); const _e=(formSlots.mgr&&formSlots.mgr.comm||[])[0], _a=document.getElementById('pj-comm-amt'); if(_e&&_a) _commUI(); }catch(e){}
   const dur=parseFloat(document.getElementById('pj-duration')?.value)||0;
   let totalExp=0;
   const catKeys=['dub','adp','mix','qc','sub','trn','mgr'];
@@ -16856,7 +16890,7 @@ async function saveProject(){
       arr.forEach(w=>{
         if(!w.staffId) return; // ข้าม placeholder ที่ยังไม่เลือกคน (ก๊อปปี้ค่าไว้/จาก calc)
         const amt=calcWorkerAmt(w,dur);
-        workers.push({id:w.staffId,slot:(cat==='dub'&&w.keepSlot)?w.keepSlot:(cat+'-'+slot),amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,status:'pending',note:'',comment:w.comment||'',...(w.minWorked?{minWorked:w.minWorked}:{}),...(w.ep?{ep:w.ep}:{}),...(cat==='dub'&&w.tier?{tier:w.tier}:{})});
+        workers.push({id:w.staffId,slot:(cat==='dub'&&w.keepSlot)?w.keepSlot:(cat+'-'+slot),amount:Math.round(amt),ratePerUnit:w.amount||0,unit:w.unit||'นาที',qty:w.qty||0,status:'pending',note:'',comment:w.comment||'',...(w.minWorked?{minWorked:w.minWorked}:{}),...(w.ep?{ep:w.ep}:{}),...(cat==='dub'&&w.tier?{tier:w.tier}:{}),...(w.commPct?{commPct:w.commPct}:{})});
       });
     });
   });
@@ -17456,7 +17490,7 @@ async function openEditProject(id){
   try{ pjDedInit(p); }catch(e){ console.warn('pjDedInit:',e); }
   // 🔒 ค่าเหมา Manager แก้ได้เฉพาะแอดมิน (เมเนเจอร์เห็นแต่แก้ไม่ได้) · สำรองจ่าย = แอดมินเท่านั้น
   { const _mf=document.getElementById('pj-manager-fee'); if(_mf){ _mf.disabled=_isMgr; _mf.title=_isMgr?'แก้ได้เฉพาะแอดมิน':''; } }
-  { const _aw=document.getElementById('pj-advance-wrap'); if(_aw) _aw.style.display=_isMgr?'none':''; }
+  { const _cw=document.getElementById('pj-comm-wrap'); if(_cw) _cw.style.display=_isMgr?'none':''; }
   openModal('modal-project');
   _pjFormBase = _pjFormSections();
   // ─ Claim presence + auto-draft ─
@@ -18095,6 +18129,8 @@ function qBoxAll(projId){
   try { renderQueue(); } catch(e){}
 }
 
+async function qToggleAdvance(pid, v){ if(currentUser?.role!=='admin') return; const r=await saveProjectMerge(pid, p=>{ p.isAdvancePaid=!!v; });
+  if(!r||!r.ok){ toast('บันทึกไม่สำเร็จ','error'); } else toast(v?'💸 บันทึกว่าบริษัทสำรองจ่ายไปก่อนแล้ว':'ยกเลิกสำรองจ่ายแล้ว','success'); try{ renderQueue(); }catch(e){} }
 function renderQueue() {
   // 🔒 Admin guard: คิวจ่ายเงินโชว์ยอดทุกคนในทีม → admin only
   if(currentUser?.role !== 'admin'){
@@ -18578,6 +18614,7 @@ function renderQueue() {
             <div style="font-weight:800;font-size:15px;display:flex;align-items:center;gap:7px;flex-wrap:wrap">${projCode(p)?`<span style="font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:6px;background:rgba(21,101,255,.18);color:var(--accent2);border:1px solid rgba(21,101,255,.35)">${esc(projCode(p))}</span>`:''}<span>${esc(p.name&&p.name!==projCode(p)?p.name:(projCode(p)?'':(p.name||'(ไม่มีชื่อ)')))}</span></div>
             <div style="font-size:11px;color:var(--text2);margin-top:3px">
               ${p.client||''}${p.type?' · '+p.type:''} ${p.deadline?'· Deadline: '+fmtDate(p.deadline):''} · ${clientChip}
+              ${currentUser?.role==='admin'?`<label onclick="event.stopPropagation()" title="บริษัทควักเงินสำรองจ่ายทีมไปก่อน (ก่อนลูกค้าจ่าย)" style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding:1px 8px;border-radius:8px;cursor:pointer;border:1px solid ${p.isAdvancePaid?'rgba(255,158,0,.55)':'var(--border2)'};color:${p.isAdvancePaid?'var(--orange)':'var(--text2)'};font-weight:${p.isAdvancePaid?800:500}"><input type="checkbox" ${p.isAdvancePaid?'checked':''} onchange="qToggleAdvance('${p.id}',this.checked)" style="margin:0"> 💸 บ.สำรองจ่าย</label>`:''}
             </div>
           </div>
         </div>
@@ -33450,7 +33487,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261105-03"></script><script src="scene/nd-profile.js?v=20261105-03"></script><script src="scene/nd-plan.js?v=20261105-03"></script><script src="scene/nd-cal.js?v=20261105-03"></script><script src="scene/nd-register.js?v=20261105-03"></script><script src="scene/nd-work.js?v=20261105-03"></script><script src="scene/nd-docform.js?v=20261105-03"></script><script src="scene/nd-docpdf.js?v=20261105-03"></script><script src="scene/nd-acct.js?v=20261105-03"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261105-06"></script><script src="scene/nd-profile.js?v=20261105-06"></script><script src="scene/nd-plan.js?v=20261105-06"></script><script src="scene/nd-cal.js?v=20261105-06"></script><script src="scene/nd-register.js?v=20261105-06"></script><script src="scene/nd-work.js?v=20261105-06"></script><script src="scene/nd-docform.js?v=20261105-06"></script><script src="scene/nd-docpdf.js?v=20261105-06"></script><script src="scene/nd-acct.js?v=20261105-06"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33460,7 +33497,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261105-03';
+var UPD_BUILD = '20261105-06';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;

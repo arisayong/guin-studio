@@ -358,7 +358,7 @@ function applyPlan(f){
   // 💰 ค่าเหมา Manager (แอดมินเท่านั้น) = รายการในหมวด mgr ของเมเนเจอร์คนนั้น · ระบบเดิมของหน้าโปรเจกต์ใช้ชุดเดียวกัน
   if(isAdm() && (T.mgrFee||T.mgrId)){ const ms=mgrStaff(S.mgrId), fee=+S.mgrFee||0; f.workers=(f.workers||[]).filter(Boolean);
     if(T.mgrId){ const prev=mgrStaff(S.src.managerId); if(prev&&(!ms||prev.id!==ms.id)) f.workers=f.workers.filter(w=>!(preOf(w)==='mgr'&&w.id===prev.id&&w.status!=='paid')); }
-    if(ms){ const i=f.workers.findIndex(w=>preOf(w)==='mgr'&&w.id===ms.id);
+    if(ms){ const i=f.workers.findIndex(w=>preOf(w)==='mgr'&&w.slot!=='mgr-comm'&&w.id===ms.id);
       if(fee>0){ if(i>=0) Object.assign(f.workers[i],{amount:fee, ratePerUnit:fee, unit:'เหมา'}); else f.workers.push({id:ms.id, slot:'mgr-only', amount:fee, ratePerUnit:fee, unit:'เหมา', qty:0, status:'pending', note:'', comment:'', confirmStatus:'none'}); }
       else if(i>=0 && f.workers[i].status!=='paid') f.workers.splice(i,1); } }
   // คน · ราคา · เวลา — เขียนเฉพาะเมื่อแตะส่วนนี้
@@ -1122,6 +1122,7 @@ function priceRender(){ const pg=$('nd-price-body'); if(!pg) return; const adm=i
   const dis=adm?'':'disabled';
   const unitSel=(v,fn)=>`<select class="form-input form-select" ${dis} onchange="${fn}">${UNITS.map(u=>`<option${u===v?' selected':''}>${u}</option>`).join('')}</select>`;
   const one=k=>`<span class="t"><input class="form-input" type="number" step="any" value="${WK[k].rate}" ${dis} onchange="NDP.pr('${k}','rate',+this.value||0)">฿ /${k==='adp'?' นาทีที่ทำจริง':' '+unitSel(WK[k].unit,`NDP.pr('${k}','unit',this.value)`)}</span>`;
+  const _sp=spHTML();
   pg.innerHTML=`<div class="pl-card"><div class="pl-cb">
     <div class="pl-f" style="grid-template-columns:minmax(220px,320px) minmax(220px,320px) auto;align-items:end;margin-bottom:12px">
      <div><label class="pl-l">📂 เลือกเทมเพลต</label><select class="form-input form-select" onchange="NDP.pc(this.value)">${keys.map(k=>`<option value="${esc(k)}"${k===pcSel&&!pcNew?' selected':''}>${esc(k)}${PRICE[k].name&&adm?' · '+esc(PRICE[k].name):''}</option>`).join('')}${pcNew?`<option selected>${esc(pcSel)} (ใหม่ · ยังไม่บันทึก)</option>`:''}${!keys.length&&!pcNew?'<option>— ยังไม่มีเทมเพลต —</option>':''}</select></div>
@@ -1132,6 +1133,24 @@ function priceRender(){ const pg=$('nd-price-body'); if(!pg) return; const adm=i
       <span class="pl-mut">${k==='adp'?'คูณนาทีที่แต่ละคนทำ':k==='dub'?'ได้เบอร์เดียวกันได้เท่ากัน':'ต่อคน'}</span></div></div>`).join('')}
     ${WK?`<div class="pl-mut" style="margin-top:8px">🧾 ทุกราคาเป็นยอดก่อนหัก ณ ที่จ่าย (งานใหม่หัก 3% เป็นค่าเริ่มต้น · แก้ได้ต่องาน)</div>`:''}
     ${adm&&WK?`<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn btn-green" onclick="NDP.pcSave('over')">💾 ${pcNew?'บันทึกเทมเพลต '+esc(pcSel):'บันทึกทับ '+esc(pcSel)}</button><button class="btn btn-outline" onclick="NDP.pcSave('new')">📄 บันทึกเป็นเทมเพลตใหม่…</button><span style="flex:1"></span>${!pcNew?`<button class="btn btn-outline btn-sm" style="color:var(--red);border-color:rgba(255,64,64,.35)" onclick="NDP.pcDel()">🗑️ ลบเทมเพลต ${esc(pcSel)}</button>`:''}</div>`:(!adm?'<div class="pl-mut" style="margin-top:10px">🔒 แก้ได้เฉพาะแอดมิน</div>':'')}
+   </div></div>${_sp}`; }
+// 💼 ค่าตอบแทนพนักงาน (เฉพาะคนที่ไม่ใช่ทีมงานทั่วไป: พนักงานบริษัท · เมเนเจอร์ · บัญชี) — เก็บที่ payroll_profiles ชุดเดียวกับรอบจ่ายรายเดือน/หน้าบัญชี
+let SP=null, SPcomm=10;
+function empList(){ const seen=new Set(); return (safe(()=>getAllStaff(),[])||[]).filter(s=>s&&s.id&&(s.employee||s.category==='manager')&&!seen.has(s.id)&&seen.add(s.id)&&safe(()=>getStaffStatus(s),'active')!=='resigned').sort((a,b)=>String(a.nickname||a.name).localeCompare(String(b.nickname||b.name),'th')); }
+async function loadSP(){ SP=JSON.parse(JSON.stringify(safe(()=>getPayrollProfiles(),{})||{})); const c=await safe(()=>fbLoadKeyed('comm_cfg'),null); SPcomm=(c&&+c.pct>0)?+c.pct:10;
+  try{ const v=await fbLoadKeyed('payroll_profiles'); if(v&&typeof v==='object') SP=JSON.parse(JSON.stringify(v)); }catch(e){} }
+function spHTML(){ if(!isAdm()) return ''; if(!SP) { loadSP().then(()=>priceRender()); return ''; } const L=empList(), T={project:'ฟรีแลนซ์ (ต่องาน)', salary:'เงินเดือน', hybrid:'เงินเดือน + ต่องาน'};
+  const role=s=>s.category==='manager'?'🗂️ เมเนเจอร์':'💼 พนักงาน';
+  return `<div class="pl-card" style="margin-top:14px"><div class="pl-cb">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><b style="font-size:15px">💼 ค่าตอบแทนพนักงาน</b><span class="pl-mut">เฉพาะพนักงานบริษัท/เมเนเจอร์ · บัญชีเห็นยอดนี้ในหน้างานบัญชี</span></div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:640px"><tr style="color:var(--text2);font-size:11.5px;text-align:left"><th style="padding:6px">ชื่อ</th><th>แบบ</th><th>ค่าเมเนเจอร์ / งาน</th><th>เงินเดือน</th><th>เริ่มเงินเดือน (เดือน)</th></tr>
+    ${L.map(st=>{ const x=SP[st.id]||{}, I=esc(st.id); return `<tr style="border-top:1px solid var(--border2)"><td style="padding:6px"><b>${esc(st.nickname||st.name)}</b> <span class="pl-mut" style="font-size:11px">${role(st)}</span></td>
+      <td><select class="form-input form-select" style="padding:5px 26px 5px 8px" onchange="NDP.sp('${I}','payType',this.value)">${Object.entries(T).map(([k,n])=>`<option value="${k}"${(x.payType||'project')===k?' selected':''}>${n}</option>`).join('')}</select></td>
+      <td><input class="form-input" type="number" min="0" step="any" style="width:110px;padding:5px 8px" value="${x.jobFee||''}" placeholder="฿" onchange="NDP.sp('${I}','jobFee',+this.value||0)"></td>
+      <td><input class="form-input" type="number" min="0" step="any" style="width:120px;padding:5px 8px" value="${x.baseSalary||''}" placeholder="฿ / เดือน" ${(x.payType||'project')==='project'?'disabled':''} onchange="NDP.sp('${I}','baseSalary',+this.value||0)"></td>
+      <td><input class="form-input" type="month" style="width:150px;padding:5px 8px" value="${esc(x.salaryFrom||'')}" ${(x.payType||'project')==='project'?'disabled':''} onchange="NDP.sp('${I}','salaryFrom',this.value)"></td></tr>`; }).join('')||'<tr><td colspan="5" class="pl-mut" style="padding:10px">ยังไม่มีพนักงานบริษัท — ติ๊ก "พนักงานบริษัท" ในโปรไฟล์ก่อน</td></tr>'}</table></div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--border2)"><b>💼 ค่านายหน้าเริ่มต้น</b><input class="form-input" type="number" min="0" max="100" step="any" style="width:80px;padding:5px 8px" value="${SPcomm}" onchange="NDP.spComm(+this.value)"><span>% ของ Budget</span><span class="pl-mut">— คนดูแลที่หางานเข้าบริษัท (ติ๊กในหน้าโปรเจกต์ · แก้ % ต่องานได้)</span></div>
+    <div class="pl-mut" style="margin-top:8px">🗓️ ตั้ง "เงินเดือน" + เดือนเริ่ม (เช่น ม.ค.) ไว้ล่วงหน้าได้ — ก่อนถึงเดือนนั้นระบบยังนับเป็นฟรีแลนซ์ต่องาน</div>
    </div></div>`; }
 function pickCodeDialog(title, cb){ const sys=codesInSystem();
   safe(()=>_tagOverlayShow(title, `<div class="pl-l">เลือกรหัสลูกค้าในระบบ หรือพิมพ์รหัสใหม่</div>
@@ -1387,7 +1406,10 @@ const NDP=window.NDP={
   pcAdd(k){ if(!k) return; const go=c=>{ if(PRICE[c]){ say('รหัส '+c+' มีเทมเพลตอยู่แล้ว — เปิดให้แก้','info'); pcSel=c; pcNew=false; WK=null; priceRender(); return; }
       WK=JSON.parse(JSON.stringify(WK||blankTpl())); WK.name=codesInSystem()[c]||''; pcSel=c; pcNew=true; priceRender(); };
     if(k==='__type') pickCodeDialog('＋ เทมเพลตราคารหัสใหม่', go); else go(k); },
-  pr(k,f,v){ WK[k][f]=v; priceRender(); }, prd(j,f,v){ const d=WK.dub; if(f==='add') d.push({rate:0,unit:'นาที'}); else if(f==='del') d.splice(j,1); else d[j][f]=v; priceRender(); },
+  pr(k,f,v){ WK[k][f]=v; priceRender(); },
+  async sp(id,f,v){ if(!isAdm()) return; SP[id]={payType:'project', baseSalary:0, allowance:0, allowanceLabel:'', ...(SP[id]||{}), [f]:v, updatedAt:new Date().toISOString(), by:safe(()=>currentUser.email,'')};
+    await safe(()=>savePayrollProfiles(SP)); say('💾 บันทึกค่าตอบแทนแล้ว','success'); priceRender(); },
+  async spComm(v){ if(!isAdm()||!(v>=0&&v<=100)) return; SPcomm=v; await safe(()=>fbSaveKeyed('comm_cfg',{pct:v})); say('💾 ค่านายหน้าเริ่มต้น '+v+'%','success'); }, prd(j,f,v){ const d=WK.dub; if(f==='add') d.push({rate:0,unit:'นาที'}); else if(f==='del') d.splice(j,1); else d[j][f]=v; priceRender(); },
   async pcSave(mode){ if(!isAdm()||!WK) return;
     const write=async c=>{ PRICE[c]=JSON.parse(JSON.stringify(WK)); PRICE[c].name=codesInSystem()[c]||PRICE[c].name||''; await fbSaveKeyed('pricetpl', PRICE); pcSel=c; pcNew=false; WK=null; audit('price.tpl', c, 'บันทึกเทมเพลตราคา'); say('💾 บันทึกเทมเพลตราคา '+c+' แล้ว','success'); priceRender(); };
     if(mode==='over'){ if(!pcNew && !confirm('บันทึกทับเทมเพลต '+pcSel+'?')) return; await write(pcSel); }
