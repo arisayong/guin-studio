@@ -48,21 +48,22 @@ const DEF_TAGS={t1:{name:'ส่วนตัว',color:'#8E24AA'},t2:{name:'ง�
 /* ── สถานะ ── */
 const LSK='guin3_cal_v2';
 const ST=Object.assign({view:'month', cur:new Date(), open:{me:true,team:true},
-  L:{me:true, tags:{}, todo:true, teamOn:true, mine:true, all:true, events:true}}, safe(()=>{ const x=JSON.parse(localStorage.getItem(LSK)); return x?{view:x.view||'month', open:x.open||{me:true,team:true}, L:x.L}:null; },{}));
+  L:{me:true, tags:{}, todo:true, teamOn:true, mine:true, all:true, events:true}}, safe(()=>{ const x=JSON.parse(localStorage.getItem(LSK)); return x?{view:x.view||'month', open:x.open||{me:true,team:true}, L:x.L, fold:x.fold||{}}:null; },{}));
 ST.cur=new Date(); ST.cur.setHours(0,0,0,0);
-const saveST=()=>{ try{ localStorage.setItem(LSK, JSON.stringify({view:ST.view, open:ST.open, L:ST.L})); }catch(e){} };
+const saveST=()=>{ try{ localStorage.setItem(LSK, JSON.stringify({view:ST.view, open:ST.open, L:ST.L, fold:ST.fold||{}})); }catch(e){} };
 const D={team:{}, mine:{}, todo:{}, tags:null, live:false, proj:null, projAt:0};
 let PROJ=[];
 
 /* ── Firebase ── */
 const myUid=()=>safe(()=>CU().uid,'');
-const path=k=>k==='team'?'teamcal/events':k==='ttags'?'teamcal/tags':'privcal/'+myUid()+'/'+(k==='mine'?'events':k==='todo'?'todos':'tags');
+const path=k=>k==='team'?'teamcal/events':k==='ttags'?'teamcal/tags':k==='tstk'?'teamcal/stickers':'privcal/'+myUid()+'/'+({mine:'events',todo:'todos',stk:'stickers',eprefs:'emoji'}[k]||'tags');
+const WHOLE=/^(tags|ttags|eprefs)$/;
 function attach(){ if(D.live) return; D.live=true; const db=DB();
-  if(!db){ ['team','mine','todo','tags','ttags'].forEach(k=>{ D[k]=safe(()=>JSON.parse(localStorage.getItem('guin3_cal_'+k)),null)||(/tags/.test(k)?null:{}); }); return; }
-  ['team','mine','todo','tags','ttags'].forEach(k=>{ try{ db.ref(path(k)).on('value', sn=>{ D[k]=sn.val()||(/tags/.test(k)?null:{}); D['err_'+k]=''; if(visible()) render(); }, e=>{ D['err_'+k]=String(e&&e.message||e); if(visible()) render(); }); }catch(e){} }); }
-async function put(k, obj, id){ const db=DB(); if(/tags/.test(k)) D[k]=obj; else D[k][id]=obj;
+  if(!db){ ['team','mine','todo','tags','ttags','stk','tstk','eprefs'].forEach(k=>{ D[k]=safe(()=>JSON.parse(localStorage.getItem('guin3_cal_'+k)),null)||(/tags/.test(k)?null:{}); }); return; }
+  ['team','mine','todo','tags','ttags','stk','tstk','eprefs'].forEach(k=>{ try{ db.ref(path(k)).on('value', sn=>{ D[k]=sn.val()||(/tags/.test(k)?null:{}); D['err_'+k]=''; if(visible()) render(); }, e=>{ D['err_'+k]=String(e&&e.message||e); if(visible()) render(); }); }catch(e){} }); }
+async function put(k, obj, id){ const db=DB(); if(WHOLE.test(k)) D[k]=obj; else D[k][id]=obj;
   if(!db){ try{ localStorage.setItem('guin3_cal_'+k, JSON.stringify(D[k])); }catch(e){} return; }
-  try{ await db.ref(path(k)+(/tags/.test(k)?'':'/'+id)).set(obj); }catch(e){ safe(()=>toast('บันทึกไม่สำเร็จ: '+e.message+(k==='team'?' (ต้องวาง Firebase Rules v6)':''),'error')); throw e; } }
+  try{ await db.ref(path(k)+(WHOLE.test(k)?'':'/'+id)).set(obj); }catch(e){ safe(()=>toast('บันทึกไม่สำเร็จ: '+e.message+(k==='team'?' (ต้องวาง Firebase Rules v6)':''),'error')); throw e; } }
 async function del(k, id){ const db=DB(); delete D[k][id]; if(!db){ try{ localStorage.setItem('guin3_cal_'+k, JSON.stringify(D[k])); }catch(e){} return; }
   try{ await db.ref(path(k)+'/'+id).remove(); }catch(e){ safe(()=>toast('ลบไม่สำเร็จ: '+e.message,'error')); } }
 async function projects(force){ if(role()==='admin'||role()==='manager'||!DB()) return safe(()=>getProjects(),[])||[];
@@ -73,7 +74,8 @@ const tags=()=>D.tags||DEF_TAGS;
 // 🏷️ แท็กทีม: ทุกคนในทีมเพิ่ม/แก้/เลือกสีได้ · มีแท็กย่อยได้ 1 ชั้น (เช่น งาน › พากย์ · งาน › มิกซ์)
 const DEF_TT={meet:{name:'ประชุม / มีตติ้ง',color:'#0487E2'},work:{name:'งาน',color:'#0463CA'},off:{name:'วันหยุด / ลา',color:'#65C2F5'},tax:{name:'ส่งภาษี / บัญชี',color:'#09B1EC'},other:{name:'อื่น ๆ',color:'#7BAAF7'}};
 const TGS=sc=>sc==='team'?(D.ttags||DEF_TT):tags(), TK=sc=>sc==='team'?'ttags':'tags', LK=sc=>sc==='team'?'tt':'tags';
-function tagTree(sc){ const T=TGS(sc), ids=Object.keys(T), top=ids.filter(id=>!T[id].parent||!T[T[id].parent]); return top.map(id=>({id, t:T[id], kids:ids.filter(k=>T[k].parent===id).map(k=>({id:k, t:T[k]}))})); }
+const ordOf=(T,ids)=>ids.map((id,i)=>[id,T[id].order!=null?+T[id].order:i]).sort((a,b)=>a[1]-b[1]).map(x=>x[0]);
+function tagTree(sc){ const T=TGS(sc), ids=Object.keys(T), top=ordOf(T,ids.filter(id=>!T[id].parent||!T[T[id].parent])); return top.map(id=>({id, t:T[id], kids:ordOf(T,ids.filter(k=>T[k].parent===id)).map(k=>({id:k, t:T[k]}))})); }
 function tagFull(sc,id){ const T=TGS(sc), t=T[id]; if(!t) return ''; const p=t.parent&&T[t.parent]; return (p?p.name+' › ':'')+t.name; }
 function tagOn(sc,id){ const L=ST.L[LK(sc)]||{}, T=TGS(sc), t=T[id]; if(L[id]===false) return false; return !(t&&t.parent&&L[t.parent]===false); }
 
@@ -122,7 +124,16 @@ const CSS=`
 .c-row{display:flex;align-items:center;gap:9px;padding:5px 6px;border-radius:8px;cursor:pointer;position:relative} .c-row:hover{background:var(--cl-hov)}
 .c-row input,.c-gh input{display:none} .c-ck{width:17px;height:17px;border-radius:4px;border:2px solid var(--c);display:inline-flex;align-items:center;justify-content:center;flex:none}
 input:checked+.c-ck{background:var(--c)} input:checked+.c-ck::after{content:'✓';color:#fff;font-size:11px;font-weight:700}
-.c-act{margin-left:auto;display:none;gap:2px} .c-row:hover .c-act{display:flex} .c-act button{background:none;border:none;color:var(--text2);cursor:pointer;font-size:12px;padding:1px 4px;border-radius:5px}
+.c-act{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:flex;opacity:0;pointer-events:none;background:var(--card);border-radius:6px} .c-row:hover .c-act{opacity:1;pointer-events:auto} .c-act button{background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;line-height:1;padding:3px 7px;border-radius:5px} .c-act button:hover{background:var(--cl-hov);color:var(--text)}
+.c-tn{flex:1;min-width:0;padding-right:24px} .c-lk{font-size:10px;opacity:.7;position:absolute;right:30px} .c-tf{width:12px;margin-left:-6px;color:var(--text2);font-size:10px;flex:none;cursor:pointer;text-align:center}
+.c-ttl{cursor:pointer;border-radius:8px;padding:2px 8px} .c-ttl:hover{background:var(--cl-hov)} .c-ttl::after{content:' ▾';font-size:13px;color:var(--text2)}
+.c-mp{padding:10px 12px!important;width:270px} .c-mp .yy{display:flex;align-items:center;gap:6px;margin-bottom:8px;font-weight:600;font-size:15px} .c-mp .yy span{flex:1;padding-left:4px} .c-mp .yy button{background:none;border:none;color:var(--text);cursor:pointer;font-size:15px;width:30px;height:30px;border-radius:50%} .c-mp .yy button:hover{background:var(--cl-hov)}
+.c-mp .mm{display:grid;grid-template-columns:repeat(4,1fr);gap:4px} .c-mp .mm div{display:flex!important;justify-content:center;padding:10px 0!important;border-radius:20px;font-size:13px} .c-mp .mm div.on{background:#0487E2;color:#fff} .c-mp .mm div.now{box-shadow:inset 0 0 0 1px #65C2F5}
+.c-stk{position:absolute;left:4px;top:3px;display:flex;gap:1px;z-index:3;max-width:calc(50% - 16px);overflow:hidden} .c-stk span{font-size:17px;line-height:22px;cursor:pointer;border-radius:5px;padding:0 1px} .c-stk span:hover{background:var(--cl-hov)} .c-stk img{width:22px;height:22px;object-fit:cover;border-radius:5px;vertical-align:top}
+.c-stk span.tm{outline:1px solid rgba(101,194,245,.55)} .c-wkh .c-stk{position:static;justify-content:center;max-width:none;margin-top:2px}
+.c-ep{width:min(460px,100%)!important} .c-etab{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--border2);margin:8px 0 6px} .c-etab button{background:none;border:none;font-size:18px;padding:6px 8px;cursor:pointer;border-bottom:2px solid transparent;color:var(--text)} .c-etab button.on{border-color:#0487E2}
+.c-eg{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;max-height:240px;overflow:auto} .c-eg div{position:relative;font-size:24px;text-align:center;padding:4px 0;border-radius:8px;cursor:pointer;line-height:1.2} .c-eg div:hover{background:var(--cl-hov)} .c-eg img{width:30px;height:30px;object-fit:cover;border-radius:6px}
+.c-eg i{position:absolute;right:0;top:-2px;font-style:normal;font-size:11px;opacity:0} .c-eg div:hover i{opacity:.85} .c-eg i.on{opacity:1}
 .c-sub{padding-left:24px} .c-sub.off{opacity:.38;pointer-events:none} .c-note{font-size:11px;color:var(--text2);padding:0 6px 5px 32px;line-height:1.45}
 .c-addtag{font-size:12.5px;color:#0487E2;cursor:pointer;padding:5px 6px;border-radius:8px} .c-addtag:hover{background:var(--cl-hov)}
 .c-todo{display:flex;gap:8px;align-items:flex-start;padding:3px 6px} .c-todo.done span{text-decoration:line-through;color:var(--text2)} .c-todo input{accent-color:#0487E2;margin-top:3px}
@@ -193,13 +204,12 @@ function ensurePage(){ if($('page-nd-cal')) return; const mc=document.querySelec
 async function open(){ const b=$('nd-cal-body'); if(!canSee()){ if(b) b.innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)">🔒 สำหรับพนักงานบริษัท (แอดมิน · เมเนเจอร์ · บัญชี · พนักงาน)</div>'; return; }
   attach(); render(); PROJ=await projects(); render(); }
 
-function side(){ const c=new Date(ST.cur.getFullYear(),ST.cur.getMonth(),1), s=addD(c,-c.getDay()), L=ST.L, T=tags(); let mini='';
-  for(let i=0;i<42;i++){ const d=addD(s,i); mini+=`<div class="${d.getMonth()!==c.getMonth()?'o':''} ${ymd(d)===TODAY()?'t':''}" onclick="NDCAL.go('${ymd(d)}')">${d.getDate()}</div>`; }
+function side(){ const L=ST.L;
   const row=(on,col,label,fn,act)=>`<label class="c-row"><input type="checkbox" ${on?'checked':''} onchange="${fn}"><span class="c-ck" style="--c:${col}"></span><span>${label}</span>${act||''}</label>`;
   const head=(key,on,col,label,hint,fn)=>`<div class="c-gh"><span class="c-car" onclick="NDCAL.fold('${key}')">▼</span><label style="display:flex;gap:8px;align-items:center;cursor:pointer;flex:1"><input type="checkbox" ${on?'checked':''} onchange="${fn}"><span class="c-ck" style="--c:${col}"></span>${label} <span style="font-weight:400;font-size:11px;color:var(--text2)">${hint}</span></label></div>`;
   const todos=Object.values(D.todo).filter(Boolean).sort((a,b)=>(a.done-b.done)||String(a.due||'9').localeCompare(String(b.due||'9')));
   return `<button class="c-create" onclick="NDCAL.add('${TODAY()}')"><b>＋</b> สร้าง</button>
-   <div class="c-mini"><div class="c-mini-h"><span>${TMF[c.getMonth()]} ${c.getFullYear()+543}</span><button onclick="NDCAL.nav(-1)">‹</button><button onclick="NDCAL.nav(1)">›</button></div><div class="c-mini-g">${WD.map(w=>`<div class="w">${w[0]}</div>`).join('')}${mini}</div></div>
+   <div style="height:12px"></div>
    <div class="c-grp ${ST.open.me?'':'closed'}">${head('me',L.me,'#9aa0a6','🙋 ปฏิทินของฉัน','(คนอื่นไม่เห็น)',"NDCAL.lay('me',this.checked)")}<div class="c-gb"><div class="c-sub ${L.me?'':'off'}">
      ${tagRows('me')}
      ${row(L.todo,'#FBBC04','☑ To-do',"NDCAL.lay('todo',this.checked)")}
@@ -213,10 +223,46 @@ function side(){ const c=new Date(ST.cur.getFullYear(),ST.cur.getMonth(),1), s=a
      <div class="${L.events?'':'c-sub off'}" style="padding-left:14px">${tagRows('team')}</div>
      <div style="display:flex;gap:7px;flex-wrap:wrap;padding:4px 6px">${PH.map(c=>`<span style="font-size:11px;display:inline-flex;gap:5px;align-items:center;color:var(--text2)"><i style="width:9px;height:9px;border-radius:2px;background:${c.color}"></i>${c.name}</span>`).join('')}</div>
    </div></div></div>`; }
-function tagRows(sc){ const L=ST.L[LK(sc)]||{}, ck=(id,t,kid)=>`<label class="c-row" style="${kid?'padding-left:26px;font-size:12.5px':''}"><input type="checkbox" ${L[id]!==false?'checked':''} onchange="NDCAL.lay('${sc}:${id}',this.checked)"><span class="c-ck" style="--c:${E(t.color)}"></span><span>${E(t.name)}</span><span class="c-act">${kid?'':`<button title="เพิ่มแท็กย่อย" onclick="event.preventDefault();NDCAL.tagAdd('${sc}','${id}')">＋</button>`}<button title="แก้ชื่อ/สี" onclick="event.preventDefault();NDCAL.tagEdit('${sc}','${id}')">✎</button><button title="ลบแท็ก" onclick="event.preventDefault();NDCAL.tagDel('${sc}','${id}')">✕</button></span></label>`;
-  return tagTree(sc).map(g=>ck(g.id,g.t)+g.kids.map(k=>ck(k.id,k.t,1)).join('')).join('')+`<div class="c-addtag" onclick="NDCAL.tagAdd('${sc}')">＋ เพิ่มแท็ก${sc==='team'?'ทีม':''}</div>`; }
+function tagRows(sc){ const L=ST.L[LK(sc)]||{}, F=ST.fold||{}, ck=(id,t,kid,nk)=>`<label class="c-row" style="${kid?'padding-left:30px;font-size:12.5px':''}">${kid?'':`<span class="c-tf" onclick="event.preventDefault();NDCAL.tfold('${sc}','${id}')" title="${nk?'ย่อ/ขยายแท็กย่อย':''}">${nk?(F[sc+':'+id]?'▸':'▾'):''}</span>`}<input type="checkbox" ${L[id]!==false?'checked':''} onchange="NDCAL.lay('${sc}:${id}',this.checked)"><span class="c-ck" style="--c:${E(t.color)}"></span><span class="c-tn">${E(t.name)}${nk&&F[sc+':'+id]?` <small style="color:var(--text2)">(${nk})</small>`:''}</span>${t.locked?'<span class="c-lk" title="ล็อคอยู่">🔒</span>':''}<span class="c-act"><button title="จัดการแท็ก" onclick="event.preventDefault();NDCAL.tagMenu(event,'${sc}','${id}')">⋯</button></span></label>`;
+  return tagTree(sc).map(g=>ck(g.id,g.t,0,g.kids.length)+(F[sc+':'+g.id]?'':g.kids.map(k=>ck(k.id,k.t,1)).join(''))).join('')+`<div class="c-addtag" onclick="NDCAL.tagAdd('${sc}')">＋ เพิ่มแท็ก${sc==='team'?'ทีม':''}</div>`; }
+// 😀 สติกเกอร์ / อิโมจิ (แบบแอป Tica): ติดลงวันได้ไว ๆ แทนนัดหมาย · ของฉัน = privcal/<uid>/stickers · ทีม = teamcal/stickers
+const imgSrc=u=>{ const m=String(u||'').match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([\w-]+)/); return m?'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w200':String(u||''); };
+const icoHTML=(v,cls)=>String(v||'').startsWith('img:')?`<img src="${E(imgSrc(v.slice(4)))}" alt="" ${cls||''} referrerpolicy="no-referrer">`:E(v);
+function stkList(k){ const L=ST.L, out=[]; if(L.me) Object.values(D.stk||{}).forEach(x=>x&&x.date===k&&out.push({...x, sc:'me'})); if(L.teamOn) Object.values(D.tstk||{}).forEach(x=>x&&x.date===k&&out.push({...x, sc:'team'})); return out.sort((a,b)=>String(a.time||'99').localeCompare(String(b.time||'99'))||String(a.at).localeCompare(String(b.at))); }
+function stkHTML(k){ const L=stkList(k); if(!L.length) return ''; return `<div class="c-stk">${L.slice(0,4).map(x=>`<span class="${x.sc==='team'?'tm':''}" draggable="true" ondragstart="NDCAL.stkDrag(event,'${x.sc}','${E(x.id)}')" onclick="event.stopPropagation();NDCAL.stkOpen(event,'${x.sc}','${E(x.id)}')" title="${E((x.time?x.time+' ':'')+(x.title||''))}${x.sc==='team'?' · ทีม':''}">${icoHTML(x.ico)}</span>`).join('')}${L.length>4?`<span style="font-size:11px;color:var(--text2)">+${L.length-4}</span>`:''}</div>`; }
+const EMO={'😀':'😀😃😄😁😆😅🤣😂🙂😉😊😇🥰😍🤩😘😋😛🤪🤗🤭🤫🤔😐😏😴😪🤤😷🤒🤧🥵🥶😵🤯🥳😎🤓🧐😕😟😮😲😳🥺😢😭😱😖😣😞😓😩😫😤😡🤬💀💩🤡👻👽🤖😺',
+ '💼':'💼📁📂🗂️📅📆🗓️📌📍📎✂️📝✏️🖊️📒📓📔📕📗📘📙📚🧾💰💵💳🏦📊📈📉🗃️📦📮📧📨📩📤📥☎️📞📱💻🖥️🖨️⌨️🖱️💾💿🎙️🎧🎤🎚️🎛️🎬🎞️📹📷📺🔊🔔⏰⏳⌛🕐',
+ '🎉':'🎉🎊🎈🎂🍰🧁🎁🎀🏆🥇🥈🥉🏅🎖️⚽🏀🏈⚾🎾🏐🏓🏸🥊🎯🎳🎮🕹️🎲🧩🎨🎭🎪🎤🎸🎹🥁🎺🎻🏋️🚴🏊🧘💃🕺🛍️🎫🎟️',
+ '🍔':'🍔🍟🍕🌭🥪🌮🌯🥗🍝🍜🍲🍛🍣🍱🥟🍤🍙🍚🥘🍳🥞🧇🥓🍗🍖🥩🍞🥐🥨🧀🥚🍎🍊🍋🍌🍉🍇🍓🍒🍑🥭🍍🥥🥝🍅🥑🍆🥕🌽☕🍵🧋🥤🍺🍷🍸🍹🍦🍩🍪🍫🍬',
+ '✈️':'✈️🚗🚕🚌🚎🏎️🚓🚑🚒🚐🛻🚚🏍️🛵🚲🛴🚂🚆🚇🚊🚢⛴️🛳️⛵🚁🚀🛸🗺️🧭🏠🏡🏢🏬🏥🏦🏨🏫🏪⛪🕌🗼🗽🏰🏯🏖️🏝️⛰️🏕️⛺🌋🗻',
+ '🌿':'🌞🌝🌛⭐🌟✨⚡🔥🌈☀️⛅☁️🌧️⛈️🌩️❄️☃️⛄💧🌊🌸💮🌹🥀🌺🌻🌼🌷🌱🪴🌲🌳🌴🌵🌾🌿☘️🍀🍁🍂🍃🐶🐱🐭🐹🐰🦊🐻🐼🐨🐯🦁🐮🐷🐸🐵🐔🐧🐦🦄🐝🦋🐢🐟🐬🐳',
+ '❤️':'❤️🧡💛💚💙💜🖤🤍🤎💔❣️💕💞💓💗💖💘💝✅☑️✔️❌❎⭕🛑⛔🚫⚠️❗❓❕❔‼️⁉️💯🔴🟠🟡🟢🔵🟣⚫⚪🟥🟧🟨🟩🟦🟪⬛⬜🔶🔷🔺🔻💠🔘🆕🆗🆙🆒🆓🔝🔜🏁🚩🎌'};
+const emoSplit=s=>[...new Intl.Segmenter('th',{granularity:'grapheme'}).segment(s)].map(x=>x.segment);
+let EP={tab:'⭐', date:'', team:false};
+function eprefs(){ return D.eprefs||{recent:[], star:[]}; }
+function emoPick(date){ closeFloat(); tipOff(); EP={tab:eprefs().star&&eprefs().star.length?'⭐':'🕘', date, team:false}; if(!(eprefs().recent||[]).length&&EP.tab==='🕘') EP.tab='😀'; const m=document.createElement('div'); m.className='c-mask'; m.id='c-emo'; m.onclick=x=>{ if(x.target===m) m.remove(); }; document.body.appendChild(m); emoRender(); }
+function emoRender(){ const m=$('c-emo'); if(!m) return; const P=eprefs(), star=new Set(P.star||[]), tabs=[['⭐','ติดดาว'],['🕘','ใช้ล่าสุด'],...Object.keys(EMO).map(k=>[k,'']),['🖼️','รูปจากลิงก์']];
+  const list=EP.tab==='⭐'?(P.star||[]):EP.tab==='🕘'?(P.recent||[]):EMO[EP.tab]?emoSplit(EMO[EP.tab]):[];
+  const enc=v=>encodeURIComponent(v).replace(/'/g,'%27'), cell=v=>`<div onclick="NDCAL.emoUse(decodeURIComponent('${enc(v)}'))" title="กดเพื่อติดลงวัน">${icoHTML(v)}<i class="${star.has(v)?'on':''}" onclick="event.stopPropagation();NDCAL.emoStar(decodeURIComponent('${enc(v)}'))" title="ติดดาว">${star.has(v)?'⭐':'☆'}</i></div>`;
+  m.innerHTML=`<div class="c-dlg c-ep"><div style="display:flex;align-items:center;gap:8px"><b>😀 ติดสติกเกอร์ · ${thD(EP.date)}</b><button class="c-bg" style="margin-left:auto;padding:4px 10px" onclick="document.getElementById('c-emo').remove()">✕</button></div>
+   <div class="c-etab">${tabs.map(([k,t])=>`<button class="${EP.tab===k?'on':''}" title="${t}" onclick="NDCAL.emoTab('${k}')">${k}</button>`).join('')}</div>
+   ${EP.tab==='🖼️'?`<div class="c-fr" style="margin-top:4px"><input class="c-fi" id="c-eimg" style="flex:1" placeholder="วางลิงก์รูป (https://… · ลิงก์ Google Drive ก็ได้)" oninput="const v=this.value.trim(),p=document.getElementById('c-eprev');p.innerHTML=v?NDCAL.ico('img:'+v,'style=&quot;width:64px;height:64px;object-fit:cover;border-radius:10px&quot;'):''"><button class="c-bp" onclick="const v=document.getElementById('c-eimg').value.trim();if(v)NDCAL.emoUse('img:'+v)">ติดรูปนี้</button></div><div id="c-eprev" style="margin-top:8px;min-height:64px"></div><div style="font-size:11.5px;color:var(--text2)">💡 ลิงก์ Drive ต้องแชร์เป็น "ทุกคนที่มีลิงก์ดูได้" รูปถึงจะขึ้น</div>`
+   :`<div class="c-eg">${list.map(cell).join('')||`<div style="grid-column:1/-1;font-size:12.5px;color:var(--text2);padding:18px 0">${EP.tab==='⭐'?'ยังไม่มีอิโมจิติดดาว — ชี้ที่อิโมจิแล้วกด ☆':'ยังไม่เคยใช้ — เลือกจากหมวดด้านบน'}</div>`}</div>`}
+   <div class="c-fr" style="margin-top:10px;border-top:1px solid var(--border2);padding-top:10px"><input class="c-fi" id="c-eany" style="width:110px" placeholder="อิโมจิอื่น…" title="พิมพ์หรือวางอิโมจิ (Windows: กด Win + .)"><button class="c-bg" onclick="const v=document.getElementById('c-eany').value.trim();if(v)NDCAL.emoUse(v)">ใช้อันนี้</button>
+    <label style="margin-left:auto;display:flex;gap:6px;align-items:center;font-size:12.5px;cursor:pointer"><input type="checkbox" ${EP.team?'checked':''} onchange="NDCAL.emoTeam(this.checked)"> 📢 ให้ทั้งทีมเห็น</label></div></div>`; }
+function stkDlg(sc,id){ const x=(sc==='team'?D.tstk:D.stk)[id]; if(!x) return; closeFloat(); const ed=sc==='me'||isAdm()||x.by===myUid(); const m=document.createElement('div'); m.className='c-mask'; m.onclick=v=>{ if(v.target===m) m.remove(); };
+  m.innerHTML=`<div class="c-dlg" style="width:min(380px,100%)"><div style="display:flex;align-items:center;gap:12px"><span style="font-size:38px;line-height:1">${icoHTML(x.ico,'style="width:44px;height:44px;object-fit:cover;border-radius:10px"')}</span><div><b>${sc==='team'?'📢 สติกเกอร์ทีม':'🙋 สติกเกอร์ของฉัน'}</b><div style="font-size:12px;color:var(--text2)">${x.byName&&sc==='team'?'ติดโดย '+E(x.byName):''}</div></div></div>
+   <input class="c-fi" id="c-sti" style="width:100%;box-sizing:border-box;margin-top:12px" placeholder="ชื่อ / ข้อความสั้น ๆ (ไม่ใส่ก็ได้)" value="${E(x.title||'')}" ${ed?'':'disabled'}>
+   <div class="c-fr"><span>📅</span><input type="date" class="c-fi" id="c-std" value="${E(x.date)}" ${ed?'':'disabled'}><span>⏰</span><input type="time" class="c-fi" id="c-stt" value="${E(x.time||'')}" ${ed?'':'disabled'}></div>
+   <textarea class="c-fi note-grow" id="c-stn" rows="2" style="width:100%;box-sizing:border-box;margin-top:10px;resize:vertical" placeholder="รายละเอียด" ${ed?'':'disabled'}>${E(x.note||'')}</textarea>
+   <div class="c-ft">${ed?`<button class="c-bg" style="color:#f28b82;margin-right:auto" onclick="NDCAL.stkDel('${sc}','${E(id)}')">🗑️ เอาออก</button><button class="c-bg" onclick="this.closest('.c-mask').remove()">ยกเลิก</button><button class="c-bp" onclick="NDCAL.stkSave('${sc}','${E(id)}')">บันทึก</button>`:'<button class="c-bg" onclick="this.closest(\'.c-mask\').remove()">ปิด</button>'}</div></div>`;
+  document.body.appendChild(m); }
+// 📅 กดชื่อเดือนบนหัวปฏิทิน → เลือกเดือน/ปีไว ๆ
+let MPY=0;
+function mpRender(m){ const c=ST.cur, now=new Date();
+  m.innerHTML=`<div class="yy"><span>พ.ศ. ${MPY+543}</span><button onclick="NDCAL.mpy(-1)" title="ปีก่อน">▲</button><button onclick="NDCAL.mpy(1)" title="ปีหน้า">▼</button></div><div class="mm">${TM.map((n,i)=>`<div class="${MPY===c.getFullYear()&&i===c.getMonth()?'on':''} ${MPY===now.getFullYear()&&i===now.getMonth()?'now':''}" onclick="NDCAL.mgo(${i})">${n}</div>`).join('')}</div><div style="display:flex;justify-content:flex-end;margin-top:6px"><button class="c-bg" style="padding:4px 10px" onclick="NDCAL.close();NDCAL.nav(0)">วันนี้</button></div>`; }
 function topBar(){ const c=ST.cur, t=ST.view==='week'?(()=>{ const s=addD(c,-c.getDay()), e=addD(s,6); return s.getDate()+' '+TM[s.getMonth()]+' – '+e.getDate()+' '+TM[e.getMonth()]+' '+(e.getFullYear()+543); })():TMF[c.getMonth()]+' '+(c.getFullYear()+543);
-  return `<button class="c-btn" onclick="NDCAL.nav(0)">วันนี้</button><button class="c-ib" onclick="NDCAL.nav(-1)">‹</button><button class="c-ib" onclick="NDCAL.nav(1)">›</button><span class="c-ttl">${t}</span>
+  return `<button class="c-btn" onclick="NDCAL.nav(0)">วันนี้</button><button class="c-ib" onclick="NDCAL.nav(-1)">‹</button><button class="c-ib" onclick="NDCAL.nav(1)">›</button><span class="c-ttl" onclick="NDCAL.mpick(event)" title="เลือกเดือน / ปี">${t}</span>
    <span class="c-seg"><button class="${ST.view==='month'?'on':''}" onclick="NDCAL.view('month')">เดือน</button><button class="${ST.view==='week'?'on':''}" onclick="NDCAL.view('week')">สัปดาห์</button></span>`; }
 
 /* ── เดือน: วางแถบไม่ให้ทับกัน (กล่องโปรเจกต์สูงตามจำนวนเส้นหน้าที่) ── */
@@ -227,7 +273,7 @@ function weekRow(ws, all, mIdx, opt){ opt=opt||{}; const k0=ymd(ws), k6=ymd(addD
   L2.forEach(x=>{ let l=0; while(!free(l,x)) l++; x.l=l; for(let r=l;r<l+x.h;r++) (occ[r]=occ[r]||[]).push(x); });
   const nL=Math.min(CAP,occ.length), hid=[0,0,0,0,0,0,0]; L2.forEach(x=>{ if(x.l+x.h>CAP) for(let d=x.s;d<=x.e;d++) hid[d]++; });
   let h=''; if(!opt.noCells) for(let i=0;i<7;i++){ const d=addD(ws,i), k=ymd(d);
-    h+=`<div class="c-cell ${mIdx!=null&&d.getMonth()!==mIdx?'out':''} ${k===TODAY()?'today':''}" style="grid-column:${i+1}" data-d="${k}" oncontextmenu="NDCAL.ctxDay(event,'${k}')" ondblclick="NDCAL.add('${k}')"><div class="c-dn"><b>${d.getDate()===1?'1 '+TM[d.getMonth()]:d.getDate()}</b></div><button class="c-plus" title="เพิ่ม" onclick="NDCAL.add('${k}')"></button></div>`; }
+    h+=`<div class="c-cell ${mIdx!=null&&d.getMonth()!==mIdx?'out':''} ${k===TODAY()?'today':''}" style="grid-column:${i+1}" data-d="${k}" oncontextmenu="NDCAL.ctxDay(event,'${k}')" ondblclick="NDCAL.add('${k}')" ondragover="NDCAL.stkOver(event)" ondrop="NDCAL.stkDrop(event,'${k}')">${stkHTML(k)}<div class="c-dn"><b>${d.getDate()===1?'1 '+TM[d.getMonth()]:d.getDate()}</b></div><button class="c-plus" title="เพิ่ม" onclick="NDCAL.add('${k}')"></button></div>`; }
   L2.filter(x=>x.l+x.h<=CAP).forEach(x=>{ const it=x.it, cutL=it.start<k0, cutR=it.end>k6, row=x.l+R0, col=`${x.s+1+OFF}/${x.e+2+OFF}`;
     if(it.kind==='proj'){ h+=projBlock(it,x,k0,cutL,cutR,row,col); return; }
     const multi=it.end>it.start, bar=multi||!it.time, ed=canEdit(it), c=colorOf(it);
@@ -248,7 +294,7 @@ function monthView(all){ const c=ST.cur, f=new Date(c.getFullYear(),c.getMonth()
 /* ── สัปดาห์: ตารางเวลา ── */
 const H0=7, H1=23, PX=48;
 function weekView(all){ const ws=addD(ST.cur,-ST.cur.getDay()), k0=ymd(ws), k6=shift(k0,6);
-  let head='<div></div>'; for(let i=0;i<7;i++){ const d=addD(ws,i); head+=`<div class="d ${ymd(d)===TODAY()?'today':''}"><small>${WD[i]}</small><b>${d.getDate()}</b></div>`; }
+  let head='<div></div>'; for(let i=0;i<7;i++){ const d=addD(ws,i); head+=`<div class="d ${ymd(d)===TODAY()?'today':''}" oncontextmenu="NDCAL.ctxDay(event,'${ymd(d)}')"><small>${WD[i]}</small><b>${d.getDate()}</b>${stkHTML(ymd(d))}</div>`; }
   const r=weekRow(ws, all.filter(x=>(x.end>x.start||!x.time||x.kind==='proj')), null, {off:1, noNum:true, noCells:true, cap:99});
   let ad='<div class="lb">ทั้งวัน</div>'; for(let i=0;i<7;i++){ const k=shift(k0,i); ad+=`<div class="c-cell" style="grid-column:${i+2};padding:0" data-d="${k}" oncontextmenu="NDCAL.ctxDay(event,'${k}')" ondblclick="NDCAL.add('${k}')"></div>`; }
   let hrs='', cols=''; for(let h=H0;h<H1;h++) hrs+=`<div class="c-hr">${h===H0?'':pad(h)+':00'}</div>`;
@@ -405,7 +451,7 @@ window.NDCAL={ render, open,
       h=`<div onclick="NDCAL.edit('${I}')">✏️ แก้ไข</div><div onclick="NDCAL.close();NDCAL.dup('${I}')">⧉ ทำซ้ำ</div>${it.scope==='me'?`<div onclick="NDCAL.close();NDCAL.toTeam('${I}')">📢 ย้ายไปปฏิทินทีม</div>`:''}<hr>${tg}<hr><div class="dang" onclick="NDCAL.close();NDCAL.delEv('${I}')">🗑️ ลบ</div>`; }
     closeFloat(); tipOff(); const m=document.createElement('div'); m.className='c-ctx'; m.innerHTML=h; document.body.appendChild(m); place(m,e.clientX-8,e.clientY-8); },
   ctxDay(e,k,time){ e.preventDefault(); closeFloat(); tipOff(); const m=document.createElement('div'); m.className='c-ctx';
-    m.innerHTML=`<div onclick="NDCAL.close();NDCAL.add('${k}'${time?`,'${time}'`:''})">＋ เพิ่มนัดหมาย ${thD(k)}${time?' '+time:''}</div><div onclick="NDCAL.close();NDCAL.add('${k}'${time?`,'${time}'`:''});NDCAL.dlgTeam(true)">📢 เพิ่มลงปฏิทินทีม</div><hr><div onclick="NDCAL.close();NDCAL.todoAdd(prompt('To-do วันที่ ${thD(k)}:')||'','${k}')">☑ เพิ่ม To-do วันนี้</div>`;
+    m.innerHTML=`<div onclick="NDCAL.close();NDCAL.add('${k}'${time?`,'${time}'`:''})">＋ เพิ่มนัดหมาย ${thD(k)}${time?' '+time:''}</div><div onclick="NDCAL.close();NDCAL.add('${k}'${time?`,'${time}'`:''});NDCAL.dlgTeam(true)">📢 เพิ่มลงปฏิทินทีม</div><div onclick="NDCAL.close();NDCAL.emo('${k}')">😀 ติดสติกเกอร์ / อิโมจิ</div><hr><div onclick="NDCAL.close();NDCAL.todoAdd(prompt('To-do วันที่ ${thD(k)}:')||'','${k}')">☑ เพิ่ม To-do วันนี้</div>`;
     document.body.appendChild(m); place(m,e.clientX-8,e.clientY-8); },
   card(id,x,y){ openCard(id,{clientX:x,clientY:y}); },
   phSave(id,k){ const p=findAny(id), m=model(p), b4=model(p), ph=m.phases[k]; ph.time=$('c-pht').value; ph.done=$('c-phd').checked; closeFloat();
@@ -436,17 +482,43 @@ window.NDCAL={ render, open,
   setF(id,f,v){ const it=findAny(id); if(it) saveEv(it,{[f]:v}); },
   async dup(id){ const it=findAny(id), k=it.scope==='team'?'team':'mine', raw=D[k][it.rid], now=new Date().toISOString(); const c={...raw, id:uid(), at:now, upd:now, by:myUid(), byName:ME(), updBy:ME()}; await put(k,c,c.id); render(); say('ทำซ้ำแล้ว'); },
   async toTeam(id){ const it=findAny(id), raw=D.mine[it.rid]; if(!raw||!confirm('ย้าย "'+raw.title+'" ไปปฏิทินทีม? ทั้งทีมจะเห็น')) return; const c={...raw, id:uid(), cat:TGS('team').other?'other':Object.keys(TGS('team'))[0], by:myUid(), byName:ME(), updBy:ME(), upd:new Date().toISOString()}; delete c.tag; await put('team',c,c.id); await del('mine',raw.id); render(); say('📢 ย้ายไปปฏิทินทีมแล้ว'); },
-  async tagAdd(sc,parent,inDlg){ sc=sc||'me'; const T={...TGS(sc)}, P=parent&&T[parent]; const n=prompt(P?'ชื่อแท็กย่อยใต้ "'+P.name+'" (เช่น พากย์ · มิกซ์):':'ชื่อแท็กใหม่:'); if(!n||!n.trim()) return;
+  tfold(sc,id){ ST.fold=ST.fold||{}; ST.fold[sc+':'+id]=!ST.fold[sc+':'+id]; saveST(); render(); },
+  tagMenu(e,sc,id){ e.stopPropagation(); const T=TGS(sc), t=T[id]; if(!t) return; closeFloat(); const m=document.createElement('div'); m.className='c-ctx'; const L=t.locked;
+    m.innerHTML=L?`<div style="color:var(--text2);cursor:default">🔒 ${E(t.name)} — ล็อคอยู่</div><hr><div onclick="NDCAL.close();NDCAL.tagLock('${sc}','${id}',false)">🔓 ปลดล็อค</div>`
+     :`${t.parent?'':`<div onclick="NDCAL.close();NDCAL.tagAdd('${sc}','${id}')">＋ เพิ่มแท็กย่อย</div>`}<div onclick="NDCAL.close();NDCAL.tagEdit('${sc}','${id}')">✎ แก้ชื่อ / สี</div><div onclick="NDCAL.close();NDCAL.tagMove('${sc}','${id}',-1)">↑ เลื่อนขึ้น</div><div onclick="NDCAL.close();NDCAL.tagMove('${sc}','${id}',1)">↓ เลื่อนลง</div><div onclick="NDCAL.close();NDCAL.tagLock('${sc}','${id}',true)">🔒 ล็อค (กันมือพลาด)</div><hr><div class="dang" onclick="NDCAL.close();NDCAL.tagDel('${sc}','${id}')">🗑️ ลบแท็ก</div>`;
+    document.body.appendChild(m); place(m,e.clientX-8,e.clientY-8); },
+  async tagLock(sc,id,v){ const T={...TGS(sc)}; T[id]={...T[id], locked:!!v}; if(!v) delete T[id].locked; await put(TK(sc),T); render(); say(v?'🔒 ล็อคแท็ก "'+T[id].name+'" แล้ว':'🔓 ปลดล็อคแล้ว'); },
+  async tagMove(sc,id,dir){ const T={...TGS(sc)}, t=T[id]; if(!t||t.locked) return; const sib=t.parent?(tagTree(sc).find(g=>g.id===t.parent)||{kids:[]}).kids.map(x=>x.id):tagTree(sc).map(g=>g.id), i=sib.indexOf(id), j=i+dir;
+    if(j<0||j>=sib.length) return; [sib[i],sib[j]]=[sib[j],sib[i]]; sib.forEach((k,n)=>{ T[k]={...T[k], order:n}; }); await put(TK(sc),T); render(); },
+  async tagAdd(sc,parent,inDlg){ sc=sc||'me'; const T={...TGS(sc)}, P=parent&&T[parent]; if(P&&P.locked){ say('🔒 แท็ก "'+P.name+'" ล็อคอยู่ — ปลดล็อคก่อน'); return; } const n=prompt(P?'ชื่อแท็กย่อยใต้ "'+P.name+'" (เช่น พากย์ · มิกซ์):':'ชื่อแท็กใหม่:'); if(!n||!n.trim()) return;
     const id='t'+uid(); T[id]={name:n.trim(), color:P?P.color:PALETTE.concat(PAL2)[Object.keys(T).length%22], ...(P?{parent}:{}), by:ME()}; await put(TK(sc),T);
     if(inDlg){ DLG[sc==='team'?'cat':'tag']=id; chips(); } render(); say('🏷️ เพิ่มแท็ก "'+n.trim()+'" แล้ว — กด ✎ เพื่อเปลี่ยนสี'); },
-  tagEdit(sc,id){ tagDlg(sc,id); },
+  tagEdit(sc,id){ const t=TGS(sc)[id]; if(t&&t.locked){ say('🔒 แท็กนี้ล็อคอยู่ — ปลดล็อคก่อน'); return; } tagDlg(sc,id); },
   async tagSave(sc,id){ const T={...TGS(sc)}, o=T[id]||{}, pe=$('c-tgp'); T[id]={...o, name:($('c-tgn').value||'').trim()||o.name, color:($('c-tgc')||{}).value||o.color};
     if(pe){ if(pe.value&&pe.value!==id) T[id].parent=pe.value; else delete T[id].parent; } document.querySelector('.c-mask')?.remove(); await put(TK(sc),T); render(); },
-  async tagDel(sc,id){ const T={...TGS(sc)}; if(Object.keys(T).length<=1){ say('ต้องมีแท็กอย่างน้อย 1 อัน'); return; }
+  async tagDel(sc,id){ const T={...TGS(sc)}; if(T[id]&&T[id].locked){ say('🔒 แท็กนี้ล็อคอยู่ — ปลดล็อคก่อน'); return; } if(Object.keys(T).length<=1){ say('ต้องมีแท็กอย่างน้อย 1 อัน'); return; }
     const kids=Object.keys(T).filter(k=>T[k].parent===id), to=T[id].parent&&T[T[id].parent]?T[id].parent:Object.keys(T).find(x=>x!==id&&!kids.includes(x)&&!T[x].parent)||Object.keys(T).find(x=>x!==id);
     const k2=sc==='team'?'team':'mine', f=sc==='team'?'cat':'tag', used=Object.values(D[k2]).filter(e=>e&&e[f]===id);
     if(!confirm('ลบแท็ก "'+T[id].name+'"?'+(kids.length?'\nแท็กย่อย '+kids.length+' อันจะกลายเป็นแท็กหลัก':'')+(used.length?'\nงาน '+used.length+' รายการจะย้ายไปแท็ก "'+(T[to]||{}).name+'"':''))) return;
     kids.forEach(k=>{ T[k]={...T[k]}; delete T[k].parent; }); delete T[id]; await put(TK(sc),T); for(const e of used) await put(k2,{...e, [f]:to},e.id); render(); },
+  mpick(e){ e.stopPropagation(); closeFloat(); MPY=ST.cur.getFullYear(); const m=document.createElement('div'); m.className='c-ctx c-mp'; m.onclick=x=>x.stopPropagation(); mpRender(m); document.body.appendChild(m); const r=e.currentTarget.getBoundingClientRect(); m.style.left=r.left+'px'; m.style.top=(r.bottom+6)+'px'; },
+  mpy(n){ MPY+=n; const m=document.querySelector('.c-mp'); if(m) mpRender(m); },
+  mgo(i){ ST.cur=new Date(MPY,i,1); closeFloat(); render(); },
+  emo:emoPick, ico:icoHTML,
+  emoTab(k){ EP.tab=k; emoRender(); }, emoTeam(v){ EP.team=v; },
+  async emoStar(v){ const P={recent:[], star:[], ...eprefs()}, s=new Set(P.star||[]); s.has(v)?s.delete(v):s.add(v); P.star=[...s]; await put('eprefs',P); emoRender(); },
+  async emoUse(v){ v=String(v||'').trim(); if(!v) return; const team=EP.team, k=team?'tstk':'stk', id=uid(), now=new Date().toISOString();
+    const x={id, date:EP.date, ico:v, at:now, by:myUid(), byName:ME()}; await put(k,x,id);
+    const P={recent:[], star:[], ...eprefs()}; P.recent=[v, ...(P.recent||[]).filter(y=>y!==v)].slice(0,32); put('eprefs',P).catch(()=>{});
+    $('c-emo')?.remove(); render(); say((team?'📢 ':'')+'ติดสติกเกอร์ '+thD(EP.date)+' แล้ว — กดที่สติกเกอร์เพื่อใส่ชื่อ/เวลา', ()=>NDCAL.stkDel(team?'team':'me',id,true)); },
+  stkOpen(e,sc,id){ stkDlg(sc,id); },
+  async stkSave(sc,id){ const k=sc==='team'?'tstk':'stk', x=(D[k]||{})[id]; if(!x) return; const nu={...x, title:($('c-sti').value||'').trim(), date:$('c-std').value||x.date, time:$('c-stt').value||'', note:($('c-stn').value||'').trim(), upd:new Date().toISOString(), updBy:ME()};
+    document.querySelector('.c-mask')?.remove(); await put(k,nu,id); render(); },
+  async stkDel(sc,id,quiet){ const k=sc==='team'?'tstk':'stk', x=(D[k]||{})[id]; document.querySelector('.c-mask')?.remove(); await del(k,id); render(); if(!quiet&&x) say('เอาสติกเกอร์ออกแล้ว', ()=>put(k,x,id).then(render)); },
+  stkDrag(e,sc,id){ try{ e.dataTransfer.setData('text/x-stk', sc+'|'+id); e.dataTransfer.effectAllowed='move'; }catch(_){} },
+  stkOver(e){ if([...(e.dataTransfer&&e.dataTransfer.types||[])].includes('text/x-stk')) e.preventDefault(); },
+  async stkDrop(e,day){ const v=safe(()=>e.dataTransfer.getData('text/x-stk'),''); if(!v) return; e.preventDefault(); const [sc,id]=v.split('|'), k=sc==='team'?'tstk':'stk', x=(D[k]||{})[id]; if(!x||x.date===day) return;
+    if(sc==='team'&&!(isAdm()||x.by===myUid())){ say('🔒 สติกเกอร์ทีมย้ายได้เฉพาะคนติดและแอดมิน'); return; } await put(k,{...x, date:day},id); render(); },
   async todoAdd(v,due){ v=String(v||'').trim(); if(!v) return; const t={id:uid(), text:v, done:false, at:new Date().toISOString()}; if(due) t.due=due; await put('todo',t,t.id); render(); if(!due) setTimeout(()=>$('cl-td')?.focus(),0); },
   async todoDone(id,v){ const t=D.todo[id]; if(t){ await put('todo',{...t, done:v, doneAt:v?new Date().toISOString():''},id); render(); } },
   async todoDel(id){ await del('todo',id); render(); },
