@@ -125,7 +125,8 @@ const CSS=`
 .c-row input,.c-gh input{display:none} .c-ck{width:17px;height:17px;border-radius:4px;border:2px solid var(--c);display:inline-flex;align-items:center;justify-content:center;flex:none}
 input:checked+.c-ck{background:var(--c)} input:checked+.c-ck::after{content:'✓';color:#fff;font-size:11px;font-weight:700}
 .c-act{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:flex;opacity:0;pointer-events:none;background:var(--card);border-radius:6px} .c-row:hover .c-act{opacity:1;pointer-events:auto} .c-act button{background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;line-height:1;padding:3px 7px;border-radius:5px} .c-act button:hover{background:var(--cl-hov);color:var(--text)}
-.c-tn{flex:1;min-width:0;padding-right:24px} .c-lk{font-size:10px;opacity:.7;position:absolute;right:30px} .c-tf{width:12px;margin-left:-6px;color:var(--text2);font-size:10px;flex:none;cursor:pointer;text-align:center}
+.c-tn{flex:1;min-width:0;padding-right:24px}
+.c-tagr[draggable="true"]{cursor:grab} .c-tagr.dt{box-shadow:inset 0 2px 0 #0487E2} .c-tagr.db{box-shadow:inset 0 -2px 0 #0487E2} .c-tagr.dragging{opacity:.4} .c-lk{font-size:10px;opacity:.7;position:absolute;right:30px} .c-tf{width:12px;margin-left:-6px;color:var(--text2);font-size:10px;flex:none;cursor:pointer;text-align:center}
 .c-ttl{cursor:pointer;border-radius:8px;padding:2px 8px} .c-ttl:hover{background:var(--cl-hov)} .c-ttl::after{content:' ▾';font-size:13px;color:var(--text2)}
 .c-mp{padding:10px 12px!important;width:270px} .c-mp .yy{display:flex;align-items:center;gap:6px;margin-bottom:8px;font-weight:600;font-size:15px} .c-mp .yy span{flex:1;padding-left:4px} .c-mp .yy button{background:none;border:none;color:var(--text);cursor:pointer;font-size:15px;width:30px;height:30px;border-radius:50%} .c-mp .yy button:hover{background:var(--cl-hov)}
 .c-mp .mm{display:grid;grid-template-columns:repeat(4,1fr);gap:4px} .c-mp .mm div{display:flex!important;justify-content:center;padding:10px 0!important;border-radius:20px;font-size:13px} .c-mp .mm div.on{background:#0487E2;color:#fff} .c-mp .mm div.now{box-shadow:inset 0 0 0 1px #65C2F5}
@@ -223,7 +224,7 @@ function side(){ const L=ST.L;
      <div class="${L.events?'':'c-sub off'}" style="padding-left:14px">${tagRows('team')}</div>
      <div style="display:flex;gap:7px;flex-wrap:wrap;padding:4px 6px">${PH.map(c=>`<span style="font-size:11px;display:inline-flex;gap:5px;align-items:center;color:var(--text2)"><i style="width:9px;height:9px;border-radius:2px;background:${c.color}"></i>${c.name}</span>`).join('')}</div>
    </div></div></div>`; }
-function tagRows(sc){ const L=ST.L[LK(sc)]||{}, F=ST.fold||{}, ck=(id,t,kid,nk)=>`<label class="c-row" style="${kid?'padding-left:30px;font-size:12.5px':''}">${kid?'':`<span class="c-tf" onclick="event.preventDefault();NDCAL.tfold('${sc}','${id}')" title="${nk?'ย่อ/ขยายแท็กย่อย':''}">${nk?(F[sc+':'+id]?'▸':'▾'):''}</span>`}<input type="checkbox" ${L[id]!==false?'checked':''} onchange="NDCAL.lay('${sc}:${id}',this.checked)"><span class="c-ck" style="--c:${E(t.color)}"></span><span class="c-tn">${E(t.name)}${nk&&F[sc+':'+id]?` <small style="color:var(--text2)">(${nk})</small>`:''}</span>${t.locked?'<span class="c-lk" title="ล็อคอยู่">🔒</span>':''}<span class="c-act"><button title="จัดการแท็ก" onclick="event.preventDefault();NDCAL.tagMenu(event,'${sc}','${id}')">⋯</button></span></label>`;
+function tagRows(sc){ const L=ST.L[LK(sc)]||{}, F=ST.fold||{}, ck=(id,t,kid,nk)=>`<label class="c-row c-tagr" style="${kid?'padding-left:30px;font-size:12.5px':''}" draggable="${t.locked?'false':'true'}" ondragstart="NDCAL.tdStart(event,'${sc}','${id}')" ondragover="NDCAL.tdOver(event,'${sc}')" ondragleave="this.classList.remove('dt','db')" ondrop="NDCAL.tdDrop(event,'${sc}','${id}')" ondragend="NDCAL.tdEnd()">${kid?'':`<span class="c-tf" onclick="event.preventDefault();NDCAL.tfold('${sc}','${id}')" title="${nk?'ย่อ/ขยายแท็กย่อย':''}">${nk?(F[sc+':'+id]?'▸':'▾'):''}</span>`}<input type="checkbox" ${L[id]!==false?'checked':''} onchange="NDCAL.lay('${sc}:${id}',this.checked)"><span class="c-ck" style="--c:${E(t.color)}"></span><span class="c-tn">${E(t.name)}${nk&&F[sc+':'+id]?` <small style="color:var(--text2)">(${nk})</small>`:''}</span>${t.locked?'<span class="c-lk" title="ล็อคอยู่">🔒</span>':''}<span class="c-act"><button title="จัดการแท็ก" onclick="event.preventDefault();NDCAL.tagMenu(event,'${sc}','${id}')">⋯</button></span></label>`;
   return tagTree(sc).map(g=>ck(g.id,g.t,0,g.kids.length)+(F[sc+':'+g.id]?'':g.kids.map(k=>ck(k.id,k.t,1)).join(''))).join('')+`<div class="c-addtag" onclick="NDCAL.tagAdd('${sc}')">＋ เพิ่มแท็ก${sc==='team'?'ทีม':''}</div>`; }
 // 😀 สติกเกอร์ / อิโมจิ (แบบแอป Tica): ติดลงวันได้ไว ๆ แทนนัดหมาย · ของฉัน = privcal/<uid>/stickers · ทีม = teamcal/stickers
 const imgSrc=u=>{ const m=String(u||'').match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([\w-]+)/); return m?'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w200':String(u||''); };
@@ -331,7 +332,7 @@ async function saveEv(it, patch, msg, undo){ const k=it.scope==='team'?'team':'m
   try{ await put(k, nu, it.rid); say(msg, undo); }catch(e){} }
 
 /* ── ลาก / ยืด ── */
-let DR=null, TIP=null, TT=null;
+let DR=null, TIP=null, TT=null, TDR=null;
 function under(e){ return document.elementsFromPoint(e.clientX,e.clientY).find(x=>x.dataset&&x.dataset.d); }
 function closeFloat(){ document.querySelectorAll('.c-ctx,.c-card').forEach(x=>x.remove()); }
 function tipOff(){ TIP&&TIP.remove(); TIP=null; }
@@ -482,6 +483,21 @@ window.NDCAL={ render, open,
   setF(id,f,v){ const it=findAny(id); if(it) saveEv(it,{[f]:v}); },
   async dup(id){ const it=findAny(id), k=it.scope==='team'?'team':'mine', raw=D[k][it.rid], now=new Date().toISOString(); const c={...raw, id:uid(), at:now, upd:now, by:myUid(), byName:ME(), updBy:ME()}; await put(k,c,c.id); render(); say('ทำซ้ำแล้ว'); },
   async toTeam(id){ const it=findAny(id), raw=D.mine[it.rid]; if(!raw||!confirm('ย้าย "'+raw.title+'" ไปปฏิทินทีม? ทั้งทีมจะเห็น')) return; const c={...raw, id:uid(), cat:TGS('team').other?'other':Object.keys(TGS('team'))[0], by:myUid(), byName:ME(), updBy:ME(), upd:new Date().toISOString()}; delete c.tag; await put('team',c,c.id); await del('mine',raw.id); render(); say('📢 ย้ายไปปฏิทินทีมแล้ว'); },
+  // ↕️ ลากแท็กขึ้น/ลง (ทั้งแท็กหลักและแท็กย่อย) · ลากแท็กย่อยไปไว้ใต้แท็กหลักอื่นได้ · แท็กที่ล็อคลากไม่ได้
+  tdStart(e,sc,id){ TDR={sc,id}; try{ e.dataTransfer.setData('text/x-tag', id); e.dataTransfer.effectAllowed='move'; }catch(_){} e.currentTarget.classList.add('dragging'); },
+  tdOver(e,sc){ if(!TDR||TDR.sc!==sc) return; e.preventDefault(); const el=e.currentTarget, r=el.getBoundingClientRect(); el.classList.toggle('dt', e.clientY<r.top+r.height/2); el.classList.toggle('db', e.clientY>=r.top+r.height/2); },
+  tdEnd(){ TDR=null; document.querySelectorAll('.c-tagr').forEach(x=>x.classList.remove('dt','db','dragging')); },
+  async tdDrop(e,sc,tid){ e.preventDefault(); const d=TDR; NDCAL.tdEnd(); if(!d||d.sc!==sc||d.id===tid) return; const T={...TGS(sc)}, a=T[d.id], b=T[tid]; if(!a||!b) return;
+    if(a.locked){ say('🔒 แท็ก "'+a.name+'" ล็อคอยู่'); return; }
+    const r=e.currentTarget.getBoundingClientRect(), after=e.clientY>=r.top+r.height/2, hasKids=Object.keys(T).some(k=>T[k].parent===d.id);
+    // ลงบนแท็กหลักที่ขยายอยู่ ครึ่งล่าง → เข้าเป็นแท็กย่อยตัวแรก · ไม่งั้นวางข้าง ๆ ในกลุ่มเดียวกับเป้าหมาย
+    const F=ST.fold||{}, intoTop=!b.parent&&after&&!hasKids&&Object.keys(T).some(k=>T[k].parent===tid)&&!F[sc+':'+tid];
+    const np=intoTop?tid:(b.parent||'');
+    if(np&&hasKids){ say('แท็กที่มีแท็กย่อยอยู่ ย้ายไปเป็นแท็กย่อยไม่ได้'); return; }
+    T[d.id]={...a}; if(np) T[d.id].parent=np; else delete T[d.id].parent;
+    const sib=(np?(tagTree(sc).find(g=>g.id===np)||{kids:[]}).kids.map(x=>x.id):tagTree(sc).map(g=>g.id)).filter(k=>k!==d.id);
+    let i=intoTop?0:sib.indexOf(tid)+(after?1:0); if(i<0) i=sib.length; sib.splice(i,0,d.id); sib.forEach((k,n)=>{ T[k]={...T[k], order:n}; });
+    await put(TK(sc),T); render(); },
   tfold(sc,id){ ST.fold=ST.fold||{}; ST.fold[sc+':'+id]=!ST.fold[sc+':'+id]; saveST(); render(); },
   tagMenu(e,sc,id){ e.stopPropagation(); const T=TGS(sc), t=T[id]; if(!t) return; closeFloat(); const m=document.createElement('div'); m.className='c-ctx'; const L=t.locked;
     m.innerHTML=L?`<div style="color:var(--text2);cursor:default">🔒 ${E(t.name)} — ล็อคอยู่</div><hr><div onclick="NDCAL.close();NDCAL.tagLock('${sc}','${id}',false)">🔓 ปลดล็อค</div>`
