@@ -48,9 +48,11 @@ const DEF_TAGS={t1:{name:'ส่วนตัว',color:'#8E24AA'},t2:{name:'ง�
 /* ── สถานะ ── */
 const LSK='guin3_cal_v2';
 const ST=Object.assign({view:'month', cur:new Date(), open:{me:true,team:true},
-  L:{me:true, tags:{}, todo:true, teamOn:true, mine:true, all:true, events:true}}, safe(()=>{ const x=JSON.parse(localStorage.getItem(LSK)); return x?{view:x.view||'month', open:x.open||{me:true,team:true}, L:x.L, fold:x.fold||{}}:null; },{}));
+  L:{me:true, tags:{}, todo:true, teamOn:true, mine:true, all:true, events:true}}, safe(()=>{ const x=JSON.parse(localStorage.getItem(LSK)); return x?{view:x.view||'month', open:x.open||{me:true,team:true}, L:x.L, fold:x.fold||{}, ws:+x.ws||0, h12:!!x.h12}:null; },{}));
 ST.cur=new Date(); ST.cur.setHours(0,0,0,0);
-const saveST=()=>{ try{ localStorage.setItem(LSK, JSON.stringify({view:ST.view, open:ST.open, L:ST.L, fold:ST.fold||{}})); }catch(e){} };
+const WS=()=>ST.ws||0, wsOf=d=>addD(d,-((d.getDay()-WS()+7)%7)), WDs=()=>[0,1,2,3,4,5,6].map(i=>WD[(i+WS())%7]);
+const fmtT=t=>{ if(!t) return ''; if(!ST.h12) return t; const [h,m]=String(t).split(':').map(Number); return ((h+11)%12+1)+':'+pad(m||0)+' '+(h<12?'AM':'PM'); };
+const saveST=()=>{ try{ localStorage.setItem(LSK, JSON.stringify({view:ST.view, open:ST.open, L:ST.L, fold:ST.fold||{}, ws:ST.ws||0, h12:!!ST.h12})); }catch(e){} };
 const D={team:{}, mine:{}, todo:{}, tags:null, live:false, proj:null, projAt:0};
 let PROJ=[];
 
@@ -75,9 +77,16 @@ const tags=()=>D.tags||DEF_TAGS;
 const DEF_TT={meet:{name:'ประชุม / มีตติ้ง',color:'#0487E2'},work:{name:'งาน',color:'#0463CA'},off:{name:'วันหยุด / ลา',color:'#65C2F5'},tax:{name:'ส่งภาษี / บัญชี',color:'#09B1EC'},other:{name:'อื่น ๆ',color:'#7BAAF7'}};
 const TGS=sc=>sc==='team'?(D.ttags||DEF_TT):tags(), TK=sc=>sc==='team'?'ttags':'tags', LK=sc=>sc==='team'?'tt':'tags';
 const ordOf=(T,ids)=>ids.map((id,i)=>[id,T[id].order!=null?+T[id].order:i]).sort((a,b)=>a[1]-b[1]).map(x=>x[0]);
-function tagTree(sc){ const T=TGS(sc), ids=Object.keys(T), top=ordOf(T,ids.filter(id=>!T[id].parent||!T[T[id].parent])); return top.map(id=>({id, t:T[id], kids:ordOf(T,ids.filter(k=>T[k].parent===id)).map(k=>({id:k, t:T[k]}))})); }
-function tagFull(sc,id){ const T=TGS(sc), t=T[id]; if(!t) return ''; const p=t.parent&&T[t.parent]; return (p?p.name+' › ':'')+t.name; }
-function tagOn(sc,id){ const L=ST.L[LK(sc)]||{}, T=TGS(sc), t=T[id]; if(L[id]===false) return false; return !(t&&t.parent&&L[t.parent]===false); }
+const MAXD=3;   // ซ้อนได้ลึกสุด: แท็กหลัก › ย่อย 1 › ย่อย 2 › ย่อย 3
+const tPar=(T,id)=>{ const p=T[id]&&T[id].parent; return p&&p!==id&&T[p]?p:''; };
+const tDepth=(T,id)=>{ let d=0, x=id, g=0; while((x=tPar(T,x))&&g++<9) d++; return d; };
+const tKids=(T,id)=>ordOf(T,Object.keys(T).filter(k=>tPar(T,k)===(id||'')));
+const tDesc=(T,id)=>{ const out=[], st=[...tKids(T,id)]; while(st.length){ const k=st.pop(); if(out.includes(k)) continue; out.push(k); st.push(...tKids(T,k)); } return out; };
+const tHeight=(T,id)=>{ const K=tKids(T,id); return K.length?1+Math.max(...K.map(k=>tHeight(T,k))):0; };
+function tagTree(sc){ const T=TGS(sc), node=(id,g)=>({id, t:T[id], kids:g>5?[]:tKids(T,id).map(k=>node(k,g+1))}); return tKids(T,'').map(id=>node(id,0)); }
+function tagFlat(sc,fold){ const out=[], F=ST.fold||{}, walk=(n,d)=>{ out.push({id:n.id, t:n.t, d, nk:n.kids.length}); if(!(fold&&F[sc+':'+n.id])) n.kids.forEach(k=>walk(k,d+1)); }; tagTree(sc).forEach(n=>walk(n,0)); return out; }
+function tagFull(sc,id){ const T=TGS(sc); if(!T[id]) return ''; const n=[]; let x=id, g=0; while(x&&g++<9){ n.unshift(T[x].name); x=tPar(T,x); } return n.join(' › '); }
+function tagOn(sc,id){ const L=ST.L[LK(sc)]||{}, T=TGS(sc); let x=id, g=0; while(x&&g++<9){ if(L[x]===false) return false; x=tPar(T,x); } return true; }
 
 /* ── แปลงข้อมูลจริง → รายการในปฏิทิน ── */
 const staffNick=id=>{ const s=safe(()=>getStaffById(id),null); return s?(s.nickname||s.name||''):''; };
@@ -224,13 +233,14 @@ function side(){ const L=ST.L;
      <div class="${L.events?'':'c-sub off'}" style="padding-left:14px">${tagRows('team')}</div>
      <div style="display:flex;gap:7px;flex-wrap:wrap;padding:4px 6px">${PH.map(c=>`<span style="font-size:11px;display:inline-flex;gap:5px;align-items:center;color:var(--text2)"><i style="width:9px;height:9px;border-radius:2px;background:${c.color}"></i>${c.name}</span>`).join('')}</div>
    </div></div></div>`; }
-function tagRows(sc){ const L=ST.L[LK(sc)]||{}, F=ST.fold||{}, ck=(id,t,kid,nk)=>`<label class="c-row c-tagr" style="${kid?'padding-left:30px;font-size:12.5px':''}" draggable="${t.locked?'false':'true'}" ondragstart="NDCAL.tdStart(event,'${sc}','${id}')" ondragover="NDCAL.tdOver(event,'${sc}')" ondragleave="this.classList.remove('dt','db')" ondrop="NDCAL.tdDrop(event,'${sc}','${id}')" ondragend="NDCAL.tdEnd()">${kid?'':`<span class="c-tf" onclick="event.preventDefault();NDCAL.tfold('${sc}','${id}')" title="${nk?'ย่อ/ขยายแท็กย่อย':''}">${nk?(F[sc+':'+id]?'▸':'▾'):''}</span>`}<input type="checkbox" ${L[id]!==false?'checked':''} onchange="NDCAL.lay('${sc}:${id}',this.checked)"><span class="c-ck" style="--c:${E(t.color)}"></span><span class="c-tn">${E(t.name)}${nk&&F[sc+':'+id]?` <small style="color:var(--text2)">(${nk})</small>`:''}</span>${t.locked?'<span class="c-lk" title="ล็อคอยู่">🔒</span>':''}<span class="c-act"><button title="จัดการแท็ก" onclick="event.preventDefault();NDCAL.tagMenu(event,'${sc}','${id}')">⋯</button></span></label>`;
-  return tagTree(sc).map(g=>ck(g.id,g.t,0,g.kids.length)+(F[sc+':'+g.id]?'':g.kids.map(k=>ck(k.id,k.t,1)).join(''))).join('')+`<div class="c-addtag" onclick="NDCAL.tagAdd('${sc}')">＋ เพิ่มแท็ก${sc==='team'?'ทีม':''}</div>`; }
+function tagRows(sc){ const L=ST.L[LK(sc)]||{}, F=ST.fold||{};
+  const ck=x=>`<label class="c-row c-tagr" style="padding-left:${6+x.d*16}px;${x.d?'font-size:12.5px':''}" draggable="${x.t.locked?'false':'true'}" ondragstart="NDCAL.tdStart(event,'${sc}','${x.id}')" ondragover="NDCAL.tdOver(event,'${sc}')" ondragleave="this.classList.remove('dt','db')" ondrop="NDCAL.tdDrop(event,'${sc}','${x.id}')" ondragend="NDCAL.tdEnd()"><span class="c-tf" onclick="event.preventDefault();NDCAL.tfold('${sc}','${x.id}')" title="${x.nk?'ย่อ/ขยายแท็กย่อย':''}">${x.nk?(F[sc+':'+x.id]?'▸':'▾'):''}</span><input type="checkbox" ${L[x.id]!==false?'checked':''} onchange="NDCAL.lay('${sc}:${x.id}',this.checked)"><span class="c-ck" style="--c:${E(x.t.color)}"></span><span class="c-tn">${E(x.t.name)}${x.nk&&F[sc+':'+x.id]?` <small style="color:var(--text2)">(${tDesc(TGS(sc),x.id).length})</small>`:''}</span>${x.t.locked?'<span class="c-lk" title="ล็อคอยู่">🔒</span>':''}<span class="c-act"><button title="จัดการแท็ก" onclick="event.preventDefault();NDCAL.tagMenu(event,'${sc}','${x.id}')">⋯</button></span></label>`;
+  return tagFlat(sc,true).map(ck).join('')+`<div class="c-addtag" onclick="NDCAL.tagAdd('${sc}')">＋ เพิ่มแท็ก${sc==='team'?'ทีม':''}</div>`; }
 // 😀 สติกเกอร์ / อิโมจิ (แบบแอป Tica): ติดลงวันได้ไว ๆ แทนนัดหมาย · ของฉัน = privcal/<uid>/stickers · ทีม = teamcal/stickers
 const imgSrc=u=>{ const m=String(u||'').match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([\w-]+)/); return m?'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w200':String(u||''); };
 const icoHTML=(v,cls)=>String(v||'').startsWith('img:')?`<img src="${E(imgSrc(v.slice(4)))}" alt="" ${cls||''} referrerpolicy="no-referrer">`:E(v);
 function stkList(k){ const L=ST.L, out=[]; if(L.me) Object.values(D.stk||{}).forEach(x=>x&&x.date===k&&out.push({...x, sc:'me'})); if(L.teamOn) Object.values(D.tstk||{}).forEach(x=>x&&x.date===k&&out.push({...x, sc:'team'})); return out.sort((a,b)=>String(a.time||'99').localeCompare(String(b.time||'99'))||String(a.at).localeCompare(String(b.at))); }
-function stkHTML(k){ const L=stkList(k); if(!L.length) return ''; return `<div class="c-stk">${L.slice(0,4).map(x=>`<span class="${x.sc==='team'?'tm':''}" draggable="true" ondragstart="NDCAL.stkDrag(event,'${x.sc}','${E(x.id)}')" onclick="event.stopPropagation();NDCAL.stkOpen(event,'${x.sc}','${E(x.id)}')" title="${E((x.time?x.time+' ':'')+(x.title||''))}${x.sc==='team'?' · ทีม':''}">${icoHTML(x.ico)}</span>`).join('')}${L.length>4?`<span style="font-size:11px;color:var(--text2)">+${L.length-4}</span>`:''}</div>`; }
+function stkHTML(k){ const L=stkList(k); if(!L.length) return ''; return `<div class="c-stk">${L.slice(0,4).map(x=>`<span class="${x.sc==='team'?'tm':''}" draggable="true" ondragstart="NDCAL.stkDrag(event,'${x.sc}','${E(x.id)}')" onclick="event.stopPropagation();NDCAL.stkOpen(event,'${x.sc}','${E(x.id)}')" title="${E((x.time?fmtT(x.time)+' ':'')+(x.title||''))}${x.sc==='team'?' · ทีม':''}">${icoHTML(x.ico)}</span>`).join('')}${L.length>4?`<span style="font-size:11px;color:var(--text2)">+${L.length-4}</span>`:''}</div>`; }
 const EMO={'😀':'😀😃😄😁😆😅🤣😂🙂😉😊😇🥰😍🤩😘😋😛🤪🤗🤭🤫🤔😐😏😴😪🤤😷🤒🤧🥵🥶😵🤯🥳😎🤓🧐😕😟😮😲😳🥺😢😭😱😖😣😞😓😩😫😤😡🤬💀💩🤡👻👽🤖😺',
  '💼':'💼📁📂🗂️📅📆🗓️📌📍📎✂️📝✏️🖊️📒📓📔📕📗📘📙📚🧾💰💵💳🏦📊📈📉🗃️📦📮📧📨📩📤📥☎️📞📱💻🖥️🖨️⌨️🖱️💾💿🎙️🎧🎤🎚️🎛️🎬🎞️📹📷📺🔊🔔⏰⏳⌛🕐',
  '🎉':'🎉🎊🎈🎂🍰🧁🎁🎀🏆🥇🥈🥉🏅🎖️⚽🏀🏈⚾🎾🏐🏓🏸🥊🎯🎳🎮🕹️🎲🧩🎨🎭🎪🎤🎸🎹🥁🎺🎻🏋️🚴🏊🧘💃🕺🛍️🎫🎟️',
@@ -262,9 +272,9 @@ function stkDlg(sc,id){ const x=(sc==='team'?D.tstk:D.stk)[id]; if(!x) return; c
 let MPY=0;
 function mpRender(m){ const c=ST.cur, now=new Date();
   m.innerHTML=`<div class="yy"><span>พ.ศ. ${MPY+543}</span><button onclick="NDCAL.mpy(-1)" title="ปีก่อน">▲</button><button onclick="NDCAL.mpy(1)" title="ปีหน้า">▼</button></div><div class="mm">${TM.map((n,i)=>`<div class="${MPY===c.getFullYear()&&i===c.getMonth()?'on':''} ${MPY===now.getFullYear()&&i===now.getMonth()?'now':''}" onclick="NDCAL.mgo(${i})">${n}</div>`).join('')}</div><div style="display:flex;justify-content:flex-end;margin-top:6px"><button class="c-bg" style="padding:4px 10px" onclick="NDCAL.close();NDCAL.nav(0)">วันนี้</button></div>`; }
-function topBar(){ const c=ST.cur, t=ST.view==='week'?(()=>{ const s=addD(c,-c.getDay()), e=addD(s,6); return s.getDate()+' '+TM[s.getMonth()]+' – '+e.getDate()+' '+TM[e.getMonth()]+' '+(e.getFullYear()+543); })():TMF[c.getMonth()]+' '+(c.getFullYear()+543);
+function topBar(){ const c=ST.cur, t=ST.view==='week'?(()=>{ const s=wsOf(c), e=addD(s,6); return s.getDate()+' '+TM[s.getMonth()]+' – '+e.getDate()+' '+TM[e.getMonth()]+' '+(e.getFullYear()+543); })():TMF[c.getMonth()]+' '+(c.getFullYear()+543);
   return `<button class="c-btn" onclick="NDCAL.nav(0)">วันนี้</button><button class="c-ib" onclick="NDCAL.nav(-1)">‹</button><button class="c-ib" onclick="NDCAL.nav(1)">›</button><span class="c-ttl" onclick="NDCAL.mpick(event)" title="เลือกเดือน / ปี">${t}</span>
-   <span class="c-seg"><button class="${ST.view==='month'?'on':''}" onclick="NDCAL.view('month')">เดือน</button><button class="${ST.view==='week'?'on':''}" onclick="NDCAL.view('week')">สัปดาห์</button></span>`; }
+   <button class="c-ib" style="margin-left:auto;font-size:17px" title="ตั้งค่าปฏิทิน" onclick="NDCAL.settings(event)">⚙️</button><span class="c-seg" style="margin-left:4px"><button class="${ST.view==='month'?'on':''}" onclick="NDCAL.view('month')">เดือน</button><button class="${ST.view==='week'?'on':''}" onclick="NDCAL.view('week')">สัปดาห์</button></span>`; }
 
 /* ── เดือน: วางแถบไม่ให้ทับกัน (กล่องโปรเจกต์สูงตามจำนวนเส้นหน้าที่) ── */
 function weekRow(ws, all, mIdx, opt){ opt=opt||{}; const k0=ymd(ws), k6=ymd(addD(ws,6)), CAP=opt.cap||14, OFF=opt.off||0, R0=opt.noNum?1:2;
@@ -278,30 +288,30 @@ function weekRow(ws, all, mIdx, opt){ opt=opt||{}; const k0=ymd(ws), k6=ymd(addD
   L2.filter(x=>x.l+x.h<=CAP).forEach(x=>{ const it=x.it, cutL=it.start<k0, cutR=it.end>k6, row=x.l+R0, col=`${x.s+1+OFF}/${x.e+2+OFF}`;
     if(it.kind==='proj'){ h+=projBlock(it,x,k0,cutL,cutR,row,col); return; }
     const multi=it.end>it.start, bar=multi||!it.time, ed=canEdit(it), c=colorOf(it);
-    h+=`<div class="c-ev ${bar?'bar':'dot'} ${cutL?'l':''} ${cutR?'r':''} ${it.done?'done':''}" style="--c:${c};--tc:${tcOf(c)};grid-row:${row};grid-column:${col}" onpointerdown="NDCAL.down(event,'${E(it.id)}')" onmouseenter="NDCAL.tip(event,'${E(it.id)}')" onmouseleave="NDCAL.tipOff()" oncontextmenu="NDCAL.ctx(event,'${E(it.id)}')">${it.time&&!multi?E(it.time)+' ':''}${E(it.title)}${ed&&bar&&it.kind!=='todo'?(cutL?'':'<span class="c-rzl" data-rz="L"></span>')+(cutR?'':'<span class="c-rz" data-rz="R"></span>'):''}</div>`; });
+    h+=`<div class="c-ev ${bar?'bar':'dot'} ${cutL?'l':''} ${cutR?'r':''} ${it.done?'done':''}" style="--c:${c};--tc:${tcOf(c)};grid-row:${row};grid-column:${col}" onpointerdown="NDCAL.down(event,'${E(it.id)}')" onmouseenter="NDCAL.tip(event,'${E(it.id)}')" onmouseleave="NDCAL.tipOff()" oncontextmenu="NDCAL.ctx(event,'${E(it.id)}')">${it.time&&!multi?E(fmtT(it.time))+' ':''}${E(it.title)}${ed&&bar&&it.kind!=='todo'?(cutL?'':'<span class="c-rzl" data-rz="L"></span>')+(cutR?'':'<span class="c-rz" data-rz="R"></span>'):''}</div>`; });
   hid.forEach((n,i)=>{ if(n) h+=`<div class="c-more" style="grid-row:${R0+nL};grid-column:${i+1+OFF}" onclick="NDCAL.go('${ymd(addD(ws,i))}','week')">อีก ${n} รายการ</div>`; });
   return {html:h, rows:nL, more:hid.some(Boolean)}; }
 function projBlock(p,x,k0,cutL,cutR,row,col){ const n=x.e-x.s+1, ed=canEdit(p), lines=phLines(p), pos=v=>Math.max(0,Math.min(n,v-x.s))/n*100;
-  const fin=p.pEnd>=k0&&p.pEnd<=shift(k0,6)?`<span class="fin">🏁 ส่ง ${E(p.endTime||thD(p.pEnd))}</span>`:'';
+  const fin=p.pEnd>=k0&&p.pEnd<=shift(k0,6)?`<span class="fin">🏁 ส่ง ${E(fmtT(p.endTime)||thD(p.pEnd))}</span>`:'';
   let ln=lines.map(L=>`<div class="c-pbl">${L.map((ph,i)=>{ const prev=L[i-1], sx=dd(k0,ph.start)+(prev&&prev.end===ph.start?frac(prev.time):0), ex=dd(k0,ph.end)+frac(ph.time);
       if(ex<=x.s||sx>=x.e+1) return ''; const l=pos(sx), w=Math.max(1.5,pos(ex)-l), cl=sx<x.s, cr=ex>x.e+1, join=prev&&prev.end===ph.start&&!cl;
-      return `<div class="c-phs ${cl?'cl':''} ${cr?'cr':''} ${join?'joinL':''} ${ph.done?'done':''} ${ed?'':'ro'}" style="left:${l}%;width:${w}%;--c:${ph.color}" onpointerdown="NDCAL.phDown(event,'${E(p.id)}','${ph.k}')" onmouseenter="NDCAL.phTip(event,'${E(p.id)}','${ph.k}')" onmouseleave="NDCAL.tipOff()"><span class="nm">${ph.name}</span><span class="who">· ${ph.who.length?E(ph.who[0])+(ph.who.length>1?' +'+(ph.who.length-1):''):'<i>ยังไม่มีคน</i>'}</span>${cr?'':`<span class="tm">${E(ph.time)}</span>`}${ed&&!cl?'<span class="h l" data-h="L"></span>':''}${ed&&!cr?'<span class="h r" data-h="R"></span>':''}</div>`; }).join('')}</div>`).join('');
+      return `<div class="c-phs ${cl?'cl':''} ${cr?'cr':''} ${join?'joinL':''} ${ph.done?'done':''} ${ed?'':'ro'}" style="left:${l}%;width:${w}%;--c:${ph.color}" onpointerdown="NDCAL.phDown(event,'${E(p.id)}','${ph.k}')" onmouseenter="NDCAL.phTip(event,'${E(p.id)}','${ph.k}')" onmouseleave="NDCAL.tipOff()"><span class="nm">${ph.name}</span><span class="who">· ${ph.who.length?E(ph.who[0])+(ph.who.length>1?' +'+(ph.who.length-1):''):'<i>ยังไม่มีคน</i>'}</span>${cr?'':`<span class="tm">${E(fmtT(ph.time))}</span>`}${ed&&!cl?'<span class="h l" data-h="L"></span>':''}${ed&&!cr?'<span class="h r" data-h="R"></span>':''}</div>`; }).join('')}</div>`).join('');
   if(!lines.length) ln='<div class="c-pbl" style="font-size:11px;color:var(--text2);padding:0 6px">ยังไม่ได้ตั้งเดดไลน์หน้าที่</div>';
   return `<div class="c-pb ${cutL?'l':''} ${cutR?'r':''} ${p.done?'done':''}" style="grid-row:${row}/span ${x.h};grid-column:${col}" oncontextmenu="NDCAL.ctx(event,'${E(p.id)}')"><div class="c-pbh" onpointerdown="NDCAL.down(event,'${E(p.id)}')" onmouseenter="NDCAL.tip(event,'${E(p.id)}')" onmouseleave="NDCAL.tipOff()">${cutL?'‹ ':''}📁 ${E(p.title)}${fin}</div>${ln}</div>`; }
-function monthView(all){ const c=ST.cur, f=new Date(c.getFullYear(),c.getMonth(),1), s=addD(f,-f.getDay()), last=new Date(c.getFullYear(),c.getMonth()+1,0), e=addD(last,6-last.getDay());
-  let h=`<div class="c-wdh">${WD.map(w=>`<div>${w}</div>`).join('')}</div>`;
+function monthView(all){ const c=ST.cur, f=new Date(c.getFullYear(),c.getMonth(),1), s=wsOf(f), last=new Date(c.getFullYear(),c.getMonth()+1,0), e=addD(wsOf(last),6);
+  let h=`<div class="c-wdh">${WDs().map(w=>`<div>${w}</div>`).join('')}</div>`;
   for(let w=new Date(s); w<=e; w=addD(w,7)){ const r=weekRow(w, all, c.getMonth()); h+=`<div class="c-wk" style="grid-template-rows:26px repeat(${r.rows},22px)${r.more?' 20px':''} 1fr">${r.html}</div>`; }
   return `<div class="c-month">${h}</div>`; }
 /* ── สัปดาห์: ตารางเวลา ── */
 const H0=7, H1=23, PX=48;
-function weekView(all){ const ws=addD(ST.cur,-ST.cur.getDay()), k0=ymd(ws), k6=shift(k0,6);
-  let head='<div></div>'; for(let i=0;i<7;i++){ const d=addD(ws,i); head+=`<div class="d ${ymd(d)===TODAY()?'today':''}" oncontextmenu="NDCAL.ctxDay(event,'${ymd(d)}')"><small>${WD[i]}</small><b>${d.getDate()}</b>${stkHTML(ymd(d))}</div>`; }
+function weekView(all){ const ws=wsOf(ST.cur), k0=ymd(ws), k6=shift(k0,6);
+  let head='<div></div>'; for(let i=0;i<7;i++){ const d=addD(ws,i); head+=`<div class="d ${ymd(d)===TODAY()?'today':''}" oncontextmenu="NDCAL.ctxDay(event,'${ymd(d)}')"><small>${WDs()[i]}</small><b>${d.getDate()}</b>${stkHTML(ymd(d))}</div>`; }
   const r=weekRow(ws, all.filter(x=>(x.end>x.start||!x.time||x.kind==='proj')), null, {off:1, noNum:true, noCells:true, cap:99});
   let ad='<div class="lb">ทั้งวัน</div>'; for(let i=0;i<7;i++){ const k=shift(k0,i); ad+=`<div class="c-cell" style="grid-column:${i+2};padding:0" data-d="${k}" oncontextmenu="NDCAL.ctxDay(event,'${k}')" ondblclick="NDCAL.add('${k}')"></div>`; }
-  let hrs='', cols=''; for(let h=H0;h<H1;h++) hrs+=`<div class="c-hr">${h===H0?'':pad(h)+':00'}</div>`;
+  let hrs='', cols=''; for(let h=H0;h<H1;h++) hrs+=`<div class="c-hr">${h===H0?'':fmtT(pad(h)+':00')}</div>`;
   for(let i=0;i<7;i++){ const k=shift(k0,i); let sl=''; for(let h=H0;h<H1;h++) sl+=`<div class="c-slot" ondblclick="NDCAL.add('${k}','${pad(h)}:00')" oncontextmenu="NDCAL.ctxDay(event,'${k}','${pad(h)}:00')"></div>`;
     const tv=all.filter(x=>x.kind!=='proj'&&x.start===k&&x.end===k&&x.time).map(it=>{ const a=Math.max(tmin(it.time),H0*60), b=Math.max(a+30,tmin(it.endTime||tstr(tmin(it.time)+60))), c=colorOf(it);
-      return `<div class="c-tev" style="top:${(a-H0*60)/60*PX}px;height:${(b-a)/60*PX-2}px;background:${c};color:${tcOf(c)}" onpointerdown="NDCAL.down(event,'${E(it.id)}')" onmouseenter="NDCAL.tip(event,'${E(it.id)}')" onmouseleave="NDCAL.tipOff()" oncontextmenu="NDCAL.ctx(event,'${E(it.id)}')"><b>${E(it.title)}</b><small>${E(it.time)} – ${E(it.endTime||'')}</small>${canEdit(it)?'<span class="rzb" data-rzb="1"></span>':''}</div>`; }).join('');
+      return `<div class="c-tev" style="top:${(a-H0*60)/60*PX}px;height:${(b-a)/60*PX-2}px;background:${c};color:${tcOf(c)}" onpointerdown="NDCAL.down(event,'${E(it.id)}')" onmouseenter="NDCAL.tip(event,'${E(it.id)}')" onmouseleave="NDCAL.tipOff()" oncontextmenu="NDCAL.ctx(event,'${E(it.id)}')"><b>${E(it.title)}</b><small>${E(fmtT(it.time))} – ${E(fmtT(it.endTime))}</small>${canEdit(it)?'<span class="rzb" data-rzb="1"></span>':''}</div>`; }).join('');
     const now=k===TODAY()?`<div class="c-now" style="top:${((new Date().getHours()*60+new Date().getMinutes())-H0*60)/60*PX}px"></div>`:'';
     cols+=`<div class="c-col" data-d="${k}">${sl}${tv}${now}</div>`; }
   return `<div class="c-week"><div class="c-wkh">${head}</div><div class="c-allday" style="grid-template-rows:repeat(${Math.max(1,r.rows)},23px)">${ad}${r.html}</div><div class="c-tg" id="c-tg"><div class="c-tgi"><div>${hrs}</div>${cols}</div></div></div>`; }
@@ -362,14 +372,16 @@ document.addEventListener('pointerup',e=>{ if(!DR) return; const d=DR; DR=null; 
   if(JSON.stringify(pt)===JSON.stringify(b4)){ render(); return; }
   saveEv(it, pt, d.mode==='move'?'ย้ายไป '+thD(pt.start)+' แล้ว':'แก้ช่วงเวลาแล้ว · ถึง '+thD(pt.end)+(pt.endTime?' '+pt.endTime:''), ()=>saveEv(it, b4, 'เลิกทำแล้ว')); });
 document.addEventListener('pointerdown',e=>{ if(!e.target.closest('.c-ctx,.c-card')) closeFloat(); }, true);
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeFloat(); document.querySelector('.c-mask')?.remove(); } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeFloat(); document.querySelector('.c-mask')?.remove(); return; }
+  if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){ const t=e.target, box=t&&t.closest&&t.closest('.c-mask,.c-card'); if(!box||/^(TEXTAREA|BUTTON|SELECT)$/.test(t.tagName)) return;
+    if(t.id==='c-eany'){ e.preventDefault(); const v=t.value.trim(); if(v) NDCAL.emoUse(v); return; } const b=box.querySelector('.c-bp'); if(b){ e.preventDefault(); b.click(); } } });
 
 /* ── ชี้ดู ── */
 function tipAt(e,html){ if(DR&&DR.active) return; tipOff(); TIP=document.createElement('div'); TIP.className='c-tip'; TIP.innerHTML=html; document.body.appendChild(TIP);
   const r=e.currentTarget.getBoundingClientRect(); TIP.style.left=Math.max(8,Math.min(innerWidth-300,r.left))+'px'; TIP.style.top=(r.bottom+6+TIP.offsetHeight>innerHeight?r.top-TIP.offsetHeight-6:r.bottom+6)+'px'; }
 const edLine=(by,at)=>by?`<div style="margin-top:4px">✏️ แก้ล่าสุดโดย <b>${E(by)}</b> <span class="m">· ${ago(at)}</span></div>`:'';
 function catName(it){ return it.kind==='todo'?'To-do':it.scope==='me'?tagFull('me',it.tag):it.kind==='proj'?'งานโปรเจกต์':(tagFull('team',it.cat)||(TEAM_CATS.find(c=>c.id===it.cat)||{}).name||'อีเวนต์ทีม'); }
-function whenTxt(it){ return thD(it.kind==='proj'?it.pStart:it.start)+((it.kind==='proj'?it.pEnd:it.end)>(it.kind==='proj'?it.pStart:it.start)?' – '+thD(it.kind==='proj'?it.pEnd:it.end):'')+(it.kind==='proj'?(it.endTime?' · ส่ง '+it.endTime:''):it.time?' · '+it.time+(it.endTime?'–'+it.endTime:''):''); }
+function whenTxt(it){ return thD(it.kind==='proj'?it.pStart:it.start)+((it.kind==='proj'?it.pEnd:it.end)>(it.kind==='proj'?it.pStart:it.start)?' – '+thD(it.kind==='proj'?it.pEnd:it.end):'')+(it.kind==='proj'?(it.endTime?' · ส่ง '+fmtT(it.endTime):''):it.time?' · '+fmtT(it.time)+(it.endTime?'–'+fmtT(it.endTime):''):''); }
 
 /* ── การ์ด / ป๊อปอัป ── */
 function openCard(id,e){ const it=findAny(id); if(!it||it.kind==='todo') return; closeFloat(); tipOff(); const ed=canEdit(it), c=document.createElement('div'); c.className='c-card';
@@ -377,7 +389,7 @@ function openCard(id,e){ const it=findAny(id); if(!it||it.kind==='todo') return;
   c.innerHTML=`<div class="tb">${ed?`<button title="${pj?'แก้วัน / เลื่อนเดดไลน์':'แก้ไข'}" onclick="NDCAL.${pj?'dates':'edit'}('${E(id)}')">✏️</button>${pj?'':`<button title="ลบ" onclick="NDCAL.delEv('${E(id)}')">🗑️</button>`}`:''}<button onclick="NDCAL.close()">✕</button></div>
    <h3 style="--c:${pj?'#0487E2':colorOf(it)}"><i></i><span>${pj?'📁 ':''}${E(it.title)}</span></h3>
    <div class="ln">${whenTxt(it)}${!pj&&!it.time?' · ทั้งวัน':''}</div><div class="ln">${it.scope==='me'?'🙋 ปฏิทินของฉัน':'🏢 ปฏิทินทีม'} · ${E(catName(it))}</div>
-   ${pj?`${it.owner?`<div class="ln">🗂️ เมเนเจอร์ ${E(it.owner)}</div>`:''}${phList(it).map(ph=>`<div class="ln" style="display:flex;gap:6px;align-items:center"><i style="width:9px;height:9px;border-radius:2px;background:${ph.color};flex:none"></i><span>${ph.name} · ${E(ph.who.join(', ')||'ยังไม่มีคน')} · ${thD(ph.start)}${ph.end>ph.start?'–'+thD(ph.end):''}${ph.time?' · เสร็จ '+E(ph.time):''}${ph.done?' ✓':''}</span></div>`).join('')}
+   ${pj?`${it.owner?`<div class="ln">🗂️ เมเนเจอร์ ${E(it.owner)}</div>`:''}${phList(it).map(ph=>`<div class="ln" style="display:flex;gap:6px;align-items:center"><i style="width:9px;height:9px;border-radius:2px;background:${ph.color};flex:none"></i><span>${ph.name} · ${E(ph.who.join(', ')||'ยังไม่มีคน')} · ${thD(ph.start)}${ph.end>ph.start?'–'+thD(ph.end):''}${ph.time?' · เสร็จ '+E(fmtT(ph.time)):''}${ph.done?' ✓':''}</span></div>`).join('')}
      ${canProj()?`<label style="display:flex;gap:8px;align-items:center;margin:10px 0 0 23px;cursor:pointer;font-weight:600"><input type="checkbox" ${it.done?'checked':''} ${it.st==='paid'?'disabled title="รับเงินแล้ว"':''} onchange="NDCAL.projDone('${E(it.pid)}',this.checked)" style="width:17px;height:17px;accent-color:#0487E2"> ✅ โปรเจกต์นี้เสร็จแล้ว${it.st==='paid'?' (รับเงินแล้ว)':''}</label>`:it.done?'<div class="ln" style="color:#1fb57a">✅ เสร็จแล้ว</div>':''}
      ${canProj()?`<div style="display:flex;gap:8px;margin:12px 0 0 23px;flex-wrap:wrap"><button class="c-bp" style="padding:6px 14px" onclick="NDCAL.dates('${E(id)}')">✏️ แก้วัน / เลื่อนเดดไลน์</button>${canOpenProj()?`<button class="c-bg" style="border:1px solid var(--border2)" onclick="NDCAL.goProj('${E(it.pid)}')">📁 แก้ข้อมูลโปรเจกต์ ›</button>`:''}</div>`:''}`:''}
    ${it.note?`<div class="ln" style="white-space:pre-wrap;color:var(--text)">${E(it.note)}</div>`:''}<div class="ln">${it.edBy?'✏️ แก้ล่าสุดโดย '+E(it.edBy)+' · '+ago(it.at):''}</div>`;
@@ -415,13 +427,13 @@ function openDlg(it, day, time){ closeFloat(); tipOff(); const isNew=!it, raw=it
   document.body.appendChild(m); chips(); setTimeout(()=>{ if(isNew) $('c-ft')?.focus(); safe(()=>_noteGrowAll(m)); },30); }
 function chips(){ const el=$('c-fchips'); if(!el) return; const sc=DLG.team?'team':'me', f=DLG.team?'cat':'tag', cur=DLG[f];
   if(!TGS(sc)[cur]) DLG[f]=Object.keys(TGS(sc))[0];
-  const chip=(id,t,kid)=>`<span class="c-chip ${DLG[f]===id?'on':''}" style="--c:${E(t.color)}${kid?';font-size:11.5px;padding:3px 9px':''}" onclick="NDCAL.dlgPick('${f}','${id}')"><i></i>${kid?'› ':''}${E(t.name)}</span>`;
-  el.innerHTML=tagTree(sc).map(g=>`<span style="display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center">${chip(g.id,g.t)}${g.kids.map(k=>chip(k.id,k.t,1)).join('')}</span>`).join('')+`<span class="c-chip" style="--c:#9aa0a6" onclick="NDCAL.tagAdd('${sc}','',true)">＋ แท็กใหม่</span>`; }
+  const chip=(id,t,kid)=>`<span class="c-chip ${DLG[f]===id?'on':''}" style="--c:${E(t.color)}${kid?';font-size:11.5px;padding:3px 9px':''}" onclick="NDCAL.dlgPick('${f}','${id}')" title="${E(tagFull(sc,id))}"><i></i>${kid?'›'.repeat(kid)+' ':''}${E(t.name)}</span>`;
+  el.innerHTML=tagFlat(sc).map(x=>chip(x.id,x.t,x.d)).join('')+`<span class="c-chip" style="--c:#9aa0a6" onclick="NDCAL.tagAdd('${sc}','',true)">＋ แท็กใหม่</span>`; }
 const PAL2=['#0463CA','#0487E2','#09B1EC','#65C2F5','#B0D6F5','#FFC9BC','#FFE2A8','#CDEDC4','#C2E2F7','#DCD0F6','#F9C6DB'];
-function tagDlg(sc,id){ const T=TGS(sc), t=T[id]||{}, kids=Object.keys(T).some(k=>T[k].parent===id), parents=tagTree(sc).filter(g=>g.id!==id);
+function tagDlg(sc,id){ const T=TGS(sc), t=T[id]||{}, ds=new Set(tDesc(T,id)), h=tHeight(T,id), parents=tagFlat(sc).filter(x=>x.id!==id&&!ds.has(x.id)&&x.d+1+h<=MAXD);
   const m=document.createElement('div'); m.className='c-mask'; m.onclick=x=>{ if(x.target===m) m.remove(); };
   m.innerHTML=`<div class="c-dlg" style="width:min(400px,100%)"><b>🏷️ แก้แท็ก${sc==='team'?'ทีม':''}</b><input class="c-fi" id="c-tgn" style="width:100%;box-sizing:border-box;margin-top:10px" value="${E(t.name||'')}" placeholder="ชื่อแท็ก">
-   ${kids?'':`<div class="c-fr"><span>อยู่ใต้แท็ก</span><select class="c-fi" id="c-tgp"><option value="">— แท็กหลัก —</option>${parents.map(g=>`<option value="${g.id}"${t.parent===g.id?' selected':''}>${E(g.t.name)}</option>`).join('')}</select></div>`}
+   <div class="c-fr"><span>อยู่ใต้แท็ก</span><select class="c-fi" id="c-tgp"><option value="">— แท็กหลัก —</option>${parents.map(x=>`<option value="${x.id}"${tPar(T,id)===x.id?' selected':''}>${'\u00a0\u00a0'.repeat(x.d)}${x.d?'› ':''}${E(x.t.name)}</option>`).join('')}</select></div>
    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center">${PALETTE.concat(PAL2).map(c=>`<span class="c-pc" data-c="${c}" onclick="document.querySelectorAll('.c-pc').forEach(x=>x.style.outline='');this.style.outline='2px solid var(--text)';document.getElementById('c-tgc').value='${c}'" style="width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;${c===t.color?'outline:2px solid var(--text)':''}"></span>`).join('')}
     <label title="เลือกสีเอง" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">🎨 <input type="color" id="c-tgc" value="${E(t.color||'#0487E2')}" style="width:34px;height:26px;border:none;background:none;padding:0;cursor:pointer" onclick="document.querySelectorAll('.c-pc').forEach(x=>x.style.outline='')"></label></div>
    <div class="c-ft"><button class="c-bg" onclick="this.closest('.c-mask').remove()">ยกเลิก</button><button class="c-bp" onclick="NDCAL.tagSave('${sc}','${id}')">บันทึก</button></div></div>`; document.body.appendChild(m); setTimeout(()=>$('c-tgn')?.focus(),30); }
@@ -443,12 +455,12 @@ window.NDCAL={ render, open,
   phDown(e,id,k){ if(e.button!==0) return; e.stopPropagation(); const p=findAny(id), ph=p.phases[k], P=PH.find(x=>x.k===k), u=under(e), h=e.target.dataset.h;
     DR={pid:id, ph:k, it:{...ph, title:P.name+' · '+p.title, kind:'phase'}, color:P.color, el:e.currentTarget, x:e.clientX, y:e.clientY, mode:h==='L'?'resizeL':h==='R'?'resize':'move', from:u?u.dataset.d:ph.start, ed:canEdit(p)}; e.preventDefault(); },
   tip(e,id){ const it=findAny(id); if(!it) return; tipAt(e,`<b>${E(it.title)}</b><div class="m">${whenTxt(it)}</div><div class="m">${it.scope==='me'?'🙋 ส่วนตัว':'🏢 ทีม'} · ${E(catName(it))}${it.owner?' · 🗂️ '+E(it.owner):''}</div>${edLine(it.edBy,it.at)}`); },
-  phTip(e,id,k){ const p=findAny(id), ph=p.phases[k], P=PH.find(x=>x.k===k); tipAt(e,`<b>${P.name} · ${E(p.title)}</b><div class="m">${thD(ph.start)}${ph.end>ph.start?' – '+thD(ph.end):''}${ph.time?' · ต้องเสร็จ '+E(ph.time)+' น.':''}</div><div style="margin-top:3px">👤 ${ph.who.length?'<b>'+ph.who.map(E).join(', ')+'</b>':'<span class="m">ยังไม่ได้มอบหมาย</span>'}</div>${p.owner?`<div class="m">🗂️ เมเนเจอร์ ${E(p.owner)}</div>`:''}${edLine(p.edBy,p.at)}`); },
+  phTip(e,id,k){ const p=findAny(id), ph=p.phases[k], P=PH.find(x=>x.k===k); tipAt(e,`<b>${P.name} · ${E(p.title)}</b><div class="m">${thD(ph.start)}${ph.end>ph.start?' – '+thD(ph.end):''}${ph.time?' · ต้องเสร็จ '+E(fmtT(ph.time))+(ST.h12?'':' น.'):''}</div><div style="margin-top:3px">👤 ${ph.who.length?'<b>'+ph.who.map(E).join(', ')+'</b>':'<span class="m">ยังไม่ได้มอบหมาย</span>'}</div>${p.owner?`<div class="m">🗂️ เมเนเจอร์ ${E(p.owner)}</div>`:''}${edLine(p.edBy,p.at)}`); },
   ctx(e,id){ const it=findAny(id); if(!it) return; e.preventDefault(); e.stopPropagation(); const ed=canEdit(it), I=E(id); let h;
     if(it.kind==='todo') h=`<div onclick="NDCAL.close();NDCAL.todoDone('${E(it.rid)}',true)">✓ ทำเสร็จแล้ว</div><div class="dang" onclick="NDCAL.close();NDCAL.todoDel('${E(it.rid)}')">🗑️ ลบ To-do</div>`;
     else if(it.kind==='proj') h=canProj()?`<div onclick="NDCAL.dates('${I}')">✏️ แก้วัน / เลื่อนเดดไลน์</div>${canOpenProj()?`<div onclick="NDCAL.goProj('${E(it.pid)}')">📁 แก้ข้อมูลโปรเจกต์ ›</div>`:''}`:`<div onclick="NDCAL.close();NDCAL.card('${I}',${e.clientX},${e.clientY})">👁️ ดูรายละเอียด</div>`;
     else if(!ed) h=`<div onclick="NDCAL.close();NDCAL.card('${I}',${e.clientX},${e.clientY})">👁️ ดูรายละเอียด</div><div style="color:var(--text2);cursor:default">🔒 อีเวนต์ของ ${E(it.byName||'คนอื่น')}</div>`;
-    else { const sc=it.scope==='me'?'me':'team', f=sc==='me'?'tag':'cat', one=(k,t,kid)=>`<div onclick="NDCAL.close();NDCAL.setF('${I}','${f}','${k}')" style="${kid?'padding-left:34px;font-size:12.5px':''}"><span class="sw" style="background:${E(t.color)}"></span>${E(t.name)}${it[f]===k?' ✓':''}</div>`, tg=tagTree(sc).map(g=>one(g.id,g.t)+g.kids.map(k=>one(k.id,k.t,1)).join('')).join('');
+    else { const sc=it.scope==='me'?'me':'team', f=sc==='me'?'tag':'cat', one=x=>`<div onclick="NDCAL.close();NDCAL.setF('${I}','${f}','${x.id}')" style="${x.d?`padding-left:${16+x.d*16}px;font-size:12.5px`:''}"><span class="sw" style="background:${E(x.t.color)}"></span>${E(x.t.name)}${it[f]===x.id?' ✓':''}</div>`, tg=tagFlat(sc).map(one).join('');
       h=`<div onclick="NDCAL.edit('${I}')">✏️ แก้ไข</div><div onclick="NDCAL.close();NDCAL.dup('${I}')">⧉ ทำซ้ำ</div>${it.scope==='me'?`<div onclick="NDCAL.close();NDCAL.toTeam('${I}')">📢 ย้ายไปปฏิทินทีม</div>`:''}<hr>${tg}<hr><div class="dang" onclick="NDCAL.close();NDCAL.delEv('${I}')">🗑️ ลบ</div>`; }
     closeFloat(); tipOff(); const m=document.createElement('div'); m.className='c-ctx'; m.innerHTML=h; document.body.appendChild(m); place(m,e.clientX-8,e.clientY-8); },
   ctxDay(e,k,time){ e.preventDefault(); closeFloat(); tipOff(); const m=document.createElement('div'); m.className='c-ctx';
@@ -489,35 +501,39 @@ window.NDCAL={ render, open,
   tdEnd(){ TDR=null; document.querySelectorAll('.c-tagr').forEach(x=>x.classList.remove('dt','db','dragging')); },
   async tdDrop(e,sc,tid){ e.preventDefault(); const d=TDR; NDCAL.tdEnd(); if(!d||d.sc!==sc||d.id===tid) return; const T={...TGS(sc)}, a=T[d.id], b=T[tid]; if(!a||!b) return;
     if(a.locked){ say('🔒 แท็ก "'+a.name+'" ล็อคอยู่'); return; }
-    const r=e.currentTarget.getBoundingClientRect(), after=e.clientY>=r.top+r.height/2, hasKids=Object.keys(T).some(k=>T[k].parent===d.id);
-    // ลงบนแท็กหลักที่ขยายอยู่ ครึ่งล่าง → เข้าเป็นแท็กย่อยตัวแรก · ไม่งั้นวางข้าง ๆ ในกลุ่มเดียวกับเป้าหมาย
-    const F=ST.fold||{}, intoTop=!b.parent&&after&&!hasKids&&Object.keys(T).some(k=>T[k].parent===tid)&&!F[sc+':'+tid];
-    const np=intoTop?tid:(b.parent||'');
-    if(np&&hasKids){ say('แท็กที่มีแท็กย่อยอยู่ ย้ายไปเป็นแท็กย่อยไม่ได้'); return; }
+    const r=e.currentTarget.getBoundingClientRect(), after=e.clientY>=r.top+r.height/2, F=ST.fold||{};
+    // วางครึ่งล่างของแท็กที่มีแท็กย่อยและขยายอยู่ → เข้าไปเป็นแท็กย่อยตัวแรก · ไม่งั้นวางข้าง ๆ ในชั้นเดียวกับเป้าหมาย
+    const into=after&&tKids(T,tid).length&&!F[sc+':'+tid], np=into?tid:tPar(T,tid);
+    if(np&&(np===d.id||tDesc(T,d.id).includes(np))){ say('ย้ายแท็กไปไว้ใต้แท็กลูกของตัวเองไม่ได้'); return; }
+    if((np?tDepth(T,np)+1:0)+tHeight(T,d.id)>MAXD){ say('ซ้อนแท็กได้ลึกสุด '+MAXD+' ชั้น'); return; }
     T[d.id]={...a}; if(np) T[d.id].parent=np; else delete T[d.id].parent;
-    const sib=(np?(tagTree(sc).find(g=>g.id===np)||{kids:[]}).kids.map(x=>x.id):tagTree(sc).map(g=>g.id)).filter(k=>k!==d.id);
-    let i=intoTop?0:sib.indexOf(tid)+(after?1:0); if(i<0) i=sib.length; sib.splice(i,0,d.id); sib.forEach((k,n)=>{ T[k]={...T[k], order:n}; });
+    const sib=tKids(T,np).filter(k=>k!==d.id); let i=into?0:sib.indexOf(tid)+(after?1:0); if(i<0) i=sib.length; sib.splice(i,0,d.id); sib.forEach((k,n)=>{ T[k]={...T[k], order:n}; });
     await put(TK(sc),T); render(); },
   tfold(sc,id){ ST.fold=ST.fold||{}; ST.fold[sc+':'+id]=!ST.fold[sc+':'+id]; saveST(); render(); },
   tagMenu(e,sc,id){ e.stopPropagation(); const T=TGS(sc), t=T[id]; if(!t) return; closeFloat(); const m=document.createElement('div'); m.className='c-ctx'; const L=t.locked;
     m.innerHTML=L?`<div style="color:var(--text2);cursor:default">🔒 ${E(t.name)} — ล็อคอยู่</div><hr><div onclick="NDCAL.close();NDCAL.tagLock('${sc}','${id}',false)">🔓 ปลดล็อค</div>`
-     :`${t.parent?'':`<div onclick="NDCAL.close();NDCAL.tagAdd('${sc}','${id}')">＋ เพิ่มแท็กย่อย</div>`}<div onclick="NDCAL.close();NDCAL.tagEdit('${sc}','${id}')">✎ แก้ชื่อ / สี</div><div onclick="NDCAL.close();NDCAL.tagMove('${sc}','${id}',-1)">↑ เลื่อนขึ้น</div><div onclick="NDCAL.close();NDCAL.tagMove('${sc}','${id}',1)">↓ เลื่อนลง</div><div onclick="NDCAL.close();NDCAL.tagLock('${sc}','${id}',true)">🔒 ล็อค (กันมือพลาด)</div><hr><div class="dang" onclick="NDCAL.close();NDCAL.tagDel('${sc}','${id}')">🗑️ ลบแท็ก</div>`;
+     :`${tDepth(T,id)>=MAXD?'':`<div onclick="NDCAL.close();NDCAL.tagAdd('${sc}','${id}')">＋ เพิ่มแท็กย่อย</div>`}<div onclick="NDCAL.close();NDCAL.tagEdit('${sc}','${id}')">✎ แก้ชื่อ / สี</div><div onclick="NDCAL.close();NDCAL.tagMove('${sc}','${id}',-1)">↑ เลื่อนขึ้น</div><div onclick="NDCAL.close();NDCAL.tagMove('${sc}','${id}',1)">↓ เลื่อนลง</div><div onclick="NDCAL.close();NDCAL.tagLock('${sc}','${id}',true)">🔒 ล็อค (กันมือพลาด)</div><hr><div class="dang" onclick="NDCAL.close();NDCAL.tagDel('${sc}','${id}')">🗑️ ลบแท็ก</div>`;
     document.body.appendChild(m); place(m,e.clientX-8,e.clientY-8); },
   async tagLock(sc,id,v){ const T={...TGS(sc)}; T[id]={...T[id], locked:!!v}; if(!v) delete T[id].locked; await put(TK(sc),T); render(); say(v?'🔒 ล็อคแท็ก "'+T[id].name+'" แล้ว':'🔓 ปลดล็อคแล้ว'); },
-  async tagMove(sc,id,dir){ const T={...TGS(sc)}, t=T[id]; if(!t||t.locked) return; const sib=t.parent?(tagTree(sc).find(g=>g.id===t.parent)||{kids:[]}).kids.map(x=>x.id):tagTree(sc).map(g=>g.id), i=sib.indexOf(id), j=i+dir;
+  async tagMove(sc,id,dir){ const T={...TGS(sc)}, t=T[id]; if(!t||t.locked) return; const sib=tKids(T,tPar(T,id)), i=sib.indexOf(id), j=i+dir;
     if(j<0||j>=sib.length) return; [sib[i],sib[j]]=[sib[j],sib[i]]; sib.forEach((k,n)=>{ T[k]={...T[k], order:n}; }); await put(TK(sc),T); render(); },
-  async tagAdd(sc,parent,inDlg){ sc=sc||'me'; const T={...TGS(sc)}, P=parent&&T[parent]; if(P&&P.locked){ say('🔒 แท็ก "'+P.name+'" ล็อคอยู่ — ปลดล็อคก่อน'); return; } const n=prompt(P?'ชื่อแท็กย่อยใต้ "'+P.name+'" (เช่น พากย์ · มิกซ์):':'ชื่อแท็กใหม่:'); if(!n||!n.trim()) return;
+  async tagAdd(sc,parent,inDlg){ sc=sc||'me'; const T={...TGS(sc)}, P=parent&&T[parent]; if(P&&tDepth(T,parent)>=MAXD){ say('ซ้อนแท็กได้ลึกสุด '+MAXD+' ชั้น'); return; } if(P&&P.locked){ say('🔒 แท็ก "'+P.name+'" ล็อคอยู่ — ปลดล็อคก่อน'); return; } const n=prompt(P?'ชื่อแท็กย่อยใต้ "'+P.name+'" (เช่น พากย์ · มิกซ์):':'ชื่อแท็กใหม่:'); if(!n||!n.trim()) return;
     const id='t'+uid(); T[id]={name:n.trim(), color:P?P.color:PALETTE.concat(PAL2)[Object.keys(T).length%22], ...(P?{parent}:{}), by:ME()}; await put(TK(sc),T);
     if(inDlg){ DLG[sc==='team'?'cat':'tag']=id; chips(); } render(); say('🏷️ เพิ่มแท็ก "'+n.trim()+'" แล้ว — กด ✎ เพื่อเปลี่ยนสี'); },
   tagEdit(sc,id){ const t=TGS(sc)[id]; if(t&&t.locked){ say('🔒 แท็กนี้ล็อคอยู่ — ปลดล็อคก่อน'); return; } tagDlg(sc,id); },
   async tagSave(sc,id){ const T={...TGS(sc)}, o=T[id]||{}, pe=$('c-tgp'); T[id]={...o, name:($('c-tgn').value||'').trim()||o.name, color:($('c-tgc')||{}).value||o.color};
-    if(pe){ if(pe.value&&pe.value!==id) T[id].parent=pe.value; else delete T[id].parent; } document.querySelector('.c-mask')?.remove(); await put(TK(sc),T); render(); },
+    if(pe){ if(pe.value&&pe.value!==id&&!tDesc(T,id).includes(pe.value)) T[id].parent=pe.value; else delete T[id].parent; } document.querySelector('.c-mask')?.remove(); await put(TK(sc),T); render(); },
   async tagDel(sc,id){ const T={...TGS(sc)}; if(T[id]&&T[id].locked){ say('🔒 แท็กนี้ล็อคอยู่ — ปลดล็อคก่อน'); return; } if(Object.keys(T).length<=1){ say('ต้องมีแท็กอย่างน้อย 1 อัน'); return; }
-    const kids=Object.keys(T).filter(k=>T[k].parent===id), to=T[id].parent&&T[T[id].parent]?T[id].parent:Object.keys(T).find(x=>x!==id&&!kids.includes(x)&&!T[x].parent)||Object.keys(T).find(x=>x!==id);
+    const kids=tKids(T,id), par=tPar(T,id), ds=tDesc(T,id), to=par||Object.keys(T).find(x=>x!==id&&!ds.includes(x)&&!tPar(T,x))||Object.keys(T).find(x=>x!==id);
     const k2=sc==='team'?'team':'mine', f=sc==='team'?'cat':'tag', used=Object.values(D[k2]).filter(e=>e&&e[f]===id);
-    if(!confirm('ลบแท็ก "'+T[id].name+'"?'+(kids.length?'\nแท็กย่อย '+kids.length+' อันจะกลายเป็นแท็กหลัก':'')+(used.length?'\nงาน '+used.length+' รายการจะย้ายไปแท็ก "'+(T[to]||{}).name+'"':''))) return;
-    kids.forEach(k=>{ T[k]={...T[k]}; delete T[k].parent; }); delete T[id]; await put(TK(sc),T); for(const e of used) await put(k2,{...e, [f]:to},e.id); render(); },
+    if(!confirm('ลบแท็ก "'+T[id].name+'"?'+(kids.length?'\nแท็กย่อย '+kids.length+' อันจะขึ้นไปอยู่ชั้นบน':'')+(used.length?'\nงาน '+used.length+' รายการจะย้ายไปแท็ก "'+(T[to]||{}).name+'"':''))) return;
+    kids.forEach(k=>{ T[k]={...T[k]}; if(par) T[k].parent=par; else delete T[k].parent; }); delete T[id]; await put(TK(sc),T); for(const e of used) await put(k2,{...e, [f]:to},e.id); render(); },
   mpick(e){ e.stopPropagation(); closeFloat(); MPY=ST.cur.getFullYear(); const m=document.createElement('div'); m.className='c-ctx c-mp'; m.onclick=x=>x.stopPropagation(); mpRender(m); document.body.appendChild(m); const r=e.currentTarget.getBoundingClientRect(); m.style.left=r.left+'px'; m.style.top=(r.bottom+6)+'px'; },
+  settings(e){ e.stopPropagation(); closeFloat(); const m=document.createElement('div'); m.className='c-ctx c-set'; m.onclick=x=>x.stopPropagation();
+    const draw=()=>{ const o=(on,lbl,js)=>`<div onclick="${js}" style="${on?'font-weight:700;color:#0487E2':''}">${on?'◉':'○'} ${lbl}</div>`;
+      m.innerHTML=`<div style="color:var(--text2);cursor:default;font-size:12px">📅 เริ่มสัปดาห์วัน</div>${o(!WS(),'อาทิตย์','NDCAL.setOpt(\'ws\',0)')}${o(WS()===1,'จันทร์','NDCAL.setOpt(\'ws\',1)')}<hr><div style="color:var(--text2);cursor:default;font-size:12px">🕐 รูปแบบเวลา</div>${o(!ST.h12,'24 ชั่วโมง (14:30)','NDCAL.setOpt(\'h12\',false)')}${o(ST.h12,'AM / PM (2:30 PM)','NDCAL.setOpt(\'h12\',true)')}`; };
+    draw(); m._draw=draw; document.body.appendChild(m); const r=e.currentTarget.getBoundingClientRect(); m.style.left=Math.max(8,Math.min(r.left,innerWidth-230))+'px'; m.style.top=(r.bottom+6)+'px'; },
+  setOpt(k,v){ ST[k]=v; saveST(); render(); const m=document.querySelector('.c-set'); if(m&&m._draw) m._draw(); },
   mpy(n){ MPY+=n; const m=document.querySelector('.c-mp'); if(m) mpRender(m); },
   mgo(i){ ST.cur=new Date(MPY,i,1); closeFloat(); render(); },
   emo:emoPick, ico:icoHTML,
