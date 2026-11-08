@@ -160,11 +160,62 @@ window.ndpDc=function(act, id){
   if(!ST.staff||ST.mode!=='admin') return; const sid=ST.staff.id, a=(ST.staff.discordAlts||[]).find(x=>x&&String(x.id)===String(id));
   try{
     if(act==='del'){ if(!confirm('ลบบัญชี Discord สำรอง "'+((a&&a.name)||id)+'" ?')) return; _dcRemoveAlt(sid, id); }
+    else if(act==='unmain'){ const al=(ST.staff.discordAlts||[]).filter(Boolean); if(!confirm('เลิกผูกบัญชี Discord หลัก "'+(ST.staff.discordName||id)+'" ?'+(al.length?'\n\nบัญชีสำรอง "'+(al[0].name||al[0].id)+'" จะขึ้นเป็นหลักแทน':''))) return;
+      _updateStaffRecords(sid, x=>{ if(String(x.discordId||'')!==String(id)) return; const nx=(x.discordAlts||[]).shift(); if(nx){ x.discordId=nx.id; x.discordName=nx.name||''; } else { delete x.discordId; delete x.discordName; } if(x.discordAlts&&!x.discordAlts.length) delete x.discordAlts; }); try{ _allStaffCache=null; }catch(e){} }
     else if(act==='main'){ _dcSetLink(sid, id, (a&&a.name)||'', 'main'); }
-    try{ logAudit('staff.edit', ST.staff.nickname||ST.staff.name||'', act==='del'?'ลบ Discord สำรอง':'ตั้ง Discord หลักใหม่'); }catch(e){}
-    toast(act==='del'?'ลบบัญชีสำรองแล้ว':'⭐ ตั้งเป็นบัญชีหลักแล้ว','success'); open('admin', sid);
+    try{ logAudit('staff.edit', ST.staff.nickname||ST.staff.name||'', act==='del'?'ลบ Discord สำรอง':act==='unmain'?'เลิกผูก Discord หลัก':'ตั้ง Discord หลักใหม่'); }catch(e){}
+    toast(act==='del'?'ลบบัญชีสำรองแล้ว':act==='unmain'?'✂️ เลิกผูกแล้ว':'⭐ ตั้งเป็นบัญชีหลักแล้ว','success'); open('admin', sid);
   }catch(e){ toast('ไม่สำเร็จ: '+e.message,'error'); }
 };
+// 🎮 แอดมิน: แก้การผูก Discord (หลัก 1 + สำรองได้หลายบัญชี) — เห็นเลยว่า ID นี้ผูกกับใครอยู่ เหมือนการ์ดบัญชีล็อกอิน
+//   ทุกบัญชีที่ผูก (หลัก/สำรอง) ใช้จำตัวตนตอนพิมพ์รับงานในห้อง · บัญชีหลักใช้แท็กในโพสต์ + ดึงเข้าห้องโปรเจกต์
+const DCM_K='guin3_dc_members';
+const dcMembers=()=>safe(()=>JSON.parse(localStorage.getItem(DCM_K)||'[]'),[])||[];
+const dcIdOf=t=>{ const m=String(t||'').match(/(\d{15,22})\s*$/)||String(t||'').match(/\b(\d{15,22})\b/); return m?m[1]:''; };
+const dcWho=id=>{ const o=safe(()=>_dcOwnerOf(id),null); if(!o) return null; return {s:o, main:String(o.discordId||'')===String(id)}; };
+function dcCardHTML(){
+  if(ST.mode!=='admin' || !ST.staff) return '';
+  const s=safe(()=>getStaffById(ST.staff.id),null)||ST.staff, alts=(s.discordAlts||[]).filter(Boolean);
+  const nm=x=>x?(x.nickname||x.name||x.id):'';
+  const row=(a,main)=>`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px dashed var(--border2,rgba(255,255,255,.12))">
+      <span>${main?'⭐':'↪'}</span><b>${esc(a.name||'(ไม่มีชื่อ)')}</b><small class="muted">${esc(a.id)}</small><small class="muted">· ${main?'หลัก':'สำรอง'}</small>
+      <span style="margin-left:auto;display:flex;gap:6px">${main?'':`<button class="btn btn-outline btn-sm" type="button" onclick="ndpDc('main','${esc(a.id)}')">⭐ ตั้งเป็นหลัก</button>`}
+      <button class="btn btn-outline btn-sm ndp-danger" type="button" onclick="ndpDc('${main?'unmain':'del'}','${esc(a.id)}')">✂️ เลิกผูก</button></span></div>`;
+  const M=dcMembers(), mine=new Set(safe(()=>_dcAllIds(s),[]));
+  const opts=M.filter(m=>m&&m.id&&!mine.has(String(m.id))).map(m=>{ const w=dcWho(m.id); return `<option value="${esc((m.n||m.u||'')+(m.u&&m.u!==m.n?' (@'+m.u+')':'')+' · '+m.id)}">${w?esc('ผูกกับ '+nm(w.s)+(w.main?'':' (สำรอง)')+' อยู่'):'ยังไม่ผูก'}</option>`; }).join('');
+  return `<div class="ndp-card"><div class="ndp-ch"><h3>🎮 บัญชี Discord ที่ผูก</h3><span class="muted">มีแอคสำรอง → เพิ่มเป็นสำรองได้ · พิมพ์รับงานจากแอคไหนก็ขึ้นชื่อคนนี้</span></div><div class="ndp-cb">
+    ${(s.discordId?row({id:s.discordId,name:s.discordName},true):'')+alts.map(a=>row(a,false)).join('')||'<div class="muted" style="margin-bottom:6px">ยังไม่ได้ผูก Discord</div>'}
+    <datalist id="ndp-dcdl">${opts}</datalist>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px">
+      <input id="ndp-dcin" list="ndp-dcdl" autocomplete="off" placeholder="🔍 พิมพ์ชื่อ Discord หรือวาง User ID" style="flex:1;min-width:220px;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px" oninput="ndpDcHint()">
+      <button class="btn btn-outline btn-sm" type="button" onclick="ndpDcLoad()" title="ดึงรายชื่อสมาชิกจากเซิร์ฟเวอร์ Discord">🔄 ${M.length?'โหลดรายชื่อใหม่':'โหลดรายชื่อ Discord'}</button></div>
+    <div id="ndp-dchint" style="font-size:12.5px;margin-top:6px;min-height:18px"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      <button class="btn btn-blue btn-sm" type="button" onclick="ndpDcAdd('${s.discordId?'alt':'main'}')">${s.discordId?'➕ เพิ่มเป็นบัญชีสำรอง':'🔗 ผูกเป็นบัญชีหลัก'}</button>
+      ${s.discordId?`<button class="btn btn-outline btn-sm" type="button" onclick="ndpDcAdd('main')">⭐ ตั้งเป็นบัญชีหลักแทน</button>`:''}</div>
+    <div class="muted" style="margin-top:8px;font-size:11.5px">⭐ หลัก = แท็กชื่อในโพสต์ + ดึงเข้าห้องโปรเจกต์ · ↪ สำรอง = จำว่าเป็นคนเดียวกันตอนพิมพ์รับงาน/ลงคิว · 1 บัญชี Discord ผูกได้กับคนเดียว${M.length?'':' · กด 🔄 เพื่อค้นหาด้วยชื่อ (หรือวาง User ID ได้เลย)'}</div></div></div>`;
+}
+window.ndpDcHint=function(){ const el=$('ndp-dchint'), v=($('ndp-dcin')||{}).value||''; if(!el) return; const id=dcIdOf(v);
+  if(!v.trim()){ el.innerHTML=''; return; }
+  if(!id){ el.innerHTML='<span class="muted">เลือกจากรายชื่อ หรือวาง User ID (ตัวเลข 17–20 หลัก)</span>'; return; }
+  const w=dcWho(id), me=ST.staff&&w&&w.s.id===ST.staff.id, m=dcMembers().find(x=>String(x.id)===id);
+  el.innerHTML=(m?`<b>${esc(m.n||m.u)}</b> <small class="muted">${esc(id)}</small> — `:`<small class="muted">${esc(id)}</small> — `)+
+    (me?'<span style="color:var(--green,#00dfa0)">ผูกกับคนนี้อยู่แล้ว</span>':w?`<span style="color:var(--orange,#ff9e00)">🔗 ผูกกับ <b>${esc(w.s.nickname||w.s.name)}</b> (${w.main?'หลัก':'สำรอง'}) อยู่ — กดผูกจะย้ายมาเป็นของคนนี้</span>`:'<span style="color:var(--green,#00dfa0)">✅ ยังไม่ผูกกับใคร</span>'); };
+window.ndpDcLoad=async function(){ try{ showLoader(true); const d=await callAppsScript({action:'discordMembers'});
+    const L=(d&&d.members||[]).map(m=>({id:String(m.id), n:m.nick||m.globalName||m.username||'', u:m.username||''}));
+    if(!L.length){ toast('ไม่พบสมาชิกในเซิร์ฟเวอร์ — เช็คว่าเปิด SERVER MEMBERS INTENT ให้บอทแล้ว','warn'); return; }
+    try{ localStorage.setItem(DCM_K, JSON.stringify(L)); }catch(e){} toast('🔄 โหลดรายชื่อ Discord '+L.length+' คนแล้ว','success'); open('admin', ST.staff.id);
+  }catch(e){ toast('ดึงรายชื่อไม่ได้: '+e.message,'error'); }finally{ try{ showLoader(false); }catch(e){} } };
+window.ndpDcAdd=function(mode){ if(!ST.staff||ST.mode!=='admin') return; const v=($('ndp-dcin')||{}).value||'', id=dcIdOf(v);
+  if(!id){ toast('เลือกบัญชี Discord หรือวาง User ID ก่อน','info'); return; }
+  const s=getStaffById(ST.staff.id)||ST.staff, nm=s.nickname||s.name, w=dcWho(id), m=dcMembers().find(x=>String(x.id)===id);
+  if(w&&w.s.id===s.id&&(mode==='alt'||w.main)){ toast('บัญชีนี้ผูกกับ '+nm+' อยู่แล้ว','info'); return; }
+  const name=(m&&(m.n||m.u))||String(v).replace(/\s*·?\s*\d{15,22}\s*$/,'').replace(/\s*\(@[^)]*\)\s*$/,'').trim();
+  if(w&&w.s.id!==s.id&&!confirm('บัญชี "'+(name||id)+'" ผูกกับ "'+(w.s.nickname||w.s.name)+'" อยู่\n\nย้ายมาเป็นของ "'+nm+'" ('+(mode==='alt'?'สำรอง':'หลัก')+') ?')) return;
+  try{ _dcSetLink(s.id, id, name, mode);
+    try{ logAudit('staff.edit', nm, (mode==='alt'?'เพิ่ม Discord สำรอง: ':'ผูก Discord หลัก: ')+(name||id)); }catch(e){}
+    toast(mode==='alt'?'➕ เพิ่มบัญชีสำรองแล้ว':'⭐ ผูกเป็นบัญชีหลักแล้ว','success'); open('admin', s.id);
+  }catch(e){ toast('ผูกไม่สำเร็จ: '+e.message,'error'); } };
 function rolesHTML(){
   if(ST.mode==='admin'){
     const acc=ST.acct, isMgr=acc&&acc.role==='manager';
@@ -175,7 +226,7 @@ function rolesHTML(){
       ${acc?`<div class="ndp-f" style="margin-top:8px;max-width:320px"><label>บทบาทในระบบ</label><select id="ndp-sysrole"><option value="staff" ${!isMgr?'selected':''}>🎙️ Staff (ทีมงาน)</option><option value="manager" ${isMgr?'selected':''}>🗂️ Manager</option></select></div>
         <label class="ndp-rchip" id="ndp-acct-wrap" style="--c:#00B4FF;margin-top:10px;display:inline-flex"><input type="checkbox" id="ndp-acct" disabled onchange="ndpSetAcct(this)"> 🧾 นักบัญชี <small style="opacity:.75;font-weight:400">— เห็นเมนู "งานบัญชี" · ดูข้อมูลการเงินได้ (โอน/แก้ไม่ได้) · มีผลทันที</small></label>`:'<div class="muted" style="margin-top:10px;font-size:12px">🧾 ตั้งเป็นนักบัญชีได้หลังผูกบัญชีผู้ใช้กับทีมงานคนนี้</div>'}
       </div>
-      ${reqNoteHTML()}</div></div>${linkCardHTML()}`;
+      ${reqNoteHTML()}</div></div>${linkCardHTML()}${dcCardHTML()}`;
   }
   const cur=ST.roles, add=ST.pendAdd, del=ST.pendDel;
   if(!ST.edit) return `<div class="ndp-card"><div class="ndp-ch"><h3>โรล / ตำแหน่งงาน</h3></div><div class="ndp-cb">
