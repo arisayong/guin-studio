@@ -46,7 +46,7 @@ const unitL=u=>{ u=String(u||'').trim(); const en=UNIT_EN[u]; return !en||LG==='
 const UNIT_SH={'นาที':'min','ชั่วโมง':'hr','หน้า':'page','วัน':'day','บท':'script','ตอน':'episode'};
 const detEn=t=>String(t||'').replace(/\/\s*(นาที|ชั่วโมง|หน้า|วัน|บท|ตอน)/g,(m,u)=>'/'+UNIT_SH[u]).replace(/หัก\s*([\d.]+)\s*%/g,'less $1% client deduction').replace(/([\d.,]+)\s*(ชั่วโมง|หน้า|วัน|บท)(?![ก-๙])/g,(m,n,u)=>n+' '+UNIT_SH[u]+(+n.replace(/,/g,'')===1?'':'s')).replace(/ความยาว\s*([\d.,]+)\s*นาที/g,'Duration $1 min').replace(/([\d.,]+)\s*ตอน/g,'$1 episodes').replace(/([\d.,]+)\s*นาที/g,'$1 min');
 // หมายเหตุที่ระบบเติมตอนลูกค้าหัก % → อังกฤษ (ข้อความที่พิมพ์เองคงเดิม)
-const noteEn=t=>String(t||'').replace(/ยอด (.+?) หักแล้ว ([\d.]+)% ตามที่ลูกค้าหัก \(เต็ม (\S+) → (\S+)\)/g,'$1: amount after $2% client deduction (full $3 → $4)');
+const noteEn=t=>String(t||'').replace(/ยอด (.+?) หักแล้ว ([\d.]+)% ตามที่ลูกค้าหัก \(เต็ม (.+?) → (.+?)\)/g,'$1: amount after $2% client deduction (full $3 → $4)');
 const noteL=t=>{ if(!t) return ''; const en=noteEn(t); return LG==='th'||en===t?E(t):LG==='en'?E(en):E(t)+'<br><span class="gd-en">'+E(en)+'</span>'; };
 const detL=t=>{ if(!t) return ''; const en=detEn(t); return LG==='th'||en===t?E(t):LG==='en'?E(en):E(t)+' <span class="gd-en">/ '+E(en)+'</span>'; };
 

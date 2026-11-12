@@ -955,7 +955,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261112-02"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261112-03"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -4050,7 +4050,7 @@ function generateDocNo(prefix){
 // 🔎 เปิดเอกสารเดิมมาแก้ → เทียบราคารายการกับงบโปรเจกต์ปัจจุบัน (ราคาในเอกสารเป็นค่า ณ ตอนที่เพิ่มรายการ ไม่ตามโปรเจกต์อัตโนมัติ)
 function _docPriceDiffs(pre){ const its=pre==='inv'?invItems:qtItems; const P=getProjects(); const r2=n=>Math.round((+n||0)*100)/100;
   return its.map((x,i)=>{ if(!x.projId) return null; const p=P.find(y=>y.id===x.projId); if(!p) return null; const want=r2(p.budget), have=r2((+x.price||0)*(+x.qty||1)), sh=_projItemShape(p);
-    const shapeDiff=sh.unit!=='งาน' && (Math.abs((+x.qty||1)-sh.qty)>1e-9 || String(x.unit||'')!==sh.unit || Math.abs((+x.price||0)-sh.price)>=0.01);
+    const shapeDiff=(sh.unit!=='งาน' && (Math.abs((+x.qty||1)-sh.qty)>1e-9 || String(x.unit||'')!==sh.unit || Math.abs((+x.price||0)-sh.price)>=0.01)) || (sh.cded && String(x.detail||'')!==String(sh.detail||''));
     return Math.abs(want-have)>=0.01||shapeDiff?{i, name:x.desc||projDisp(p), have, want, p, sh, shapeOnly:Math.abs(want-have)<0.01}:null; }).filter(Boolean); }
 function _docPriceCheck(pre){ const bar=document.getElementById(pre+'-docno-bar'); if(!bar) return; document.getElementById(pre+'-price-warn')?.remove();
   const D=_docPriceDiffs(pre); if(!D.length) return;
@@ -26290,15 +26290,23 @@ function _docMailText(kind, data, total){ const lang=data.lang||'both', inv=kind
   if(lang==='en') return en; if(lang==='th') return th;
   return {subject:th.subject+' / '+en.subject.replace(' — Guin Home Studio',''), body:th.body+'\n\n— — —\n\n'+en.body}; }
 function _cdedDocNote(pre, p){ if(!p||!(+p.clientDedPct>0)) return; const el=document.getElementById(pre+'-note'); if(!el) return;
-  const en=document.getElementById(pre+'-lang')?.value==='en';
-  const line=en?(projDisp(p)+': amount after '+p.clientDedPct+'% client deduction (full '+fmtB(+p.budgetGross||0)+' → '+fmtB(+p.budget||0)+')')
-              :('ยอด '+projDisp(p)+' หักแล้ว '+p.clientDedPct+'% ตามที่ลูกค้าหัก (เต็ม '+fmtB(+p.budgetGross||0)+' → '+fmtB(+p.budget||0)+')');
-  if(String(el.value||'').includes(line)) return; el.value=(el.value?el.value.trim()+' · ':'')+line; }
-function _projFxItem(p){ const t=projFxTotal(p); if(!t) return {}; const sh=_projItemShape(p); return {fxCur:p.budgetCur, fxPrice:t, fxBase:p.budget||0, fxUnitP:sh.qty!==1||sh.unit!=='งาน'?+p.budgetFx:t}; }
+  const en=document.getElementById(pre+'-lang')?.value==='en', A=_cdedAmts(p);
+  const line=en?(projDisp(p)+': amount after '+p.clientDedPct+'% client deduction (full '+A.f(A.gross)+' → '+A.f(A.net)+')')
+              :('ยอด '+projDisp(p)+' หักแล้ว '+p.clientDedPct+'% ตามที่ลูกค้าหัก (เต็ม '+A.f(A.gross)+' → '+A.f(A.net)+')');
+  if(String(el.value||'').includes(line)) return;
+  // เอาบรรทัดหักเดิมของโปรเจกต์นี้ออกก่อน (เช่นเคยเป็นบาท/ภาษาไทย) แล้วค่อยใส่อันใหม่
+  const d=projDisp(p).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), old=new RegExp('(\\s*·\\s*)?(ยอด )?'+d+'(: amount after| หักแล้ว)[^)]*\\)','g');
+  const v=String(el.value||'').replace(old,'').replace(/^\s*·\s*/,'').trim();
+  el.value=(v?v+' · ':'')+line; }
+function _projFxItem(p){ let t=projFxTotal(p); if(!t) return {}; if(+p.clientDedPct>0) t=_cdedAmts(p).net; const sh=_projItemShape(p); return {fxCur:p.budgetCur, fxPrice:t, fxBase:p.budget||0, fxUnitP:sh.qty!==1||sh.unit!=='งาน'?+p.budgetFx:t}; }
 // รูปแบบรายการตามวิธีคิดงบ: นาที → จำนวน=ความยาว(นาที) · ชั่วโมง/หน้า/วัน/บท → จำนวนที่กรอก · เหมา → 1 งาน
+// ✂️ ยอดก่อน/หลังลูกค้าหัก ในสกุลของโปรเจกต์ (บาท หรือ USD ฯลฯ) — ใช้เขียนรายละเอียด + หมายเหตุเอกสาร
+function _cdedAmts(p){ const pct=+p.clientDedPct||0, fx=projFxTotal(p);
+  if(fx){ const c=p.budgetCur, f=v=>c+' '+(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); return {rate:+p.budgetFx||0, gross:fx, net:_r2(fx*(1-pct/100)), f}; }
+  return {rate:+p.budgetRate||0, gross:+p.budgetGross||0, net:+p.budget||0, f:fmtB}; }
 function _projItemShape(p){ const r=+p.budgetRate||0, t=p.budgetType||'flat';
-  if(+p.clientDedPct>0){ const g=+p.budgetGross||0, pct=+p.clientDedPct, q=t==='per-minute'?+p.duration:+p.budgetQty, u=t==='per-minute'?'นาที':BUDGET_QTY_LABEL[t];
-    const how=(r>0&&q>0&&u?fmtB(r)+'/'+u+' × '+q+' '+u+' = ':'')+(g?fmtB(g)+' ':'')+'หัก '+pct+'% = '+fmtB(+p.budget||0);
+  if(+p.clientDedPct>0){ const pct=+p.clientDedPct, q=t==='per-minute'?+p.duration:+p.budgetQty, u=t==='per-minute'?'นาที':BUDGET_QTY_LABEL[t], A=_cdedAmts(p);
+    const how=(A.rate>0&&q>0&&u?A.f(A.rate)+'/'+u+' × '+q+' '+u+' = ':'')+(A.gross?A.f(A.gross)+' ':'')+'หัก '+pct+'% = '+A.f(A.net);
     return {qty:1, unit:'งาน', price:Math.round((+p.budget||0)*100)/100, detail:(p.duration?'ความยาว '+p.duration+' นาที · ':'')+how, cded:pct}; }
   if(t==='per-minute' && r>0 && +p.duration>0) return {qty:+p.duration, unit:'นาที', price:r};
   if(BUDGET_QTY_LABEL[t] && r>0 && +p.budgetQty>0) return {qty:+p.budgetQty, unit:BUDGET_QTY_LABEL[t], price:r};
@@ -33523,7 +33531,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261112-02"></script><script src="scene/nd-profile.js?v=20261112-02"></script><script src="scene/nd-plan.js?v=20261112-02"></script><script src="scene/nd-cal.js?v=20261112-02"></script><script src="scene/nd-register.js?v=20261112-02"></script><script src="scene/nd-work.js?v=20261112-02"></script><script src="scene/nd-docform.js?v=20261112-02"></script><script src="scene/nd-docpdf.js?v=20261112-02"></script><script src="scene/nd-acct.js?v=20261112-02"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261112-03"></script><script src="scene/nd-profile.js?v=20261112-03"></script><script src="scene/nd-plan.js?v=20261112-03"></script><script src="scene/nd-cal.js?v=20261112-03"></script><script src="scene/nd-register.js?v=20261112-03"></script><script src="scene/nd-work.js?v=20261112-03"></script><script src="scene/nd-docform.js?v=20261112-03"></script><script src="scene/nd-docpdf.js?v=20261112-03"></script><script src="scene/nd-acct.js?v=20261112-03"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33533,7 +33541,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261112-02';
+var UPD_BUILD = '20261112-03';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
