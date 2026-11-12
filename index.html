@@ -955,7 +955,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261112-04"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261112-05"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -4092,7 +4092,7 @@ function renderInvDocNoBar(){
         <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(255,158,0,.18);border:1px solid rgba(255,158,0,.5);color:var(--orange);font-weight:700;letter-spacing:.5px">✏️ กำลังแก้ไข</span>
         <span style="font-family:monospace;font-size:15px;font-weight:800;color:var(--orange);letter-spacing:1px">${_invEditingDocNo}</span>
       </div>
-      <button class="btn btn-xs btn-outline" onclick="cancelInvEdit()" title="ยกเลิกการแก้ไข + เริ่มใบใหม่">✕ ยกเลิกแก้ไข (สร้างใบใหม่แทน)</button>`;
+      `+_docBarBtns('inv');
     el.style.borderColor = 'rgba(255,158,0,.4)';
     el.style.background = 'rgba(255,158,0,.06)';
   } else {
@@ -4102,7 +4102,7 @@ function renderInvDocNoBar(){
         <span style="font-size:11px;color:var(--text2);letter-spacing:.5px;font-weight:600">🆕 เลขใบแจ้งหนี้ถัดไป:</span>
         <span style="font-family:monospace;font-size:15px;font-weight:800;color:var(--accent2);letter-spacing:1px">${next}</span>
       </div>
-      <span style="font-size:10px;color:var(--text2);opacity:.75">บันทึกแล้วจะใช้เลขนี้</span>`+_draftStrip(el.id.startsWith('inv')?'inv':'qt');
+      <span style="font-size:10px;color:var(--text2);opacity:.75">บันทึกแล้วจะใช้เลขนี้</span>`+_docBarBtns(el.id.startsWith('inv')?'inv':'qt');
     el.style.borderColor = 'var(--border2)';
     el.style.background = 'var(--bg2)';
   }
@@ -4115,7 +4115,7 @@ function renderQtDocNoBar(){
         <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(255,158,0,.18);border:1px solid rgba(255,158,0,.5);color:var(--orange);font-weight:700;letter-spacing:.5px">✏️ กำลังแก้ไข</span>
         <span style="font-family:monospace;font-size:15px;font-weight:800;color:var(--orange);letter-spacing:1px">${_qtEditingDocNo}</span>
       </div>
-      <button class="btn btn-xs btn-outline" onclick="cancelQtEdit()" title="ยกเลิกการแก้ไข + เริ่มใบใหม่">✕ ยกเลิกแก้ไข (สร้างใบใหม่แทน)</button>`;
+      `+_docBarBtns('qt');
     el.style.borderColor = 'rgba(255,158,0,.4)';
     el.style.background = 'rgba(255,158,0,.06)';
   } else {
@@ -4125,31 +4125,50 @@ function renderQtDocNoBar(){
         <span style="font-size:11px;color:var(--text2);letter-spacing:.5px;font-weight:600">🆕 เลขใบเสนอราคาถัดไป:</span>
         <span style="font-family:monospace;font-size:15px;font-weight:800;color:var(--accent2);letter-spacing:1px">${next}</span>
       </div>
-      <span style="font-size:10px;color:var(--text2);opacity:.75">บันทึกแล้วจะใช้เลขนี้</span>`+_draftStrip(el.id.startsWith('inv')?'inv':'qt');
+      <span style="font-size:10px;color:var(--text2);opacity:.75">บันทึกแล้วจะใช้เลขนี้</span>`+_docBarBtns(el.id.startsWith('inv')?'inv':'qt');
     el.style.borderColor = 'var(--border2)';
     el.style.background = 'var(--bg2)';
   }
 }
 
-function cancelInvEdit(){
-  if(!confirm('ยกเลิกการแก้ไข + ล้างฟอร์ม สร้างใบใหม่?')) return;
+// 🆕 ทำใบใหม่ / ✕ ยกเลิก / 📝 เรียกดราฟ — ขึ้นบนแถบเลขที่ตลอด
+//   ทำใบใหม่: ล้างฟอร์ม (ถ้าใบนี้บันทึก/ส่งแล้ว ไม่ถามซ้ำ) · ยกเลิก: ทิ้งสิ่งที่แก้ (ถามก่อนเสมอ) · เรียกดราฟ: เปิดดราฟที่บันทึกไว้
+const _docClean={inv:'',qt:''};
+function _docSig(pre){ try{ const d=pre==='inv'?getInvoiceData():getQuotationData(); delete d.docNo; return JSON.stringify(d); }catch(e){ return ''; } }
+function _docIsEmpty(pre){ const its=pre==='inv'?invItems:qtItems; return !(document.getElementById(pre+'-client')?.value||'').trim() && !(document.getElementById(pre+'-note')?.value||'').trim() && !(its||[]).some(x=>x&&(x.desc||+x.price)); }
+function _docBarBtns(pre){ const n=(getDocsStore(pre==='inv'?'invoices':'quotations')||[]).filter(d=>d&&d.isDraft).length;
+  return `<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+    <button class="btn btn-xs btn-blue" onclick="docNewForm('${pre}')" title="ล้างฟอร์ม เริ่มทำใบใหม่">🆕 ทำใบใหม่</button>
+    <button class="btn btn-xs btn-outline" onclick="docCancelForm('${pre}')" title="ทิ้งสิ่งที่กรอก/แก้ไว้ แล้วล้างฟอร์ม">✕ ยกเลิก</button>
+    <button class="btn btn-xs" style="background:rgba(255,158,0,.1);border:1px solid rgba(255,158,0,.4);color:var(--orange);font-weight:700" onclick="openDraftPicker('${pre}')" title="เปิดดราฟที่บันทึกไว้มาแก้ต่อ">📝 เรียกดราฟ${n?' ('+n+')':''}</button></span>`; }
+function docNewForm(pre){ const clean=_docIsEmpty(pre)||(_docClean[pre]&&_docClean[pre]===_docSig(pre));
+  if(!clean && !confirm('ใบนี้ยังไม่ได้บันทึก — ล้างฟอร์มแล้วทำใบใหม่?\n\n(อยากเก็บไว้ก่อน กด "ยกเลิก" แล้วบันทึกเป็นดราฟ)')) return;
+  pre==='inv'?cancelInvEdit(true):cancelQtEdit(true); }
+function docCancelForm(pre){ if(_docIsEmpty(pre)&&!(pre==='inv'?_invEditingDocNo:_qtEditingDocNo)){ toast('ฟอร์มว่างอยู่แล้ว','info'); return; }
+  if(!confirm((pre==='inv'?_invEditingDocNo:_qtEditingDocNo)?'ยกเลิกการแก้ไขใบนี้? (ที่แก้ไว้แต่ยังไม่บันทึกจะหาย · ใบเดิมที่บันทึกไว้ไม่หาย)':'ยกเลิกใบนี้และล้างฟอร์ม? (ที่กรอกไว้จะหาย)')) return;
+  pre==='inv'?cancelInvEdit(true):cancelQtEdit(true); }
+// บันทึก/ส่งเอกสาร → จำว่าฟอร์มตอนนี้ "บันทึกแล้ว" (กดทำใบใหม่จะไม่ถามซ้ำ)
+(function(){ const o=saveDocsStore; saveDocsStore=function(k){ const r=o.apply(this,arguments);
+  try{ if(k==='invoices') _docClean.inv=_docSig('inv'); else if(k==='quotations') _docClean.qt=_docSig('qt'); }catch(e){} return r; }; })();
+function cancelInvEdit(skip){
+  if(!skip && !confirm('ยกเลิกการแก้ไข + ล้างฟอร์ม สร้างใบใหม่?')) return;
   _invEditingDocNo = null;
   invItems = [];
   _invPayAccountIds = [];
   _docFxSet('inv',{}); document.getElementById('inv-price-warn')?.remove();
   ['inv-client','inv-email','inv-ctax','inv-cbranch','inv-caddr','inv-date','inv-duedate','inv-vat','inv-note'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=(id==='inv-vat'?'0':''); });
   const dt = document.getElementById('inv-date'); if(dt) dt.value = isoToThai(new Date().toISOString().split('T')[0]);
-  initInvItems(); initInvPayChips(); renderInvDocNoBar();
+  initInvItems(); initInvPayChips(); renderInvDocNoBar(); _docClean.inv='';
   toast('ล้างฟอร์มแล้ว — พร้อมสร้างใบใหม่','info');
 }
-function cancelQtEdit(){
-  if(!confirm('ยกเลิกการแก้ไข + ล้างฟอร์ม สร้างใบใหม่?')) return;
+function cancelQtEdit(skip){
+  if(!skip && !confirm('ยกเลิกการแก้ไข + ล้างฟอร์ม สร้างใบใหม่?')) return;
   _qtEditingDocNo = null;
   qtItems = [];
   _docFxSet('qt',{}); document.getElementById('qt-price-warn')?.remove();
   ['qt-client','qt-email','qt-ctax','qt-cbranch','qt-caddr','qt-date','qt-vat','qt-note'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=(id==='qt-vat'?'0':''); });
   const dt = document.getElementById('qt-date'); if(dt) dt.value = isoToThai(new Date().toISOString().split('T')[0]);
-  initQtItems(); renderQtDocNoBar();
+  initQtItems(); renderQtDocNoBar(); _docClean.qt='';
   toast('ล้างฟอร์มแล้ว — พร้อมสร้างใบใหม่','info');
 }
 
@@ -33531,7 +33550,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261112-04"></script><script src="scene/nd-profile.js?v=20261112-04"></script><script src="scene/nd-plan.js?v=20261112-04"></script><script src="scene/nd-cal.js?v=20261112-04"></script><script src="scene/nd-register.js?v=20261112-04"></script><script src="scene/nd-work.js?v=20261112-04"></script><script src="scene/nd-docform.js?v=20261112-04"></script><script src="scene/nd-docpdf.js?v=20261112-04"></script><script src="scene/nd-acct.js?v=20261112-04"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261112-05"></script><script src="scene/nd-profile.js?v=20261112-05"></script><script src="scene/nd-plan.js?v=20261112-05"></script><script src="scene/nd-cal.js?v=20261112-05"></script><script src="scene/nd-register.js?v=20261112-05"></script><script src="scene/nd-work.js?v=20261112-05"></script><script src="scene/nd-docform.js?v=20261112-05"></script><script src="scene/nd-docpdf.js?v=20261112-05"></script><script src="scene/nd-acct.js?v=20261112-05"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33541,7 +33560,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261112-04';
+var UPD_BUILD = '20261112-05';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;
