@@ -955,7 +955,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261108-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261112-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -2751,7 +2751,8 @@ body.sidebar-collapsed .main-content{
       <span id="pj-fx-thb" style="color:var(--accent2);font-weight:700;width:100%"></span>
       <span style="white-space:nowrap">1 <b id="pj-fx-code">USD</b> =</span><input id="pj-fxrate" type="number" step="any" min="0" oninput="_pjFxCalc()" style="width:76px;padding:3px 6px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px"><span>฿</span>
       <button type="button" class="btn btn-xs btn-outline" onclick="_pjFxRefresh()" title="ดึงเรทวันนี้">🔄</button><span id="pj-fx-date" style="opacity:.7;white-space:nowrap"></span></div>
-     <div id="pj-budget-calc" style="font-size:11px;color:var(--text2);margin-top:3px;display:none"></div></div>
+     <div id="pj-budget-calc" style="font-size:11px;color:var(--text2);margin-top:3px;display:none"></div>
+     <div id="pj-cded-row" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px;font-size:12px"><label style="display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--text2)" title="ลูกค้าหักเงินจากงบ (เช่น ค่าธรรมเนียม/ค่าปรับ) → งบลูกค้าลดตาม % · กำไรคิดจากยอดหลังหัก"><input type="checkbox" id="pj-cded-on" onchange="_pjCdedToggle()"> ✂️ ลูกค้าหักเงิน</label><span id="pj-cded-box" style="display:none;align-items:center;gap:4px"><input id="pj-cded-pct" type="number" min="0" max="100" step="any" onwheel="this.blur()" oninput="calcProjSummary()" style="width:62px;padding:3px 6px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:Kanit;font-size:12px;text-align:center">%<span id="pj-cded-calc" style="color:var(--orange)"></span></span></div></div>
     <div class="s3 form-group" id="pj-client-row"><label class="form-label">ชื่อ / URL ลูกค้า</label><input class="form-input" id="pj-client" placeholder="ชื่อลูกค้า หรือ link"></div>
 
     <div class="s4 form-group"><label class="form-label">🔗 Link โหลดงาน</label><input class="form-input" id="pj-downloadlink" placeholder="https://..."></div>
@@ -4058,7 +4059,7 @@ function _docPriceCheck(pre){ const bar=document.getElementById(pre+'-docno-bar'
     <div style="margin:6px 0">${D.map(d=>`• ${esc(d.name)}: `+(d.shapeOnly?`แสดงเป็นเรท <b style="color:var(--accent2)">${fmtB(d.sh.price)} × ${d.sh.qty} ${esc(d.sh.unit)}</b> (ยอดเท่าเดิม ${fmtB(d.want)})`:`ในเอกสาร <b>${fmtB(d.have)}</b> → โปรเจกต์ <b style="color:var(--accent2)">${fmtB(d.want)}</b>${d.sh.unit!=='งาน'?` <span style="color:var(--text2)">(${fmtB(d.sh.price)} × ${d.sh.qty} ${esc(d.sh.unit)})</span>`:''}`)).join('<br>')}</div>
     <button class="btn btn-xs btn-blue" onclick="_docPriceSync('${pre}')">🔄 อัปเดตตามโปรเจกต์</button> <button class="btn btn-xs btn-outline" onclick="document.getElementById('${pre}-price-warn').remove()">ใช้ราคาเดิม</button></div>`); }
 function _docPriceSync(pre){ const its=pre==='inv'?invItems:qtItems;
-  _docPriceDiffs(pre).forEach(d=>{ const x=its[d.i]; Object.assign(x, _projFxItem(d.p), d.sh); });
+  _docPriceDiffs(pre).forEach(d=>{ const x=its[d.i]; Object.assign(x, _projFxItem(d.p), d.sh); _cdedDocNote(pre, d.p); });
   document.getElementById(pre+'-price-warn')?.remove(); pre==='inv'?renderInvItems():renderQtItems(); toast('🔄 อัปเดตราคาตามโปรเจกต์แล้ว — กดบันทึกเพื่อเก็บ','success'); }
 
 // 📝 ดราฟที่บันทึกไว้ — โชว์บนหัวฟอร์ม กดเปิดต่อได้เลย (ไม่ต้องไปหาในประวัติเอกสาร)
@@ -15686,7 +15687,7 @@ function _commDefPct(){ const c=ls('comm_cfg'); return (c&&+c.pct>0)?+c.pct:10; 
 function _mgrFeeHint(staffId){ const el=document.getElementById('pj-manager-fee-none'); const w=document.getElementById('pj-manager-fee-wrap'); if(!w) return;
   let h=document.getElementById('pj-mgrfee-hint'); if(!h){ h=document.createElement('div'); h.id='pj-mgrfee-hint'; h.style.cssText='font-size:10.5px;color:var(--text2);margin-top:3px'; w.parentNode.appendChild(h); }
   const pf=staffId?getPayProfile(staffId):null; h.textContent=!staffId?'':_salActive(pf)?'🗓️ คนนี้รับเงินเดือนประจำ — ปกติไม่คิดค่าต่องาน':(pf&&pf.jobFee>0?'ค่าเริ่มต้น ฿'+Number(pf.jobFee).toLocaleString()+' จากเทมเพลตราคา (แก้ต่องานได้)':'ตั้งค่าเริ่มต้นได้ที่ เทมเพลตราคา › ค่าตอบแทนพนักงาน'); }
-function _commBudget(){ const dur=parseFloat(document.getElementById('pj-duration')?.value)||0, r=parseFloat(document.getElementById('pj-budget')?.value)||0, t=document.getElementById('pj-budget-type')?.value||'flat', q=parseFloat(document.getElementById('pj-budget-qty')?.value)||0; return calcBudgetTotal(r,t,dur,q)||0; }
+function _commBudget(){ const dur=parseFloat(document.getElementById('pj-duration')?.value)||0, r=parseFloat(document.getElementById('pj-budget')?.value)||0, t=document.getElementById('pj-budget-type')?.value||'flat', q=parseFloat(document.getElementById('pj-budget-qty')?.value)||0; return _cdedNet(calcBudgetTotal(r,t,dur,q)||0,_pjCdedPct()); }
 function _commSync(){ try{ if(!formSlots.mgr) formSlots.mgr={only:[]}; if(!formSlots.mgr.comm) formSlots.mgr.comm=[]; const e=formSlots.mgr.comm[0]; if(!e) return;
   const sid=window._mgrFeeStaffId||(_mgrStaffIdOf(document.getElementById('pj-manager')?.value||'')||'');
   if(!sid&&!e.staffId) return; const pct=+e.commPct||(parseFloat(String(e.comment||'').match(/([\d.]+)\s*%/)?.[1])||_commDefPct());
@@ -15933,6 +15934,7 @@ async function openNewProject(){
   if(_metaEl){ _metaEl.textContent=''; _metaEl.style.display='none'; }
   ['pj-name','pj-client','pj-budget','pj-budget-qty','pj-duration','pj-note','pj-clientcode','pj-seq','pj-episodes','pj-downloadlink','pj-secretkey','pj-budget-fx','pj-fxrate'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   { const _c=document.getElementById('pj-cur'); if(_c){ _c.value='THB'; _pjCurUI(); } }
+  try{ _pjCdedLoad(0); }catch(e){}
   // 🔒 เมเนเจอร์ต้องไม่เห็น/ไม่กรอกชื่อลูกค้า (แอดมินเห็นปกติ)
   { const _cr=document.getElementById('pj-client-row'); if(_cr) _cr.style.display=(currentUser?.role==='manager')?'none':''; }
   { const _ap=document.getElementById('pj-advancepaid'); if(_ap) _ap.checked=false; }
@@ -16021,13 +16023,20 @@ function _thaiDateToIso(s){
     return y+'-'+String(mi+1).padStart(2,'0')+'-'+String(parseInt(m[1])).padStart(2,'0');
   }catch(e){ return ''; }
 }
-// งบลูกค้ารวมจากช่องในฟอร์ม (เรท × หน่วย) — ใช้ร่วมกันทุกที่ในบล็อกงวดรับเงิน
+// ✂️ ลูกค้าหักเงิน (% จากงบ) — p.clientDedPct · p.budget = ยอดหลังหัก (กำไร/รายงาน/ค่านายหน้าใช้ยอดนี้) · p.budgetGross = ก่อนหัก
+function _pjCdedPct(){ const on=document.getElementById('pj-cded-on')?.checked; const v=parseFloat(document.getElementById('pj-cded-pct')?.value)||0; return on?Math.min(100,Math.max(0,v)):0; }
+function _cdedNet(gross,pct){ return Math.round((+gross||0)*(1-(+pct||0)/100)); }
+function _pjCdedToggle(){ const on=document.getElementById('pj-cded-on')?.checked, box=document.getElementById('pj-cded-box'), i=document.getElementById('pj-cded-pct');
+  if(box) box.style.display=on?'inline-flex':'none'; if(on&&i&&!i.value){ i.value=''; setTimeout(()=>i.focus(),0); } calcProjSummary(); }
+function _pjCdedLoad(pct){ const on=document.getElementById('pj-cded-on'), i=document.getElementById('pj-cded-pct'), box=document.getElementById('pj-cded-box');
+  if(on) on.checked=+pct>0; if(i) i.value=+pct>0?pct:''; if(box) box.style.display=+pct>0?'inline-flex':'none'; }
+// งบลูกค้ารวมจากช่องในฟอร์ม (เรท × หน่วย) — ใช้ร่วมกันทุกที่ในบล็อกงวดรับเงิน (หลังลูกค้าหักแล้ว)
 function _pjBudgetTotal(){
   const rate = parseFloat(document.getElementById('pj-budget')?.value)||0;
   const dur  = parseFloat(document.getElementById('pj-duration')?.value)||0;
   const type = document.getElementById('pj-budget-type')?.value||'flat';
   const qty  = parseFloat(document.getElementById('pj-budget-qty')?.value)||0;
-  try{ return calcBudgetTotal(rate,type,dur,qty); }catch(e){ return rate; }
+  let g; try{ g=calcBudgetTotal(rate,type,dur,qty); }catch(e){ g=rate; } return _cdedNet(g,_pjCdedPct());
 }
 function pjIncomeAdd(){
   const already = formIncome.reduce((a,r)=>a+(parseFloat(r.amount)||0),0);
@@ -16390,7 +16399,8 @@ async function assignSaveRow(projId){
       if(budgetEl && bRate!=null){
         p.budgetRate=bRate; p.budgetType=bType; p.budgetQty=bQty;
         if(bType==='per-minute' && bDur>0) p.duration=bDur;
-        p.budget=calcBudgetTotal(bRate, bType, bType==='per-minute'?(bDur||parseFloat(p.duration)||0):(parseFloat(p.duration)||0), bQty);
+        p.budgetGross=Math.round(calcBudgetTotal(bRate, bType, bType==='per-minute'?(bDur||parseFloat(p.duration)||0):(parseFloat(p.duration)||0), bQty));
+        p.budget=_cdedNet(p.budgetGross, p.clientDedPct);
       }
       p.phases=p.phases||{};
       _ASSIGN_PHASES.forEach(([k])=>{
@@ -16846,7 +16856,8 @@ function calcProjSummary(){
   const budgetRaw=parseFloat(document.getElementById('pj-budget')?.value)||0;
   const budgetType=document.getElementById('pj-budget-type')?.value||'flat';
   const budgetQty=parseFloat(document.getElementById('pj-budget-qty')?.value)||0;
-  const budget=calcBudgetTotal(budgetRaw,budgetType,dur,budgetQty);
+  const budgetGross=calcBudgetTotal(budgetRaw,budgetType,dur,budgetQty), _cdp=_pjCdedPct(), budget=_cdedNet(budgetGross,_cdp), _cded=Math.round(budgetGross-budget);
+  { const cc=document.getElementById('pj-cded-calc'); if(cc) cc.innerHTML=_cdp>0&&budgetGross>0?(' = หัก '+fmtB(_cded)+' → เหลือ <b style="color:var(--accent2)">'+fmtB(budget)+'</b>'):''; }
   const _bcEl=document.getElementById('pj-budget-calc');
   if(_bcEl){
     const _qLabel=BUDGET_QTY_LABEL[budgetType];
@@ -16859,9 +16870,9 @@ function calcProjSummary(){
     } else { _bcEl.style.display='none'; }
   }
   const profit=budget-totalExp;
-  document.getElementById('sum-budget').textContent=fmtB(budget);
+  { const sb=document.getElementById('sum-budget'); if(_cdp>0&&budgetGross>0) sb.innerHTML='<span style="font-size:11px;text-decoration:line-through;opacity:.5;font-weight:600">'+fmtB(budgetGross)+'</span> '+fmtB(budget); else sb.textContent=fmtB(budget); }
   document.getElementById('sum-expense').textContent=fmtB(Math.round(totalExp));
-  document.getElementById('sum-deduction').textContent='฿0';
+  { const sd=document.getElementById('sum-deduction'); sd.textContent=fmtB(_cded); const lb=sd.previousElementSibling; if(lb) lb.textContent=_cdp>0?('ลูกค้าหัก '+_cdp+'%'):'หักเพิ่ม'; }
   const pe=document.getElementById('sum-profit');pe.textContent=fmtB(Math.round(profit));pe.style.color=profit>=0?'var(--green)':'var(--red)';
   try{ _updateIncomeSummary(); }catch(e){}   // งบเปลี่ยน → เตือนยอดงวดไม่ตรงให้ทันที
   // Manager เห็นการเงินของโปรเจกต์ที่ตัวเองดูแลได้ (รายจ่าย/หัก/กำไร) — เหมือนแอดมิน
@@ -16901,7 +16912,9 @@ async function saveProject(){
     id:editingProjId||('P'+Date.now()),name,date:existingProj?.date||today,
     client:document.getElementById('pj-client').value.trim(),
     type:document.getElementById('pj-type').value,
-    budget:(function(){const r=parseFloat(document.getElementById('pj-budget').value)||0;const t=document.getElementById('pj-budget-type')?.value||'flat';const q=parseFloat(document.getElementById('pj-budget-qty')?.value)||0;return calcBudgetTotal(r,t,dur,q);})(),
+    budget:(function(){const r=parseFloat(document.getElementById('pj-budget').value)||0;const t=document.getElementById('pj-budget-type')?.value||'flat';const q=parseFloat(document.getElementById('pj-budget-qty')?.value)||0;return _cdedNet(calcBudgetTotal(r,t,dur,q),_pjCdedPct());})(),
+    budgetGross:(function(){const r=parseFloat(document.getElementById('pj-budget').value)||0;const t=document.getElementById('pj-budget-type')?.value||'flat';const q=parseFloat(document.getElementById('pj-budget-qty')?.value)||0;return Math.round(calcBudgetTotal(r,t,dur,q));})(),
+    clientDedPct:_pjCdedPct(),
     budgetRate:parseFloat(document.getElementById('pj-budget').value)||0,
     budgetType:document.getElementById('pj-budget-type')?.value||'flat',
     budgetQty:parseFloat(document.getElementById('pj-budget-qty')?.value)||0,
@@ -17429,9 +17442,10 @@ async function openEditProject(id){
   if(p.budgetRate&&(p.budgetType==='per-minute'||BUDGET_QTY_LABEL[p.budgetType])){
     document.getElementById('pj-budget').value=p.budgetRate;
   } else {
-    document.getElementById('pj-budget').value=p.budget||'';
+    document.getElementById('pj-budget').value=(+p.clientDedPct>0?(p.budgetRate||p.budgetGross):0)||p.budget||'';
   }
   const _bqEl=document.getElementById('pj-budget-qty');if(_bqEl)_bqEl.value=p.budgetQty||'';
+  try{ _pjCdedLoad(p.clientDedPct||0); }catch(e){}
   _pjFxLoad(p);
   toggleBudgetQty();
   document.getElementById('pj-duration').value=p.duration||'';
@@ -23638,7 +23652,7 @@ function confirmQtPPAdd(){
       ..._projFxItem(p),
       ..._projItemShape(p)
     };
-    _docFxAdopt('qt', p);
+    _docFxAdopt('qt', p); _cdedDocNote('qt', p);
     if(shouldReplace && addedCount===0) qtItems[0] = newItem;
     else qtItems.push(newItem);
     if(!autoFillClient && p.client) autoFillClient = p.client;
@@ -26264,9 +26278,15 @@ function _pjFxLoad(p){ const c=document.getElementById('pj-cur'); if(!c) return;
 // ยอดรวมของโปรเจกต์เป็นสกุลลูกค้า (คิดแบบเดียวกับงบบาท: เหมา/นาที/หน่วย)
 function projFxTotal(p){ if(!p||!p.budgetCur||p.budgetCur==='THB'||!p.budgetFx) return 0;
   try{ return _r2(calcBudgetTotal(+p.budgetFx, p.budgetType||'flat', +p.duration||0, +p.budgetQty||0)); }catch(e){ return +p.budgetFx||0; } }
+function _cdedDocNote(pre, p){ if(!p||!(+p.clientDedPct>0)) return; const el=document.getElementById(pre+'-note'); if(!el) return;
+  const line='ยอด '+projDisp(p)+' หักแล้ว '+p.clientDedPct+'% ตามที่ลูกค้าหัก (เต็ม '+fmtB(+p.budgetGross||0)+' → '+fmtB(+p.budget||0)+')';
+  if(String(el.value||'').includes(line)) return; el.value=(el.value?el.value.trim()+' · ':'')+line; }
 function _projFxItem(p){ const t=projFxTotal(p); if(!t) return {}; const sh=_projItemShape(p); return {fxCur:p.budgetCur, fxPrice:t, fxBase:p.budget||0, fxUnitP:sh.qty!==1||sh.unit!=='งาน'?+p.budgetFx:t}; }
 // รูปแบบรายการตามวิธีคิดงบ: นาที → จำนวน=ความยาว(นาที) · ชั่วโมง/หน้า/วัน/บท → จำนวนที่กรอก · เหมา → 1 งาน
 function _projItemShape(p){ const r=+p.budgetRate||0, t=p.budgetType||'flat';
+  if(+p.clientDedPct>0){ const g=+p.budgetGross||0, pct=+p.clientDedPct, q=t==='per-minute'?+p.duration:+p.budgetQty, u=t==='per-minute'?'นาที':BUDGET_QTY_LABEL[t];
+    const how=(r>0&&q>0&&u?fmtB(r)+'/'+u+' × '+q+' '+u+' = ':'')+(g?fmtB(g)+' ':'')+'หัก '+pct+'% = '+fmtB(+p.budget||0);
+    return {qty:1, unit:'งาน', price:Math.round((+p.budget||0)*100)/100, detail:(p.duration?'ความยาว '+p.duration+' นาที · ':'')+how, cded:pct}; }
   if(t==='per-minute' && r>0 && +p.duration>0) return {qty:+p.duration, unit:'นาที', price:r};
   if(BUDGET_QTY_LABEL[t] && r>0 && +p.budgetQty>0) return {qty:+p.budgetQty, unit:BUDGET_QTY_LABEL[t], price:r};
   return {qty:1, unit:'งาน', price:Math.round((+p.budget||0)*100)/100}; }
@@ -28554,6 +28574,7 @@ function _getCurrentFormSnapshot(){
       budget: get('pj-budget'),
       budgetType: get('pj-budget-type') || 'flat',
       budgetQty: get('pj-budget-qty'),
+      clientDedPct: (function(){ try{ return _pjCdedPct(); }catch(e){ return 0; } })(),
       budgetCur: get('pj-cur')||'THB', budgetFx: get('pj-budget-fx'), fxRate: get('pj-fxrate'),
       managerFee: get('pj-manager-fee'),
       duration: get('pj-duration'),
@@ -28618,6 +28639,7 @@ function _applyDraft(snap){
   set('pj-budget', snap.budget);
   set('pj-budget-type', snap.budgetType);
   set('pj-budget-qty', snap.budgetQty);
+  try{ _pjCdedLoad(snap.clientDedPct||0); }catch(e){}
   try{ _pjFxLoad({budgetCur:snap.budgetCur, budgetFx:snap.budgetFx, fxRate:snap.fxRate}); }catch(e){}
   set('pj-manager-fee', snap.managerFee);
   try{ toggleBudgetQty(); }catch(e){}
@@ -30117,7 +30139,7 @@ function confirmInvPPAdd(){
       ..._projFxItem(p),
       ..._projItemShape(p)
     };
-    _docFxAdopt('inv', p);
+    _docFxAdopt('inv', p); _cdedDocNote('inv', p);
     if(shouldReplace && addedCount===0) invItems[0] = newItem;
     else invItems.push(newItem);
     if(!autoFillClient && p.client) autoFillClient = p.client;
@@ -30137,7 +30159,7 @@ function addInvItemFromProject(projId){
   const p = getProjects().find(x=>x.id===projId);
   if(!p){ toast('ไม่พบโปรเจกต์','error'); return; }
   const shouldReplace = invItems.length===1 && !invItems[0].desc && !invItems[0].price && !invItems[0].projId;
-  const newItem = { projId: p.id, desc: projDisp(p), detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '', qty: 1, unit: 'งาน', price: p.budget||0, ..._projFxItem(p), ..._projItemShape(p) }; _docFxAdopt('inv', p);
+  const newItem = { projId: p.id, desc: projDisp(p), detail: p.duration ? 'ความยาว '+p.duration+' นาที' : '', qty: 1, unit: 'งาน', price: p.budget||0, ..._projFxItem(p), ..._projItemShape(p) }; _docFxAdopt('inv', p); _cdedDocNote('inv', p);
   if(shouldReplace) invItems[0] = newItem; else invItems.push(newItem);
   const cli = document.getElementById('inv-client');
   if(cli && !cli.value && p?.client) cli.value = p.client;
@@ -33487,7 +33509,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261108-01"></script><script src="scene/nd-profile.js?v=20261108-01"></script><script src="scene/nd-plan.js?v=20261108-01"></script><script src="scene/nd-cal.js?v=20261108-01"></script><script src="scene/nd-register.js?v=20261108-01"></script><script src="scene/nd-work.js?v=20261108-01"></script><script src="scene/nd-docform.js?v=20261108-01"></script><script src="scene/nd-docpdf.js?v=20261108-01"></script><script src="scene/nd-acct.js?v=20261108-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261112-01"></script><script src="scene/nd-profile.js?v=20261112-01"></script><script src="scene/nd-plan.js?v=20261112-01"></script><script src="scene/nd-cal.js?v=20261112-01"></script><script src="scene/nd-register.js?v=20261112-01"></script><script src="scene/nd-work.js?v=20261112-01"></script><script src="scene/nd-docform.js?v=20261112-01"></script><script src="scene/nd-docpdf.js?v=20261112-01"></script><script src="scene/nd-acct.js?v=20261112-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33497,7 +33519,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261108-01';
+var UPD_BUILD = '20261112-01';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;

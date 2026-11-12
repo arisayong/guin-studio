@@ -266,7 +266,7 @@ function loadProject(id){
   const isNew=!ws.some(w=>ORDER.includes(preOf(w)));
   S={id:p.id, src:p, code:p.clientCode||'', seq:p.seq||'', name:p.name||'', type:p.type||'', minutes:dur, eps:+p.episodes||0,
      start:dOnly(p.startDate), deadline:dOnly(dl), dtime:p.deadlineTime||(dl.includes('T')?dl.slice(11,16):''), dlT:dl.includes('T'),
-     budType:p.budgetType||'flat', budRate:+p.budgetRate||+p.budget||0, budQty:+p.budgetQty||0,
+     budType:p.budgetType||'flat', budRate:+p.budgetRate||+p.budgetGross||+p.budget||0, budQty:+p.budgetQty||0, cdp:+p.clientDedPct||0,
      client:p.client||'', link:p.downloadLink||'', secret:p.secretKey||'', mgrId:p.managerId||'',
      ded:(Array.isArray(p.deductions)&&p.deductions.length)?p.deductions.map(d=>({label:d.label||'',pct:+d.pct||0,on:!!d.on}))
          :[{label:'หัก ณ ที่จ่าย (บริษัท)',pct:maxTax||3,on:maxTax>0||isNew}],
@@ -315,7 +315,9 @@ function calc(r,s){ const c=s.cu;
   return Math.round(roleUnit(r)); }
 const amt=(r,s)=>s.fix!=null?s.fix:calc(r,s);
 const subTot=r=>r.slots.reduce((a,s)=>a+(s.id?amt(r,s):0),0);
-const budget=()=>Math.round(safe(()=>calcBudgetTotal(+S.budRate||0,S.budType,S.minutes,+S.budQty||0),+S.budRate||0));
+const budGross=()=>Math.round(safe(()=>calcBudgetTotal(+S.budRate||0,S.budType,S.minutes,+S.budQty||0),+S.budRate||0));
+// ✂️ ลูกค้าหักเงิน % → Budget ที่ใช้คิดกำไร = ยอดหลังหัก
+const budget=()=>Math.round(budGross()*(1-Math.min(100,Math.max(0,+S.cdp||0))/100));
 const stdHint=(cur,std,fn)=>std==null?'':(+cur!==+std?`<span class="pl-std chg" title="กดเพื่อใช้ราคามาตรฐาน" onclick="${fn}">↺ มาตรฐาน ${std}</span>`:'<span class="pl-std">✓ มาตรฐาน</span>');
 // ป้ายบอกในแถวคน: เรทเฉพาะคน / ยอดเดิม
 const slotTag=(k,j)=>{ const s=S.roles[k].slots[j]; const out=[];
@@ -339,6 +341,7 @@ function buildWorkers(){
 // ลายเซ็นของแต่ละหน้าที่ตอนเปิด — หน้าที่ที่ไม่ได้แตะ จะไม่เขียนทับของล่าสุดบนเซิร์ฟเวอร์ (คน/ราคา/เดดไลน์/สถานะ)
 function roleSig(r){ const o={...r}; delete o.step; return JSON.stringify(o); }
 const roleTouched=k=>!S.base0 || S.t.minutes || roleSig(S.roles[k])!==S.base0[k];
+window.S_cdp=v=>{ const n=Math.min(100,Math.max(0,+v||0)); if(n) S.cdpLast=n; NDP.set('cdp',n); };
 function applyPlan(f){
   const T=S.t, resend=[];
   // ข้อมูลโปรเจกต์ — เขียนเฉพาะช่องที่แก้
@@ -350,7 +353,7 @@ function applyPlan(f){
   if(T.eps) f.episodes=+S.eps||0;
   if(T.start) f.startDate=S.start||'';
   if(T.deadline||T.dtime){ if(S.dlT){ f.deadline=S.deadline?(S.deadline+(S.dtime?'T'+S.dtime:'')):''; } else { f.deadline=S.deadline||''; if(S.dtime) f.deadlineTime=S.dtime; } }
-  if(T.budType||T.budRate||T.budQty||(T.minutes&&S.budType==='per-minute')){ f.budgetType=S.budType; f.budgetRate=+S.budRate||0; f.budgetQty=+S.budQty||0; f.budget=budget(); }
+  if(T.budType||T.budRate||T.budQty||T.cdp||(T.minutes&&S.budType==='per-minute')){ f.budgetType=S.budType; f.budgetRate=+S.budRate||0; f.budgetQty=+S.budQty||0; f.budgetGross=budGross(); f.clientDedPct=+S.cdp||0; f.budget=budget(); }
   if(T.link) f.downloadLink=S.link||'';
   if(T.secret) f.secretKey=S.secret||'';
   if(isAdm()){ if(T.client) f.client=S.client; if(T.mgrId) f.managerId=S.mgrId||''; }
@@ -504,7 +507,7 @@ function infoHTML(){ const adm=isAdm(), ms=mgrStaff(S.mgrId);
 
    ${C(2,'วันเริ่มงาน',`<input class="form-input" type="date" value="${esc(S.start)}" onchange="NDP.set('start',this.value)">`)}
    ${C(4,'🏁 Deadline ลูกค้า',`<div class="pl-dt"><input class="form-input" type="date" value="${esc(S.deadline)}" onchange="NDP.set('deadline',this.value)"><input class="form-input pl-time" type="text" inputmode="numeric" maxlength="5" placeholder="--:--" autocomplete="off" value="${esc(S.dtime)}" onchange="NDP.tm(this,v=>NDP.set('dtime',v))"></div>`)}
-   ${C(3,'Budget จากลูกค้า',`<div class="pl-dt"><select class="form-input form-select" style="width:92px;flex-shrink:0" onchange="NDP.set('budType',this.value)">${[['flat','เหมา'],['per-minute','นาที'],['per-hour','ชั่วโมง'],['per-page','หน้า'],['per-day','วัน'],['per-episode','บท'],['per-project','โปรเจกต์']].map(([v,l])=>`<option value="${v}"${v===S.budType?' selected':''}>${l}</option>`).join('')}</select><input class="form-input" type="number" step="any" value="${S.budRate||''}" onchange="NDP.set('budRate',+this.value||0)">${['flat','per-minute','per-project'].includes(S.budType)?'':`<input class="form-input" type="number" step="any" style="width:72px;flex-shrink:0" value="${S.budQty||''}" placeholder="จำนวน" onchange="NDP.set('budQty',+this.value||0)">`}</div>`)}
+   ${C(3,'Budget จากลูกค้า',`<div class="pl-dt"><select class="form-input form-select" style="width:92px;flex-shrink:0" onchange="NDP.set('budType',this.value)">${[['flat','เหมา'],['per-minute','นาที'],['per-hour','ชั่วโมง'],['per-page','หน้า'],['per-day','วัน'],['per-episode','บท'],['per-project','โปรเจกต์']].map(([v,l])=>`<option value="${v}"${v===S.budType?' selected':''}>${l}</option>`).join('')}</select><input class="form-input" type="number" step="any" value="${S.budRate||''}" onchange="NDP.set('budRate',+this.value||0)">${['flat','per-minute','per-project'].includes(S.budType)?'':`<input class="form-input" type="number" step="any" style="width:72px;flex-shrink:0" value="${S.budQty||''}" placeholder="จำนวน" onchange="NDP.set('budQty',+this.value||0)">`}</div><div class="pl-cdp" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px;font-size:12px"><label style="display:flex;align-items:center;gap:5px;cursor:pointer" title="ลูกค้าหักเงินจากงบ → Budget ลดตาม % · กำไรคิดจากยอดหลังหัก"><input type="checkbox" ${S.cdp?'checked':''} onchange="NDP.set('cdp',this.checked?(S.cdpLast||3):0)"> ✂️ ลูกค้าหักเงิน</label>${S.cdp?`<input class="form-input" type="number" min="0" max="100" step="any" style="width:64px;padding:3px 6px;text-align:center" value="${S.cdp}" onchange="S_cdp(this.value)">%<span style="color:var(--orange)">หัก ${B(budGross()-budget())} → เหลือ <b style="color:var(--accent2)">${B(budget())}</b></span>`:''}</div>`)}
    ${C(3,adm?'ชื่อ / URL ลูกค้า':'ลูกค้า',adm?`<input class="form-input" value="${esc(S.client)}" onchange="NDP.set('client',this.value)">`:'<div class="pl-lock">🔒 เฉพาะแอดมิน</div>')}
 
    ${C(3,'🔗 Link โหลดงาน',`<input class="form-input" value="${esc(S.link)}" placeholder="https://…" onchange="NDP.set('link',this.value)">`)}
@@ -581,7 +584,7 @@ function leftHTML(){ const c=PCODE()+(S.seq?String(S.seq).padStart(2,'0'):''), s
 function rightHTML(){ const cost=on().reduce((a,r)=>a+subTot(r),0), bud=budget(), w=WHT(), wht=Math.round(cost*w/100), pf=bud-cost;
   const s0=+new Date(S.start||S.deadline), e0=+new Date(S.deadline)+864e5, span=Math.max(1,e0-s0), x=d=>{ const t=+new Date(d); return isNaN(t)?0:Math.max(0,Math.min(100,(t-s0)/span*100)); };
   const days=[]; if(!isNaN(s0)&&!isNaN(e0)) for(let t=s0;t<e0&&days.length<60;t+=864e5) days.push(new Date(t));
-  return `<div class="pl-mrow" title="จ่ายทีม ${B(cost)} = โอนจริง ${B(cost-wht)} + หัก ณ ที่จ่าย ${w}% ${B(wht)}"><div><span>💰 Budget</span><b>${B(bud)}</b></div><div><span>👥 จ่ายทีม${w?` (หัก ${w}% ${B(wht)})`:' (ไม่หัก)'}</span><b>${B(cost)}</b></div><div><span>📈 กำไร ${bud?Math.round(pf/bud*100):0}%</span><b class="${pf<0?'pl-bad':'pl-ok'}">${B(pf)}</b></div></div>
+  return `<div class="pl-mrow" title="จ่ายทีม ${B(cost)} = โอนจริง ${B(cost-wht)} + หัก ณ ที่จ่าย ${w}% ${B(wht)}"><div><span>💰 Budget${S.cdp?` (ลูกค้าหัก ${S.cdp}%)`:''}</span><b>${B(bud)}</b></div><div><span>👥 จ่ายทีม${w?` (หัก ${w}% ${B(wht)})`:' (ไม่หัก)'}</span><b>${B(cost)}</b></div><div><span>📈 กำไร ${bud?Math.round(pf/bud*100):0}%</span><b class="${pf<0?'pl-bad':'pl-ok'}">${B(pf)}</b></div></div>
    <div class="pl-card"><div class="pl-ch"><h3>📅 ไทม์ไลน์</h3></div><div class="pl-cb pl-tl">${isNaN(s0)||isNaN(e0)?'<div class="pl-mut">ใส่วันเริ่มงาน + Deadline ก่อน</div>':`<div class="wrap">${on().map(rr=>`<div class="row" onclick="NDP.open(${ORDER.indexOf(rr.k)})"><span>${R[rr.k][1]} ${R[rr.k][0]}</span><div class="lane"><i style="left:${x(rS(rr)+'T'+rST(rr))}%;width:${Math.max(3,x(lastEnd(rr).date+'T'+lastEnd(rr).time)-x(rS(rr)+'T'+rST(rr)))}%;background:${R[rr.k][2]};${isLate(rr)?'box-shadow:0 0 0 2px var(--red)':''}"></i>${rds(rr).length?[{date:rE(rr),time:rET(rr),label:'รอบ 1'},...rds(rr)].map(d=>`<u title="${esc(d.label||'')} ${fd(d.date)} ${esc(d.time||'')}" style="left:${x(d.date+'T'+(d.time||'23:59'))}%"></u>`).join(''):''}</div></div>`).join('')}
      <div class="vl" style="left:calc(76px + (100% - 76px)*${x(new Date())/100});background:var(--accent2)"></div><div class="vl" style="left:calc(76px + (100% - 76px)*${x(S.deadline+'T'+(S.dtime||'23:59'))/100});border-left:2px dashed var(--red);width:0"></div>
      ${days.filter((d,i)=>days.length<=10||i%Math.ceil(days.length/10)===0).map(d=>`<span class="dl" style="left:calc(76px + (100% - 76px)*${x(+d+12*36e5)/100})">${d.getDate()}</span>`).join('')}</div>`}</div></div>
@@ -1049,7 +1052,7 @@ function overviewHTML(){ syncSame(); const cost=on().reduce((a,r)=>a+subTot(r),0
   return `<div class="pl-ov">
    <div class="pl-ovh"><div><div style="font-size:18px;font-weight:800"><span style="color:var(--accent2)">${esc(drCode())}</span> ${esc(S.name)}</div>
      <div class="pl-mut">${esc(S.type||'—')} · ${S.eps||'—'} ตอน · ${S.minutes||'—'} นาที · 🏁 ส่งลูกค้า <b style="color:var(--text)">${fd(S.deadline)} ${esc(S.dtime||'')}</b> · 🗂️ ${esc(mgrName(S.mgrId))}</div></div>
-     <div class="pl-mrow" style="min-width:330px"><div><span>💰 Budget</span><b>${B(bud)}</b></div><div><span>👥 จ่ายทีม${w?' (หัก '+w+'%)':''}</span><b>${B(cost)}</b></div><div><span>📈 กำไร</span><b class="${pf<0?'pl-bad':'pl-ok'}">${B(pf)}</b></div></div></div>
+     <div class="pl-mrow" style="min-width:330px"><div><span>💰 Budget${S.cdp?` (ลูกค้าหัก ${S.cdp}%)`:''}</span><b>${B(bud)}</b></div><div><span>👥 จ่ายทีม${w?' (หัก '+w+'%)':''}</span><b>${B(cost)}</b></div><div><span>📈 กำไร</span><b class="${pf<0?'pl-bad':'pl-ok'}">${B(pf)}</b></div></div></div>
    ${warns.length?`<div class="pl-ovw">${warns.map(([to,t])=>`<span onclick="NDP.ovGo('${to}')">⚠️ ${esc(t)}</span>`).join('')}</div>`:'<div class="pl-ovw ok"><span>✅ ข้อมูลครบ ไม่มีจุดที่ต้องเช็ก</span></div>'}
    <table class="pl-ovt"><tr><th>หน้าที่</th><th>คนทำงาน</th><th>เดดไลน์</th><th>สถานะ</th><th style="text-align:right">ค่าตอบแทน</th></tr>
     ${on().map(r=>`<tr onclick="NDP.ovGo('role:${r.k}')" title="กดเพื่อไปแก้หน้าที่นี้"><td style="--c:${R[r.k][2]}"><span class="pl-ovr">${R[r.k][1]} ${R[r.k][0]}</span>${r.sameAs&&S.roles[r.sameAs]?`<div class="pl-mut">🔗 ตาม${esc(R[r.sameAs][0])}</div>`:''}</td>
