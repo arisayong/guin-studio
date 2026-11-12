@@ -33,7 +33,7 @@ function engText(n){ n=Math.round(Math.abs(+n||0)*100)/100; const a=['','One','T
   const h=x=>{ let o=''; if(x>=100){ o+=a[Math.floor(x/100)]+' Hundred'; x%=100; if(x) o+=' '; } if(x>=20){ o+=t[Math.floor(x/10)]; if(x%10) o+='-'+a[x%10]; } else if(x) o+=a[x]; return o; };
   const w=x=>{ if(!x) return 'Zero'; const o=[]; for(const [v,nm] of [[1e9,'Billion'],[1e6,'Million'],[1e3,'Thousand']]) if(x>=v){ o.push(h(Math.floor(x/v))+' '+nm); x%=v; } if(x) o.push(h(x)); return o.join(' '); };
   const b=Math.floor(n), s=Math.round((n-b)*100); return w(b)+' Baht'+(s?' and '+w(s)+' Satang':' Only'); }
-let CUR='THB';                                  // สกุลเงินของเอกสารที่กำลังสร้าง (ใบเสนอราคา/ใบแจ้งหนี้/ใบเสร็จ)
+let RATE=0; let CUR='THB';                                  // สกุลเงินของเอกสารที่กำลังสร้าง (ใบเสนอราคา/ใบแจ้งหนี้/ใบเสร็จ)
 const CURN={USD:['US Dollars','Cents'],EUR:['Euros','Cents'],GBP:['Pounds Sterling','Pence'],JPY:['Japanese Yen',''],CNY:['Chinese Yuan','Fen'],HKD:['Hong Kong Dollars','Cents'],SGD:['Singapore Dollars','Cents'],TWD:['New Taiwan Dollars','Cents'],KRW:['Korean Won',''],AUD:['Australian Dollars','Cents'],MYR:['Malaysian Ringgit','Sen']};
 function fxText(n,c){ const [m,s]=CURN[c]||[c,'Cents']; const w=engText(Math.floor(Math.abs(+n||0))).replace(/ Baht.*$/,''); const sc=Math.round((Math.abs(+n||0)%1)*100); return w+' '+m+(sc&&s?' and '+engText(sc).replace(/ Baht.*$/,'')+' '+s:'')+' Only'; }
 const words=n=>CUR!=='THB'?fxText(n,CUR):LG==='th'?bahtText(n):LG==='en'?engText(n):bahtText(n)+'<br><span class="gd-en">'+engText(n)+'</span>';
@@ -47,8 +47,9 @@ const UNIT_SH={'นาที':'min','ชั่วโมง':'hr','หน้า':
 const detEn=t=>String(t||'').replace(/\/\s*(นาที|ชั่วโมง|หน้า|วัน|บท|ตอน)/g,(m,u)=>'/'+UNIT_SH[u]).replace(/หัก\s*([\d.]+)\s*%/g,'less $1% client deduction').replace(/([\d.,]+)\s*(ชั่วโมง|หน้า|วัน|บท)(?![ก-๙])/g,(m,n,u)=>n+' '+UNIT_SH[u]+(+n.replace(/,/g,'')===1?'':'s')).replace(/ความยาว\s*([\d.,]+)\s*นาที/g,'Duration $1 min').replace(/([\d.,]+)\s*ตอน/g,'$1 episodes').replace(/([\d.,]+)\s*นาที/g,'$1 min');
 // หมายเหตุที่ระบบเติมตอนลูกค้าหัก % → อังกฤษ (ข้อความที่พิมพ์เองคงเดิม)
 const noteEn=t=>String(t||'').replace(/ยอด (.+?) หักแล้ว ([\d.]+)% ตามที่ลูกค้าหัก \(เต็ม (.+?) → (.+?)\)/g,'$1: amount after $2% client deduction (full $3 → $4)');
-const noteL=t=>{ if(!t) return ''; const en=noteEn(t); return LG==='th'||en===t?E(t):LG==='en'?E(en):E(t)+'<br><span class="gd-en">'+E(en)+'</span>'; };
-const detL=t=>{ if(!t) return ''; const en=detEn(t); return LG==='th'||en===t?E(t):LG==='en'?E(en):E(t)+' <span class="gd-en">/ '+E(en)+'</span>'; };
+const fxT=t=>CUR==='THB'||!RATE?String(t||''):String(t||'').replace(/฿\s?([\d,]+(?:\.\d+)?)/g,(m,n)=>CUR+' '+(Math.round(+n.replace(/,/g,'')/RATE*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}));
+const noteL=t=>{ if(!t) return ''; t=fxT(t); const en=noteEn(t); return LG==='th'||en===t?E(t):LG==='en'?E(en):E(t)+'<br><span class="gd-en">'+E(en)+'</span>'; };
+const detL=t=>{ if(!t) return ''; t=fxT(t); const en=detEn(t); return LG==='th'||en===t?E(t):LG==='en'?E(en):E(t)+' <span class="gd-en">/ '+E(en)+'</span>'; };
 
 // ── CSS (ใส่ครั้งเดียว · ทุกคลาสขึ้นต้น gd- ไม่ชนกับเว็บ) ──
 const CSS=`
@@ -229,7 +230,7 @@ async function whtPages(d){ await prep(); const A=await assets(); LG=safe(()=>ls
 // ═══ 📋🧾 ใบเสนอราคา / ใบแจ้งหนี้ / ใบเสร็จรับเงิน (ข้อมูลจากฟอร์มเดิมของเว็บ) ═══
 const KIND={quotation:['ใบเสนอราคา','QUOTATION'], invoice:['ใบแจ้งหนี้ / ใบวางบิล','INVOICE / BILLING NOTE'], receipt:['ใบเสร็จรับเงิน','RECEIPT']};
 async function salesPages(kind, d){ await prep(); const A=await assets(); LG=(d&&['both','th','en'].includes(d.lang)?d.lang:'')||safe(()=>ls('doc_lang'),'')||'both';
-  const FX=d.currency&&d.currency!=='THB'&&+d.fxRate>0; CUR=FX?d.currency:'THB';
+  const FX=d.currency&&d.currency!=='THB'&&+d.fxRate>0; CUR=FX?d.currency:'THB'; RATE=FX?+d.fxRate:0;
   const qn=x=>(+x.qty||1), r2=n=>Math.round((+n||0)*100)/100, up=x=>FX?(x.fxUnit!=null?+x.fxUnit:r2((+x.price||0)/d.fxRate)):(+x.price||0);   // ราคาต่อหน่วยในสกุลเอกสาร
   const [th,en]=KIND[kind]||KIND.invoice, sub=r2((d.items||[]).reduce((a,x)=>a+qn(x)*up(x),0));
   const vp=+d.vat||0, vat=vp?(FX?r2(sub*vp/100):Math.round(sub*vp/100)):0, grand=FX?r2(sub+vat):(d.total!=null?+d.total:sub+vat), dt=thDate(d.date);
@@ -246,7 +247,7 @@ async function salesPages(kind, d){ await prep(); const A=await assets(); LG=(d&
      ${info([['เลขที่','No.',E(d.docNo||'')],['วันที่','Date',dt],['ครบกำหนด','Due date',kind==='invoice'&&d.dueDate?thDate(d.dueDate):''],['อ้างอิง','Reference',E(d.fromInvoice||d.ref||'')]])}</div>`);
     const last=totals(grand,[['รวมเป็นเงิน','Subtotal',sub]].concat(vat?[[`ภาษีมูลค่าเพิ่ม ${vp}%`,`VAT ${vp}%`,vat]]:[]), [fxNote, d.note?noteL(d.note):''].filter(Boolean).join('<br>'))+`<div class="gd-end"><div class="gd-ev">${evid}</div>${signBox(A,dt)}</div>`;
     out.push(...paginate({top, cols, rows, last, foot:foot((d.docNo||'')+' · '+cp.replace(/<[^>]+>/g,''))})); });
-  CUR='THB'; return out; }
+  CUR='THB'; RATE=0; return out; }
 
 // ── PDF: แต่ละหน้า = ภาพเต็มแผ่น A4 (ไม่มีขอบเพิ่ม) ──
 async function libs(){ await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'); await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); }
