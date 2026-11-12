@@ -955,7 +955,7 @@ body.sidebar-collapsed .main-content{
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="scene/nd.css?v=20261112-01"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
+<link rel="stylesheet" href="scene/nd.css?v=20261112-02"><!-- 🎨 ดีไซน์ใหม่ (ชั้นหน้าตา) -->
 </head>
 <body>
 
@@ -23873,8 +23873,9 @@ function saveAndSendQuotation() {
   });
 
   const openGmail = function(){
-    const subject = encodeURIComponent('ใบเสนอราคา '+data.docNo+' — Guin Home Studio');
-    const body = encodeURIComponent('เรียน คุณ'+data.client+'\n\nขออนุญาตส่งใบเสนอราคา '+data.docNo+' มาเพื่อพิจารณาค่ะ\nยอดรวม: ฿'+total.toLocaleString()+'\n\nกรุณาตรวจสอบเอกสารในไฟล์แนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio');
+    const _m = _docMailText('qt', data, total);
+    const subject = encodeURIComponent(_m.subject);
+    const body = encodeURIComponent(_m.body);
     window.open('https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm&to='+encodeURIComponent(data.email)+'&su='+subject+'&body='+body,'_blank');
     toast('📧 เปิด Gmail แล้ว — กรุณาแนบ PDF ก่อนกดส่ง','info');
   };
@@ -26278,8 +26279,20 @@ function _pjFxLoad(p){ const c=document.getElementById('pj-cur'); if(!c) return;
 // ยอดรวมของโปรเจกต์เป็นสกุลลูกค้า (คิดแบบเดียวกับงบบาท: เหมา/นาที/หน่วย)
 function projFxTotal(p){ if(!p||!p.budgetCur||p.budgetCur==='THB'||!p.budgetFx) return 0;
   try{ return _r2(calcBudgetTotal(+p.budgetFx, p.budgetType||'flat', +p.duration||0, +p.budgetQty||0)); }catch(e){ return +p.budgetFx||0; } }
+// ✉️ ข้อความอีเมลตามภาษาเอกสาร (th / en / both)
+function _docMailText(kind, data, total){ const lang=data.lang||'both', inv=kind==='inv';
+  const cur=data.currency&&data.currency!=='THB'&&+data.fxRate>0?data.currency:'', amt=cur?cur+' '+(Math.round(total/data.fxRate*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'฿'+(+total||0).toLocaleString();
+  const due=inv&&data.dueDate?new Date(data.dueDate):null;
+  const th={subject:(inv?'ใบแจ้งหนี้ ':'ใบเสนอราคา ')+data.docNo+' — Guin Home Studio',
+    body:'เรียน คุณ'+data.client+'\n\nขออนุญาตส่ง'+(inv?'ใบแจ้งหนี้ '+data.docNo+' เพื่อแจ้งยอดที่ต้องชำระ':'ใบเสนอราคา '+data.docNo+' มาเพื่อพิจารณา')+'ค่ะ\nยอดรวม: '+amt+(due?'\nครบกำหนดชำระ: '+due.toLocaleDateString('th-TH'):'')+'\n\nกรุณาตรวจสอบเอกสารในไฟล์แนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio'};
+  const en={subject:(inv?'Invoice ':'Quotation ')+data.docNo+' — Guin Home Studio',
+    body:'Dear '+data.client+',\n\nPlease find attached '+(inv?'invoice '+data.docNo+' for the amount due':'quotation '+data.docNo+' for your consideration')+'.\nTotal: '+amt+(due?'\nDue date: '+due.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):'')+'\n\nPlease review the attached document.'+(inv?' Kindly let us know once payment has been made.':'')+'\n\nBest regards,\nGuin Home Studio'};
+  if(lang==='en') return en; if(lang==='th') return th;
+  return {subject:th.subject+' / '+en.subject.replace(' — Guin Home Studio',''), body:th.body+'\n\n— — —\n\n'+en.body}; }
 function _cdedDocNote(pre, p){ if(!p||!(+p.clientDedPct>0)) return; const el=document.getElementById(pre+'-note'); if(!el) return;
-  const line='ยอด '+projDisp(p)+' หักแล้ว '+p.clientDedPct+'% ตามที่ลูกค้าหัก (เต็ม '+fmtB(+p.budgetGross||0)+' → '+fmtB(+p.budget||0)+')';
+  const en=document.getElementById(pre+'-lang')?.value==='en';
+  const line=en?(projDisp(p)+': amount after '+p.clientDedPct+'% client deduction (full '+fmtB(+p.budgetGross||0)+' → '+fmtB(+p.budget||0)+')')
+              :('ยอด '+projDisp(p)+' หักแล้ว '+p.clientDedPct+'% ตามที่ลูกค้าหัก (เต็ม '+fmtB(+p.budgetGross||0)+' → '+fmtB(+p.budget||0)+')');
   if(String(el.value||'').includes(line)) return; el.value=(el.value?el.value.trim()+' · ':'')+line; }
 function _projFxItem(p){ const t=projFxTotal(p); if(!t) return {}; const sh=_projItemShape(p); return {fxCur:p.budgetCur, fxPrice:t, fxBase:p.budget||0, fxUnitP:sh.qty!==1||sh.unit!=='งาน'?+p.budgetFx:t}; }
 // รูปแบบรายการตามวิธีคิดงบ: นาที → จำนวน=ความยาว(นาที) · ชั่วโมง/หน้า/วัน/บท → จำนวนที่กรอก · เหมา → 1 งาน
@@ -30512,8 +30525,9 @@ function saveAndSendInvoice(){
     reader.readAsDataURL(file);
   });
   const openGmail = function(){
-    const subject = encodeURIComponent('ใบแจ้งหนี้ '+data.docNo+' — Guin Home Studio');
-    const body = encodeURIComponent('เรียน คุณ'+data.client+'\n\nขออนุญาตส่งใบแจ้งหนี้ '+data.docNo+' เพื่อแจ้งยอดที่ต้องชำระค่ะ\nยอดรวม: ฿'+total.toLocaleString()+(data.dueDate?'\nครบกำหนดชำระ: '+new Date(data.dueDate).toLocaleDateString('th-TH'):'')+'\n\nกรุณาตรวจสอบเอกสารในไฟล์แนบค่ะ\n\nขอบคุณค่ะ\nGuin Home Studio');
+    const _m = _docMailText('inv', data, total);
+    const subject = encodeURIComponent(_m.subject);
+    const body = encodeURIComponent(_m.body);
     window.open('https://mail.google.com/mail/?authuser=penguinstudiovoice@gmail.com&view=cm&to='+encodeURIComponent(data.email)+'&su='+subject+'&body='+body,'_blank');
     toast('📧 เปิด Gmail แล้ว — กรุณาแนบ PDF ก่อนกดส่ง','info');
   };
@@ -33509,7 +33523,7 @@ const _origSaveStaff = window.saveStaff;
   </div>
 </div>
 
-<script src="scene/nd.js?v=20261112-01"></script><script src="scene/nd-profile.js?v=20261112-01"></script><script src="scene/nd-plan.js?v=20261112-01"></script><script src="scene/nd-cal.js?v=20261112-01"></script><script src="scene/nd-register.js?v=20261112-01"></script><script src="scene/nd-work.js?v=20261112-01"></script><script src="scene/nd-docform.js?v=20261112-01"></script><script src="scene/nd-docpdf.js?v=20261112-01"></script><script src="scene/nd-acct.js?v=20261112-01"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
+<script src="scene/nd.js?v=20261112-02"></script><script src="scene/nd-profile.js?v=20261112-02"></script><script src="scene/nd-plan.js?v=20261112-02"></script><script src="scene/nd-cal.js?v=20261112-02"></script><script src="scene/nd-register.js?v=20261112-02"></script><script src="scene/nd-work.js?v=20261112-02"></script><script src="scene/nd-docform.js?v=20261112-02"></script><script src="scene/nd-docpdf.js?v=20261112-02"></script><script src="scene/nd-acct.js?v=20261112-02"></script><!-- 🎨 ดีไซน์ใหม่: เมนูซ้าย · ฉากหน้าแรก · เมนูล่างมือถือ -->
 <script>
 /* ══ 🔄 อัปเดตอัตโนมัติ ══════════════════════════════════════════════
    ปัญหาเดิม: อัปโหลดเว็บใหม่แล้วทีมเปิดแท็บค้างไว้ / เบราว์เซอร์จำไฟล์เก่า (GitHub เก็บแคช ~10 นาที)
@@ -33519,7 +33533,7 @@ const _origSaveStaff = window.saveStaff;
          (กำลังพิมพ์/มีหน้าต่างเปิดอยู่ = ไม่รีเฟรชเอง ให้กดปุ่มเอง ข้อมูลที่พิมพ์ไม่หาย)
    ⚠️ ทุกครั้งที่อัปโหลด: เปลี่ยน UPD_BUILD ด้านล่าง + version.json ให้เป็นเลขเดียวกัน (เลขใหม่ต้องมากกว่าเดิม)
    ═══════════════════════════════════════════════════════════════════ */
-var UPD_BUILD = '20261112-01';
+var UPD_BUILD = '20261112-02';
 (function(){
   if(location.protocol==='file:') return;
   var shown=false, timer=null, left=20;

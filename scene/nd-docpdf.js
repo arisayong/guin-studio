@@ -43,7 +43,11 @@ const thDate=d=>{ const i=isoOf(d); if(!i) return E(d||''); const [y,mo,da]=i.sp
 // หน่วย / รายละเอียดที่ระบบเติมให้ (ภาษาไทย) → อังกฤษ ในเอกสารภาษาอังกฤษ
 const UNIT_EN={'งาน':'Job','ชิ้น':'Piece','ตอน':'Episode','นาที':'Minute','ชั่วโมง':'Hour','ชม.':'Hour','หน้า':'Page','วัน':'Day','เรื่อง':'Title','บท':'Script','เดือน':'Month','ครั้ง':'Time','โปรเจกต์':'Project','ชุด':'Set','รายการ':'Item','คน':'Person','เสียง':'Voice','ไฟล์':'File'};
 const unitL=u=>{ u=String(u||'').trim(); const en=UNIT_EN[u]; return !en||LG==='th'?E(u):LG==='en'?en:E(u)+'<br><span class="gd-en">'+en+'</span>'; };
-const detEn=t=>String(t||'').replace(/ความยาว\s*([\d.,]+)\s*นาที/g,'Duration $1 min').replace(/([\d.,]+)\s*ตอน/g,'$1 episodes').replace(/([\d.,]+)\s*นาที/g,'$1 min');
+const UNIT_SH={'นาที':'min','ชั่วโมง':'hr','หน้า':'page','วัน':'day','บท':'script','ตอน':'episode'};
+const detEn=t=>String(t||'').replace(/\/\s*(นาที|ชั่วโมง|หน้า|วัน|บท|ตอน)/g,(m,u)=>'/'+UNIT_SH[u]).replace(/หัก\s*([\d.]+)\s*%/g,'less $1% client deduction').replace(/([\d.,]+)\s*(ชั่วโมง|หน้า|วัน|บท)(?![ก-๙])/g,(m,n,u)=>n+' '+UNIT_SH[u]+(+n.replace(/,/g,'')===1?'':'s')).replace(/ความยาว\s*([\d.,]+)\s*นาที/g,'Duration $1 min').replace(/([\d.,]+)\s*ตอน/g,'$1 episodes').replace(/([\d.,]+)\s*นาที/g,'$1 min');
+// หมายเหตุที่ระบบเติมตอนลูกค้าหัก % → อังกฤษ (ข้อความที่พิมพ์เองคงเดิม)
+const noteEn=t=>String(t||'').replace(/ยอด (.+?) หักแล้ว ([\d.]+)% ตามที่ลูกค้าหัก \(เต็ม (\S+) → (\S+)\)/g,'$1: amount after $2% client deduction (full $3 → $4)');
+const noteL=t=>{ if(!t) return ''; const en=noteEn(t); return LG==='th'||en===t?E(t):LG==='en'?E(en):E(t)+'<br><span class="gd-en">'+E(en)+'</span>'; };
 const detL=t=>{ if(!t) return ''; const en=detEn(t); return LG==='th'||en===t?E(t):LG==='en'?E(en):E(t)+' <span class="gd-en">/ '+E(en)+'</span>'; };
 
 // ── CSS (ใส่ครั้งเดียว · ทุกคลาสขึ้นต้น gd- ไม่ชนกับเว็บ) ──
@@ -240,7 +244,7 @@ async function salesPages(kind, d){ await prep(); const A=await assets(); LG=(d&
   const out=[];
   copies.forEach(cp=>{ const top=pg=>head(A,th,en,cp,pg)+(pg>1?'':`<div class="gd-g2">${party(kind==='receipt'?'ได้รับเงินจาก':'ลูกค้า', kind==='receipt'?'Received from':'Customer', E(d.client||'—'), cust)}
      ${info([['เลขที่','No.',E(d.docNo||'')],['วันที่','Date',dt],['ครบกำหนด','Due date',kind==='invoice'&&d.dueDate?thDate(d.dueDate):''],['อ้างอิง','Reference',E(d.fromInvoice||d.ref||'')]])}</div>`);
-    const last=totals(grand,[['รวมเป็นเงิน','Subtotal',sub]].concat(vat?[[`ภาษีมูลค่าเพิ่ม ${vp}%`,`VAT ${vp}%`,vat]]:[]), [fxNote, d.note?E(d.note):''].filter(Boolean).join('<br>'))+`<div class="gd-end"><div class="gd-ev">${evid}</div>${signBox(A,dt)}</div>`;
+    const last=totals(grand,[['รวมเป็นเงิน','Subtotal',sub]].concat(vat?[[`ภาษีมูลค่าเพิ่ม ${vp}%`,`VAT ${vp}%`,vat]]:[]), [fxNote, d.note?noteL(d.note):''].filter(Boolean).join('<br>'))+`<div class="gd-end"><div class="gd-ev">${evid}</div>${signBox(A,dt)}</div>`;
     out.push(...paginate({top, cols, rows, last, foot:foot((d.docNo||'')+' · '+cp.replace(/<[^>]+>/g,''))})); });
   CUR='THB'; return out; }
 
