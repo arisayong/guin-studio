@@ -1,0 +1,17 @@
+{
+  "name": "Guin Home Studio",
+  "short_name": "Guin",
+  "description": "ระบบงานและการเงินของทีม Guin Home Studio",
+  "lang": "th",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#04080F",
+  "theme_color": "#04080F",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

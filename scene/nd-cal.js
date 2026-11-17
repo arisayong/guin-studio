@@ -135,6 +135,8 @@ const CSS=`
 input:checked+.c-ck{background:var(--c)} input:checked+.c-ck::after{content:'✓';color:#fff;font-size:11px;font-weight:700}
 .c-act{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:flex;opacity:0;pointer-events:none;background:var(--card);border-radius:6px} .c-row:hover .c-act{opacity:1;pointer-events:auto} .c-act button{background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;line-height:1;padding:3px 7px;border-radius:5px} .c-act button:hover{background:var(--cl-hov);color:var(--text)}
 .c-tn{flex:1;min-width:0;padding-right:24px}
+.c-holding{transition:box-shadow 3s linear;box-shadow:0 0 0 3px rgba(4,135,226,.85)!important}
+.c-armed{box-shadow:0 0 0 3px #0487E2,0 6px 16px rgba(0,0,0,.35)!important;transform:scale(1.03);z-index:6!important}
 .c-tagr[draggable="true"]{cursor:grab} .c-tagr.dt{box-shadow:inset 0 2px 0 #0487E2} .c-tagr.db{box-shadow:inset 0 -2px 0 #0487E2} .c-tagr.dragging{opacity:.4} .c-lk{font-size:10px;opacity:.7;position:absolute;right:30px} .c-tf{width:12px;margin-left:-6px;color:var(--text2);font-size:10px;flex:none;cursor:pointer;text-align:center}
 .c-ttl{cursor:pointer;border-radius:8px;padding:2px 8px} .c-ttl:hover{background:var(--cl-hov)} .c-ttl::after{content:' ▾';font-size:13px;color:var(--text2)}
 .c-mp{padding:10px 12px!important;width:270px} .c-mp .yy{display:flex;align-items:center;gap:6px;margin-bottom:8px;font-weight:600;font-size:15px} .c-mp .yy span{flex:1;padding-left:4px} .c-mp .yy button{background:none;border:none;color:var(--text);cursor:pointer;font-size:15px;width:30px;height:30px;border-radius:50%} .c-mp .yy button:hover{background:var(--cl-hov)}
@@ -161,7 +163,7 @@ input:checked+.c-ck{background:var(--c)} input:checked+.c-ck::after{content:'✓
 .c-cell.today .c-dn b{background:#0487E2;color:#fff}
 .c-plus{position:absolute;top:3px;right:5px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(4,135,226,.16);color:#0487E2;padding:0;cursor:pointer;opacity:0;transition:.12s}
 .c-plus::before,.c-plus::after{content:'';position:absolute;left:50%;top:50%;width:10px;height:2px;border-radius:1px;background:currentColor;transform:translate(-50%,-50%)} .c-plus::after{transform:translate(-50%,-50%) rotate(90deg)} .c-cell:hover .c-plus{opacity:1}
-.c-ev{z-index:2;margin:1px 4px;font-size:12px;line-height:18px;height:20px;padding:0 6px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;position:relative;min-width:0;align-self:center;touch-action:none}
+.c-ev{z-index:2;margin:1px 4px;font-size:12px;line-height:18px;height:20px;padding:0 6px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;position:relative;min-width:0;align-self:center;touch-action:pan-x pan-y;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .c-ev.bar{background:var(--c);color:var(--tc);font-weight:500} .c-ev.dot::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:6px;vertical-align:1px}
 .c-ev:hover{filter:brightness(1.08)} .c-ev.dot:hover{background:var(--cl-hov)} .c-ev.l{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:0} .c-ev.r{border-top-right-radius:0;border-bottom-right-radius:0;margin-right:0}
 .c-ev.done{opacity:.55;text-decoration:line-through} .c-ev.dragging,.c-phs.dragging{opacity:.35}
@@ -173,7 +175,7 @@ input:checked+.c-ck{background:var(--c)} input:checked+.c-ck::after{content:'✓
 .c-pbh{height:18px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#65C2F5;white-space:nowrap;overflow:hidden;padding:0 4px;cursor:pointer}
 [data-theme="light"] .c-pbh{color:#0463CA} .c-pbh .fin{margin-left:auto;font-size:10.5px;font-weight:500;background:rgba(4,135,226,.18);border-radius:4px;padding:0 5px;flex:none}
 .c-pbl{height:18px;position:relative}
-.c-phs{position:absolute;top:0;bottom:0;border-radius:5px;background:var(--c);color:#1d2733;font-size:11px;display:flex;align-items:center;gap:4px;padding:0 6px;overflow:hidden;white-space:nowrap;cursor:grab;touch-action:none;min-width:6px}
+.c-phs{position:absolute;top:0;bottom:0;border-radius:5px;background:var(--c);color:#1d2733;font-size:11px;display:flex;align-items:center;gap:4px;padding:0 6px;overflow:hidden;white-space:nowrap;cursor:grab;touch-action:pan-x pan-y;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;min-width:6px}
 .c-phs .nm{font-weight:600;flex:none} .c-phs .who{opacity:.85;overflow:hidden;text-overflow:ellipsis;min-width:0} .c-phs .tm{margin-left:auto;font-size:10.5px;opacity:.85;flex:none}
 .c-phs.cl{border-top-left-radius:0;border-bottom-left-radius:0} .c-phs.cr{border-top-right-radius:0;border-bottom-right-radius:0} .c-phs.joinL{border-top-left-radius:0;border-bottom-left-radius:0;box-shadow:inset 1px 0 0 rgba(0,0,0,.25)}
 .c-phs .h{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize} .c-phs .h.l{left:0} .c-phs .h.r{right:0} .c-phs.ro{cursor:pointer} .c-phs.done{opacity:.55} .c-phs.done .nm::before{content:'✓ '} .c-phs:hover{filter:brightness(1.05)}
@@ -183,7 +185,7 @@ input:checked+.c-ck{background:var(--c)} input:checked+.c-ck::after{content:'✓
 .c-allday{min-height:28px} .c-allday .lb{font-size:10px;color:var(--text2);padding:6px 4px;text-align:right;grid-row:1/-1}
 .c-tg{flex:1;overflow:auto} .c-hr{height:48px;font-size:10.5px;color:var(--text2);text-align:right;padding-right:8px;transform:translateY(-7px)}
 .c-col{position:relative;border-left:1px solid var(--cl-line)} .c-slot{height:48px;border-bottom:1px solid var(--cl-line)} .c-slot:hover{background:var(--cl-hov)} .c-col.drop{background:rgba(4,135,226,.08)}
-.c-tev{position:absolute;left:2px;right:4px;border-radius:6px;padding:3px 6px;font-size:12px;line-height:1.3;overflow:hidden;cursor:pointer;z-index:2;touch-action:none}
+.c-tev{position:absolute;left:2px;right:4px;border-radius:6px;padding:3px 6px;font-size:12px;line-height:1.3;overflow:hidden;cursor:pointer;z-index:2;touch-action:pan-x pan-y;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .c-tev small{display:block;opacity:.85;font-size:11px} .c-tev .rzb{position:absolute;left:0;right:0;bottom:0;height:7px;cursor:ns-resize}
 .c-now{position:absolute;left:0;right:0;height:2px;background:#ea4335;z-index:3} .c-now::before{content:'';position:absolute;left:-6px;top:-5px;width:12px;height:12px;border-radius:50%;background:#ea4335}
 .c-tip,.c-ctx,.c-card,.c-dlg{background:var(--card);border:1px solid var(--cl-line,#3c4043);color:var(--text);font-family:Kanit;box-shadow:0 12px 36px rgba(0,0,0,.45)}
@@ -343,12 +345,17 @@ async function saveEv(it, patch, msg, undo){ const k=it.scope==='team'?'team':'m
 
 /* ── ลาก / ยืด ── */
 let DR=null, TIP=null, TT=null, TDR=null;
+const HOLD=3000;
+function armTouch(e){ if(e.pointerType!=='touch'||!DR) return; const d=DR; d.touch=true; d.armed=false; d.el.classList.add('c-holding');
+  d.tm=setTimeout(()=>{ if(DR!==d) return; d.armed=true; d.el.classList.remove('c-holding'); d.el.classList.add('c-armed'); try{ navigator.vibrate&&navigator.vibrate(30); }catch(_){} }, HOLD); }
+function dropDR(){ const d=DR; if(!d) return; clearTimeout(d.tm); d.el&&d.el.classList.remove('c-holding','c-armed','dragging'); d.g&&d.g.remove(); DR=null; }
 function under(e){ return document.elementsFromPoint(e.clientX,e.clientY).find(x=>x.dataset&&x.dataset.d); }
 function closeFloat(){ document.querySelectorAll('.c-ctx,.c-card').forEach(x=>x.remove()); }
 function tipOff(){ TIP&&TIP.remove(); TIP=null; }
 function place(el,x,y,w){ el.style.left=Math.max(8,Math.min(x+8,innerWidth-(w||el.offsetWidth)-10))+'px'; el.style.top=Math.max(8,Math.min(y+8,innerHeight-el.offsetHeight-10))+'px'; }
 function say(msg, undo){ if(!msg) return; document.querySelector('.c-toast')?.remove(); clearTimeout(TT); const t=document.createElement('div'); t.className='c-toast'; t.innerHTML=E(msg)+(undo?'<button>เลิกทำ</button>':''); if(undo) t.querySelector('button').onclick=()=>{ t.remove(); undo(); }; document.body.appendChild(t); TT=setTimeout(()=>t.remove(),5000); }
 document.addEventListener('pointermove',e=>{ if(!DR) return;
+  if(DR.touch&&!DR.armed){ if(Math.hypot(e.clientX-DR.x,e.clientY-DR.y)>8) dropDR(); return; }   // ขยับก่อนครบ 3 วิ = ปัดจอ ไม่ใช่ลาก
   if(!DR.active){ if(Math.hypot(e.clientX-DR.x,e.clientY-DR.y)<5) return; if(!DR.ed){ say(DR.ph||DR.it.kind==='proj'?'🔒 วันของโปรเจกต์แก้ได้เฉพาะแอดมิน · เมเนเจอร์ · พนักงานบริษัท':'🔒 แก้ได้เฉพาะคนสร้างและแอดมิน'); DR=null; return; }
     if(DR.mode==='proj'){ DR=null; return; }
     DR.active=true; tipOff(); DR.el.classList.add('dragging'); const g=document.createElement('div'); g.className='c-ghost'; const c=DR.color||colorOf(DR.it); g.style.background=c; g.style.color=tcOf(c); g.textContent=DR.it.title; document.body.appendChild(g); DR.g=g; }
@@ -356,7 +363,11 @@ document.addEventListener('pointermove',e=>{ if(!DR) return;
   document.querySelectorAll('#page-nd-cal .drop').forEach(x=>x.classList.remove('drop'));
   const t=under(e); if(t&&!(DR.ph&&t.classList.contains('c-col'))){ t.classList.add('drop'); DR.to=t.dataset.d; DR.toEl=t; DR.cy=e.clientY; }
   if(DR.to){ const it=DR.it, n=dd(DR.from,DR.to); DR.g.textContent=DR.mode==='move'?it.title+' → '+thD(shift(it.start,n))+(it.end>it.start?' – '+thD(shift(it.end,n)):''):DR.mode==='resize'?'↔ ถึง '+thD(DR.to<it.start?it.start:DR.to):DR.mode==='resizeL'?'↔ เริ่ม '+thD(DR.to>it.end?it.end:DR.to):it.title; } });
-document.addEventListener('pointerup',e=>{ if(!DR) return; const d=DR; DR=null; document.querySelectorAll('#page-nd-cal .drop').forEach(x=>x.classList.remove('drop')); d.g&&d.g.remove(); d.el.classList.remove('dragging');
+// กดค้างครบแล้ว → ห้ามจอเลื่อนตอนลาก
+document.addEventListener('touchmove',e=>{ if(DR&&DR.touch&&DR.armed) e.preventDefault(); },{passive:false});
+document.addEventListener('pointercancel',()=>{ if(DR&&!(DR.touch&&DR.armed)) dropDR(); });
+document.addEventListener('pointerup',e=>{ if(!DR) return; const d=DR; DR=null; clearTimeout(d.tm); d.el.classList.remove('c-holding','c-armed');
+  if(d.touch&&d.armed&&!d.active){ return; }   // กดค้างแล้วปล่อยเฉย ๆ = ไม่ทำอะไร document.querySelectorAll('#page-nd-cal .drop').forEach(x=>x.classList.remove('drop')); d.g&&d.g.remove(); d.el.classList.remove('dragging');
   if(!d.active){ if(d.ph) phPop(d.pid,d.ph,e); else openCard(d.it.id,e); return; }
   if(!d.to){ render(); return; } const it=d.it, n=dd(d.from,d.to);
   if(d.ph){ const p=findAny(d.pid), m=model(p), ph=m.phases[d.ph], oldEnd=ph.end, b4=model(p), nm=PH.find(x=>x.k===d.ph).name;
@@ -451,12 +462,12 @@ window.NDCAL={ render, open,
   dates:projDates,
   goProj(pid){ closeFloat(); document.querySelector('.c-mask')?.remove(); if(canOpenProj()) safe(()=>openEditProject(pid)); },
   down(e,id){ if(e.button!==0) return; const it=findAny(id); if(!it) return; const u=under(e), rz=e.target.dataset.rz, rzb=e.target.dataset.rzb;
-    DR={it, el:e.currentTarget, x:e.clientX, y:e.clientY, mode:rz==='L'?'resizeL':rz?'resize':rzb?'resizeT':it.kind==='proj'?'proj':'move', from:u?u.dataset.d:it.start, ed:canEdit(it)}; e.preventDefault(); },
+    DR={it, el:e.currentTarget, x:e.clientX, y:e.clientY, mode:rz==='L'?'resizeL':rz?'resize':rzb?'resizeT':it.kind==='proj'?'proj':'move', from:u?u.dataset.d:it.start, ed:canEdit(it)}; armTouch(e); if(e.pointerType!=='touch') e.preventDefault(); },
   phDown(e,id,k){ if(e.button!==0) return; e.stopPropagation(); const p=findAny(id), ph=p.phases[k], P=PH.find(x=>x.k===k), u=under(e), h=e.target.dataset.h;
-    DR={pid:id, ph:k, it:{...ph, title:P.name+' · '+p.title, kind:'phase'}, color:P.color, el:e.currentTarget, x:e.clientX, y:e.clientY, mode:h==='L'?'resizeL':h==='R'?'resize':'move', from:u?u.dataset.d:ph.start, ed:canEdit(p)}; e.preventDefault(); },
+    DR={pid:id, ph:k, it:{...ph, title:P.name+' · '+p.title, kind:'phase'}, color:P.color, el:e.currentTarget, x:e.clientX, y:e.clientY, mode:h==='L'?'resizeL':h==='R'?'resize':'move', from:u?u.dataset.d:ph.start, ed:canEdit(p)}; armTouch(e); if(e.pointerType!=='touch') e.preventDefault(); },
   tip(e,id){ const it=findAny(id); if(!it) return; tipAt(e,`<b>${E(it.title)}</b><div class="m">${whenTxt(it)}</div><div class="m">${it.scope==='me'?'🙋 ส่วนตัว':'🏢 ทีม'} · ${E(catName(it))}${it.owner?' · 🗂️ '+E(it.owner):''}</div>${edLine(it.edBy,it.at)}`); },
   phTip(e,id,k){ const p=findAny(id), ph=p.phases[k], P=PH.find(x=>x.k===k); tipAt(e,`<b>${P.name} · ${E(p.title)}</b><div class="m">${thD(ph.start)}${ph.end>ph.start?' – '+thD(ph.end):''}${ph.time?' · ต้องเสร็จ '+E(fmtT(ph.time))+(ST.h12?'':' น.'):''}</div><div style="margin-top:3px">👤 ${ph.who.length?'<b>'+ph.who.map(E).join(', ')+'</b>':'<span class="m">ยังไม่ได้มอบหมาย</span>'}</div>${p.owner?`<div class="m">🗂️ เมเนเจอร์ ${E(p.owner)}</div>`:''}${edLine(p.edBy,p.at)}`); },
-  ctx(e,id){ const it=findAny(id); if(!it) return; e.preventDefault(); e.stopPropagation(); const ed=canEdit(it), I=E(id); let h;
+  ctx(e,id){ if(DR&&DR.touch){ e.preventDefault(); return; } const it=findAny(id); if(!it) return; e.preventDefault(); e.stopPropagation(); const ed=canEdit(it), I=E(id); let h;
     if(it.kind==='todo') h=`<div onclick="NDCAL.close();NDCAL.todoDone('${E(it.rid)}',true)">✓ ทำเสร็จแล้ว</div><div class="dang" onclick="NDCAL.close();NDCAL.todoDel('${E(it.rid)}')">🗑️ ลบ To-do</div>`;
     else if(it.kind==='proj') h=canProj()?`<div onclick="NDCAL.dates('${I}')">✏️ แก้วัน / เลื่อนเดดไลน์</div>${canOpenProj()?`<div onclick="NDCAL.goProj('${E(it.pid)}')">📁 แก้ข้อมูลโปรเจกต์ ›</div>`:''}`:`<div onclick="NDCAL.close();NDCAL.card('${I}',${e.clientX},${e.clientY})">👁️ ดูรายละเอียด</div>`;
     else if(!ed) h=`<div onclick="NDCAL.close();NDCAL.card('${I}',${e.clientX},${e.clientY})">👁️ ดูรายละเอียด</div><div style="color:var(--text2);cursor:default">🔒 อีเวนต์ของ ${E(it.byName||'คนอื่น')}</div>`;
