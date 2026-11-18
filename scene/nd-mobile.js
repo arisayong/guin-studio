@@ -64,7 +64,10 @@ const ic=(k,sz)=>`<svg width="${sz||22}" height="${sz||22}" viewBox="0 0 24 24" 
 /* ── CSS ── */
 const CSS=`
 #ndm{position:fixed;inset:0;z-index:950;background:#0b1424;color:#e8eef7;font-family:Kanit,system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden;-webkit-tap-highlight-color:transparent}
-#ndm *{box-sizing:border-box}#ndm button{font-family:inherit;cursor:pointer;color:inherit}
+#ndm *{box-sizing:border-box;animation:none!important;transition:none!important}
+#ndm .m-bar.hold{transition:box-shadow 3s linear!important}
+html.ndm-wait #app-layout,html.ndm-wait .main-content{visibility:hidden}
+@media (max-width:760px){.main-content>.page:not(.hidden){animation:none!important}}#ndm button{font-family:inherit;cursor:pointer;color:inherit}
 #ndm .m-hd{display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top)) 16px 8px;flex-shrink:0}
 #ndm .m-logo{width:40px;height:40px;border-radius:12px;background:#0487E2;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;color:#fff;flex-shrink:0}
 #ndm .m-sub{font-size:12px;color:#9fb0c6}#ndm .m-ttl{font-size:20px;font-weight:600;line-height:1.2}
@@ -105,7 +108,7 @@ const CSS=`
 #ndm .m-bar{margin:0 2px;height:20px;border-radius:4px;border:0;color:#1d2733;font-size:11px;font-weight:600;padding:0 4px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;z-index:1;
   user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:pan-x pan-y}
 #ndm .m-bar.done{opacity:.45;text-decoration:line-through}
-#ndm .m-bar.hold{box-shadow:0 0 0 3px rgba(30,140,255,.85);transition:box-shadow 3s linear}
+#ndm .m-bar.hold{box-shadow:0 0 0 3px rgba(30,140,255,.85)}
 #ndm .m-bar.mv{outline:2px dashed #fff;box-shadow:0 4px 14px rgba(0,0,0,.5)}
 #ndm .m-addbar{flex-shrink:0;display:flex;align-items:center;gap:12px;padding:8px 14px}
 #ndm .m-pill{flex:1;height:48px;border-radius:24px;border:1.5px solid #3a4a62;background:#121b2b;color:#8193ab;font-size:15px;text-align:left;padding:0 18px}
@@ -133,18 +136,44 @@ const CSS=`
 @media (min-width:761px){#ndm-pill{display:none}}
 `;
 
+/* ════════ ปฏิทินบริษัท: นัด/อีเวนต์ทีม + ของฉัน + To-do (ที่เดียวกับปฏิทินบนคอม) ════════ */
+const canSeeTeam=()=>{ const u=CU()||{}; return u.role==='admin'||u.role==='manager'||u.acct===true||isEmp(); };
+const CAL={team:{}, mine:{}, ttags:null, tags:null, live:false};
+const DEF_TT={meet:{name:'ประชุม / มีตติ้ง',color:'#0487E2'},work:{name:'งาน',color:'#0463CA'},off:{name:'วันหยุด / ลา',color:'#65C2F5'},tax:{name:'ส่งภาษี / บัญชี',color:'#09B1EC'},other:{name:'อื่น ๆ',color:'#7B8BA1'}};
+const DEF_TG={t1:{name:'ส่วนตัว',color:'#8E24AA'},t2:{name:'งาน',color:'#F4511E'}};
+const TG=sc=>sc==='team'?(CAL.ttags||DEF_TT):(CAL.tags||DEF_TG);
+function calAttach(){ if(CAL.live) return; const db=DB(), uid=safe(()=>CU().uid,''); if(!db||!uid) return; CAL.live=true;
+  const on=(p,k)=>{ try{ db.ref(p).on('value', sn=>{ CAL[k]=sn.val()||(/tags/.test(k)?null:{}); soft(); }, ()=>{}); }catch(e){} };
+  if(canSeeTeam()){ on('teamcal/events','team'); on('teamcal/tags','ttags'); }
+  on('privcal/'+uid+'/events','mine'); on('privcal/'+uid+'/tags','tags'); }
+// ตัวกรองหมวดหมู่ — ใช้ค่าเดียวกับปฏิทินบนคอม (localStorage guin3_cal_v2.L) เปิด/ปิดที่ไหนก็ตรงกัน
+const LSK='guin3_cal_v2';
+function FL(){ const x=safe(()=>JSON.parse(localStorage.getItem(LSK)),null)||{}; const L=Object.assign({me:true, tags:{}, tt:{}, todo:true, teamOn:true, mine:true, all:true, events:true, mEnd:true}, x.L||{}); L.tags=L.tags||{}; L.tt=L.tt||{}; return L; }
+function setFL(L){ const x=safe(()=>JSON.parse(localStorage.getItem(LSK)),null)||{}; x.L=L; try{ localStorage.setItem(LSK, JSON.stringify(x)); }catch(e){} }
+const tPar=(T,id)=>{ const p=T[id]&&T[id].parent; return p&&p!==id&&T[p]?p:''; };
+function tagOn(sc,id,L){ const M=L[sc==='team'?'tt':'tags']||{}, T=TG(sc); let x=id, g=0; while(x&&g++<9){ if(M[x]===false) return false; x=tPar(T,x); } return true; }
+function evItems(L){ const out=[];
+  if(canSeeTeam()&&L.teamOn&&L.events) Object.values(CAL.team||{}).forEach(e=>{ if(!e||!e.start) return; if(e.cat&&TG('team')[e.cat]&&!tagOn('team',e.cat,L)) return;
+    out.push({key:'t:'+e.id, ev:'team', id:e.id, code:'', ph:e.title||'', color:(TG('team')[e.cat]||{}).color||e.color||'#0487E2', s:e.start, e:e.end&&e.end>=e.start?e.end:e.start, time:e.time||'', done:false, who:''}); });
+  if(L.me) Object.values(CAL.mine||{}).forEach(e=>{ if(!e||!e.start||!tagOn('me',e.tag,L)) return;
+    out.push({key:'m:'+e.id, ev:'mine', id:e.id, code:'', ph:e.title||'', color:(TG('me')[e.tag]||{}).color||'#8E24AA', s:e.start, e:e.end&&e.end>=e.start?e.end:e.start, time:e.time||'', done:false, who:''}); });
+  if(L.me&&L.todo) Object.values(TODO||{}).forEach(t=>{ if(t&&t.due) out.push({key:'d:'+t.id, ev:'todo', id:t.id, code:'', ph:'☑ '+(t.text||''), color:'#FBBC04', s:t.due, e:t.due, time:'', done:!!t.done, who:''}); });
+  return out; }
+
 /* ════════ ข้อมูล ════════ */
-// งานในปฏิทิน: ช่วงของแต่ละหน้าที่ + วันส่งลูกค้า (🏁)
+// งานในปฏิทิน: ช่วงของแต่ละหน้าที่ + วันส่งลูกค้า (🏁) + นัด/อีเวนต์ + To-do
 function calItems(onlyMine){
-  const me=safe(()=>CU().staffId,''), uid=safe(()=>CU().uid,''), out=[];
+  const L=FL(), me=safe(()=>CU().staffId,''), uid=safe(()=>CU().uid,''), out=evItems(L);
+  if(!onlyMine&&!L.teamOn) return out;
   projs().forEach(p=>{ if(pDone(p)) return; const ws=p.workers||[];
+    if(!onlyMine&&!L.all&&!(p.managerId===uid||ws.some(w=>w&&w.id===me))) return;
     const mineP=!onlyMine||p.managerId===uid||ws.some(w=>w&&w.id===me);
     if(!mineP) return;
     PH.forEach(P=>{ const x=(p.phases||{})[P.k]; if(!x) return; const s=dOnly(x.startDate)||dOnly(x.deadline), e=dOnly(x.deadline)||s; if(!s) return;
       const pw=ws.filter(w=>w&&pre(w)===P.s);
       if(onlyMine&&!isMgr()&&!pw.some(w=>w.id===me)) return;
       out.push({key:p.id+'|'+P.k, pid:p.id, k:P.k, code:code(p), ph:P.name, color:P.color, s, e:e<s?s:e, time:x.submitTime||'', done:x.status==='done', who:[...new Set(pw.map(w=>nick(w.id)).filter(Boolean))].join(',')}); });
-    const dl=dOnly(p.deadline); if(dl&&!onlyMine) out.push({key:p.id+'|end', pid:p.id, k:'end', code:code(p), ph:'🏁 ส่งลูกค้า', color:'#7fb8ff', s:dl, e:dl, time:dlTime(p), done:false, who:''});
+    const dl=dOnly(p.deadline); if(dl&&!onlyMine&&L.mEnd) out.push({key:p.id+'|end', pid:p.id, k:'end', code:code(p), ph:'🏁 ส่งลูกค้า', color:'#7fb8ff', s:dl, e:dl, time:dlTime(p), done:false, who:''});
   });
   return out;
 }
@@ -196,7 +225,8 @@ function calHTML(){
   const mine=!(isAdm()||(isEmp()&&S.calMode==='team')||isMgr()), items=calItems(mine&&!isMgr());
   const y=S.cur.getFullYear(), m=S.cur.getMonth(), first=new Date(y,m,1), start=addD(first,-first.getDay()), rows=Math.ceil((first.getDay()+new Date(y,m+1,0).getDate())/7), t=TODAY();
   let h=`${isEmp()&&!isAdm()&&!isMgr()?`<div class="m-seg">${[['mine','ของฉัน'],['team','ทั้งทีม']].map(([k,l])=>`<button class="${S.calMode===k?'on':''}" onclick="NDM.set('calMode','${k}')">${l}</button>`).join('')}</div>`:''}
-    <div class="m-mon"><button aria-label="เดือนก่อน" onclick="NDM.mon(-1)">‹</button><b>${TM[m]} ${y+543}</b><button aria-label="เดือนถัดไป" onclick="NDM.mon(1)">›</button></div>
+    <div class="m-mon" style="position:relative"><button aria-label="เดือนก่อน" onclick="NDM.mon(-1)">‹</button><b onclick="NDM.today()">${TM[m]} ${y+543}</b><button aria-label="เดือนถัดไป" onclick="NDM.mon(1)">›</button>
+      <button aria-label="เลือกหมวดหมู่ที่จะดู" onclick="NDM.filt()" style="position:absolute;right:0;top:2px;width:auto!important;height:36px!important;padding:0 10px;border:1px solid #2a3d5c!important;border-radius:10px;font-size:12.5px!important;color:#c9d6e8!important;display:flex;align-items:center;gap:4px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4"/></svg>หมวดหมู่${filtOff()?` <span class="m-badge" style="position:static;margin-left:2px">${filtOff()}</span>`:''}</button></div>
     <div><div class="m-dow">${WD.map((w,i)=>`<span style="${i===0?'color:#ff6b6b':''}">${w}.</span>`).join('')}</div>`;
   for(let r=0;r<rows;r++){ const ws=addD(start,r*7), wsY=ymd(ws), weY=ymd(addD(ws,6));
     let cells='', bars='', more={};
@@ -207,10 +237,36 @@ function calHTML(){
       const a=e.s<wsY?wsY:e.s, b=e.e>weY?weY:e.e, ca=dd(wsY,a), cb=dd(wsY,b), L=lanes.findIndex(l=>l.every(([x,y])=>cb<x||ca>y));
       if(L<0){ for(let c=ca;c<=cb;c++) more[c]=(more[c]||0)+1; return; } lanes[L].push([ca,cb]);
       const mv=S.moving&&S.moving.key===e.key;
-      bars+=`<button class="m-bar ${e.done?'done':''} ${mv?'mv':''}" data-key="${E(e.key)}" style="grid-column:${ca+1}/span ${cb-ca+1};grid-row:${L+2};background:${e.color}">${mv?'✥ ':''}${E(e.code)} ${E(e.ph)}${e.who?'·'+E(e.who):''}</button>`; });
+      bars+=`<button class="m-bar ${e.done?'done':''} ${mv?'mv':''}" data-key="${E(e.key)}" style="grid-column:${ca+1}/span ${cb-ca+1};grid-row:${L+2};background:${e.color};color:${tcOf(e.color)}">${mv?'✥ ':''}${e.time&&e.ev?E(e.time)+' ':''}${e.code?E(e.code)+' ':''}${E(e.ph)}${e.who?'·'+E(e.who):''}</button>`; });
     Object.keys(more).forEach(c=>{ bars+=`<span class="m-more" style="grid-column:${+c+1}">+${more[c]}</span>`; });
     h+=`<div class="m-wk" style="height:${28+20*3+14+12}px">${cells}${bars}</div>`; }
   return h+'</div>'; }
+const tcOf=hex=>{ const h=String(hex||'').replace('#',''); if(h.length<6) return '#1d2733'; const [r,g,b]=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255); return (0.2126*r+0.7152*g+0.0722*b)>0.55?'#1d2733':'#fff'; };
+// นับหมวดที่ปิดอยู่ (โชว์เลขบนปุ่ม "หมวดหมู่")
+function filtOff(){ const L=FL(); let n=0; ['teamOn','all','events','me','todo','mEnd'].forEach(k=>{ if(L[k]===false) n++; }); n+=Object.values(L.tt||{}).filter(v=>v===false).length+Object.values(L.tags||{}).filter(v=>v===false).length; return n; }
+function tagRows(sc){ const T=TG(sc), L=FL(), M=L[sc==='team'?'tt':'tags']||{}, ids=Object.keys(T);
+  const depth=id=>{ let d=0, x=tPar(T,id); while(x&&d<4){ d++; x=tPar(T,x); } return d; };
+  const kids=par=>ids.filter(id=>tPar(T,id)===par).sort((a,b)=>(+T[a].order||0)-(+T[b].order||0)||String(T[a].name).localeCompare(String(T[b].name),'th'));
+  const walk=par=>kids(par).flatMap(id=>[id].concat(walk(id)));
+  return walk('').map(id=>{ const on=M[id]!==false; return `<button class="m-li" style="padding-left:${14+depth(id)*18}px" onclick="NDM.tg('${sc}','${A(id)}')"><span style="width:20px;height:20px;border-radius:6px;border:2px solid ${T[id].color||'#888'};background:${on?(T[id].color||'#888'):'transparent'};flex-shrink:0"></span><span style="flex:1;font-size:14px">${E(T[id].name)}</span></button>`; }).join(''); }
+function sheetFilt(){ const L=FL(), row=(k,t,c)=>`<button class="m-li" onclick="NDM.fl('${k}')"><span style="width:20px;height:20px;border-radius:6px;border:2px solid ${c};background:${L[k]!==false?c:'transparent'};flex-shrink:0"></span><span style="flex:1;font-size:14px">${t}</span></button>`;
+  const team=canSeeTeam()&&!(!isAdm()&&!isMgr()&&!isEmp());
+  return `<div class="m-h2" style="font-size:18px">เลือกหมวดหมู่ที่จะดู</div><div class="m-mut">ตั้งไว้ตรงไหนก็ใช้ทั้งในมือถือเครื่องนี้และปฏิทินบนเว็บ</div>
+    ${team?`<div class="m-mut" style="font-weight:600;color:#c9d6e8">🏢 ปฏิทินทีม</div><div class="m-list">${row('teamOn','แสดงปฏิทินทีม','#0487E2')}${row('all','งานโปรเจกต์ทั้งทีม (ปิด = เฉพาะงานของฉัน)','#4fb3ff')}${row('mEnd','🏁 วันส่งลูกค้า','#7fb8ff')}${row('events','อีเวนต์ / งานทีม','#09B1EC')}${tagRows('team')}</div>`:''}
+    <div class="m-mut" style="font-weight:600;color:#c9d6e8">🙋 ปฏิทินของฉัน</div><div class="m-list">${row('me','แสดงปฏิทินของฉัน','#8E24AA')}${row('todo','To-do ที่มีวันกำหนด','#FBBC04')}${tagRows('me')}</div>
+    <button class="m-btn m-pri" style="height:50px" onclick="NDM.close()">เสร็จ</button>`; }
+// แผ่นแก้นัด/อีเวนต์
+function evRaw(key){ const k=key.slice(0,2), id=key.slice(2); return k==='t:'?{sc:'team', raw:(CAL.team||{})[id]}:k==='m:'?{sc:'mine', raw:(CAL.mine||{})[id]}:null; }
+function canEv(sc,raw){ if(sc==='mine') return true; const uid=safe(()=>CU().uid,''); return isAdm()||!raw.by||raw.by===uid; }
+function sheetEv(){ const f=evRaw(S.sheet.key); if(!f||!f.raw) return '<div class="m-mut">ไม่พบรายการ</div>'; const {sc,raw}=f, d=S.sheet.dr, ok=canEv(sc,raw), T=TG(sc==='team'?'team':'me'), cur=sc==='team'?d.cat:d.tag;
+  return `<div class="m-mut">${sc==='team'?'🏢 ปฏิทินทีม':'🙋 ปฏิทินของฉัน'}${raw.byName?' · โดย '+E(raw.byName):''}</div>
+    <input class="m-in" style="font-size:17px;font-weight:600" value="${E(d.title)}" ${ok?'':'disabled'} oninput="NDM.ev('title',this.value,1)">
+    <div class="m-lbl">วันเริ่ม<div class="m-step"><button ${ok?'':'disabled'} onclick="NDM.evd('s',-1)">−1</button><div>${thDW(d.s)}</div><button ${ok?'':'disabled'} onclick="NDM.evd('s',1)">+1</button></div></div>
+    <div class="m-lbl">ถึงวันที่<div class="m-step"><button ${ok?'':'disabled'} onclick="NDM.evd('e',-1)">−1</button><div>${thDW(d.e)}</div><button ${ok?'':'disabled'} onclick="NDM.evd('e',1)">+1</button></div></div>
+    <div class="m-grid2"><label class="m-lbl">เวลาเริ่ม<input type="time" class="m-in" value="${E(d.time)}" ${ok?'':'disabled'} onchange="NDM.ev('time',this.value,1)"></label><label class="m-lbl">ถึง<input type="time" class="m-in" value="${E(d.endTime)}" ${ok?'':'disabled'} onchange="NDM.ev('endTime',this.value,1)"></label></div>
+    <div class="m-lbl">หมวดหมู่<div style="display:flex;gap:6px;flex-wrap:wrap">${Object.keys(T).map(id=>`<button class="m-chip" style="${cur===id?`background:${T[id].color};border-color:${T[id].color};color:${tcOf(T[id].color)}`:''}" ${ok?'':'disabled'} onclick="NDM.ev('${sc==='team'?'cat':'tag'}','${A(id)}')">${E(T[id].name)}</button>`).join('')}</div></div>
+    <label class="m-lbl">รายละเอียด<textarea class="m-in" rows="3" ${ok?'':'disabled'} oninput="NDM.ev('note',this.value,1)">${E(d.note)}</textarea></label>
+    ${ok?`<button class="m-btn m-pri" style="height:52px;font-size:16px" onclick="NDM.evSave()">บันทึก</button><button class="m-btn" style="color:#ff9aa6;border-color:#5a2a33" onclick="NDM.evDel()">ลบรายการนี้</button>`:'<div class="m-mut" style="text-align:center">แก้ได้เฉพาะคนสร้างและแอดมิน</div>'}`; }
 function dayItems(){ const mine=!(isAdm()||(isEmp()&&S.calMode==='team')||isMgr()); return calItems(mine&&!isMgr()).filter(e=>e.s<=S.day&&e.e>=S.day); }
 
 /* ── แผ่นงานของวัน + แผ่นแก้หน้าที่ ── */
@@ -218,8 +274,11 @@ function sheetDay(){ const L=dayItems(), tdo=todoList();
   return `<div class="m-h2">${S.day===TODAY()?'วันนี้ · ':''}${thDW(S.day)}</div>
     ${L.map(e=>`<button class="m-li" style="background:#0d1729;border-radius:12px;border:0" onclick="NDM.openPh('${A(e.key)}')"><span style="width:5px;align-self:stretch;border-radius:3px;background:${e.color};flex-shrink:0"></span>
       <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">${E(e.code)} · ${E(e.ph)}</div><div class="m-mut">${E(e.who||'—')}${e.time?' · ส่ง '+E(e.time):''} · ${thD(e.s)}${e.e!==e.s?'–'+thD(e.e):''}</div></div><span style="font-size:12px;color:#6cc0ff">แก้</span></button>`).join('')||'<div class="m-mut" style="text-align:center;padding:8px">ยังไม่มีงานวันนี้</div>'}
-    ${tdo!==null?`<div class="m-h2" style="font-size:14px;margin-top:4px">To-do ของฉัน</div>
-    <div style="display:flex;gap:8px"><input id="ndm-todo" class="m-in" placeholder="พิมพ์ To-do แล้วกดเพิ่ม" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();NDM.todoAdd()}"><button class="m-btn m-pri" onclick="NDM.todoAdd()">เพิ่ม</button></div>
+    <div class="m-h2" style="font-size:14px;margin-top:4px">เพิ่มในวันนี้</div>
+    <input id="ndm-todo" class="m-in" placeholder="พิมพ์ชื่อนัด / งาน / To-do" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();NDM.evAdd()}">
+    ${canSeeTeam()?`<label style="display:flex;gap:8px;align-items:center;font-size:13px;color:#c9d6e8"><input id="ndm-add-team" type="checkbox" style="width:20px;height:20px"> 📢 ลงปฏิทินทีม (ทุกคนเห็น)</label>`:''}
+    <div class="m-grid2"><button class="m-btn m-pri" onclick="NDM.evAdd()">＋ เพิ่มนัด</button>${tdo!==null?'<button class="m-btn" onclick="NDM.todoAdd()">＋ To-do</button>':''}</div>
+    ${tdo!==null?`${tdo.length?'<div class="m-h2" style="font-size:14px">To-do ของฉัน</div>':''}
     ${tdo.map(t=>`<button class="m-li" onclick="NDM.todoTog('${A(t.id)}')"><span style="width:22px;height:22px;border-radius:7px;border:2px solid ${t.done?'#1fae7f':'#4a5d7a'};background:${t.done?'#1fae7f':'transparent'};flex-shrink:0"></span><span style="font-size:14px;${t.done?'text-decoration:line-through;opacity:.5':''}">${E(t.text)}</span></button>`).join('')}`:''}`; }
 function findItem(key){ const [pid,k]=String(key).split('|'), p=projs().find(x=>x.id===pid); return p?{p,k}:null; }
 function sheetPh(){ const f=findItem(S.sheet.key); if(!f) return '<div class="m-mut">ไม่พบงาน</div>'; const {p,k}=f, dr=S.sheet.dr;
@@ -381,7 +440,7 @@ function meHTML(){ const u=CU()||{}, s=safe(()=>getStaffById(u.staffId),null)||{
 
 /* ── To-do ส่วนตัว (เก็บที่เดียวกับปฏิทินบนคอม privcal/<uid>/todos) ── */
 let TODO=null, todoOn=false;
-function todoList(){ if(!(isAdm()||isMgr()||isEmp())) return null; if(!todoOn){ todoOn=true; const db=DB(), uid=safe(()=>CU().uid,''); if(db&&uid) db.ref('privcal/'+uid+'/todos').on('value',sn=>{ TODO=sn.val()||{}; if(S.sheet&&S.sheet.type==='day') renderSheet(); }); }
+function todoList(){ if(!(isAdm()||isMgr()||isEmp())) return null; if(!todoOn){ todoOn=true; const db=DB(), uid=safe(()=>CU().uid,''); if(db&&uid) db.ref('privcal/'+uid+'/todos').on('value',sn=>{ TODO=sn.val()||{}; if(S.sheet&&S.sheet.type==='day') renderSheet(); else soft(); }); }
   return Object.values(TODO||{}).filter(t=>t&&(!t.due||t.due===S.day||!t.done)).sort((a,b)=>(a.done?1:0)-(b.done?1:0)||String(a.at||'').localeCompare(String(b.at||''))).slice(0,20); }
 
 /* ════════ วาดหน้า ════════ */
@@ -395,7 +454,7 @@ function render(){ if(!ROOT) return; const keep=ROOT.querySelector('.m-body'), s
     +tabsHTML()+'<div id="ndm-sheet"></div>';
   const nb=ROOT.querySelector('.m-body'); if(nb&&S.keepScroll!==false) nb.scrollTop=st; S.keepScroll=true; renderSheet(); }
 function renderSheet(){ const h=$('ndm-sheet'); if(!h) return; const sh=S.sheet; if(!sh){ h.innerHTML=''; return; }
-  const inner=sh.type==='day'?sheetDay():sh.type==='ph'?sheetPh():sh.type==='proj'?sheetProj():sh.type==='doc'?sheetDoc():sh.type==='job'?sheetJob():sh.type==='rej'?sheetRej():'';
+  const inner=sh.type==='filt'?sheetFilt():sh.type==='ev'?sheetEv():sh.type==='day'?sheetDay():sh.type==='ph'?sheetPh():sh.type==='proj'?sheetProj():sh.type==='doc'?sheetDoc():sh.type==='job'?sheetJob():sh.type==='rej'?sheetRej():'';
   const b=h.querySelector('.m-shb'), st=b?b.scrollTop:0;
   h.innerHTML=`<div class="m-sh"><button class="m-shx" aria-label="ปิด" onclick="NDM.close()"></button><div class="m-shb"><div class="m-grip"></div>${inner}</div></div>`;
   const nb=h.querySelector('.m-shb'); if(nb) nb.scrollTop=st; }
@@ -406,8 +465,11 @@ let RT=null; function soft(){ clearTimeout(RT); RT=setTimeout(()=>{ if(!ROOT||RO
 function bindHold(){ if(!ROOT) return;
   ROOT.addEventListener('pointerdown',e=>{ const b=e.target.closest&&e.target.closest('.m-bar'); if(!b) return; const key=b.dataset.key; held=false; clearTimeout(hold);
     const x0=e.clientX, y0=e.clientY; b._xy=[x0,y0]; b.classList.add('hold');
-    hold=setTimeout(()=>{ held=true; b.classList.remove('hold'); const f=findItem(key); if(!f||f.k==='end'||!canDates()){ held=false; return; }
-      try{ navigator.vibrate&&navigator.vibrate(30); }catch(_){} S.moving={key, label:code(f.p)+' '+PHK(f.k).name}; render(); },3000); });
+    hold=setTimeout(()=>{ held=true; b.classList.remove('hold');
+      let label='';
+      if(/^[tm]:/.test(key)){ const f=evRaw(key); if(!f||!f.raw||!canEv(f.sc,f.raw)){ held=false; return; } label=f.raw.title||''; }
+      else { const f=findItem(key); if(!f||f.k==='end'||!canDates()){ held=false; return; } label=code(f.p)+' '+PHK(f.k).name; }
+      try{ navigator.vibrate&&navigator.vibrate(30); }catch(_){} S.moving={key, label}; render(); },3000); });
   ROOT.addEventListener('pointermove',e=>{ const b=e.target.closest&&e.target.closest('.m-bar'); if(!hold||!b||!b._xy) return; if(Math.hypot(e.clientX-b._xy[0],e.clientY-b._xy[1])>8){ clearTimeout(hold); hold=null; b.classList.remove('hold'); } });
   const end=e=>{ const b=e.target.closest&&e.target.closest('.m-bar'); clearTimeout(hold); if(b) b.classList.remove('hold');
     if(e.type==='pointerup'&&b&&hold!==null&&!held&&b._xy&&Math.hypot(e.clientX-b._xy[0],e.clientY-b._xy[1])<=8) NDM.openPh(encodeURIComponent(b.dataset.key)); hold=null; };
@@ -422,7 +484,29 @@ const NDM=window.NDM={
   mon(n){ S.cur=new Date(S.cur.getFullYear(), S.cur.getMonth()+n, 1); render(); },
   day(k){ if(S.moving){ return NDM.drop(k); } if(S.day===k){ S.sheet={type:'day'}; renderSheet(); return; } S.day=k; render(); },
   openDay(){ S.sheet={type:'day'}; renderSheet(); },
-  openPh(key){ key=decodeURIComponent(key); const f=findItem(key); if(!f) return; const {p,k}=f;
+  today(){ const d=new Date(); S.cur=new Date(d.getFullYear(), d.getMonth(), 1); S.day=TODAY(); render(); },
+  filt(){ S.sheet={type:'filt'}; renderSheet(); },
+  fl(k){ const L=FL(); L[k]=L[k]===false; setFL(L); render(); },
+  tg(sc,id){ id=decodeURIComponent(id); const L=FL(), m=sc==='team'?'tt':'tags'; L[m]=L[m]||{}; L[m][id]=L[m][id]===false; setFL(L); render(); },
+  openEv(key){ const f=evRaw(key); if(!f||!f.raw) return; const r=f.raw;
+    S.sheet={type:'ev', key, dr:{title:r.title||'', s:r.start, e:r.end&&r.end>=r.start?r.end:r.start, time:r.time||'', endTime:r.endTime||'', note:r.note||'', cat:r.cat||'', tag:r.tag||''}}; renderSheet(); },
+  ev(k,v,quiet){ S.sheet.dr[k]=(k==='cat'||k==='tag')?decodeURIComponent(v):v; if(!quiet) renderSheet(); },
+  evd(f,n){ const d=S.sheet.dr; d[f]=shift(d[f],n); if(d.e<d.s){ if(f==='s') d.e=d.s; else d.s=d.e; } renderSheet(); },
+  async evSave(){ const f=evRaw(S.sheet.key); if(!f||!f.raw) return; const d=S.sheet.dr; if(!String(d.title).trim()){ toastM('ใส่ชื่อก่อน','warn'); return; }
+    const now=new Date().toISOString(), u=CU()||{}, ev={...f.raw, title:String(d.title).trim(), start:d.s, end:d.e, time:d.time||'', endTime:d.endTime||'', note:String(d.note||'').trim(), upd:now, updBy:u.nickname||u.email||''};
+    if(f.sc==='team') ev.cat=d.cat||ev.cat||'other'; else ev.tag=d.tag||ev.tag||'';
+    try{ await DB().ref((f.sc==='team'?'teamcal/events/':'privcal/'+u.uid+'/events/')+ev.id).set(ev); toastM('บันทึกแล้ว'); S.sheet=null; render(); }catch(e){ toastM('บันทึกไม่สำเร็จ: '+e.message,'error'); } },
+  async evDel(){ const f=evRaw(S.sheet.key); if(!f||!f.raw||!confirm('ลบ "'+(f.raw.title||'')+'"?')) return; const u=CU()||{};
+    try{ await DB().ref((f.sc==='team'?'teamcal/events/':'privcal/'+u.uid+'/events/')+f.raw.id).remove(); toastM('ลบแล้ว'); S.sheet=null; render(); }catch(e){ toastM('ลบไม่สำเร็จ','error'); } },
+  async evAdd(){ const el=$('ndm-todo'), v=String(el&&el.value||'').trim(); if(!v){ el&&el.focus(); return; } const db=DB(), u=CU()||{}; if(!db||!u.uid) return;
+    const team=!!($('ndm-add-team')&&$('ndm-add-team').checked), now=new Date().toISOString(), id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    const ev={id, title:v, start:S.day, end:S.day, time:'', endTime:'', note:'', at:now, upd:now, updBy:u.nickname||'', by:u.uid, byName:u.nickname||u.email||''};
+    if(team) ev.cat='other'; else ev.tag=Object.keys(TG('me'))[0]||'';
+    try{ await db.ref((team?'teamcal/events/':'privcal/'+u.uid+'/events/')+id).set(ev); el.value=''; toastM(team?'📢 เพิ่มในปฏิทินทีมแล้ว':'เพิ่มในปฏิทินของฉันแล้ว'); }catch(e){ toastM('บันทึกไม่สำเร็จ: '+e.message,'error'); } },
+  openPh(key){ key=decodeURIComponent(key);
+    if(/^[tm]:/.test(key)) return NDM.openEv(key);
+    if(/^d:/.test(key)) return NDM.todoTog(encodeURIComponent(key.slice(2)));
+    const f=findItem(key); if(!f) return; const {p,k}=f;
     const x=k==='end'?{startDate:p.deadline, deadline:p.deadline, submitTime:dlTime(p)}:((p.phases||{})[k]||{});
     S.sheet={type:'ph', key, dr:{s:dOnly(x.startDate)||dOnly(x.deadline), e:dOnly(x.deadline)||dOnly(x.startDate), t:x.submitTime||'', done:x.status==='done'}}; renderSheet(); },
   dr(f,n){ const d=S.sheet.dr; d[f]=shift(d[f]||TODAY(),n); if(d.e<d.s) (f==='s'?d.e=d.s:d.s=d.e); renderSheet(); },
@@ -441,7 +525,12 @@ const NDM=window.NDM={
       if(w){ w.id=sid; w.status='pending'; w.confirmStatus='none'; delete w.confirmAmount; delete w.confirmSentAt; delete w.confirmRejectReason; delete w.confirmAskAmount; }
       else q.workers.push({id:sid, slot:P.s+'-'+(P.s==='dub'?'main':'only'), amount:0, ratePerUnit:0, unit:'งาน', qty:0, status:'pending', note:'', comment:''}); }), Promise.resolve({ok:false}));
     if(r&&r.ok){ toastM('บันทึกคนทำแล้ว'+(cur.length?'':' · อย่าลืมใส่ค่าจ้าง')); S.sheet=null; render(); } else toastM('บันทึกไม่สำเร็จ','error'); },
-  drop(k){ const mv=S.moving; S.moving=null; const f=findItem(mv.key); if(!f){ render(); return; } const {p,k:ph}=f, x=(p.phases||{})[ph]||{}, oe=dOnly(x.deadline)||dOnly(x.startDate), delta=dd(oe,k);
+  drop(k){ const mv=S.moving; S.moving=null;
+    if(/^[tm]:/.test(mv.key)){ const f=evRaw(mv.key); if(!f||!f.raw){ render(); return; } const r=f.raw, n=dd(r.start,k); if(!n){ render(); return; } const u=CU()||{};
+      const ev={...r, start:shift(r.start,n), end:shift(r.end&&r.end>=r.start?r.end:r.start,n), upd:new Date().toISOString(), updBy:u.nickname||''};
+      DB().ref((f.sc==='team'?'teamcal/events/':'privcal/'+u.uid+'/events/')+r.id).set(ev).then(()=>toastM('ย้าย "'+(r.title||'')+'" ไป '+thD(k)+' แล้ว')).catch(e=>toastM('ย้ายไม่สำเร็จ','error'));
+      S.day=k; render(); return; }
+    const f=findItem(mv.key); if(!f){ render(); return; } const {p,k:ph}=f, x=(p.phases||{})[ph]||{}, oe=dOnly(x.deadline)||dOnly(x.startDate), delta=dd(oe,k);
     if(!delta){ render(); return; } let moved=[];
     writeProj(p.id, q=>{ const y=q.phases[ph]; const o=dOnly(y.deadline)||dOnly(y.startDate); if(y.startDate) y.startDate=shift(y.startDate,delta); y.deadline=shift(o,delta); moved=chain(q,ph,o,delta); }, q=>phFields(q,[ph].concat(moved)))
       .then(r=>done(r,'ย้าย '+mv.label+' ไปส่ง '+thD(k)+' แล้ว'+(moved.length?' · หน้าที่ถัดไปเลื่อนตาม '+moved.length+' อัน':''))); S.day=k; render(); },
@@ -507,7 +596,7 @@ const NDM=window.NDM={
     if(go==='proj'&&pid) openEditProject(decodeURIComponent(pid));
     else if(go==='profile') window.nav('nd-profile'); else if(go==='docs-me') window.nav('nd-docs');
     else if(go) window.nav(go); }catch(e){} },
-  offMode(temp){ try{ sessionStorage.setItem(OFFK,'1'); }catch(e){} if(ROOT) ROOT.style.display='none'; pill(true); document.documentElement.style.overflow=''; },
+  offMode(temp){ try{ sessionStorage.setItem(OFFK,'1'); }catch(e){} document.documentElement.classList.remove('ndm-wait'); if(ROOT) ROOT.style.display='none'; pill(true); document.documentElement.style.overflow=''; },
   onMode(){ try{ sessionStorage.removeItem(OFFK); }catch(e){} pill(false); show(); },
   logout(){ if(!confirm('ออกจากระบบ?')) return; safe(()=>doLogout()); }
 };
@@ -517,15 +606,18 @@ function done(r,msg){ if(r&&r.ok){ toastM(msg); S.sheet=null; render(); } else t
 function pill(on){ let b=$('ndm-pill'); if(!on){ b&&b.remove(); return; } if(b||!small()) return; b=document.createElement('button'); b.id='ndm-pill'; b.textContent='📱 โหมดมือถือ'; b.onclick=()=>NDM.onMode(); document.body.appendChild(b); }
 
 /* ── เริ่มทำงาน ── */
-function show(){ if(!ROOT){ const st=document.createElement('style'); st.id='ndm-css'; st.textContent=CSS; document.head.appendChild(st);
-    ROOT=document.createElement('div'); ROOT.id='ndm'; document.body.appendChild(ROOT); bindHold(); }
+function show(){ if(!ROOT){ ROOT=document.createElement('div'); ROOT.id='ndm'; document.body.appendChild(ROOT); bindHold(); }
   if(!S.tab||!tabsOf().some(x=>x[0]===S.tab)&&S.tab!=='approve') S.tab=tabsOf()[0][0];
-  ROOT.style.display='flex'; render(); }
+  ROOT.style.display='flex'; document.documentElement.classList.remove('ndm-wait'); calAttach(); todoList(); render(); }
 function tick(){ if(!ready()){ if(ROOT&&!CU()){ ROOT.style.display='none'; S.tab=''; } return; }
-  if(!small()){ if(ROOT&&ROOT.style.display!=='none') ROOT.style.display='none'; pill(false); return; }
-  if(off()){ if(ROOT) ROOT.style.display='none'; pill(true); return; }
+  if(!small()){ document.documentElement.classList.remove('ndm-wait'); if(ROOT&&ROOT.style.display!=='none') ROOT.style.display='none'; pill(false); return; }
+  if(off()){ document.documentElement.classList.remove('ndm-wait'); if(ROOT) ROOT.style.display='none'; pill(true); return; }
   if(!ROOT||ROOT.style.display==='none') show(); }
-setInterval(tick, 700); setTimeout(tick, 300);
+{ const st=document.createElement('style'); st.id='ndm-css'; st.textContent=CSS; document.head.appendChild(st); }
+if(small()&&!off()){ document.documentElement.classList.add('ndm-wait');
+  // กันพลาด: ถ้าโหมดมือถือขึ้นไม่ได้ภายใน 8 วิหลังล็อกอิน → โชว์หน้าเว็บปกติ
+  let t0=0; const g=setInterval(()=>{ if(!document.documentElement.classList.contains('ndm-wait')) return clearInterval(g); if(!ready()) return; if(!t0) t0=Date.now(); if(Date.now()-t0>8000&&(!ROOT||ROOT.style.display==='none')){ document.documentElement.classList.remove('ndm-wait'); clearInterval(g); } },500); }
+setInterval(tick, 150);
 window.addEventListener('resize', ()=>setTimeout(tick,100));
 window.addEventListener('guindatachange', e=>{ const k=e&&e.detail&&e.detail.key; if(ROOT&&ROOT.style.display!=='none'&&/projects|staff|docs|mgr_|payroll/.test(String(k||''))) soft(); });
 // เปิดกลับมาที่แท็บ → วาดใหม่ (ข้อมูลอาจเปลี่ยน)
