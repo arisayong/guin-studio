@@ -3,8 +3,9 @@
      · ถ้าเป็นการรีเฟรชจากแถบ "มีเว็บเวอร์ชันใหม่" (URL มี ?v=) → โหลดจากเน็ตก่อนเสมอ
    - version.json / Firebase / API ภายนอก: ไม่แตะ (ไปเน็ตตรง ๆ)
    - ไฟล์ scene/*.js?v=… และรูป: เก็บไว้ในเครื่อง (เลข ?v= เปลี่ยน = ได้ไฟล์ใหม่) */
-const CACHE = 'guin-app-v1';
-const PAGE = './';
+const CACHE = 'guin-app-v2';
+// เก็บหน้าเว็บแยกตามที่อยู่หน้า (ไม่รวม ?v=) · / กับ /index.html = หน้าเดียวกัน
+const pageKey = u => u.origin + u.pathname.replace(/index\.html$/, '');
 
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -27,9 +28,10 @@ self.addEventListener('fetch', e => {
     const fresh = url.searchParams.has('v');
     e.respondWith((async () => {
       const cache = await caches.open(CACHE);
-      const net = fetch(req, { cache: 'no-store' }).then(r => { if (r && r.ok) cache.put(PAGE, r.clone()); return r; });
-      if (fresh) { try { return await net; } catch (_) { return (await cache.match(PAGE)) || Response.error(); } }
-      const hit = await cache.match(PAGE);
+      const key = pageKey(url);
+      const net = fetch(req, { cache: 'no-store' }).then(r => { if (r && r.ok) cache.put(key, r.clone()); return r; });
+      if (fresh) { try { return await net; } catch (_) { return (await cache.match(key)) || Response.error(); } }
+      const hit = await cache.match(key);
       if (hit) { e.waitUntil(net.catch(() => {})); return hit; }
       try { return await net; } catch (_) { return Response.error(); }
     })());

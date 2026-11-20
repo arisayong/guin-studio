@@ -79,12 +79,22 @@ function linkCardHTML(){
   const how=acc?(acc.staffId===ST.staff.id?'ผูกด้วยรหัสสมาชิก':'จับคู่จากอีเมลที่ตรงกัน'):'';
   return `<div class="ndp-card"><div class="ndp-ch"><h3>🔗 บัญชีล็อกอินที่ผูก</h3><span class="muted">ผูกผิดคน → เปลี่ยน/ยกเลิกได้ที่นี่</span></div><div class="ndp-cb">
     ${acc?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><b>${esc(acc.email||acc.uid)}</b><span class="muted">${esc(acc.nickname||'')}${how?' · '+how:''}</span>
-      <button class="btn btn-outline btn-sm" type="button" style="margin-left:auto" onclick="ndUnlinkAcct('${esc(acc.uid)}')">✂️ ยกเลิกผูก</button></div>`
+      <button class="btn btn-outline btn-sm" type="button" style="margin-left:auto" onclick="ndUnlinkAcct('${esc(acc.uid)}')">✂️ ยกเลิกผูก</button></div>
+      ${acc.email?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:-2px 0 10px"><button class="btn btn-blue btn-sm" type="button" onclick="ndSendReset('${esc(acc.email)}')">📧 ส่งลิงก์ตั้งรหัสผ่านใหม่ทางอีเมล</button><span class="muted" style="font-size:11.5px">ระบบส่งอีเมลให้เอง · ลิงก์ใช้ได้ประมาณ 1 ชม. · บอกให้เช็กโฟลเดอร์สแปมด้วย</span></div>`:''}`
       :'<div class="muted" style="margin-bottom:10px">ยังไม่มีบัญชีล็อกอินที่ผูกกับสมาชิกคนนี้</div>'}
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select id="ndp-relink" style="flex:1;min-width:220px"><option value="">— เลือกบัญชี${acc?'ใหม่':''} —</option>${opts}</select>
       <button class="btn btn-blue btn-sm" type="button" onclick="ndRelinkAcct()">🔗 ${acc?'เปลี่ยนเป็นบัญชีนี้':'ผูกบัญชีนี้'}</button></div>
     <div class="muted" style="margin-top:8px;font-size:11.5px">บัญชีที่ผูกจะเห็นงาน ยอดเงิน และข้อมูลส่วนตัวของสมาชิกคนนี้ · บัญชีที่ถูกยกเลิกผูกจะไม่ถูกผูกกลับอัตโนมัติจากอีเมล</div></div></div>`;
 }
+// 📧 แอดมินส่งลิงก์ตั้งรหัสผ่านใหม่ให้สมาชิก (Firebase ส่งอีเมลให้เอง · แอดมินไม่เห็น/ไม่ต้องรู้รหัสใหม่)
+window.ndSendReset=async function(email){
+  if(!email) return; if(!confirm('ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่\n'+email+' ?\n\nเขากดลิงก์ในอีเมลแล้วตั้งรหัสใหม่เองได้เลย (รหัสเดิมจะใช้ไม่ได้หลังตั้งใหม่)')) return;
+  try{ const A=safe(()=>_fbAuth,null); if(!A) throw new Error('ไม่ได้เชื่อมต่อ Firebase');
+    await A.sendPasswordResetEmail(email);
+    try{ logAudit('staff.link', (ST&&ST.staff&&(ST.staff.nickname||ST.staff.name))||email, 'ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ '+email); }catch(e){}
+    toast('📧 ส่งลิงก์ไปที่ '+email+' แล้ว — บอกให้เขาเช็กกล่องจดหมาย (รวมสแปม)','success');
+  }catch(e){ toast('ส่งไม่สำเร็จ: '+(String(e.code||'').includes('user-not-found')?'ไม่พบอีเมลนี้ในระบบล็อกอิน':(e.code||e.message)),'error'); }
+};
 window.ndUnlinkAcct=async function(uid){
   const db=FB(); if(!db||!ST||!ST.staff) return; const uc=ls('mgr_users_cache')||{}; const u=uc[uid]||{};
   if(!confirm('ยกเลิกผูกบัญชี "'+(u.email||uid)+'" ออกจาก "'+(ST.staff.nickname||ST.staff.name)+'"?\n\nบัญชีนี้จะเห็นข้อมูลทีมไม่ได้จนกว่าจะผูกใหม่ · จะไปอยู่ในการ์ด "บัญชีที่ยังไม่ได้ผูก"')) return;
