@@ -75,14 +75,21 @@ function linkCardHTML(){
   const lbl=(uid,u)=>`${u.email||uid}${u.nickname?' · '+u.nickname:''}${u.staffId&&u.staffId!==ST.staff.id?' (ผูกกับ '+nameOf(u.staffId)+' อยู่)':''}`;
   const opts=Object.entries(uc).filter(([uid,u])=>u && u.role!=='admin' && (!acc || uid!==acc.uid))
     .sort((a,b)=>(!!a[1].staffId-!!b[1].staffId) || String(a[1].email||a[0]).localeCompare(String(b[1].email||b[0])))
-    .map(([uid,u])=>`<option value="${esc(uid)}">${esc(lbl(uid,u))}</option>`).join('');
+    .map(([uid,u])=>`<option value="${esc(lbl(uid,u))}"></option>`).join('');
+  // 🔎 อีเมลในโปรไฟล์ / ชื่อ → หาบัญชีที่น่าจะใช่ให้ก่อน (ไม่ต้องไล่หาเอง)
+  const pe=String(ST.staff.email||'').trim().toLowerCase(), nk=String(ST.staff.nickname||'').trim().toLowerCase().split(/[\/\s]/)[0];
+  const sug=acc?[]:Object.entries(uc).filter(([uid,u])=>u&&u.role!=='admin'&&((pe&&String(u.email||'').toLowerCase()===pe)||(nk&&nk.length>1&&String(u.nickname||'').toLowerCase().includes(nk)))).slice(0,4);
+  const peHas=pe&&Object.values(uc).some(u=>u&&String(u.email||'').toLowerCase()===pe);
   const how=acc?(acc.staffId===ST.staff.id?'ผูกด้วยรหัสสมาชิก':'จับคู่จากอีเมลที่ตรงกัน'):'';
   return `<div class="ndp-card"><div class="ndp-ch"><h3>🔗 บัญชีล็อกอินที่ผูก</h3><span class="muted">ผูกผิดคน → เปลี่ยน/ยกเลิกได้ที่นี่</span></div><div class="ndp-cb">
     ${acc?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><b>${esc(acc.email||acc.uid)}</b><span class="muted">${esc(acc.nickname||'')}${how?' · '+how:''}</span>
       <button class="btn btn-outline btn-sm" type="button" style="margin-left:auto" onclick="ndUnlinkAcct('${esc(acc.uid)}')">✂️ ยกเลิกผูก</button></div>
       ${acc.email?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:-2px 0 10px"><button class="btn btn-blue btn-sm" type="button" onclick="ndSendReset('${esc(acc.email)}')">📧 ส่งลิงก์ตั้งรหัสผ่านใหม่ทางอีเมล</button><span class="muted" style="font-size:11.5px">ระบบส่งอีเมลให้เอง · ลิงก์ใช้ได้ประมาณ 1 ชม. · บอกให้เช็กโฟลเดอร์สแปมด้วย</span></div>`:''}`
-      :'<div class="muted" style="margin-bottom:10px">ยังไม่มีบัญชีล็อกอินที่ผูกกับสมาชิกคนนี้</div>'}
-    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select id="ndp-relink" style="flex:1;min-width:220px"><option value="">— เลือกบัญชี${acc?'ใหม่':''} —</option>${opts}</select>
+      :`<div class="muted" style="margin-bottom:8px">ยังไม่มีบัญชีล็อกอินที่ผูกกับสมาชิกคนนี้</div>
+        ${sug.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><span class="muted" style="font-size:12px">น่าจะใช่:</span>${sug.map(([uid,u])=>`<button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('ndp-relink').value=this.dataset.v" data-v="${esc(lbl(uid,u))}">${esc((u.email||uid)+(u.nickname?' · '+u.nickname:''))}</button>`).join('')}</div>`:''}
+        ${pe&&!peHas?`<div style="font-size:12.5px;margin-bottom:8px;padding:8px 10px;border-radius:8px;background:rgba(255,158,0,.1);color:var(--orange)">⚠️ อีเมลในโปรไฟล์ <b>${esc(pe)}</b> ยังไม่มีบัญชีล็อกอินในเว็บ — เขายังไม่ได้สมัคร (หรือสมัครด้วยอีเมลอื่น) · ให้เขากด "สมัครสมาชิก" ที่หน้าเว็บด้วยอีเมลนี้ แล้วระบบจะผูกให้เอง</div>`:''}
+        ${pe?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><button class="btn btn-outline btn-sm" type="button" onclick="ndSendReset('${esc(pe)}')">📧 ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ ${esc(pe)}</button><span class="muted" style="font-size:11.5px">ใช้ได้เมื่อเขาเคยสมัครด้วยอีเมลนี้</span></div>`:''}`}
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input id="ndp-relink" list="ndp-relink-dl" autocomplete="off" placeholder="🔍 พิมพ์อีเมล หรือชื่อเล่น เพื่อค้นหาบัญชี${acc?'ใหม่':''}" style="flex:1;min-width:220px;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:Kanit;font-size:13px"><datalist id="ndp-relink-dl">${opts}</datalist>
       <button class="btn btn-blue btn-sm" type="button" onclick="ndRelinkAcct()">🔗 ${acc?'เปลี่ยนเป็นบัญชีนี้':'ผูกบัญชีนี้'}</button></div>
     <div class="muted" style="margin-top:8px;font-size:11.5px">บัญชีที่ผูกจะเห็นงาน ยอดเงิน และข้อมูลส่วนตัวของสมาชิกคนนี้ · บัญชีที่ถูกยกเลิกผูกจะไม่ถูกผูกกลับอัตโนมัติจากอีเมล</div></div></div>`;
 }
@@ -106,7 +113,11 @@ window.ndUnlinkAcct=async function(uid){
   }catch(e){ toast('ยกเลิกผูกไม่สำเร็จ: '+e.message,'error'); }
 };
 window.ndRelinkAcct=async function(){
-  const db=FB(); if(!db||!ST||!ST.staff) return; const sel=$('ndp-relink'), uid=sel&&sel.value;
+  const db=FB(); if(!db||!ST||!ST.staff) return; const sel=$('ndp-relink'), raw=String(sel&&sel.value||'').trim(), uc0=ls('mgr_users_cache')||{};
+  // ช่องค้นหา: รับได้ทั้งข้อความเต็มจากรายการ / อีเมล / uid
+  const em=(raw.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i)||[''])[0].toLowerCase();
+  const uid=uc0[raw]?raw:(Object.entries(uc0).find(([k,u])=>u&&em&&String(u.email||'').toLowerCase()===em)||[''])[0];
+  if(raw&&!uid){ toast('ไม่พบบัญชีนี้ — เลือกจากรายการที่ขึ้นตอนพิมพ์','warn'); return; }
   if(!uid){ toast('เลือกบัญชีก่อน','info'); return; }
   const uc=ls('mgr_users_cache')||{}, u=uc[uid]||{}, old=ST.acct, nm=ST.staff.nickname||ST.staff.name;
   const other=u.staffId&&u.staffId!==ST.staff.id?safe(()=>getStaffById(u.staffId),null):null;
